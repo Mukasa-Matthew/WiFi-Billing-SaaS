@@ -1,0 +1,52 @@
+# ==============================================================================
+# WiFi-Billing-SaaS Root .gitignore
+# ==============================================================================
+
+# Secrets & Environment Configurations (NEVER COMMIT CREDENTIALS)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+*db.env*
+
+# Local Unprivileged PostgreSQL Development Data Directory
+.pgdata/
+
+# Java / Spring Boot / Maven
+backend/target/
+backend/.mvn/wrapper/maven-wrapper.jar
+*.class
+*.log
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+hs_err_pid*
+replay_pid*
+
+# Node.js / React / Vite
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+frontend/.vite/
+*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# IDEs & Editors
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+.DS_Store
+Thumbs.db

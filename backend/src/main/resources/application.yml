@@ -1,0 +1,47 @@
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    session:
+      timeout: 8h
+      cookie:
+        name: WIFISESSIONID
+        http-only: true
+        same-site: lax
+
+spring:
+  application:
+    name: wifi-billing-backend
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://127.0.0.1:5435/wifi_app_dev}
+    username: ${DB_USER:wifi_app_user}
+    password: ${DB_PASSWORD:local_dev_password_2026}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: false
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
+    locations: classpath:db/migration
+
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
+  infrastructure:
+    provisioning-base-url: ${PROVISIONING_BASE_URL:http://127.0.0.1:18085}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when_authorized
