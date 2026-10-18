@@ -11,7 +11,21 @@ if (!configuredBaseUrl) {
   );
 }
 
-export const API_BASE_URL = configuredBaseUrl.replace(/\/+$/, '');
+function resolveApiBaseUrl(rawUrl: string): string {
+  const trimmed = rawUrl.replace(/\/+$/, '');
+  if (typeof window !== 'undefined') {
+    const pageHost = window.location.hostname;
+    if (pageHost === '127.0.0.1' && trimmed.includes('://localhost:')) {
+      return trimmed.replace('://localhost:', '://127.0.0.1:');
+    }
+    if (pageHost === 'localhost' && trimmed.includes('://127.0.0.1:')) {
+      return trimmed.replace('://127.0.0.1:', '://localhost:');
+    }
+  }
+  return trimmed;
+}
+
+export const API_BASE_URL = resolveApiBaseUrl(configuredBaseUrl);
 
 export interface SessionUser {
   userId: number;
