@@ -1,0 +1,13 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8080
+    container_name: frontend-ui
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "3000:3000"
