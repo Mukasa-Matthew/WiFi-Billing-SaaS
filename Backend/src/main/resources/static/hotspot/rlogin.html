@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<!-- sopraent-rlogin-version: sopraent-rlogin-2026-08-23.1 -->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <meta http-equiv="pragma" content="no-cache">
+    <meta http-equiv="expires" content="-1">
+    <title>Connecting…</title>
+    <noscript>
+        <meta http-equiv="refresh" content="0; url=https://calton.sopraent.com/hotspot?router=1215&amp;mac=$(mac)&amp;ip=$(ip)&amp;link-login-only=$(link-login-only)&amp;link-orig=$(link-orig)">
+    </noscript>
+    <style>
+        :root {
+            --color-deep: #0A0F1C;
+            --color-navy: #0F172A;
+            --color-slate: #1E293B;
+            --color-muted: #64748B;
+            --color-light: #CBD5E1;
+            --color-white: #F8FAFC;
+            --color-blue: #3B82F6;
+            --color-cyan: #06B6D4;
+            --color-indigo: #6366F1;
+            --color-emerald: #10B981;
+            --color-amber: #F59E0B;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: var(--color-deep);
+            color: var(--color-light);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            position: relative;
+            overflow: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Gradient orbs */
+        .orb { position: fixed; border-radius: 50%; filter: blur(120px); opacity: 0.18; pointer-events: none; z-index: 0; }
+        .orb-1 { width: 500px; height: 500px; background: var(--color-blue); top: -200px; right: -100px; animation: float-orb 20s ease-in-out infinite; }
+        .orb-2 { width: 400px; height: 400px; background: var(--color-cyan); bottom: -150px; left: -100px; animation: float-orb 25s ease-in-out infinite reverse; }
+        .orb-3 { width: 300px; height: 300px; background: var(--color-indigo); top: 50%; left: 20%; transform: translate(-50%, -50%); animation: float-orb 30s ease-in-out infinite; }
+        @keyframes float-orb {
+            0%, 100% { transform: translate(0, 0); }
+            33% { transform: translate(30px, -30px); }
+            66% { transform: translate(-20px, 20px); }
+        }
+
+        /* Network grid */
+        .network-bg {
+            position: fixed; inset: 0; z-index: 0; opacity: 0.25; pointer-events: none;
+            background-image:
+                linear-gradient(var(--color-slate) 0.5px, transparent 0.5px),
+                linear-gradient(90deg, var(--color-slate) 0.5px, transparent 0.5px);
+            background-size: 44px 44px;
+            mask-image: radial-gradient(circle at 50% 42%, #000 0%, transparent 78%);
+            -webkit-mask-image: radial-gradient(circle at 50% 42%, #000 0%, transparent 78%);
+        }
+
+        .container {
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.6), rgba(15, 23, 42, 0.8));
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 28px;
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.5);
+            max-width: 440px;
+            width: 100%;
+            padding: 48px 40px;
+            text-align: center;
+            position: relative;
+            z-index: 1;
+            animation: slideUp 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(40px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* WiFi icon */
+        .wifi-container { width: 120px; height: 120px; margin: 0 auto 28px; position: relative; display: flex; align-items: center; justify-content: center; }
+        .wifi-bg {
+            position: absolute; width: 100%; height: 100%;
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.14), rgba(6, 182, 212, 0.12));
+            border-radius: 50%; border: 1px solid rgba(16, 185, 129, 0.28);
+        }
+        .wifi-icon { position: relative; width: 60px; height: 60px; }
+        .wifi-wave {
+            position: absolute; border: 3px solid var(--color-muted); border-radius: 50%;
+            border-bottom-color: transparent; border-left-color: transparent;
+            transform: rotate(-45deg); opacity: 0.3; left: 50%; bottom: 8px;
+        }
+        .wifi-wave-1 { width: 24px; height: 24px; margin-left: -12px; animation: wavePulse 2s ease-in-out infinite; animation-delay: 0s; }
+        .wifi-wave-2 { width: 40px; height: 40px; margin-left: -20px; animation: wavePulse 2s ease-in-out infinite; animation-delay: 0.2s; }
+        .wifi-wave-3 { width: 56px; height: 56px; margin-left: -28px; animation: wavePulse 2s ease-in-out infinite; animation-delay: 0.4s; }
+        .wifi-dot {
+            position: absolute; width: 10px; height: 10px; background: var(--color-emerald); border-radius: 50%;
+            bottom: 4px; left: 50%; margin-left: -5px; animation: dotPulse 2s ease-in-out infinite;
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.7);
+        }
+        @keyframes wavePulse {
+            0%, 100% { opacity: 0.25; border-color: var(--color-muted); border-bottom-color: transparent; border-left-color: transparent; }
+            50% { opacity: 0.75; border-color: var(--color-emerald); border-bottom-color: transparent; border-left-color: transparent; }
+        }
+        @keyframes dotPulse {
+            0%, 100% { transform: scale(1); background: var(--color-emerald); }
+            50% { transform: scale(1.25); background: #34D399; }
+        }
+
+        .status-badge {
+            display: inline-flex; align-items: center; gap: 8px;
+            background: rgba(16, 185, 129, 0.12);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: #6EE7B7;
+            padding: 7px 14px; border-radius: 99px;
+            font-size: 12.5px; font-weight: 600; letter-spacing: 0.02em;
+            margin-bottom: 20px;
+        }
+        .status-badge .pip { width: 7px; height: 7px; border-radius: 50%; background: var(--color-emerald); box-shadow: 0 0 10px rgba(16,185,129,0.7); animation: blink 1.4s ease-in-out infinite; }
+
+        .message { font-size: 14.5px; font-weight: 500; color: var(--color-light); line-height: 1.5; margin-bottom: 24px; }
+
+        .loader { display: flex; justify-content: center; gap: 9px; }
+        .loader span { width: 9px; height: 9px; border-radius: 50%; animation: bounce 1.4s ease-in-out infinite both; }
+        .loader span:nth-child(1) { background: var(--color-blue); animation-delay: -0.32s; }
+        .loader span:nth-child(2) { background: var(--color-cyan); animation-delay: -0.16s; }
+        .loader span:nth-child(3) { background: var(--color-indigo); }
+        @keyframes bounce { 0%, 80%, 100% { transform: translateY(0); opacity: 0.4; } 40% { transform: translateY(-9px); opacity: 1; } }
+        @keyframes blink { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+
+        .powered {
+            margin-top: 28px; font-size: 12px; font-weight: 600; letter-spacing: 0.04em;
+            color: var(--color-muted);
+        }
+        .powered b { color: var(--color-light); font-weight: 700; }
+
+        .portal-context { display: none; }
+
+        @media (prefers-reduced-motion: reduce) {
+            .orb, .container, .wifi-wave, .wifi-dot, .loader span, .status-badge .pip { animation: none !important; }
+            .wifi-wave { opacity: 0.5; border-color: var(--color-cyan); }
+        }
+    </style>
+</head>
+<body>
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+    <div class="network-bg"></div>
+
+    <div class="container">
+        <div class="wifi-container" aria-hidden="true">
+            <div class="wifi-bg"></div>
+            <div class="wifi-icon">
+                <div class="wifi-wave wifi-wave-3"></div>
+                <div class="wifi-wave wifi-wave-2"></div>
+                <div class="wifi-wave wifi-wave-1"></div>
+                <div class="wifi-dot"></div>
+            </div>
+        </div>
+
+        <span class="status-badge"><span class="pip"></span>One moment</span>
+
+        <p class="message">Taking you to the available plans. This only takes a moment.</p>
+
+        <div class="loader" aria-hidden="true"><span></span><span></span><span></span></div>
+
+        <div class="powered">Powered by <b>SopraEnt</b></div>
+    </div>
+
+    <form id="portal-context" class="portal-context" action="https://calton.sopraent.com/hotspot" method="get">
+        <input type="hidden" name="router" value="1215">
+        <input type="hidden" name="mac" value="$(mac)">
+        <input type="hidden" name="ip" value="$(ip)">
+        <input type="hidden" name="username" value="$(username)">
+        <input type="hidden" name="link-login-only" value="$(link-login-only)">
+        <input type="hidden" name="link-orig" value="$(link-orig)">
+        <input type="hidden" name="error" value="$(error)">
+    </form>
+
+    <script>
+        setTimeout(function () {
+            document.getElementById('portal-context').submit();
+        }, 300);
+    </script>
+</body>
+</html>

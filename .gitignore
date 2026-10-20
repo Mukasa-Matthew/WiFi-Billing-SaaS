@@ -5,43 +5,46 @@
 # Secrets & Environment Configurations (NEVER COMMIT CREDENTIALS)
 .env
 .env.*
+*.env
+*.env.*
 !.env.example
+!*.env.example
 *.pem
 *.key
 *.p12
 *.jks
 *db.env*
 
-# Local Unprivileged PostgreSQL Development Data Directory
+# Local PostgreSQL Development Data Directory
 .pgdata/
 
-# Java / Spring Boot / Maven
+# Backend (Java / Spring Boot / Maven)
+Backend/target/
 backend/target/
+Backend/.mvn/wrapper/maven-wrapper.jar
 backend/.mvn/wrapper/maven-wrapper.jar
 *.class
 *.log
 *.jar
 *.war
-*.nar
-*.ear
-*.zip
-*.tar.gz
-*.rar
 hs_err_pid*
 replay_pid*
 
-# Node.js / React / Vite
+# Frontend (Next.js / React)
+Frontend/.next/
+frontend/.next/
+Frontend/out/
+frontend/out/
+Frontend/node_modules/
 frontend/node_modules/
-frontend/dist/
-frontend/dist-ssr/
-frontend/.vite/
+Frontend/.turbo/
+frontend/.turbo/
 *.local
 npm-debug.log*
 yarn-debug.log*
-yarn-error.log*
 pnpm-debug.log*
 
-# IDEs & Editors
+# IDEs & System
 .idea/
 *.iml
 .vscode/
