@@ -2,13 +2,14 @@ package com.wifibilling;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration;
 
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 
-@SpringBootApplication
+@SpringBootApplication(exclude = UserDetailsServiceAutoConfiguration.class)
 public class ApiApplication {
 
 	static {
@@ -25,6 +26,9 @@ public class ApiApplication {
 	 * both during tests and runtime.
 	 */
 	public static void loadDotenv() {
+		if (Boolean.getBoolean("app.dotenv.disabled")) {
+			return;
+		}
 		String[] candidatePaths = {
 			".env",
 			"Backend/.env",

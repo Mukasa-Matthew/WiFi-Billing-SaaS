@@ -63,6 +63,22 @@ class PortalControllerTest {
     }
 
     @Test
+    void portalExcludesHiddenAndDisabledAndPrioritizesFeatured() {
+        Tenant tenant = Tenant.builder().id(10L).build();
+        when(routerRepository.findByToken("tok_A1234567")).thenReturn(Optional.of(
+                Router.builder().tenant(tenant).build()));
+        PackagePlan normal = PackagePlan.builder().id(1L).price(BigDecimal.ONE).build();
+        PackagePlan hidden = PackagePlan.builder().id(2L).price(BigDecimal.ONE).availability("HIDDEN").build();
+        PackagePlan disabled = PackagePlan.builder().id(3L).price(BigDecimal.ONE).availability("DISABLED").build();
+        PackagePlan featured = PackagePlan.builder().id(4L).price(BigDecimal.TEN).featured(true).build();
+        when(packagePlanRepository.findAllByTenantIdOrderByPriceAsc(10L))
+                .thenReturn(List.of(normal, hidden, disabled, featured));
+        var result = controller.getPackages("tok_A1234567");
+        assertEquals(List.of(4L, 1L), result.stream().map(PortalPackageResponse::id).toList());
+        assertTrue(result.getFirst().featured());
+    }
+
+    @Test
     void getPackages_ThrowsNotFoundForInvalidOrMissingToken() {
         when(routerRepository.findByToken("tok_INVALID123")).thenReturn(Optional.empty());
 

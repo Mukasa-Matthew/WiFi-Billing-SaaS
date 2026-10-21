@@ -7,14 +7,25 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 
 @RestController
 @RequestMapping("/api/payments")
-@RequiredArgsConstructor
 public class PaymentController {
 
     private final PaymentService paymentService;
+    private final String webhookSecret;
+
+    public PaymentController(
+            PaymentService paymentService,
+            @Value("${payment.webhook.secret:}") String webhookSecret) {
+        this.paymentService = paymentService;
+        this.webhookSecret = webhookSecret;
+    }
 
     @PostMapping(value = "/initiate", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(HttpStatus.ACCEPTED)
@@ -23,7 +34,17 @@ public class PaymentController {
     }
 
     @PostMapping(value = "/webhook", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<Void> webhook(@Valid @RequestBody PaymentDto.WebhookRequest body) {
+    public ResponseEntity<Void> webhook(
+            @RequestHeader(value = "X-Webhook-Secret", required = false) String suppliedSecret,
+            @Valid @RequestBody PaymentDto.WebhookRequest body) {
+        if (webhookSecret.isBlank()) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
+        }
+        if (suppliedSecret == null || !MessageDigest.isEqual(
+                webhookSecret.getBytes(StandardCharsets.UTF_8),
+                suppliedSecret.getBytes(StandardCharsets.UTF_8))) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
         paymentService.processWebhook(body);
         return ResponseEntity.ok().build();
     }

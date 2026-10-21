@@ -36,6 +36,18 @@ public class Router {
     @Column(name = "radius_secret", nullable = false, length = 64)
     private String radiusSecret;
 
+    @Column(name = "wan_interface", length = 32)
+    @Builder.Default
+    private String wanInterface = "ether1";
+
+    @Column(name = "hotspot_interfaces", length = 255)
+    @Builder.Default
+    private String hotspotInterfaces = "ether2,ether3,ether4,ether5,wlan1";
+
+    @Column(name = "wifi_ssid", length = 32)
+    @Builder.Default
+    private String wifiSsid = "WiFi Hotspot";
+
     @Column(length = 20)
     @Builder.Default
     private String status = "pending";
@@ -57,6 +69,11 @@ public class Router {
 
     @Column(name = "last_seen")
     private OffsetDateTime lastSeen;
+
+    @Column(length=64) private String bindingsHash;
+    private OffsetDateTime bindingsSyncedAt;
+    @Column(length=12000) private String hostsJson;
+    private OffsetDateTime hostsSeenAt;
 
     @Column(name = "created_at")
     @Builder.Default

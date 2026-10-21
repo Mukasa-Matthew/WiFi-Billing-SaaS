@@ -1,0 +1,34 @@
+#!/bin/sh
+set -eu
+
+# This command is forced by authorized_keys. Only the two peer operations used
+# by the billing backend are accepted; no interactive shell is available.
+set -- ${SSH_ORIGINAL_COMMAND:-}
+test "${1:-}" = "wifi-wg-peer"
+test "${2:-}" = "set"
+test "${3:-}" = "wg0"
+test "${4:-}" = "peer"
+
+key=${5:-}
+action=${6:-}
+value=${7:-}
+
+case "$key" in
+  *[!A-Za-z0-9+/=]*|'') exit 64 ;;
+esac
+test "${#key}" -le 64
+
+case "$action" in
+  allowed-ips)
+    case "$value" in
+      10.9.*.*/32) ;;
+      *) exit 64 ;;
+    esac
+    exec sudo -n /usr/bin/wg set wg0 peer "$key" allowed-ips "$value"
+    ;;
+  remove)
+    test -z "$value"
+    exec sudo -n /usr/bin/wg set wg0 peer "$key" remove
+    ;;
+  *) exit 64 ;;
+esac

@@ -7,5 +7,5 @@ public record PortalPackageResponse(
         String name,
         BigDecimal price,
         String rateLimit,
-        Integer sessionTimeout) {
+        Integer sessionTimeout, Boolean featured) {
 }

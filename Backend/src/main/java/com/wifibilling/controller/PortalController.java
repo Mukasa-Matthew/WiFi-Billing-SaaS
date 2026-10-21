@@ -40,12 +40,16 @@ public class PortalController {
         List<PackagePlan> plans = packagePlanRepository.findAllByTenantIdOrderByPriceAsc(router.getTenant().getId());
 
         return plans.stream()
+                .filter(p -> "ACTIVE".equals(p.effectiveAvailability()))
+                .sorted(java.util.Comparator.<PackagePlan, Boolean>comparing(p -> !Boolean.TRUE.equals(p.getFeatured()))
+                        .thenComparing(PackagePlan::getPrice)
+                        .thenComparing(p -> p.getDisplayOrder() == null ? 0 : p.getDisplayOrder()))
                 .map(p -> new PortalPackageResponse(
                         p.getId(),
                         p.getName(),
                         p.getPrice(),
                         p.getRateLimit(),
-                        p.getSessionTimeout()))
+                        p.getSessionTimeout(), Boolean.TRUE.equals(p.getFeatured())))
                 .toList();
     }
 

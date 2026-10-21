@@ -36,7 +36,7 @@ export default function LoginPage() {
           setError(axErr.response?.data?.message || "Failed to connect to authentication server.");
         }
       } else {
-        setError("Network error: Could not reach backend server at localhost:8080");
+        setError("Network error: Could not reach the server. Please try again.");
       }
     } finally {
       setLoading(false);

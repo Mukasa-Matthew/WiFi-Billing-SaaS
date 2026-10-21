@@ -25,7 +25,7 @@ class PaymentControllerTest {
 
     @BeforeEach
     void setUp() {
-        controller = new PaymentController(paymentService);
+        controller = new PaymentController(paymentService, "test-webhook-secret");
     }
 
     @Test
@@ -43,10 +43,20 @@ class PaymentControllerTest {
     @Test
     void webhook_DelegatesToService() {
         PaymentDto.WebhookRequest req = new PaymentDto.WebhookRequest("PAY-123", "SUCCESSFUL", "EXT-123", null);
-        ResponseEntity<Void> response = controller.webhook(req);
+        ResponseEntity<Void> response = controller.webhook("test-webhook-secret", req);
 
         assertEquals(200, response.getStatusCode().value());
         verify(paymentService).processWebhook(req);
+    }
+
+    @Test
+    void webhook_RejectsInvalidSecret() {
+        PaymentDto.WebhookRequest req = new PaymentDto.WebhookRequest("PAY-123", "SUCCESSFUL", "EXT-123", null);
+
+        ResponseEntity<Void> response = controller.webhook("wrong-secret", req);
+
+        assertEquals(401, response.getStatusCode().value());
+        verifyNoInteractions(paymentService);
     }
 
     @Test

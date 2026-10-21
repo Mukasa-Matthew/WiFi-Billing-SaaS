@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+
+exec /usr/bin/ssh \
+  -o BatchMode=yes \
+  -o IdentitiesOnly=yes \
+  -o StrictHostKeyChecking=yes \
+  -i /home/matthew/.ssh/wifi_hub_ed25519 \
+  matthew@100.88.129.17 wifi-wg-peer "$@"

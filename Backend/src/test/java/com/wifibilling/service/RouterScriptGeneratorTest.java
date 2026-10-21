@@ -2,6 +2,7 @@ package com.wifibilling.service;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -13,7 +14,8 @@ class RouterScriptGeneratorTest {
 
     private String render(String secret) {
         return generator.generate(new RouterScriptGenerator.ScriptContext(
-                "Cafe \"Main\"", "tok_ABC123xyz", "10.9.0.5", 16,
+                "Cafe \"Main\"", "ether1", List.of("ether2", "ether3", "wlan1"), "Cafe WiFi",
+                "tok_ABC123xyz", "10.9.0.5", 16,
                 secret, "10.9.0.1",
                 "yoay+E/LyCqRq0xxqsIRJdRoqe8XjRVmkMe3nDx5wEc=", "203.0.113.10", 443, "10.9.0.0/16",
                 "http://203.0.113.10:8080", Set.of("203.0.113.10"), Set.of("momo.mtn.com")));
@@ -23,13 +25,18 @@ class RouterScriptGeneratorTest {
     void rendersCoreSectionsRouterOsV7() {
         String s = render("s3cret");
         System.out.println(s);
+        assertTrue(s.contains("/interface/bridge add name=\"wb-hotspot-bridge\""));
+        assertTrue(s.contains("/ip/dhcp-server add name=\"wb-hotspot-dhcp\""));
+        assertTrue(s.contains("/ip/firewall/nat add chain=srcnat out-interface=\"ether1\" action=masquerade"));
+        assertTrue(s.contains("ssid=\\\"Cafe WiFi\\\""));
+        assertTrue(s.contains("/ip/hotspot add name=\"wb-hotspot\""));
         assertTrue(s.contains("/interface/wireguard add name=\"wg-billing\" listen-port=13231 mtu=1420"));
         assertTrue(s.contains("/interface/wireguard/peers add interface=\"wg-billing\" public-key=\"yoay+E/LyCqRq0xxqsIRJdRoqe8XjRVmkMe3nDx5wEc=\""));
         assertTrue(s.contains("endpoint-address=\"203.0.113.10\" endpoint-port=443 allowed-address=10.9.0.0/16 persistent-keepalive=25s"));
         assertTrue(s.contains("/ip/address add address=10.9.0.5/16 interface=\"wg-billing\""));
         assertTrue(s.contains("/radius add address=10.9.0.1 secret=\"s3cret\" service=hotspot,login src-address=10.9.0.5 timeout=3s"));
         assertTrue(s.contains("/radius/incoming/set accept=yes port=3799"));
-        assertTrue(s.contains("/ip/hotspot/profile/set [find] use-radius=yes radius-accounting=yes radius-interim-update=2m html-directory=flash/hotspot"));
+        assertTrue(s.contains("/ip/hotspot/profile add name=\"wb-hotspot-profile\""));
         assertTrue(s.contains("/file add name=flash/hotspot/login.html"));
         assertTrue(s.contains("dst-path=\"flash/hotspot/login.html\""));
         assertTrue(s.contains("/ip/hotspot/walled-garden/ip add action=accept dst-address=203.0.113.10"));
@@ -49,9 +56,16 @@ class RouterScriptGeneratorTest {
     @Test
     void newlineInRouterNameCannotInjectCommands() {
         String s = generator.generate(new RouterScriptGenerator.ScriptContext(
-                "evil\n/system reset-configuration", "tok_ABC123xyz", "10.9.0.5", 16,
+                "evil\n/system reset-configuration", "ether1", List.of("ether2"), "Cafe WiFi",
+                "tok_ABC123xyz", "10.9.0.5", 16,
                 "x", "10.9.0.1", "yoay+E/LyCqRq0xxqsIRJdRoqe8XjRVmkMe3nDx5wEc=", "203.0.113.10", 443,
                 "10.9.0.0/16", "http://203.0.113.10:8080", Set.of(), Set.of()));
         assertFalse(s.contains("\n/system reset-configuration"));
+    }
+
+    @Test
+    void newlineInQuotedValueCannotInjectCommands() {
+        assertFalse(RouterScriptGenerator.q("Cafe\n/system reset-configuration")
+                .contains("\n/system reset-configuration"));
     }
 }

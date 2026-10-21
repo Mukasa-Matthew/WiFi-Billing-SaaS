@@ -24,6 +24,8 @@ public interface RouterRepository extends JpaRepository<Router, Long> {
 
     List<Router> findAllByTenantId(Long tenantId);
 
+    Optional<Router> findByIdAndTenantId(Long id, Long tenantId);
+
     /** Routers that have completed the WireGuard key handshake (used to re-sync hub peers on startup). */
     List<Router> findAllByWgPublicKeyIsNotNull();
 

@@ -13,5 +13,7 @@ public record VoucherResponse(
         String claimedMac,
         OffsetDateTime firstLogin,
         OffsetDateTime expiresAt,
-        OffsetDateTime createdAt) {
+        OffsetDateTime createdAt,
+        Long customerId, String customerName, String customerPhone,
+        String batchReference, String saleType, String delivery, Boolean archived) {
 }
