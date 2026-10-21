@@ -69,6 +69,19 @@ class PaymentServiceTest {
     }
 
     @Test
+    void hiddenAndDisabledPlansRejectNewPayments() {
+        when(routerRepository.findByToken("tok_valid123456")).thenReturn(Optional.of(router));
+        when(packagePlanRepository.findByIdAndTenantId(100L, 1L)).thenReturn(Optional.of(packagePlan));
+        for (String availability : java.util.List.of("HIDDEN", "DISABLED")) {
+            packagePlan.setAvailability(availability);
+            var request = new PaymentDto.InitiateRequest("tok_valid123456", 100L, "256771234567", null);
+            assertEquals(HttpStatus.CONFLICT, assertThrows(ResponseStatusException.class,
+                    () -> paymentService.initiatePayment(request)).getStatusCode());
+        }
+        verifyNoInteractions(gatewayClient);
+    }
+
+    @Test
     void initiatePayment_Success() {
         when(routerRepository.findByToken("tok_valid123456")).thenReturn(Optional.of(router));
         when(packagePlanRepository.findByIdAndTenantId(100L, 1L)).thenReturn(Optional.of(packagePlan));
@@ -120,7 +133,7 @@ class PaymentServiceTest {
 
         VoucherResponse vResp = new VoucherResponse(
                 1L, "VOUCH999", "unused", 100L, "1 Hour",
-                new BigDecimal("1000.00"), null, null, null, OffsetDateTime.now()
+                new BigDecimal("1000.00"), null, null, null, OffsetDateTime.now(), null, null, null, null, "ONLINE", "MANUAL", false
         );
         when(voucherService.generate(eq(1L), any(GenerateVouchersRequest.class))).thenReturn(List.of(vResp));
 

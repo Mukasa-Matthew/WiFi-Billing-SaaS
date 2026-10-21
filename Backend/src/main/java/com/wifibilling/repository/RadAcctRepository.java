@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -14,6 +15,21 @@ public interface RadAcctRepository extends JpaRepository<RadAcct, Long> {
 
     /** Find all active (open) accounting sessions for a username. */
     List<RadAcct> findAllByUsernameAndAcctStopTimeIsNull(String username);
+
+    /** Find all active (open) accounting sessions across the platform. */
+    List<RadAcct> findAllByAcctStopTimeIsNullOrderByAcctStartTimeDesc();
+
+    /** Find active accounting sessions for a specific set of usernames (scoped to a tenant's vouchers). */
+    List<RadAcct> findAllByUsernameInAndAcctStopTimeIsNullOrderByAcctStartTimeDesc(Collection<String> usernames);
+
+    /** Find recent accounting sessions for a specific set of usernames. */
+    List<RadAcct> findTop100ByUsernameInOrderByAcctStartTimeDesc(Collection<String> usernames);
+
+    /** Find recent accounting sessions across the platform. */
+    List<RadAcct> findTop100ByOrderByAcctStartTimeDesc();
+
+    /** Find all accounting records for a set of usernames. */
+    List<RadAcct> findAllByUsernameIn(Collection<String> usernames);
 
     /** Find the earliest start time recorded for a username to stamp first_login. */
     @Query("SELECT r FROM RadAcct r WHERE r.username = :username ORDER BY r.acctStartTime ASC LIMIT 1")

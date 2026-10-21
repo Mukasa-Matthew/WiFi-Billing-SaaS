@@ -45,6 +45,7 @@ public class VoucherService {
     private final RadCheckRepository radCheckRepository;
     private final RadReplyRepository radReplyRepository;
     private final VoucherExpirationWorker expirationWorker;
+    private final CustomerRepository customerRepository;
 
     @Transactional
     public List<VoucherResponse> generate(Long tenantId, GenerateVouchersRequest req) {
@@ -53,15 +54,18 @@ public class VoucherService {
         PackagePlan plan = packagePlanRepository.findByIdAndTenantId(req.packageId(), tenant.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Package not found for tenant"));
 
+        String batchReference = req.batchReference() == null || req.batchReference().isBlank()
+                ? "BATCH-" + java.util.UUID.randomUUID().toString().substring(0, 8).toUpperCase() : req.batchReference().trim();
         Set<String> batch = new HashSet<>();
         List<VoucherResponse> created = new ArrayList<>(req.count());
         for (int i = 0; i < req.count(); i++) {
-            String code = uniqueCode(batch);
+            String code = uniqueCode(batch, req);
             Voucher voucher = voucherRepository.save(Voucher.builder()
                     .tenant(tenant)
                     .packagePlan(plan)
                     .code(code)
                     .status(STATUS_UNUSED)
+                    .batchReference(batchReference).saleType(Boolean.TRUE.equals(req.giveaway()) ? "GIVEAWAY" : "INVENTORY").delivery("MANUAL").archived(false)
                     .build());
             writeRadiusAttributes(code, plan);
             created.add(toResponse(voucher));
@@ -101,6 +105,26 @@ public class VoucherService {
         return toResponse(voucher);
     }
 
+    @Transactional
+    public void recordOnlineSale(Long tenantId, String code) {
+        Voucher v = findByCodeAndTenant(code, tenantId); v.setSaleType("ONLINE"); voucherRepository.save(v);
+    }
+
+    @Transactional
+    public void assign(Long tenantId, List<String> codes, Long customerId) {
+        var customer = customerRepository.findByIdAndTenantId(customerId,tenantId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,"Customer not found"));
+        for (String code: codes) { var voucher=findByCodeAndTenant(code,tenantId);voucher.setCustomer(customer);voucherRepository.save(voucher); }
+    }
+
+    @Transactional
+    public void archive(Long tenantId, String code) {
+        var v=findByCodeAndTenant(code,tenantId);
+        if (!List.of("expired","revoked").contains(v.getStatus()))
+            throw new ResponseStatusException(HttpStatus.CONFLICT,"Only expired or revoked vouchers can be archived");
+        v.setArchived(true);voucherRepository.save(v);
+    }
+
     private void writeRadiusAttributes(String code, PackagePlan plan) {
         radCheckRepository.save(RadCheck.builder()
                 .username(code).attribute("Cleartext-Password").op(":=").value(code).build());
@@ -130,11 +154,14 @@ public class VoucherService {
         return voucher;
     }
 
-    private String uniqueCode(Set<String> batch) {
+    private String uniqueCode(Set<String> batch, GenerateVouchersRequest req) {
+        String prefix = req.prefix() == null ? "" : req.prefix().toUpperCase();
+        int length = req.codeLength() == null ? CODE_LENGTH : req.codeLength();
+        String alphabet = "NUMERIC".equals(req.codeFormat()) ? "23456789" : "LETTERS".equals(req.codeFormat()) ? "ABCDEFGHJKLMNPQRSTUVWXYZ" : CODE_ALPHABET;
         for (int attempt = 0; attempt < 20; attempt++) {
-            StringBuilder sb = new StringBuilder(CODE_LENGTH);
-            for (int i = 0; i < CODE_LENGTH; i++) {
-                sb.append(CODE_ALPHABET.charAt(RANDOM.nextInt(CODE_ALPHABET.length())));
+            StringBuilder sb = new StringBuilder(prefix);
+            for (int i = 0; i < length - prefix.length(); i++) {
+                sb.append(alphabet.charAt(RANDOM.nextInt(alphabet.length())));
             }
             String code = sb.toString();
             if (batch.add(code) && !voucherRepository.existsByCode(code) && !radCheckRepository.existsByUsername(code)) {
@@ -148,6 +175,11 @@ public class VoucherService {
         PackagePlan p = v.getPackagePlan();
         return new VoucherResponse(v.getId(), v.getCode(), v.getStatus(),
                 p.getId(), p.getName(), p.getPrice(),
-                v.getClaimedMac(), v.getFirstLogin(), v.getExpiresAt(), v.getCreatedAt());
+                v.getClaimedMac(), v.getFirstLogin(), v.getExpiresAt(), v.getCreatedAt(),
+                v.getCustomer() == null ? null : v.getCustomer().getId(),
+                v.getCustomer() == null ? null : v.getCustomer().getName(),
+                v.getCustomer() == null ? null : v.getCustomer().getPhone(),
+                v.getBatchReference(), v.getSaleType() == null ? "INVENTORY" : v.getSaleType(),
+                v.getDelivery() == null ? "MANUAL" : v.getDelivery(), Boolean.TRUE.equals(v.getArchived()));
     }
 }

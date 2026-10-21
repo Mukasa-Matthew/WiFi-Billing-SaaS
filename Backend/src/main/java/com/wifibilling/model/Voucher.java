@@ -32,6 +32,14 @@ public class Voucher {
     @Builder.Default
     private String status = "unused";
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "customer_id")
+    private Customer customer;
+    @Column(length = 80) private String batchReference;
+    @Column(length = 20) private String saleType;
+    @Column(length = 20) private String delivery;
+    private Boolean archived;
+
     @Column(name = "claimed_mac", length = 30)
     private String claimedMac;
 

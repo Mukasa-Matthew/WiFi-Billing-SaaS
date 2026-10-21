@@ -53,6 +53,8 @@ public class Transaction {
     @Column(name = "external_reference", length = 128)
     private String externalReference;
 
+    @Column(length=1000) private String notes;
+
     @Column(name = "created_at")
     @Builder.Default
     private OffsetDateTime createdAt = OffsetDateTime.now();

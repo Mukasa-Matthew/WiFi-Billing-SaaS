@@ -38,6 +38,19 @@ public class PackagePlan {
     @Builder.Default
     private Integer sharedUsers = 1;
 
+    @Column(length = 500)
+    private String description;
+
+    @Column(length = 12)
+    private String availability;
+
+    private Boolean featured;
+    private Integer displayOrder;
+
+    public String effectiveAvailability() {
+        return availability == null ? "ACTIVE" : availability;
+    }
+
     @Column(name = "created_at")
     @Builder.Default
     private OffsetDateTime createdAt = OffsetDateTime.now();

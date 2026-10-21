@@ -45,6 +45,10 @@ public class PackagePlanController {
                 .rateLimit(req.rateLimit().trim())
                 .sessionTimeout(req.sessionTimeout())
                 .sharedUsers(req.sharedUsers() != null ? req.sharedUsers() : 1)
+                .description(req.description())
+                .availability(req.availability() == null ? "ACTIVE" : req.availability())
+                .featured(Boolean.TRUE.equals(req.featured()))
+                .displayOrder(req.displayOrder() == null ? 0 : req.displayOrder())
                 .build();
 
         plan = packagePlanRepository.save(plan);
@@ -60,6 +64,31 @@ public class PackagePlanController {
         return toResponse(plan);
     }
 
+    @PatchMapping("/{id}/availability")
+    public PackagePlanDto.Response availability(
+            @AuthenticationPrincipal TenantPrincipal principal,
+            @PathVariable Long id,
+            @Valid @RequestBody AvailabilityRequest req) {
+        PackagePlan plan = packagePlanRepository.findByIdAndTenantId(id, principal.getTenantId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Package not found"));
+        plan.setAvailability(req.availability());
+        return toResponse(packagePlanRepository.save(plan));
+    }
+
+    public record AvailabilityRequest(
+            @jakarta.validation.constraints.NotNull
+            @jakarta.validation.constraints.Pattern(regexp = "ACTIVE|HIDDEN|DISABLED") String availability) {}
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(
+            @AuthenticationPrincipal TenantPrincipal principal,
+            @PathVariable Long id) {
+        PackagePlan plan = packagePlanRepository.findByIdAndTenantId(id, principal.getTenantId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Package not found"));
+        packagePlanRepository.delete(plan);
+    }
+
     private PackagePlanDto.Response toResponse(PackagePlan p) {
         return new PackagePlanDto.Response(
                 p.getId(),
@@ -68,6 +97,10 @@ public class PackagePlanController {
                 p.getRateLimit(),
                 p.getSessionTimeout(),
                 p.getSharedUsers(),
+                p.getDescription(),
+                p.effectiveAvailability(),
+                Boolean.TRUE.equals(p.getFeatured()),
+                p.getDisplayOrder() == null ? 0 : p.getDisplayOrder(),
                 p.getCreatedAt()
         );
     }

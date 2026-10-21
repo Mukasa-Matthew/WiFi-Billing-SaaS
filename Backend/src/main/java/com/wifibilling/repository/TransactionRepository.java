@@ -17,4 +17,6 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
     List<Transaction> findAllByTenantIdOrderByCreatedAtDesc(Long tenantId);
 
     List<Transaction> findAllByTenantIdAndStatusOrderByCreatedAtDesc(Long tenantId, String status);
+
+    boolean existsByRouterId(Long routerId);
 }

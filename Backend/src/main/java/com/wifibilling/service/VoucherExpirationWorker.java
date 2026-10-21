@@ -3,6 +3,7 @@ package com.wifibilling.service;
 import com.wifibilling.model.Router;
 import com.wifibilling.model.Voucher;
 import com.wifibilling.radius.RadAcct;
+import com.wifibilling.radius.RadCheck;
 import com.wifibilling.repository.*;
 import com.wifibilling.util.Ipv4Subnet;
 import lombok.RequiredArgsConstructor;
@@ -64,6 +65,10 @@ public class VoucherExpirationWorker {
                 Integer timeoutSeconds = voucher.getPackagePlan().getSessionTimeout();
                 if (timeoutSeconds != null && timeoutSeconds > 0) {
                     voucher.setExpiresAt(loginTime.plusSeconds(timeoutSeconds));
+                    String expiry = voucher.getExpiresAt().withOffsetSameInstant(java.time.ZoneOffset.UTC)
+                            .format(java.time.format.DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm:ss",java.util.Locale.ENGLISH));
+                    radCheckRepository.save(RadCheck.builder().username(voucher.getCode())
+                            .attribute("Expiration").op(":=").value(expiry).build());
                 }
                 voucherRepository.save(voucher);
                 log.info("Voucher '{}' activated. First login: {}, expires at: {}", voucher.getCode(), loginTime, voucher.getExpiresAt());

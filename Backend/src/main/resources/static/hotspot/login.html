@@ -465,7 +465,7 @@
                     var speed = pkg.rateLimit ? ' • ' + pkg.rateLimit : '';
                     html += '<div class="package-item" id="pkg-' + pkg.id + '" onclick="selectPackage(' + pkg.id + ', \'' + formattedPrice + '\')">' +
                                 '<div class="package-info">' +
-                                    '<span class="package-name">' + pkg.name + '</span>' +
+                                    '<span class="package-name">' + String(pkg.name).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + (pkg.featured ? ' · Popular' : '') + '</span>' +
                                     '<span class="package-meta">' + duration + speed + '</span>' +
                                 '</div>' +
                                 '<span class="package-price">' + formattedPrice + '</span>' +

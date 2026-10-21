@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-<!-- sopraent-rlogin-version: sopraent-rlogin-2026-08-23.1 -->
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -8,7 +7,7 @@
     <meta http-equiv="expires" content="-1">
     <title>Connecting…</title>
     <noscript>
-        <meta http-equiv="refresh" content="0; url=https://calton.sopraent.com/hotspot?router=1215&amp;mac=$(mac)&amp;ip=$(ip)&amp;link-login-only=$(link-login-only)&amp;link-orig=$(link-orig)">
+        <meta http-equiv="refresh" content="0; url=$(link-login)">
     </noscript>
     <style>
         :root {
@@ -169,17 +168,11 @@
 
         <div class="loader" aria-hidden="true"><span></span><span></span><span></span></div>
 
-        <div class="powered">Powered by <b>SopraEnt</b></div>
+        <div class="powered">Powered by <b>mattytech</b></div>
     </div>
 
-    <form id="portal-context" class="portal-context" action="https://calton.sopraent.com/hotspot" method="get">
-        <input type="hidden" name="router" value="1215">
-        <input type="hidden" name="mac" value="$(mac)">
-        <input type="hidden" name="ip" value="$(ip)">
-        <input type="hidden" name="username" value="$(username)">
-        <input type="hidden" name="link-login-only" value="$(link-login-only)">
-        <input type="hidden" name="link-orig" value="$(link-orig)">
-        <input type="hidden" name="error" value="$(error)">
+    <form id="portal-context" class="portal-context" action="$(link-login-only)" method="get">
+        <input type="hidden" name="dst" value="$(link-orig)">
     </form>
 
     <script>

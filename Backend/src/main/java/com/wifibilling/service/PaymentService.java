@@ -52,6 +52,10 @@ public class PaymentService {
         PackagePlan packagePlan = packagePlanRepository.findByIdAndTenantId(req.packageId(), router.getTenant().getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Package not found for router tenant"));
 
+        if (!"ACTIVE".equals(packagePlan.effectiveAvailability())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Package is unavailable for purchase");
+        }
+
         String reference = "PAY-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16).toUpperCase();
 
         String network = detectNetwork(req.phone(), req.network());
@@ -118,6 +122,7 @@ public class PaymentService {
             if (!vouchers.isEmpty()) {
                 String voucherCode = vouchers.get(0).code();
                 tx.setVoucherCode(voucherCode);
+                voucherService.recordOnlineSale(tx.getTenant().getId(), voucherCode);
                 log.info("Payment SUCCESSFUL for ref {}. Provisioned voucher: {}", tx.getReference(), voucherCode);
             } else {
                 log.error("Failed to generate voucher for successful transaction ref {}", tx.getReference());

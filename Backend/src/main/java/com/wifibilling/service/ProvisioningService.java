@@ -18,6 +18,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.net.URI;
 import java.security.SecureRandom;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -73,6 +74,11 @@ public class ProvisioningService {
 
         return scriptGenerator.generate(new RouterScriptGenerator.ScriptContext(
                 router.getName(),
+                defaultValue(router.getWanInterface(), "ether1"),
+                router.getHotspotInterfaces() == null || router.getHotspotInterfaces().isBlank()
+                        ? List.of("ether2", "ether3", "ether4", "ether5", "wlan1")
+                        : List.of(router.getHotspotInterfaces().split(",")),
+                defaultValue(router.getWifiSsid(), "WiFi Hotspot"),
                 router.getToken(),
                 wgIp,
                 subnet.prefix(),
@@ -172,5 +178,9 @@ public class ProvisioningService {
             sb.append(SECRET_ALPHABET.charAt(RANDOM.nextInt(SECRET_ALPHABET.length())));
         }
         return sb.toString();
+    }
+
+    private static String defaultValue(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value;
     }
 }

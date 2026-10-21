@@ -12,4 +12,6 @@ public interface NasRepository extends JpaRepository<Nas, Long> {
     Optional<Nas> findByNasname(String nasname);
 
     boolean existsByNasname(String nasname);
+
+    void deleteByNasname(String nasname);
 }
