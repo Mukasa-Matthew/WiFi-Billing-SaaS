@@ -37,6 +37,7 @@ public class VoucherExpirationWorker {
     private final RadReplyRepository radReplyRepository;
     private final RouterRepository routerRepository;
     private final RadiusDisconnectService disconnectService;
+    private final RouterManagementService managementService;
 
     @Scheduled(fixedDelayString = "PT30S", initialDelayString = "PT10S")
     @Transactional
@@ -106,6 +107,8 @@ public class VoucherExpirationWorker {
             String nasIp = Ipv4Subnet.stripPrefix(session.getNasIpAddress());
             if (nasIp != null) {
                 routerRepository.findByWgIp(nasIp).ifPresent(router -> {
+                    // Router polling also delivers the request when AppServer cannot route to the hub's VPN subnet.
+                    managementService.enqueueDisconnect(router, username);
                     disconnectService.sendDisconnect(
                             nasIp,
                             RadiusDisconnectService.DEFAULT_COA_PORT,

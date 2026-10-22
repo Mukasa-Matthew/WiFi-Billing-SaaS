@@ -124,10 +124,14 @@ class CoreFlowIntegrationTest {
         Number routerId=JsonPath.read(routerBody,"$.id");String token=JsonPath.read(routerBody,"$.token");
         // A second pending router must not collide on an empty tunnel address.
         request(jwt,"/api/routers","{\"name\":\"Second Router\"}");
-        request(jwt,"/api/bindings","{\"routerId\":"+routerId+",\"name\":\"Office\",\"mac\":\"AA:BB:CC:DD:EE:11\",\"address\":\"10.10.0.7\",\"recordPayment\":false}");
+        Number bindingPlan=plan(jwt);
+        request(jwt,"/api/bindings","{\"routerId\":"+routerId+",\"packageId\":"+bindingPlan+",\"name\":\"Office\",\"mac\":\"AA:BB:CC:DD:EE:11\",\"address\":\"10.10.0.7\",\"recordPayment\":false}");
         mockMvc.perform(get("/api/bindings").header("Authorization","Bearer "+jwt)).andExpect(jsonPath("$[0].synced").value(false));
         String script=mockMvc.perform(get("/api/router/provision/"+token+"/management.rsc")).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         assertTrue(script.contains("type=bypassed"));
+        assertTrue(script.indexOf("/queue/simple/add") < script.indexOf("/ip/hotspot/ip-binding/add"));
+        assertTrue(script.indexOf("/system/scheduler/add") < script.indexOf("/ip/hotspot/ip-binding/add"));
+        assertTrue(script.contains("interval=0s"));
         String hash=java.util.regex.Pattern.compile("bindings-ack\\?hash=([a-f0-9]{64})").matcher(script).results().findFirst().orElseThrow().group(1);
         mockMvc.perform(post("/api/router/provision/"+token+"/bindings-ack").param("hash",hash)).andExpect(status().isOk());
         mockMvc.perform(get("/api/bindings").header("Authorization","Bearer "+jwt)).andExpect(jsonPath("$[0].synced").value(true));

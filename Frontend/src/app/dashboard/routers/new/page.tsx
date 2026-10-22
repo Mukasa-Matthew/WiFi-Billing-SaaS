@@ -73,6 +73,7 @@ export default function AddRouterPage() {
   const createRouter = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!identity.trim()) return;
+    if (router) { setStep(2); return; }
     setCreating(true);
     setError(null);
     try {
@@ -83,7 +84,7 @@ export default function AddRouterPage() {
         name: identity.trim(),
         wanInterface: "ether1",
         hotspotInterfaces,
-        wifiSsid: hasWireless ? `${identity.trim()} WiFi` : "WiFi Hotspot",
+        wifiSsid: hasWireless ? `${identity.trim().replace(/[^\x20-\x7E]/g, "").slice(0, 27)} WiFi` : "WiFi Hotspot",
       });
       setRouter(response.data);
       setAttempt(0);
@@ -99,7 +100,16 @@ export default function AddRouterPage() {
   };
 
   const copyCommand = async () => {
-    await navigator.clipboard.writeText(provisioningCommand);
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(provisioningCommand);
+      } else {
+        const text = document.createElement("textarea");
+        text.value = provisioningCommand; document.body.appendChild(text); text.select();
+        const success = document.execCommand("copy"); text.remove();
+        if (!success) throw new Error("Copy unavailable");
+      }
+    } catch { setError("Copy is unavailable in this browser. Select and copy the command manually."); return; }
     setCopied(true);
     window.setTimeout(() => setCopied(false), 2000);
   };
@@ -194,6 +204,8 @@ export default function AddRouterPage() {
 
           {step === 2 && router && (
             <div className="space-y-6">
+              {error && <p role="alert" className="text-xs text-amber-300">{error}</p>}
+              {attempt >= MAX_ATTEMPTS && !connected && <button className="text-xs text-blue-400" onClick={() => setAttempt(0)}>Polling timed out. Retry connection checks</button>}
               <div className="overflow-hidden rounded-xl border border-slate-700 bg-slate-950/60">
                 <div className="flex items-center justify-between border-b border-slate-700 px-5 py-4">
                   <span className="flex items-center gap-2 text-sm font-semibold text-white"><Terminal className="h-4 w-4" /> Provisioning Command</span>
@@ -213,12 +225,12 @@ export default function AddRouterPage() {
                   {connected ? <CheckCircle2 className="h-6 w-6 text-emerald-400" /> : <LoaderCircle className="h-6 w-6 animate-spin text-blue-400" />}
                   <div>
                     <p className={`font-mono text-sm font-semibold ${connected ? "text-emerald-300" : "text-white"}`}>
-                      {connected ? "Router connected and provisioning confirmed" : "$ Paste the provisioning command in your MikroTik terminal to begin"}
+                      {connected ? "Router registration received" : "$ Paste the provisioning command in your MikroTik terminal to begin"}
                     </p>
                     <p className="mt-2 text-xs text-slate-400">
-                      {connected ? `Tunnel ${router.wgIp} is registered with the cloud core.` : "The system automatically detects when the router finishes provisioning."}
+                      {connected ? `Tunnel ${router.wgIp} is registered with the cloud core.` : "The system waits for the router to register its WireGuard public key."}
                     </p>
-                    {!connected && <p className="mt-3 text-xs text-slate-500">Attempt {attempt + 1} of {MAX_ATTEMPTS}</p>}
+                    {!connected && <p className="mt-3 text-xs text-slate-500">Attempt {Math.min(attempt + 1, MAX_ATTEMPTS)} of {MAX_ATTEMPTS}</p>}
                   </div>
                 </div>
               </div>
@@ -234,8 +246,8 @@ export default function AddRouterPage() {
             <div className="space-y-6">
               <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-6 text-center">
                 <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-400" />
-                <h2 className="mt-3 text-xl font-bold text-white">Hotspot service configured</h2>
-                <p className="mt-2 text-sm text-slate-400">{router.name} is connected to the billing core and ready for customer authentication.</p>
+                <h2 className="mt-3 text-xl font-bold text-white">Router configuration submitted</h2>
+                <p className="mt-2 text-sm text-slate-400">{router.name} has registered with the billing core. Tunnel connectivity and customer authentication will be verified during router testing.</p>
               </div>
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4"><p className="text-xs text-slate-500">WAN interface</p><p className="mt-1 font-mono text-sm text-white">{router.wanInterface}</p></div>
