@@ -18,7 +18,7 @@ class RouterScriptGeneratorTest {
                 "tok_ABC123xyz", "10.9.0.5", 16,
                 secret, "10.9.0.1",
                 "yoay+E/LyCqRq0xxqsIRJdRoqe8XjRVmkMe3nDx5wEc=", "203.0.113.10", 443, "10.9.0.0/16",
-                "http://203.0.113.10:8080", Set.of("203.0.113.10"), Set.of("momo.mtn.com")));
+                "http://203.0.113.10:8080", Set.of("203.0.113.10"), Set.of("momo.mtn.com"), "BLOCK"));
     }
 
     @Test
@@ -45,6 +45,9 @@ class RouterScriptGeneratorTest {
         assertTrue(s.contains("http://203.0.113.10:8080/api/router/provision/tok_ABC123xyz/register"));
         assertTrue(s.contains(":local wbPub [/interface/wireguard get [find name=\"wg-billing\"] public-key]"));
         assertTrue(s.contains("http-data=(\"{\\\"publicKey\\\":\\\"\" . $wbPub . \"\\\"}\")"));
+        // tethering BLOCK mode emits drop rules
+        assertTrue(s.contains("/ip/firewall/filter/add chain=forward ttl=equal:63 action=drop"));
+        assertTrue(s.contains("/ip/firewall/filter/add chain=forward ttl=equal:127 action=drop"));
     }
 
     @Test
@@ -59,7 +62,7 @@ class RouterScriptGeneratorTest {
                 "evil\n/system reset-configuration", "ether1", List.of("ether2"), "Cafe WiFi",
                 "tok_ABC123xyz", "10.9.0.5", 16,
                 "x", "10.9.0.1", "yoay+E/LyCqRq0xxqsIRJdRoqe8XjRVmkMe3nDx5wEc=", "203.0.113.10", 443,
-                "10.9.0.0/16", "http://203.0.113.10:8080", Set.of(), Set.of()));
+                "10.9.0.0/16", "http://203.0.113.10:8080", Set.of(), Set.of(), "OFF"));
         assertFalse(s.contains("\n/system reset-configuration"));
     }
 

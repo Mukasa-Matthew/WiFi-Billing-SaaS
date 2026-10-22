@@ -74,6 +74,9 @@ public class RouterManagementService {
    var s=new StringBuilder();for(String name:List.of("login.html","status.html","logout.html","alogin.html","redirect.html","rlogin.html","error.html"))s.append("/tool/fetch url=").append(q(props.getPublicBaseUrl()+"/api/portal/templates/"+name+"?token="+r.getToken())).append(" dst-path=").append(q("flash/hotspot/"+name)).append('\n');script=s.toString();
   }else if("SYNC_TIME".equals(action)){
    script=timeScript();
+  }else if("SYNC_TETHERING".equals(action)){
+   String mode=r.getTenant().getTetheringProtection();
+   script=RouterScriptGenerator.tetheringRules(mode==null?"OFF":mode);
   }else throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Unknown router action");
   if(tasks.findFirstByRouterIdAndStatusOrderByIdAsc(r.getId(),"PENDING").isPresent())throw new ResponseStatusException(HttpStatus.CONFLICT,"A router action is already pending");
   return tasks.save(RouterTask.builder().router(r).action(action).script(script).build());

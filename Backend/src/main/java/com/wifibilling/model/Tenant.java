@@ -72,6 +72,14 @@ public class Tenant {
     @Column(name = "notify_phones", length = 255)
     private String notifyPhones;
 
+    @Column(name = "portal_template", length = 40)
+    @Builder.Default
+    private String portalTemplate = "midnight";
+
+    @Column(name = "tethering_protection", length = 12)
+    @Builder.Default
+    private String tetheringProtection = "OFF"; // OFF, LOG, BLOCK
+
     @Column(name = "created_at")
     @Builder.Default
     private OffsetDateTime createdAt = OffsetDateTime.now();
