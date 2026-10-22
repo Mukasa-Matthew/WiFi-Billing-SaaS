@@ -44,6 +44,12 @@ npm-debug.log*
 yarn-debug.log*
 pnpm-debug.log*
 
+# Server-side artifacts (deploy backups, stale copies, npm strays)
+backups/
+Frontend/src.old-deploy/
+Frontend/next
+Frontend/frontend-app@*
+
 # IDEs & System
 .idea/
 *.iml
