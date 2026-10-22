@@ -6,6 +6,7 @@ import com.wifibilling.model.PackagePlan;
 import com.wifibilling.model.Router;
 import com.wifibilling.repository.PackagePlanRepository;
 import com.wifibilling.repository.RouterRepository;
+import com.wifibilling.repository.TransactionRepository;
 import com.wifibilling.util.RouterTokens;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +29,7 @@ public class PortalController {
 
     private final RouterRepository routerRepository;
     private final PackagePlanRepository packagePlanRepository;
+    private final TransactionRepository transactionRepository;
     private final PlatformProperties props;
 
     /**
@@ -54,6 +56,27 @@ public class PortalController {
                         p.getRateLimit(),
                         p.getSessionTimeout(), Boolean.TRUE.equals(p.getFeatured())))
                 .toList();
+    }
+
+    /**
+     * "Already bought? Find your voucher" — looks up the most recent successful
+     * purchase by phone number for this tenant and returns its voucher code.
+     */
+    @GetMapping(value = "/find-voucher", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<java.util.Map<String, Object>> findVoucher(
+            @RequestParam("token") String token,
+            @RequestParam("phone") String phone) {
+        Router router = resolveRouter(token);
+        String normalized = phone == null ? "" : phone.replaceAll("[^0-9+]", "");
+        if (normalized.length() < 7) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("voucherCode", ""));
+        }
+        var tx = transactionRepository.findFirstByTenantIdAndPhoneAndStatusOrderByCreatedAtDesc(
+                router.getTenant().getId(), normalized, "SUCCESSFUL");
+        if (tx.isEmpty() || tx.get().getVoucherCode() == null) {
+            return ResponseEntity.ok(java.util.Map.of("voucherCode", ""));
+        }
+        return ResponseEntity.ok(java.util.Map.of("voucherCode", tx.get().getVoucherCode()));
     }
 
     /**
