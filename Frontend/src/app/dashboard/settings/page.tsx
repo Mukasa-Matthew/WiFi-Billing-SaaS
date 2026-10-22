@@ -34,6 +34,8 @@ const card = "rounded-xl border border-slate-800 bg-slate-900/70 p-6";
 
 export default function TenantSettingsPage() {
   const [form, setForm] = useState<Settings | null>(null);
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+  const [previewKey, setPreviewKey] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,6 +45,15 @@ export default function TenantSettingsPage() {
       .then((r) => setForm(r.data))
       .catch(() => setError("Could not load settings"));
   }, []);
+
+  // Fetch preview through the authenticated API client — iframes can't
+  // attach the JWT header, and the backend correctly denies framing anyway.
+  useEffect(() => {
+    if (!form) return;
+    api.get<string>(`/api/settings/portal-preview?template=${encodeURIComponent(form.portalTemplate)}`, { responseType: "text" })
+      .then((r) => setPreviewHtml(r.data))
+      .catch(() => setPreviewHtml(null));
+  }, [form?.portalTemplate, previewKey]);
 
   const set = <K extends keyof Settings>(key: K, value: Settings[K]) =>
     setForm((f) => (f ? { ...f, [key]: value } : f));
@@ -56,6 +67,7 @@ export default function TenantSettingsPage() {
     try {
       const r = await api.put<Settings>("/api/settings", form);
       setForm(r.data);
+      setPreviewKey((k) => k + 1);
       setSaved(true);
       window.setTimeout(() => setSaved(false), 3000);
     } catch {
@@ -174,12 +186,18 @@ export default function TenantSettingsPage() {
             <div>
               <div className="overflow-hidden rounded-xl border border-slate-700 bg-slate-950">
                 <div className="border-b border-slate-800 px-3 py-2 text-[10px] text-slate-500">Live preview — {form.portalTemplate}</div>
-                <iframe
-                  key={form.portalTemplate}
-                  src={`/api/settings/portal-preview?template=${encodeURIComponent(form.portalTemplate)}`}
-                  title="Captive portal preview"
-                  className="h-[420px] w-full bg-slate-900"
-                />
+                {previewHtml ? (
+                  <iframe
+                    key={form.portalTemplate}
+                    srcDoc={previewHtml}
+                    title="Captive portal preview"
+                    className="h-[420px] w-full bg-slate-900"
+                  />
+                ) : (
+                  <div className="flex h-[420px] items-center justify-center text-xs text-slate-500">
+                    <LoaderCircle size={16} className="mr-2 animate-spin" />Rendering preview…
+                  </div>
+                )}
               </div>
             </div>
           </div>
