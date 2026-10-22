@@ -6,126 +6,107 @@
     <title>TENANT_NAME_PLACEHOLDER WiFi</title>
     <style>
         body.theme-midnight {
-            --bg: #0A0F1D;
-            --card: rgba(18, 26, 47, 0.85);
-            --border: rgba(255, 255, 255, 0.08);
-            --text: #F8FAFC;
-            --muted: #94A3B8;
-            --input-bg: rgba(255, 255, 255, 0.05);
-            --accent: #10B981;
+            --bg: #0A0F1D; --card: #141B2E; --card-2: #1B2440;
+            --border: rgba(255,255,255,0.08); --text: #F8FAFC; --muted: #94A3B8;
+            --input-bg: rgba(255,255,255,0.05); --accent: #10B981; --accent-text: #fff;
         }
         body.theme-daylight {
-            --bg: #EDF2F7;
-            --card: rgba(255, 255, 255, 0.95);
-            --border: rgba(15, 23, 42, 0.12);
-            --text: #0F172A;
-            --muted: #64748B;
-            --input-bg: rgba(15, 23, 42, 0.04);
-            --accent: #059669;
+            --bg: #EDF2F7; --card: #FFFFFF; --card-2: #F7FAFC;
+            --border: rgba(15,23,42,0.12); --text: #0F172A; --muted: #64748B;
+            --input-bg: rgba(15,23,42,0.04); --accent: #059669; --accent-text: #fff;
         }
         body.theme-ember {
-            --bg: #15090A;
-            --card: rgba(43, 20, 12, 0.9);
-            --border: rgba(255, 255, 255, 0.08);
-            --text: #F8FAFC;
-            --muted: #B8A79A;
-            --input-bg: rgba(255, 255, 255, 0.05);
-            --accent: #F59E0B;
+            --bg: #15090A; --card: #231012; --card-2: #2E1614;
+            --border: rgba(255,255,255,0.08); --text: #F8FAFC; --muted: #B8A79A;
+            --input-bg: rgba(255,255,255,0.05); --accent: #F59E0B; --accent-text: #1A0A00;
         }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             --primary: TENANT_BRAND_COLOR_PLACEHOLDER;
-            --primary-hover: TENANT_BRAND_COLOR_PLACEHOLDER;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg);
-            color: var(--text);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-            margin: 0;
-            position: relative;
-            -webkit-font-smoothing: antialiased;
+            background: var(--bg); color: var(--text);
+            min-height: 100vh; display: flex; align-items: center; justify-content: center;
+            padding: 20px; position: relative; -webkit-font-smoothing: antialiased;
         }
-        * { box-sizing: border-box; }
-
-        .orb { position: fixed; border-radius: 50%; filter: blur(120px); opacity: 0.15; pointer-events: none; z-index: 0; }
-        .orb-1 { width: 500px; height: 500px; background: var(--primary); top: -200px; right: -100px; }
-        .orb-2 { width: 400px; height: 400px; background: var(--accent); bottom: -150px; left: -100px; }
+        .orb { position: fixed; border-radius: 50%; filter: blur(120px); opacity: 0.13; pointer-events: none; z-index: 0; }
+        .orb-1 { width: 480px; height: 480px; background: var(--primary); top: -180px; right: -100px; }
+        .orb-2 { width: 380px; height: 380px; background: var(--accent); bottom: -140px; left: -100px; }
 
         .portal-card {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 24px;
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            width: 100%;
-            max-width: 440px;
-            padding: 32px 28px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-            position: relative;
-            z-index: 1;
+            background: var(--card); border: 1px solid var(--border);
+            border-radius: 24px; width: 100%; max-width: 420px;
+            padding: 34px 30px 26px; position: relative; z-index: 1;
+            box-shadow: 0 25px 60px -12px rgba(0,0,0,0.45);
         }
-        body.theme-daylight .portal-card { box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.18); }
+        body.theme-daylight .portal-card { box-shadow: 0 25px 60px -12px rgba(15,23,42,0.15); }
 
-        .header { text-align: center; margin-bottom: 24px; }
-        .logo-badge {
-            width: 64px; height: 64px; margin: 0 auto 14px;
+        .brand { text-align: center; margin-bottom: 24px; }
+        .brand-icon {
+            width: 56px; height: 56px; margin: 0 auto 14px;
+            border-radius: 18px; display: flex; align-items: center; justify-content: center;
             background: linear-gradient(135deg, var(--primary), var(--accent));
-            border-radius: 20px; display: flex; align-items: center; justify-content: center;
-            font-size: 30px; box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+            box-shadow: 0 10px 26px rgba(0,0,0,0.28); font-size: 26px;
         }
-        .header h1 { font-size: 22px; font-weight: 700; margin: 0; }
-        .header p { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
-        .support-line { font-size: 12px; color: var(--muted); margin-top: 6px; }
+        .brand h1 { font-size: 19px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+        .brand p { font-size: 13px; color: var(--muted); margin-top: 5px; }
 
-        .tabs { display: flex; background: var(--input-bg); border-radius: 12px; padding: 4px; margin-bottom: 20px; }
-        .tab-btn {
-            flex: 1; padding: 10px; border: none; background: transparent; color: var(--muted);
-            font-size: 13px; font-weight: 600; border-radius: 9px; cursor: pointer; transition: all .2s;
+        .section-label {
+            display: block; text-align: center; font-size: 11px; font-weight: 700;
+            letter-spacing: .14em; color: var(--muted); margin: 22px 0 14px; text-transform: uppercase;
         }
-        .tab-btn.active { background: var(--card); color: var(--text); box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
-        body.theme-daylight .tab-btn.active { background: #fff; }
 
-        .section-label { display: block; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
-
-        .pkg-card {
-            display: flex; align-items: center; justify-content: space-between;
-            background: var(--input-bg); border: 1px solid var(--border); border-radius: 14px;
-            padding: 14px 16px; margin-bottom: 10px; cursor: pointer; transition: all .15s; width: 100%; text-align: left; color: var(--text);
-        }
-        .pkg-card:hover { border-color: var(--primary); }
-        .pkg-card.selected { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 12%, transparent); }
-        .pkg-name { font-size: 14px; font-weight: 600; }
-        .pkg-meta { font-size: 12px; color: var(--muted); margin-top: 3px; }
-        .pkg-price { font-size: 15px; font-weight: 700; color: var(--accent); white-space: nowrap; }
-        .pkg-featured { font-size: 10px; font-weight: 700; color: #FBBF24; letter-spacing: .05em; }
-
-        .form-group { margin-bottom: 16px; }
-        .form-label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 8px; }
+        .voucher-box { background: var(--card-2); border: 1px solid var(--border); border-radius: 16px; padding: 18px; }
+        .voucher-box label { display:block; font-size: 12px; color: var(--muted); margin-bottom: 8px; font-weight: 600; }
         .form-input {
             width: 100%; background: var(--input-bg); border: 1px solid var(--border); border-radius: 12px;
-            padding: 12px 14px; color: var(--text); font-size: 14px; outline: none; transition: border-color .2s;
+            padding: 13px 14px; color: var(--text); font-size: 14px; outline: none; transition: border-color .2s;
         }
         .form-input:focus { border-color: var(--primary); }
-
-        .btn-submit {
-            width: 100%; padding: 14px; border: none; border-radius: 12px;
-            background: linear-gradient(135deg, var(--primary), var(--primary-hover));
-            color: #fff; font-size: 15px; font-weight: 700; cursor: pointer; transition: transform .1s, opacity .2s;
+        .btn {
+            width: 100%; padding: 13px; border: none; border-radius: 12px; cursor: pointer;
+            font-size: 14.5px; font-weight: 700; transition: transform .1s, opacity .2s; margin-top: 12px;
         }
-        .btn-submit:disabled { opacity: .45; cursor: not-allowed; }
-        .btn-submit:active:not(:disabled) { transform: scale(.98); }
+        .btn:active:not(:disabled) { transform: scale(.98); }
+        .btn:disabled { opacity: .45; cursor: not-allowed; }
+        .btn-primary { background: var(--primary); color: #fff; }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); font-weight: 600; }
+        .btn-whatsapp { background: #25D366; color: #06280F; display: flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; font-weight: 700; }
 
-        .status-msg { font-size: 13px; padding: 10px 14px; border-radius: 10px; margin-bottom: 14px; display: none; }
-        .status-msg.error { display: block; background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.3); color: #FCA5A5; }
-        .status-msg.success { display: block; background: rgba(16,185,129,.12); border: 1px solid rgba(16,185,129,.3); color: #6EE7B7; }
+        .link-row { text-align: center; margin-top: 12px; }
+        .link-row a, .link-row button.link { color: var(--primary); font-size: 13px; text-decoration: none; background:none; border:none; cursor:pointer; }
 
-        .voucher-result { text-align: center; padding: 18px; background: var(--input-bg); border-radius: 14px; margin-bottom: 14px; display: none; }
+        .pkg-row {
+            display: flex; align-items: center; justify-content: space-between;
+            background: var(--card-2); border: 1px solid var(--border);
+            border-radius: 14px; padding: 13px 15px; margin-bottom: 10px;
+        }
+        .pkg-name { font-size: 14px; font-weight: 600; }
+        .pkg-meta { display:block; font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+        .pkg-featured { font-size: 10px; font-weight: 700; color: #FBBF24; }
+        .pkg-buy {
+            background: var(--accent); color: var(--accent-text); border: none; border-radius: 10px;
+            padding: 8px 20px; font-size: 13px; font-weight: 800; cursor: pointer; letter-spacing: .03em;
+        }
+        .pkg-buy:active { transform: scale(.96); }
+
+        .note-box {
+            background: rgba(251,191,36,0.08); border: 1px solid rgba(251,191,36,0.25);
+            color: #FBBF24; border-radius: 12px; padding: 12px 14px;
+            font-size: 12.5px; line-height: 1.5; margin-top: 16px; text-align: center;
+        }
+        .support-box { text-align: center; margin-top: 18px; }
+        .support-box .support-label { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+        .support-line { margin-top: 14px; font-size: 12.5px; color: var(--muted); }
+
+        .status-msg { font-size: 13px; padding: 10px 14px; border-radius: 10px; margin-bottom: 14px; }
+        .status-msg.error { background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.3); color: #FCA5A5; }
+        .status-msg.success { background: rgba(16,185,129,.12); border: 1px solid rgba(16,185,129,.3); color: #6EE7B7; }
+
+        .voucher-result { text-align: center; padding: 16px; background: var(--card-2); border-radius: 14px; margin-bottom: 14px; display: none; }
         .voucher-result.show { display: block; }
-        .voucher-code { font-family: ui-monospace, monospace; font-size: 26px; font-weight: 700; letter-spacing: .15em; color: var(--accent); margin: 8px 0; }
+        .voucher-code { font-family: ui-monospace, monospace; font-size: 25px; font-weight: 700; letter-spacing: .15em; color: var(--accent); margin: 8px 0; }
 
-        .footer { text-align: center; margin-top: 20px; font-size: 11px; color: var(--muted); }
+        .footer { text-align: center; margin-top: 22px; font-size: 11px; color: var(--muted); }
         .footer b { color: var(--text); }
 
         .payment-overlay {
@@ -139,9 +120,13 @@
         .modal-box p { font-size: 13px; color: var(--muted); line-height: 1.5; margin: 0 0 16px; }
         .modal-btn-cancel { margin-top: 8px; padding: 10px 24px; background: transparent; border: 1px solid var(--border); color: var(--muted); border-radius: 10px; cursor: pointer; font-size: 13px; }
 
-        .spinner { width: 32px; height: 32px; margin: 24px auto; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; }
+        .spinner { width: 30px; height: 30px; margin: 22px auto; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
-        .empty-state { text-align: center; color: var(--muted); font-size: 13px; padding: 24px 0; }
+        .empty-state { text-align: center; color: var(--muted); font-size: 13px; padding: 20px 0; }
+
+        /* purchase sheet */
+        .pay-sheet { display: none; margin-top: 14px; }
+        .pay-sheet.show { display: block; }
     </style>
 </head>
 <body class="PORTAL_THEME_PLACEHOLDER">
@@ -150,55 +135,60 @@
 <div class="orb orb-2"></div>
 
 <div class="portal-card">
-    <div class="header">
-        <div class="logo-badge">📶</div>
+    <div class="brand">
+        <div class="brand-icon">📶</div>
         <h1>TENANT_NAME_PLACEHOLDER</h1>
-        <p>Choose an internet plan or enter your voucher code</p>
-        <p class="support-line" id="support-line">Support: TENANT_SUPPORT_PHONE_PLACEHOLDER TENANT_SUPPORT_EMAIL_PLACEHOLDER</p>
+        <p>Connect to the internet</p>
     </div>
 
-    <div class="status-msg error" id="mt-error"></div>
-    <div class="status-msg success" id="ok-msg"></div>
+    <div id="msg-area"></div>
 
-    <div class="tabs" id="tabs">
-        <button type="button" class="tab-btn active" id="tab-packages" onclick="switchTab('packages-tab')">Buy Plan</button>
-        <button type="button" class="tab-btn" id="tab-voucher" onclick="switchTab('voucher-tab')">Have a Voucher</button>
-    </div>
-
-    <div id="packages-tab">
-        <span class="section-label">Available Internet Plans</span>
-        <div id="packages-list"><div class="spinner"></div></div>
-        <form id="purchase-form" onsubmit="handlePurchase(event)">
-            <input type="hidden" id="selected-package-id" value="">
-            <div class="form-group">
-                <label class="form-label" for="phone-number">Mobile Money Number (Airtel / MTN)</label>
-                <input class="form-input" id="phone-number" type="tel" placeholder="e.g. 0770000000" required>
-            </div>
-            <button type="submit" id="buy-btn" class="btn-submit" disabled>Select a Plan to Pay</button>
-        </form>
-    </div>
-
-    <div id="voucher-tab" style="display:none">
-        <div class="voucher-result" id="voucher-result">
-            <div style="font-size:12px;color:var(--muted)">Your voucher code</div>
-            <div class="voucher-code" id="voucher-code-display"></div>
-            <button type="button" class="btn-submit" style="margin-top:6px" onclick="useVoucher()">Connect with this code</button>
-        </div>
+    <!-- HAVE A VOUCHER? -->
+    <div class="voucher-box">
+        <span class="section-label" style="margin-top:0">Have a voucher?</span>
         <form id="login-form" name="login" method="post">
             <input type="hidden" name="dst" id="dst-input" value="" />
             <input type="hidden" name="popup" value="true" />
-            <div class="form-group">
-                <label class="form-label" for="username-input">Voucher Code</label>
-                <input class="form-input" id="username-input" name="username" type="text" placeholder="e.g. AB82K9XQ" required autocomplete="off" autocorrect="off" autocapitalize="characters">
-            </div>
+            <label for="username-input">Enter voucher code</label>
+            <input class="form-input" id="username-input" name="username" type="text" placeholder="e.g. AB82K9XQ" required autocomplete="off" autocorrect="off" autocapitalize="characters">
             <input type="hidden" id="password-input" name="password" value="">
-            <button type="submit" class="btn-submit" onclick="document.getElementById('password-input').value = document.getElementById('username-input').value.trim();">Connect to Internet</button>
+            <button type="submit" class="btn btn-primary" onclick="document.getElementById('password-input').value = document.getElementById('username-input').value.trim();">Connect</button>
         </form>
+        <div class="voucher-result" id="voucher-result">
+            <div style="font-size:12px;color:var(--muted)">Your voucher code</div>
+            <div class="voucher-code" id="voucher-code-display"></div>
+            <button type="button" class="btn btn-primary" style="margin-top:4px" onclick="useVoucher()">Connect with this code</button>
+        </div>
+        <div class="link-row"><button type="button" class="link" onclick="toggleFind()">Already bought? Find your voucher</button></div>
+        <div class="pay-sheet" id="find-sheet">
+            <div class="form-group" style="margin-top:10px">
+                <input class="form-input" id="find-phone" type="tel" placeholder="Phone number used to pay">
+            </div>
+            <button type="button" class="btn btn-outline" style="margin-top:0" onclick="findVoucher()">Look up my voucher</button>
+            <div id="find-result" style="margin-top:10px"></div>
+        </div>
     </div>
 
-    <div class="footer">
-        Powered by <b>WiFi-Billing SaaS</b>
+    <!-- PACKAGES -->
+    <span class="section-label" id="plans-label">Or purchase a package</span>
+    <div id="packages-list"><div class="spinner"></div></div>
+    <div class="pay-sheet" id="pay-sheet">
+        <div class="voucher-box">
+            <label for="phone-number" id="pay-label">Mobile Money Number (Airtel / MTN)</label>
+            <input class="form-input" id="phone-number" type="tel" placeholder="e.g. 0770000000">
+            <button type="button" class="btn btn-primary" id="pay-btn" onclick="handlePurchase()">Pay</button>
+        </div>
     </div>
+
+    <div class="note-box">Smart TV or Computer? Buy on TV / Landline devices or register here</div>
+
+    <div class="support-box">
+        <div class="support-label">Comments / issues?</div>
+        <a id="whatsapp-btn" class="btn btn-whatsapp" style="display:none" target="_blank" rel="noopener">💬 WhatsApp Hotspot</a>
+        <p class="support-line" id="support-line">Need help? Call: TENANT_SUPPORT_PHONE_PLACEHOLDER TENANT_SUPPORT_EMAIL_PLACEHOLDER</p>
+    </div>
+
+    <div class="footer">Powered by <b>WiFi-Billing SaaS</b></div>
 </div>
 
 <div id="payment-modal" class="payment-overlay">
@@ -215,19 +205,31 @@
 <script>
 var Q = new URLSearchParams(location.search);
 var TOKEN = Q.get('token') || '';
-var MAC = Q.get('mac') || '';
 var LINK_LOGIN = Q.get('link-login-only') || '';
 var LINK_ORIG = Q.get('link-orig') || '';
 var MT_ERROR = Q.get('error') || '';
 var BASE = location.origin;
 var pollTimer = null;
 var purchasedCode = '';
+var selectedPkg = null;
 
-// MikroTik error passthrough
-if (MT_ERROR) { var e = document.getElementById('mt-error'); e.textContent = MT_ERROR; e.style.display = 'block'; }
-// Hide support line when empty
-(function(){ var s = document.getElementById('support-line'); if (s.textContent.trim() === 'Support:') s.style.display = 'none'; })();
-// Voucher login target: post straight back to the router
+function showMsg(text, isError) {
+    document.getElementById('msg-area').innerHTML =
+        '<div class="status-msg ' + (isError ? 'error' : 'success') + '">' + text + '</div>';
+}
+if (MT_ERROR) showMsg(MT_ERROR, true);
+
+(function(){
+    var s = document.getElementById('support-line');
+    if (s.textContent.indexOf('Call:') >= 0 && s.textContent.replace('Need help? Call:','').trim() === '') s.style.display = 'none';
+    var phone = 'TENANT_SUPPORT_PHONE_PLACEHOLDER'.replace(/[^0-9]/g, '');
+    if (phone.length > 6) {
+        var w = document.getElementById('whatsapp-btn');
+        w.href = 'https://wa.me/' + phone;
+        w.style.display = 'flex';
+    }
+})();
+
 if (LINK_LOGIN) {
     document.getElementById('login-form').action = LINK_LOGIN;
     document.getElementById('dst-input').value = 'POST_LOGIN_REDIRECT_PLACEHOLDER' || LINK_ORIG;
@@ -235,15 +237,27 @@ if (LINK_LOGIN) {
     document.getElementById('login-form').onsubmit = function(ev){ ev.preventDefault(); showMsg('Router context missing — reconnect to WiFi and try again.', true); };
 }
 
-function showMsg(text, isError) {
-    var el = document.getElementById(isError ? 'mt-error' : 'ok-msg');
-    el.textContent = text; el.style.display = 'block';
-}
-function switchTab(id) {
-    document.getElementById('packages-tab').style.display = id === 'packages-tab' ? 'block' : 'none';
-    document.getElementById('voucher-tab').style.display = id === 'voucher-tab' ? 'block' : 'none';
-    document.getElementById('tab-packages').className = 'tab-btn' + (id === 'packages-tab' ? ' active' : '');
-    document.getElementById('tab-voucher').className = 'tab-btn' + (id === 'voucher-tab' ? ' active' : '');
+function toggleFind(){ var s = document.getElementById('find-sheet'); s.classList.toggle('show'); }
+
+function findVoucher(){
+    var phone = document.getElementById('find-phone').value.trim();
+    if (!phone) return;
+    document.getElementById('find-result').innerHTML = '<div class="spinner" style="margin:10px auto"></div>';
+    fetch(BASE + '/api/portal/find-voucher?token=' + encodeURIComponent(TOKEN) + '&phone=' + encodeURIComponent(phone))
+        .then(function(r){ return r.json(); })
+        .then(function(res){
+            if (res.voucherCode) {
+                purchasedCode = res.voucherCode;
+                document.getElementById('voucher-code-display').textContent = res.voucherCode;
+                document.getElementById('voucher-result').classList.add('show');
+                document.getElementById('username-input').value = res.voucherCode;
+                document.getElementById('find-result').innerHTML = '';
+                showMsg('Voucher found — press "Connect with this code".', false);
+            } else {
+                document.getElementById('find-result').innerHTML = '<div class="status-msg error">No voucher found for that number.</div>';
+            }
+        })
+        .catch(function(){ document.getElementById('find-result').innerHTML = '<div class="status-msg error">Lookup failed. Try again.</div>'; });
 }
 
 function fmtDuration(seconds) {
@@ -252,50 +266,47 @@ function fmtDuration(seconds) {
     if (seconds < 86400) return Math.round(seconds/3600) + ' hr';
     return Math.round(seconds/86400) + ' day';
 }
-function fmtPrice(p) { return 'UGX ' + Number(p).toLocaleString(); }
+function fmtPrice(p){ return 'UGX ' + Number(p).toLocaleString(); }
 
-// ---- Packages ----
 fetch(BASE + '/api/portal/packages?token=' + encodeURIComponent(TOKEN))
     .then(function(r){ return r.json(); })
     .then(function(plans){
         var list = document.getElementById('packages-list');
         list.innerHTML = '';
-        if (!plans.length) { list.innerHTML = '<div class="empty-state">No internet plans available right now. Try the voucher tab.</div>'; return; }
+        if (!plans.length) {
+            document.getElementById('plans-label').style.display = 'none';
+            list.innerHTML = '';
+            return;
+        }
         plans.forEach(function(p){
-            var card = document.createElement('button');
-            card.type = 'button';
-            card.className = 'pkg-card';
-            card.innerHTML = '<span><span class="pkg-name">' + p.name + '</span>' +
-                (p.featured ? ' <span class="pkg-featured">★ POPULAR</span>' : '') +
-                '<span class="pkg-meta" style="display:block">' +
-                [p.sessionTimeout ? fmtDuration(p.sessionTimeout) : '', p.rateLimit || ''].filter(Boolean).join(' · ') +
-                '</span></span><span class="pkg-price">' + fmtPrice(p.price) + '</span>';
-            card.onclick = function(){
-                document.querySelectorAll('.pkg-card').forEach(function(c){ c.classList.remove('selected'); });
-                card.classList.add('selected');
-                document.getElementById('selected-package-id').value = p.id;
-                document.getElementById('buy-btn').disabled = false;
-                document.getElementById('buy-btn').textContent = 'Pay ' + fmtPrice(p.price) + ' — ' + p.name;
+            var row = document.createElement('div');
+            row.className = 'pkg-row';
+            row.innerHTML = '<span><span class="pkg-name">' + p.name + (p.featured ? ' <span class="pkg-featured">★</span>' : '') + '</span>' +
+                '<span class="pkg-meta">' + [p.sessionTimeout ? fmtDuration(p.sessionTimeout) : '', p.rateLimit || ''].filter(Boolean).join(' · ') + ' · ' + fmtPrice(p.price) + '</span></span>' +
+                '<button type="button" class="pkg-buy">BUY</button>';
+            row.querySelector('.pkg-buy').onclick = function(){
+                selectedPkg = p;
+                document.getElementById('pay-sheet').classList.add('show');
+                document.getElementById('pay-label').textContent = 'Pay ' + fmtPrice(p.price) + ' for ' + p.name + ' — enter Mobile Money number';
+                document.getElementById('pay-btn').textContent = 'Pay ' + fmtPrice(p.price);
+                document.getElementById('phone-number').focus();
             };
-            list.appendChild(card);
+            list.appendChild(row);
         });
     })
     .catch(function(){
         document.getElementById('packages-list').innerHTML = '<div class="empty-state">Could not load plans. Pull down to retry.</div>';
     });
 
-// ---- Mobile money purchase ----
-function handlePurchase(ev) {
-    ev.preventDefault();
-    var packageId = Number(document.getElementById('selected-package-id').value);
+function handlePurchase() {
     var phone = document.getElementById('phone-number').value.trim();
-    if (!packageId || !phone) return;
+    if (!selectedPkg || !phone) return;
     document.getElementById('payment-modal').classList.add('show');
     document.getElementById('modal-status').textContent = 'Sending payment request…';
     fetch(BASE + '/api/payments/initiate', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ token: TOKEN, packageId: packageId, phone: phone, network: '' })
+        body: JSON.stringify({ token: TOKEN, packageId: selectedPkg.id, phone: phone, network: '' })
     })
     .then(function(r){ return r.json(); })
     .then(function(res){
@@ -319,7 +330,6 @@ function pollPayment(reference, attempt) {
                         document.getElementById('voucher-code-display').textContent = purchasedCode;
                         document.getElementById('voucher-result').classList.add('show');
                         document.getElementById('username-input').value = purchasedCode;
-                        switchTab('voucher-tab');
                         showMsg('Payment received! Press "Connect with this code" to go online.', false);
                     } else {
                         showMsg('Payment received! You are being connected…', false);
