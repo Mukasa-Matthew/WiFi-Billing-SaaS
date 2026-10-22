@@ -100,8 +100,8 @@ class PortalControllerTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
 
-        assertTrue(response.getBody().contains("var ROUTER_TOKEN = 'tok_A1234567';"));
-        assertTrue(response.getBody().contains("var SERVER_BASE_URL = 'http://cloudserv.example.com:8080';"));
+        assertTrue(response.getBody().contains("token=tok_A1234567"));
+        assertTrue(response.getBody().contains("http://cloudserv.example.com:8080/api/portal/page"));
         assertFalse(response.getBody().contains("ROUTER_TOKEN_PLACEHOLDER"));
         assertFalse(response.getBody().contains("SERVER_BASE_URL_PLACEHOLDER"));
     }
