@@ -35,6 +35,7 @@ export default function AddRouterPage() {
   const [step, setStep] = useState(1);
   const [identity, setIdentity] = useState("MikroTik-1");
   const [hasWireless, setHasWireless] = useState(true);
+  const [wanInterface, setWanInterface] = useState("ether1");
   const [router, setRouter] = useState<RouterRecord | null>(null);
   const [creating, setCreating] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -77,13 +78,10 @@ export default function AddRouterPage() {
     setCreating(true);
     setError(null);
     try {
-      const hotspotInterfaces = hasWireless
-        ? ["ether2", "ether3", "ether4", "ether5", "wlan1"]
-        : ["ether2", "ether3", "ether4", "ether5"];
       const response = await api.post<RouterRecord>("/api/routers", {
         name: identity.trim(),
-        wanInterface: "ether1",
-        hotspotInterfaces,
+        wanInterface: wanInterface.trim() || "ether1",
+        hotspotInterfaces: [],
         wifiSsid: hasWireless ? `${identity.trim().replace(/[^\x20-\x7E]/g, "").slice(0, 27)} WiFi` : "WiFi Hotspot",
       });
       setRouter(response.data);
@@ -175,6 +173,21 @@ export default function AddRouterPage() {
                 <p className="mt-2 text-xs text-slate-500">Auto-generated name — you can change it if needed.</p>
               </div>
 
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-white">Internet / ISP port</label>
+                <input
+                  required
+                  maxLength={32}
+                  value={wanInterface}
+                  onChange={(event) => setWanInterface(event.target.value)}
+                  className="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 font-mono text-sm text-white outline-none transition focus:border-blue-500"
+                  placeholder="ether1"
+                />
+                <p className="mt-2 text-xs text-slate-500">
+                  The port your ISP cable plugs into (e.g. <code className="text-slate-300">ether1</code>, <code className="text-slate-300">sfp1</code>). All other ports and Wi-Fi are bridged to the hotspot automatically — no port counting needed.
+                </p>
+              </div>
+
               <label className="flex cursor-pointer items-start gap-4">
                 <button
                   type="button"
@@ -251,7 +264,7 @@ export default function AddRouterPage() {
               </div>
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4"><p className="text-xs text-slate-500">WAN interface</p><p className="mt-1 font-mono text-sm text-white">{router.wanInterface}</p></div>
-                <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4"><p className="text-xs text-slate-500">Hotspot ports</p><p className="mt-1 font-mono text-sm text-white">{router.hotspotInterfaces.join(", ")}</p></div>
+                <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4"><p className="text-xs text-slate-500">Hotspot ports</p><p className="mt-1 font-mono text-sm text-white">{router.hotspotInterfaces.length > 0 ? router.hotspotInterfaces.join(", ") : `All ports except ${router.wanInterface} (auto)`}</p></div>
                 <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4"><p className="text-xs text-slate-500">Wi-Fi name</p><p className="mt-1 flex items-center gap-2 text-sm text-white"><Wifi className="h-4 w-4 text-blue-400" />{hasWireless ? router.wifiSsid : "Wireless disabled"}</p></div>
               </div>
               <div className="flex justify-end border-t border-slate-800 pt-5">
