@@ -130,7 +130,8 @@ public class RouterScriptGenerator {
                 + " security-profile=\"wb-open\" disabled=no } }";
         String newWifi = ":foreach w in=[/interface/wifi find] do={ :local n [/interface/wifi get $w name]; " + skipWan
                 + port + "; /interface/wifi set $w configuration.mode=ap configuration.ssid=" + q(c.wifiSsid())
-                + " security.authentication-types=\"\" disabled=no } }";
+                + " disabled=no; :do { /interface/wifi set $w configuration.security.authentication-types=\"\" configuration.security.passphrase=\"\" }"
+                + " on-error={ :do { /interface/wifi set $w security.authentication-types=\"\" security.passphrase=\"\" } on-error={} } } }";
         s.append(":do { :local f [:parse ").append(q(legacyWifi)).append("]; $f } on-error={}\n");
         s.append(":do { :local f [:parse ").append(q(newWifi)).append("]; $f } on-error={}\n");
         s.append("/ip/address add address=10.10.0.1/24 interface=").append(q(BRIDGE_NAME)).append(" comment=").append(tag).append('\n');
@@ -172,8 +173,18 @@ public class RouterScriptGenerator {
                 + " protocol=udp dst-port=3799 action=accept comment=" + tag;
         s.append(":if ([:len [/ip/firewall/filter find]] > 0) do={ ").append(coaRule)
                 .append(" place-before=0 } else={ ").append(coaRule).append(" }\n");
-        s.append("/ip/firewall/filter add chain=pre-hs-input protocol=tcp dst-port=8291 action=accept comment=")
-                .append(tag).append('\n');
+        // Management access from the hotspot side: winbox (8291) and neighbor
+        // discovery (5678) must be inserted BEFORE the hotspot dynamic jump rules,
+        // or unauthenticated clients can never reach the router.
+        String winboxRule = "/ip/firewall/filter add chain=pre-hs-input protocol=tcp dst-port=8291 action=accept comment=" + tag;
+        String mndpRule = "/ip/firewall/filter add chain=pre-hs-input protocol=udp dst-port=5678 action=accept comment=" + tag;
+        s.append(":if ([:len [/ip/firewall/filter find]] > 0) do={ ").append(winboxRule)
+                .append(" place-before=0 } else={ ").append(winboxRule).append(" }\n");
+        s.append(":if ([:len [/ip/firewall/filter find]] > 0) do={ ").append(mndpRule)
+                .append(" place-before=0 } else={ ").append(mndpRule).append(" }\n");
+        s.append("/ip/neighbor/discovery-settings/set discover-interface-list=LAN\n");
+        s.append(":do { /tool/mac-server/set allowed-interface-list=LAN } on-error={}\n");
+        s.append(":do { /tool/mac-server/mac-winbox/set allowed-interface-list=LAN } on-error={}\n");
         s.append('\n');
 
         // 3. Captive Portal Template Download to flash/hotspot
