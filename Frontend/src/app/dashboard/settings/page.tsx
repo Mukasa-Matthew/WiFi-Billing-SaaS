@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import api from "@/lib/api";
-import { CheckCircle2, LoaderCircle, Save } from "lucide-react";
+import { AlertTriangle, CheckCircle2, LoaderCircle, Save } from "lucide-react";
 
 interface Settings {
   name: string;
@@ -35,6 +35,7 @@ const card = "rounded-xl border border-slate-200 bg-white p-6";
 export default function TenantSettingsPage() {
   const [form, setForm] = useState<Settings | null>(null);
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const [previewKey, setPreviewKey] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -48,11 +49,24 @@ export default function TenantSettingsPage() {
 
   // Fetch preview through the authenticated API client — iframes can't
   // attach the JWT header, and the backend correctly denies framing anyway.
+  // Guard: only inject real captive-portal HTML. Auth redirects, error pages,
+  // or app-shell HTML render Next.js inside about:srcdoc and throw
+  // history.replaceState SecurityErrors.
+  const isPortalHtml = (html: string) =>
+    typeof html === "string" &&
+    html.includes("portal-card") &&
+    !html.includes("/_next/") &&
+    !/<title[^>]*>\s*WiFi-Billing/i.test(html);
+
   useEffect(() => {
     if (!form) return;
+    setPreviewError(null);
     api.get<string>(`/api/settings/portal-preview?template=${encodeURIComponent(form.portalTemplate)}`, { responseType: "text" })
-      .then((r) => setPreviewHtml(r.data))
-      .catch(() => setPreviewHtml(null));
+      .then((r) => {
+        if (isPortalHtml(r.data)) { setPreviewHtml(r.data); }
+        else { setPreviewHtml(null); setPreviewError("The preview response wasn't a captive-portal page."); }
+      })
+      .catch(() => { setPreviewHtml(null); setPreviewError("Could not load the portal preview."); });
   }, [form?.portalTemplate, previewKey]);
 
   const set = <K extends keyof Settings>(key: K, value: Settings[K]) =>
@@ -186,7 +200,13 @@ export default function TenantSettingsPage() {
             <div>
               <div className="overflow-hidden rounded-xl border border-slate-300 bg-[#F5F7FA]">
                 <div className="border-b border-slate-200 px-3 py-2 text-[10px] text-slate-500">Live preview — {form.portalTemplate}</div>
-                {previewHtml ? (
+                {previewError ? (
+                  <div className="flex h-[420px] flex-col items-center justify-center gap-2 px-6 text-center">
+                    <AlertTriangle size={20} className="text-amber-600" />
+                    <p className="text-xs font-medium text-slate-700">{previewError}</p>
+                    <button onClick={() => setPreviewKey(k => k + 1)} className="mt-1 text-xs font-medium text-blue-700 hover:underline">Retry preview</button>
+                  </div>
+                ) : previewHtml ? (
                   <iframe
                     key={form.portalTemplate}
                     srcDoc={previewHtml}
