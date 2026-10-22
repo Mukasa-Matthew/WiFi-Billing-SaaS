@@ -2,6 +2,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import api from "@/lib/api";
+import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { useToast } from "@/components/ui/Toast";
 import { useResource, Table, Badge, Notice, FilterTabs, button, date, message, panel } from "@/components/BillingUI";
 import { MoreVertical, Eye, RefreshCw, FileDown, Clock, Terminal, Trash2 } from "lucide-react";
 
@@ -60,11 +62,17 @@ export default function Page() {
       await open(r);
     } catch (e) { setNote(message(e)); }
   };
-  const remove = async (r: Router) => {
-    if (!confirm(`Delete ${r.name}? Payment history may prevent deletion.`)) return;
-    try { await api.delete(`/api/routers/${r.id}`); await load(); setSelected(null); }
-    catch (e) { setNote(message(e)); }
-  };
+  const toast = useToast();
+  const { confirm, dialog } = useConfirmDialog();
+  const remove = (r: Router) => confirm({
+    title: "Delete router",
+    body: `Delete ${r.name}? Payment history may prevent deletion.`,
+    confirmLabel: "Delete",
+    onConfirm: async () => {
+      try { await api.delete(`/api/routers/${r.id}`); toast("success", `${r.name} deleted.`); await load(); setSelected(null); }
+      catch (e) { toast("error", message(e)); }
+    },
+  });
   const showCommand = (r: Router, install = false) => {
     const url = `${window.location.origin}/api/router/provision/${r.token}${install ? "/install-management.rsc" : ""}`;
     setCommand(`:do { /tool fetch url="${url}" dst-path=wb-setup.rsc; /import wb-setup.rsc } on-error={ :put "Setup failed. Check router logs." }`);
@@ -78,7 +86,7 @@ export default function Page() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6">{dialog}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-slate-900">MikroTik routers</h1>

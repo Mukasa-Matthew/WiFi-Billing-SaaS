@@ -81,6 +81,7 @@ export default function Page() {
       </div>
 
       <Table
+        emptyTitle="No payments" emptyDescription="Transactions will appear here once payments are recorded."
         rows={tab === "COMPLETED" ? completed : pending}
         loading={loading}
         columns={[
