@@ -1,589 +1,65 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="pragma" content="no-cache">
     <meta http-equiv="expires" content="-1">
-    <title>TENANT_NAME_PLACEHOLDER WiFi</title>
+    <title>Redirecting to TENANT_NAME_PLACEHOLDER...</title>
     <style>
-        :root {
-            --bg-color: #0A0F1D;
-            --card-bg: rgba(18, 26, 47, 0.85);
-            --border-color: rgba(255, 255, 255, 0.08);
-            --primary: TENANT_BRAND_COLOR_PLACEHOLDER;
-            --primary-hover: #2563EB;
-            --accent: #10B981;
-            --text-main: #F8FAFC;
-            --text-muted: #94A3B8;
-            --font-stack: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: var(--font-stack);
-        }
-
         body {
-            background-color: var(--bg-color);
-            background-image: radial-gradient(circle at 50% 10%, rgba(59, 130, 246, 0.15) 0%, transparent 60%);
-            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
             min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-            position: relative;
-        }
-
-        .portal-card {
-            background: var(--card-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 24px;
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            width: 100%;
-            max-width: 440px;
-            padding: 32px 28px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-            position: relative;
-            z-index: 1;
-        }
-
-        .header {
-            text-align: center;
-            margin-bottom: 24px;
-        }
-
-        .logo-badge {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 56px;
-            height: 56px;
-            border-radius: 16px;
-            background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(16, 185, 129, 0.2));
-            border: 1px solid rgba(59, 130, 246, 0.3);
-            margin-bottom: 12px;
-            color: #60A5FA;
-            font-size: 26px;
-        }
-
-        .header h1 {
-            font-size: 22px;
-            font-weight: 700;
-            margin-bottom: 6px;
-        }
-
-        .header p {
-            font-size: 14px;
-            color: var(--text-muted);
-        }
-
-        .tabs {
-            display: flex;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 12px;
-            padding: 4px;
-            margin-bottom: 20px;
-        }
-
-        .tab-btn {
-            flex: 1;
-            padding: 10px;
-            text-align: center;
-            background: transparent;
-            border: none;
-            color: var(--text-muted);
-            font-size: 13.5px;
-            font-weight: 600;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .tab-btn.active {
-            background: var(--primary);
+            margin: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
         }
-
-        .tab-content {
-            display: none;
-        }
-
-        .tab-content.active {
-            display: block;
-        }
-
-        /* Package selection */
-        .support-line {
-            font-size: 12px;
-            color: var(--text-muted);
-            margin-top: 4px;
-        }
-        .section-label {
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            margin-bottom: 12px;
-            display: block;
-        }
-
-        #packages-list {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            margin-bottom: 20px;
-            max-height: 260px;
-            overflow-y: auto;
-            padding-right: 4px;
-        }
-
-        .package-item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: rgba(255, 255, 255, 0.03);
-            border: 1.5px solid var(--border-color);
-            border-radius: 14px;
-            padding: 14px 16px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .package-item:hover {
-            border-color: rgba(59, 130, 246, 0.5);
-            background: rgba(59, 130, 246, 0.05);
-        }
-
-        .package-item.selected {
-            border-color: var(--primary);
-            background: rgba(59, 130, 246, 0.12);
-        }
-
-        .package-info {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-
-        .package-name {
-            font-size: 15px;
-            font-weight: 600;
-            color: var(--text-main);
-        }
-
-        .package-meta {
-            font-size: 12px;
-            color: var(--text-muted);
-        }
-
-        .package-price {
-            font-size: 15px;
-            font-weight: 700;
-            color: #34D399;
-        }
-
-        .form-group {
-            margin-bottom: 16px;
-        }
-
-        .form-label {
-            display: block;
-            font-size: 13px;
-            font-weight: 500;
-            color: var(--text-muted);
-            margin-bottom: 8px;
-        }
-
-        .form-input {
-            width: 100%;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 12px 14px;
-            color: var(--text-main);
-            font-size: 14px;
-            outline: none;
-            transition: border-color 0.2s ease;
-        }
-
-        .form-input:focus {
-            border-color: var(--primary);
-        }
-
-        .btn-submit {
-            width: 100%;
-            background: var(--primary);
-            color: white;
-            border: none;
-            border-radius: 12px;
-            padding: 14px;
-            font-size: 15px;
-            font-weight: 600;
-            cursor: pointer;
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-            transition: background 0.2s ease;
-        }
-
-        .btn-submit:hover {
-            background: var(--primary-hover);
-        }
-
-        .btn-submit:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .status-msg {
-            padding: 12px;
-            border-radius: 10px;
-            font-size: 13px;
-            margin-bottom: 16px;
-            display: none;
-        }
-
-        .status-msg.error {
-            display: block;
-            background: rgba(239, 68, 68, 0.15);
-            border: 1px solid rgba(239, 68, 68, 0.3);
-            color: #F87171;
-        }
-
-        .footer {
-            text-align: center;
-            margin-top: 20px;
-            font-size: 12px;
-            color: var(--text-muted);
-        }
-
-        .footer b {
-            color: var(--text-main);
-        }
-
+        .loader { text-align: center; }
         .spinner {
-            border: 3px solid rgba(255, 255, 255, 0.1);
-            border-top: 3px solid var(--primary);
+            width: 50px; height: 50px;
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top-color: white;
             border-radius: 50%;
-            width: 24px;
-            height: 24px;
             animation: spin 1s linear infinite;
-            margin: 20px auto;
+            margin: 0 auto 20px;
         }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        /* Modal Overlay for Payment Prompt */
-        .payment-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(10, 15, 29, 0.88);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            padding: 24px;
-            z-index: 999;
-        }
-
-        .payment-overlay.active {
-            display: flex;
-        }
-
-        .modal-box {
-            background: #131C31;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 20px;
-            padding: 32px 24px;
-            text-align: center;
-            max-width: 380px;
-            width: 100%;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
-        }
-
-        .pulse-icon {
-            width: 64px;
-            height: 64px;
-            background: rgba(59, 130, 246, 0.15);
-            border: 2px solid var(--primary);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 28px;
-            margin: 0 auto 16px;
-            animation: pulse 1.5s infinite;
-        }
-
-        @keyframes pulse {
-            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
-            70% { transform: scale(1.05); box-shadow: 0 0 0 16px rgba(59, 130, 246, 0); }
-            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
-        }
-
-        .modal-box h3 {
-            font-size: 18px;
-            margin-bottom: 8px;
-            color: var(--text-main);
-        }
-
-        .modal-box p {
-            font-size: 13.5px;
-            color: var(--text-muted);
-            line-height: 1.5;
-            margin-bottom: 20px;
-        }
-
-        .modal-btn-cancel {
-            background: transparent;
-            border: 1px solid var(--border-color);
-            color: var(--text-muted);
-            padding: 10px 20px;
-            border-radius: 10px;
-            font-size: 13px;
-            cursor: pointer;
-        }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
-
-<div class="portal-card">
-    <div class="header">
-        <div class="logo-badge">📶</div>
-        <h1>TENANT_NAME_PLACEHOLDER</h1>
-        <p>Choose an internet plan or enter your voucher code</p>
-        <p class="support-line" id="support-line">Support: TENANT_SUPPORT_PHONE_PLACEHOLDER TENANT_SUPPORT_EMAIL_PLACEHOLDER</p>
-        <script>if (document.getElementById('support-line').textContent.trim() === 'Support:') document.getElementById('support-line').style.display = 'none';</script>
-    </div>
-
-    <div class="tabs">
-        <button type="button" class="tab-btn active" onclick="switchTab('packages-tab')">Buy Plan</button>
-        <button type="button" class="tab-btn" onclick="switchTab('voucher-tab')">Have a Voucher</button>
-    </div>
-
-    <!-- TAB 1: Buy Package via Mobile Money -->
-    <div id="packages-tab" class="tab-content active">
-        <span class="section-label">Available Internet Plans</span>
-        <div id="packages-list">
-            <div class="spinner"></div>
-        </div>
-
-        <form id="purchase-form" onsubmit="handlePurchase(event)">
-            <input type="hidden" id="selected-package-id" value="">
-            <div class="form-group">
-                <label class="form-label" for="phone-number">Mobile Money Number (Airtel / MTN)</label>
-                <input class="form-input" id="phone-number" type="tel" placeholder="e.g. 0770000000" required>
-            </div>
-            <button type="submit" id="buy-btn" class="btn-submit" disabled>Select a Plan to Pay</button>
-        </form>
-    </div>
-
-    <!-- TAB 2: Direct MikroTik Voucher Login Form -->
-    <div id="voucher-tab" class="tab-content">
-        <!-- $(if error) -->
-        <div class="status-msg error" id="mt-error">$(error)</div>
-        <!-- $(endif) -->
-
-        <form id="login-form" name="login" action="$(link-login-only)" method="post">
-            <input type="hidden" name="dst" value="POST_LOGIN_REDIRECT_PLACEHOLDER" />
-            <input type="hidden" name="popup" value="true" />
-
-            <div class="form-group">
-                <label class="form-label" for="username-input">Voucher Code</label>
-                <input class="form-input" id="username-input" name="username" type="text" placeholder="e.g. AB82K9XQ" value="$(username)" required autocomplete="off" autocorrect="off" autocapitalize="characters">
-            </div>
-
-            <!-- In voucher mode, password is identical to the voucher code -->
-            <input type="hidden" id="password-input" name="password" value="">
-
-            <button type="submit" class="btn-submit" onclick="document.getElementById('password-input').value = document.getElementById('username-input').value;">Connect to Internet</button>
-        </form>
-    </div>
-
-    <div class="footer">
-        Powered by <b>WiFi-Billing SaaS</b>
-    </div>
-</div>
-
-<!-- Mobile Money Waiting Modal Overlay -->
-<div id="payment-modal" class="payment-overlay">
-    <div class="modal-box">
-        <div class="pulse-icon">📲</div>
-        <h3>Check Your Phone</h3>
-        <p id="modal-desc">A payment request has been sent. Please enter your Mobile Money PIN on your phone to complete access.</p>
+    <div class="loader">
         <div class="spinner"></div>
-        <p style="font-size: 12px; color: var(--accent); margin-bottom: 16px;">Waiting for confirmation...</p>
-        <button type="button" class="modal-btn-cancel" onclick="cancelPaymentPolling()">Cancel</button>
+        <h2>Connecting to WiFi Portal...</h2>
+        <p>Please wait while we redirect you.</p>
     </div>
-</div>
 
-<script>
-    var ROUTER_TOKEN = 'ROUTER_TOKEN_PLACEHOLDER';
-    var SERVER_BASE_URL = 'SERVER_BASE_URL_PLACEHOLDER';
-    var pollingInterval = null;
+    <script>
+        var portalUrl = 'SERVER_BASE_URL_PLACEHOLDER/api/portal/page';
+        var params = [];
 
-    function switchTab(tabId) {
-        document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
-        document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
-        if (tabId === 'packages-tab') {
-            document.querySelectorAll('.tab-btn')[0].classList.add('active');
-            document.getElementById('packages-tab').classList.add('active');
-        } else {
-            document.querySelectorAll('.tab-btn')[1].classList.add('active');
-            document.getElementById('voucher-tab').classList.add('active');
-        }
-    }
+        var mac = '$(mac)';
+        var ip = '$(ip)';
+        var username = '$(username)';
+        var linkLogin = '$(link-login-only)';
+        var linkOrig = '$(link-orig)';
+        var error = '$(error)';
 
-    function formatDuration(seconds) {
-        if (!seconds) return '';
-        if (seconds < 3600) return Math.round(seconds / 60) + ' Mins';
-        if (seconds < 86400) return Math.round(seconds / 3600) + ' Hours';
-        return Math.round(seconds / 86400) + ' Days';
-    }
+        params.push('token=ROUTER_TOKEN_PLACEHOLDER');
+        params.push('mac=' + encodeURIComponent(mac !== '$(mac)' ? mac : ''));
+        params.push('ip=' + encodeURIComponent(ip !== '$(ip)' ? ip : ''));
+        if (username && username !== '$(username)') params.push('username=' + encodeURIComponent(username));
+        if (linkLogin && linkLogin !== '$(link-login-only)') params.push('link-login-only=' + encodeURIComponent(linkLogin));
+        if (linkOrig && linkOrig !== '$(link-orig)') params.push('link-orig=' + encodeURIComponent(linkOrig));
+        if (error && error !== '$(error)' && error !== '') params.push('error=' + encodeURIComponent(error));
 
-    function loadPackages() {
-        var container = document.getElementById('packages-list');
-        var url = SERVER_BASE_URL + '/api/portal/packages?token=' + encodeURIComponent(ROUTER_TOKEN);
+        window.location.href = portalUrl + '?' + params.join('&');
+    </script>
 
-        fetch(url)
-            .then(function(res) {
-                if (!res.ok) throw new Error('HTTP ' + res.status);
-                return res.json();
-            })
-            .then(function(packages) {
-                if (!packages || packages.length === 0) {
-                    container.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 20px;">No internet plans are currently available.</div>';
-                    return;
-                }
-
-                var html = '';
-                packages.forEach(function(pkg) {
-                    var formattedPrice = Number(pkg.price).toLocaleString() + ' UGX';
-                    var duration = formatDuration(pkg.sessionTimeout);
-                    var speed = pkg.rateLimit ? ' • ' + pkg.rateLimit : '';
-                    html += '<div class="package-item" id="pkg-' + pkg.id + '" onclick="selectPackage(' + pkg.id + ', \'' + formattedPrice + '\')">' +
-                                '<div class="package-info">' +
-                                    '<span class="package-name">' + String(pkg.name).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + (pkg.featured ? ' · Popular' : '') + '</span>' +
-                                    '<span class="package-meta">' + duration + speed + '</span>' +
-                                '</div>' +
-                                '<span class="package-price">' + formattedPrice + '</span>' +
-                            '</div>';
-                });
-                container.innerHTML = html;
-
-                if (packages.length > 0) {
-                    selectPackage(packages[0].id, Number(packages[0].price).toLocaleString() + ' UGX');
-                }
-            })
-            .catch(function(err) {
-                container.innerHTML = '<div style="text-align: center; color: #F87171; padding: 20px;">Unable to load plans. Please connect using a voucher.</div>';
-            });
-    }
-
-    function selectPackage(id, priceStr) {
-        document.querySelectorAll('.package-item').forEach(function(el) {
-            el.classList.remove('selected');
-        });
-        var target = document.getElementById('pkg-' + id);
-        if (target) target.classList.add('selected');
-
-        document.getElementById('selected-package-id').value = id;
-        var btn = document.getElementById('buy-btn');
-        btn.disabled = false;
-        btn.textContent = 'Pay ' + priceStr;
-    }
-
-    function handlePurchase(e) {
-        e.preventDefault();
-        var pkgId = document.getElementById('selected-package-id').value;
-        var phone = document.getElementById('phone-number').value.trim();
-        if (!pkgId || !phone) return;
-
-        var btn = document.getElementById('buy-btn');
-        btn.disabled = true;
-        btn.textContent = 'Initiating Payment...';
-
-        fetch(SERVER_BASE_URL + '/api/payments/initiate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                token: ROUTER_TOKEN,
-                packageId: Number(pkgId),
-                phone: phone
-            })
-        })
-        .then(function(res) {
-            if (!res.ok) throw new Error('Payment initiation failed');
-            return res.json();
-        })
-        .then(function(data) {
-            btn.disabled = false;
-            btn.textContent = 'Pay';
-            showPaymentModal(data.reference, phone);
-        })
-        .catch(function(err) {
-            alert('Payment could not be started: ' + err.message);
-            btn.disabled = false;
-            btn.textContent = 'Try Again';
-        });
-    }
-
-    function showPaymentModal(reference, phone) {
-        document.getElementById('modal-desc').textContent = 'A prompt was sent to ' + phone + '. Please approve on your phone to complete your WiFi access.';
-        document.getElementById('payment-modal').classList.add('active');
-
-        // Start polling payment status every 2 seconds
-        if (pollingInterval) clearInterval(pollingInterval);
-        pollingInterval = setInterval(function() {
-            checkPaymentStatus(reference);
-        }, 2000);
-    }
-
-    function cancelPaymentPolling() {
-        if (pollingInterval) clearInterval(pollingInterval);
-        document.getElementById('payment-modal').classList.remove('active');
-    }
-
-    function checkPaymentStatus(reference) {
-        fetch(SERVER_BASE_URL + '/api/payments/status/' + encodeURIComponent(reference))
-            .then(function(res) {
-                if (!res.ok) throw new Error('Status check failed');
-                return res.json();
-            })
-            .then(function(data) {
-                if (data.status === 'SUCCESSFUL' && data.voucherCode) {
-                    clearInterval(pollingInterval);
-                    document.getElementById('modal-desc').textContent = 'Payment successful! Authenticating your device...';
-
-                    // Auto-fill and submit login form to MikroTik $(link-login-only)
-                    setTimeout(function() {
-                        var userField = document.getElementById('username-input');
-                        var passField = document.getElementById('password-input');
-                        userField.value = data.voucherCode;
-                        passField.value = data.voucherCode;
-                        document.getElementById('login-form').submit();
-                    }, 800);
-                } else if (data.status === 'FAILED') {
-                    clearInterval(pollingInterval);
-                    alert('Payment failed or was cancelled. Please try again.');
-                    document.getElementById('payment-modal').classList.remove('active');
-                }
-            })
-            .catch(function(err) {
-                console.warn('Status poll warning: ' + err.message);
-            });
-    }
-
-    document.addEventListener('DOMContentLoaded', loadPackages);
-</script>
+    <noscript>
+        <meta http-equiv="refresh" content="0; url=SERVER_BASE_URL_PLACEHOLDER/api/portal/page?token=ROUTER_TOKEN_PLACEHOLDER&amp;mac=$(mac)&amp;ip=$(ip)&amp;link-login-only=$(link-login-only)&amp;link-orig=$(link-orig)">
+    </noscript>
 </body>
 </html>

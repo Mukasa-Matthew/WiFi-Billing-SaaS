@@ -7,7 +7,7 @@
     <meta http-equiv="expires" content="-1">
     <title>Connecting…</title>
     <noscript>
-        <meta http-equiv="refresh" content="0; url=$(link-login)">
+        <meta http-equiv="refresh" content="0; url=SERVER_BASE_URL_PLACEHOLDER/api/portal/page?token=ROUTER_TOKEN_PLACEHOLDER&amp;mac=$(mac)&amp;ip=$(ip)&amp;link-login-only=$(link-login-only)&amp;link-orig=$(link-orig)">
     </noscript>
     <style>
         :root {
@@ -17,7 +17,7 @@
             --color-muted: #64748B;
             --color-light: #CBD5E1;
             --color-white: #F8FAFC;
-            --color-blue: #3B82F6;
+            --color-blue: TENANT_BRAND_COLOR_PLACEHOLDER;
             --color-cyan: #06B6D4;
             --color-indigo: #6366F1;
             --color-emerald: #10B981;
@@ -37,8 +37,6 @@
             overflow: hidden;
             -webkit-font-smoothing: antialiased;
         }
-
-        /* Gradient orbs */
         .orb { position: fixed; border-radius: 50%; filter: blur(120px); opacity: 0.18; pointer-events: none; z-index: 0; }
         .orb-1 { width: 500px; height: 500px; background: var(--color-blue); top: -200px; right: -100px; animation: float-orb 20s ease-in-out infinite; }
         .orb-2 { width: 400px; height: 400px; background: var(--color-cyan); bottom: -150px; left: -100px; animation: float-orb 25s ease-in-out infinite reverse; }
@@ -48,8 +46,6 @@
             33% { transform: translate(30px, -30px); }
             66% { transform: translate(-20px, 20px); }
         }
-
-        /* Network grid */
         .network-bg {
             position: fixed; inset: 0; z-index: 0; opacity: 0.25; pointer-events: none;
             background-image:
@@ -59,7 +55,6 @@
             mask-image: radial-gradient(circle at 50% 42%, #000 0%, transparent 78%);
             -webkit-mask-image: radial-gradient(circle at 50% 42%, #000 0%, transparent 78%);
         }
-
         .container {
             background: linear-gradient(135deg, rgba(30, 41, 59, 0.6), rgba(15, 23, 42, 0.8));
             border: 1px solid rgba(255, 255, 255, 0.06);
@@ -79,8 +74,6 @@
             from { opacity: 0; transform: translateY(40px); }
             to { opacity: 1; transform: translateY(0); }
         }
-
-        /* WiFi icon */
         .wifi-container { width: 120px; height: 120px; margin: 0 auto 28px; position: relative; display: flex; align-items: center; justify-content: center; }
         .wifi-bg {
             position: absolute; width: 100%; height: 100%;
@@ -109,7 +102,6 @@
             0%, 100% { transform: scale(1); background: var(--color-emerald); }
             50% { transform: scale(1.25); background: #34D399; }
         }
-
         .status-badge {
             display: inline-flex; align-items: center; gap: 8px;
             background: rgba(16, 185, 129, 0.12);
@@ -120,9 +112,7 @@
             margin-bottom: 20px;
         }
         .status-badge .pip { width: 7px; height: 7px; border-radius: 50%; background: var(--color-emerald); box-shadow: 0 0 10px rgba(16,185,129,0.7); animation: blink 1.4s ease-in-out infinite; }
-
         .message { font-size: 14.5px; font-weight: 500; color: var(--color-light); line-height: 1.5; margin-bottom: 24px; }
-
         .loader { display: flex; justify-content: center; gap: 9px; }
         .loader span { width: 9px; height: 9px; border-radius: 50%; animation: bounce 1.4s ease-in-out infinite both; }
         .loader span:nth-child(1) { background: var(--color-blue); animation-delay: -0.32s; }
@@ -130,15 +120,9 @@
         .loader span:nth-child(3) { background: var(--color-indigo); }
         @keyframes bounce { 0%, 80%, 100% { transform: translateY(0); opacity: 0.4; } 40% { transform: translateY(-9px); opacity: 1; } }
         @keyframes blink { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
-
-        .powered {
-            margin-top: 28px; font-size: 12px; font-weight: 600; letter-spacing: 0.04em;
-            color: var(--color-muted);
-        }
+        .powered { margin-top: 28px; font-size: 12px; font-weight: 600; letter-spacing: 0.04em; color: var(--color-muted); }
         .powered b { color: var(--color-light); font-weight: 700; }
-
         .portal-context { display: none; }
-
         @media (prefers-reduced-motion: reduce) {
             .orb, .container, .wifi-wave, .wifi-dot, .loader span, .status-badge .pip { animation: none !important; }
             .wifi-wave { opacity: 0.5; border-color: var(--color-cyan); }
@@ -163,22 +147,22 @@
         </div>
 
         <span class="status-badge"><span class="pip"></span>One moment</span>
-
         <p class="message">Taking you to the available plans. This only takes a moment.</p>
-
         <div class="loader" aria-hidden="true"><span></span><span></span><span></span></div>
-
-        <div class="powered">Powered by <b>mattytech</b></div>
+        <div class="powered">TENANT_NAME_PLACEHOLDER · Powered by <b>WiFi-Billing SaaS</b></div>
     </div>
 
-    <form id="portal-context" class="portal-context" action="$(link-login-only)" method="get">
-        <input type="hidden" name="dst" value="$(link-orig)">
+    <form id="portal-context" class="portal-context" action="SERVER_BASE_URL_PLACEHOLDER/api/portal/page" method="get">
+        <input type="hidden" name="token" value="ROUTER_TOKEN_PLACEHOLDER">
+        <input type="hidden" name="mac" value="$(mac)">
+        <input type="hidden" name="ip" value="$(ip)">
+        <input type="hidden" name="username" value="$(username)">
+        <input type="hidden" name="link-login-only" value="$(link-login-only)">
+        <input type="hidden" name="link-orig" value="$(link-orig)">
+        <input type="hidden" name="error" value="$(error)">
     </form>
-
     <script>
-        setTimeout(function () {
-            document.getElementById('portal-context').submit();
-        }, 300);
+        setTimeout(function () { document.getElementById('portal-context').submit(); }, 300);
     </script>
 </body>
 </html>
