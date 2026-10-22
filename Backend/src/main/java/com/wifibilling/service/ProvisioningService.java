@@ -113,6 +113,7 @@ public class ProvisioningService {
 
         String previousKey = router.getWgPublicKey();
         router.setWgPublicKey(publicKey);
+        router.setBindingsHash(null);
         router.setStatus(STATUS_REGISTERED);
         routerRepository.save(router);
 

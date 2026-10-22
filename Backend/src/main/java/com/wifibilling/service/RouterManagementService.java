@@ -25,7 +25,7 @@ public class RouterManagementService {
  public boolean bindingsSynced(Router r){return hash(r).equals(r.getBindingsHash());}
  public Router resolve(String token){if(!RouterTokens.isValid(token))throw new ResponseStatusException(HttpStatus.NOT_FOUND);return routers.findByToken(token).orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND));}
  private String base(Router r){return props.getPublicBaseUrl()+"/api/router/provision/"+r.getToken();}
- public String installer(String token){return RouterScriptGenerator.managementInstaller(props.getPublicBaseUrl(),token);}
+ @Transactional public String installer(String token){var r=resolve(token);r.setBindingsHash(null);routers.save(r);return RouterScriptGenerator.managementInstaller(props.getPublicBaseUrl(),token);}
  @Transactional public void acknowledgeBindings(String token,String hash){var r=resolve(token);if(hash(r).equals(hash)){r.setBindingsHash(hash);r.setBindingsSyncedAt(OffsetDateTime.now());routers.save(r);}}
  @Transactional public void acknowledgeTask(String token,Long id,boolean success){var r=resolve(token);var t=tasks.findByIdAndRouterId(id,r.getId()).orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND));if("PENDING".equals(t.getStatus())){t.setStatus(success?"APPLIED":"FAILED");t.setAppliedAt(OffsetDateTime.now());tasks.save(t);}}
  @Transactional(readOnly=true) public String script(String token){
@@ -35,7 +35,7 @@ public class RouterManagementService {
    for(var v:bindings.findAllByRouterId(r.getId())){
     String tag="wb-binding:"+v.getId();String mac=q(v.getMac());
     if(!active(v)){s.append("/ip/hotspot/active/remove [find mac-address=").append(mac).append("]\n");continue;}
-    s.append("/ip/hotspot/ip-binding/add type=bypassed mac-address=").append(mac).append(" comment=").append(q(tag));if(v.getAddress()!=null)s.append(" address=").append(q(v.getAddress()));s.append('\n');
+
     if(v.getPackagePlan()!=null){
      s.append(":local boundIp ").append(q(v.getAddress()==null?"":v.getAddress())).append('\n');
      s.append(":if ($boundIp = \"\") do={ :local lease [/ip/dhcp-server/lease find mac-address=").append(mac).append(" status=bound]; :if ([:len $lease] > 0) do={ :set boundIp [/ip/dhcp-server/lease get [:pick $lease 0] address] } }\n");
@@ -47,20 +47,33 @@ public class RouterManagementService {
      var exp=v.getExpiresAt().withOffsetSameInstant(ZoneOffset.UTC);
      s.append("/system/scheduler/add name=").append(q("wb-bind-exp-"+v.getId())).append(" start-date=").append(exp.toLocalDate()).append(" start-time=").append(exp.format(DateTimeFormatter.ofPattern("HH:mm:ss"))).append(" interval=0s policy=read,write,test on-event=").append(q(removal)).append('\n');
     }
+    s.append("/ip/hotspot/ip-binding/add type=bypassed mac-address=").append(mac).append(" comment=").append(q(tag));
+    if(v.getAddress()!=null)s.append(" address=").append(q(v.getAddress()));
+    s.append('\n');
    }
    s.append("/tool/fetch url=").append(q(base(r)+"/bindings-ack?hash="+hash)).append(" http-method=post output=none\n} on-error={ :log error \"wifi-billing: binding sync failed\" }\n");
   }
   tasks.findFirstByRouterIdAndStatusOrderByIdAsc(r.getId(),"PENDING").ifPresent(t->{
-   s.append(":do {\n").append(t.getScript()).append("\n/tool/fetch url=").append(q(base(r)+"/tasks/"+t.getId()+"/ack?success=true")).append(" http-method=post output=none\n} on-error={ /tool/fetch url=").append(q(base(r)+"/tasks/"+t.getId()+"/ack?success=false")).append(" http-method=post output=none }\n");
+   s.append(":do {\n").append("SYNC_TIME".equals(t.getAction()) ? timeScript() : t.getScript()).append("\n/tool/fetch url=").append(q(base(r)+"/tasks/"+t.getId()+"/ack?success=true")).append(" http-method=post output=none\n} on-error={ /tool/fetch url=").append(q(base(r)+"/tasks/"+t.getId()+"/ack?success=false")).append(" http-method=post output=none }\n");
   });
   return s.toString();
+ }
+ @Transactional public void enqueueDisconnect(Router router,String username) {
+  String script="/ip/hotspot/active/remove [find user="+q(username)+"]";
+  boolean pending=tasks.findAllByRouterIdOrderByCreatedAtDesc(router.getId()).stream()
+      .anyMatch(t->"PENDING".equals(t.getStatus())&&script.equals(t.getScript()));
+  if(!pending)tasks.save(RouterTask.builder().router(router).action("DISCONNECT").script(script).build());
+ }
+ private String timeScript() {
+  var now=OffsetDateTime.now(ZoneOffset.UTC);
+  return "/system/clock/set time-zone-autodetect=no time-zone-name=Etc/UTC date="+now.toLocalDate()+" time="+now.format(DateTimeFormatter.ofPattern("HH:mm:ss"));
  }
  @Transactional public RouterTask enqueue(Router r,String action){
   String script;
   if("SYNC_PORTAL".equals(action)){
    var s=new StringBuilder();for(String name:List.of("login.html","status.html","logout.html","alogin.html","redirect.html","rlogin.html","error.html"))s.append("/tool/fetch url=").append(q(props.getPublicBaseUrl()+"/api/portal/templates/"+name+"?token="+r.getToken())).append(" dst-path=").append(q("flash/hotspot/"+name)).append('\n');script=s.toString();
   }else if("SYNC_TIME".equals(action)){
-   var now=OffsetDateTime.now(ZoneOffset.UTC);script="/system/clock/set time-zone-name=Etc/UTC date="+now.toLocalDate()+" time="+now.format(DateTimeFormatter.ofPattern("HH:mm:ss"));
+   script=timeScript();
   }else throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Unknown router action");
   if(tasks.findFirstByRouterIdAndStatusOrderByIdAsc(r.getId(),"PENDING").isPresent())throw new ResponseStatusException(HttpStatus.CONFLICT,"A router action is already pending");
   return tasks.save(RouterTask.builder().router(r).action(action).script(script).build());

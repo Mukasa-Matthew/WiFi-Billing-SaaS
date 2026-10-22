@@ -27,6 +27,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class RouterController {
 
     private final RouterRepository routerRepository;
+    private final com.wifibilling.repository.IpBindingRepository bindingRepository;
+    private final com.wifibilling.repository.RouterTaskRepository taskRepository;
     private final com.wifibilling.service.WireGuardIpAllocator ipAllocator;
     private final TenantRepository tenantRepository;
     private final TransactionRepository transactionRepository;
@@ -96,6 +98,10 @@ public class RouterController {
                     "Router has payment history and cannot be deleted");
         }
 
+        if (bindingRepository.existsByRouterId(id)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Router has binding history and cannot be deleted");
+        }
+        taskRepository.deleteAllByRouterId(id);
         String publicKey = router.getWgPublicKey();
         if (router.getWgIp() != null && !router.getWgIp().isBlank()) {
             nasRepository.deleteByNasname(router.getWgIp());
