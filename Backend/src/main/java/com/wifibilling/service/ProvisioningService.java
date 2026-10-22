@@ -76,7 +76,7 @@ public class ProvisioningService {
                 router.getName(),
                 defaultValue(router.getWanInterface(), "ether1"),
                 router.getHotspotInterfaces() == null || router.getHotspotInterfaces().isBlank()
-                        ? List.of("ether2", "ether3", "ether4", "ether5", "wlan1")
+                        ? List.of()
                         : List.of(router.getHotspotInterfaces().split(",")),
                 defaultValue(router.getWifiSsid(), "WiFi Hotspot"),
                 router.getToken(),

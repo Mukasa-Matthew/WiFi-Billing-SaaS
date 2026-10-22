@@ -107,11 +107,20 @@ public class RouterScriptGenerator {
         s.append(":if ([:len [/ip/dhcp-client find interface=").append(q(c.wanInterface())).append("]] = 0) do={ /ip/dhcp-client add interface=")
                 .append(q(c.wanInterface())).append(" disabled=no comment=").append(tag).append(" }\n");
         s.append("/interface/bridge add name=").append(q(BRIDGE_NAME)).append(" protocol-mode=rstp comment=").append(tag).append('\n');
-        for (String hotspotInterface : c.hotspotInterfaces()) {
-            s.append(":if ([:len [/interface find name=").append(q(hotspotInterface)).append("]] > 0) do={ ")
-                    .append("/interface/bridge/port/remove [find interface=").append(q(hotspotInterface)).append("]; ")
+        if (c.hotspotInterfaces() == null || c.hotspotInterfaces().isEmpty()) {
+            // Auto mode: bridge every ethernet port except the WAN uplink, whatever the model.
+            s.append(":foreach e in=[/interface/ethernet find] do={ :local n [/interface/ethernet get $e name]; ")
+                    .append(":if ($n != ").append(q(c.wanInterface())).append(") do={ ")
+                    .append("/interface/bridge/port/remove [find interface=$n]; ")
                     .append("/interface/bridge/port add bridge=").append(q(BRIDGE_NAME))
-                    .append(" interface=").append(q(hotspotInterface)).append(" comment=").append(tag).append(" }\n");
+                    .append(" interface=$n comment=").append(tag).append(" } }\n");
+        } else {
+            for (String hotspotInterface : c.hotspotInterfaces()) {
+                s.append(":if ([:len [/interface find name=").append(q(hotspotInterface)).append("]] > 0) do={ ")
+                        .append("/interface/bridge/port/remove [find interface=").append(q(hotspotInterface)).append("]; ")
+                        .append("/interface/bridge/port add bridge=").append(q(BRIDGE_NAME))
+                        .append(" interface=").append(q(hotspotInterface)).append(" comment=").append(tag).append(" }\n");
+            }
         }
         // Keep the router manageable: the hotspot bridge must be in the LAN list, otherwise the
         // default firewall, MAC-WinBox and neighbor discovery ignore it and WinBox can't find the router.

@@ -11,7 +11,7 @@ public class RouterDto {
     public record CreateRequest(
             @NotBlank @Size(max = 80) String name,
             @Pattern(regexp = "[A-Za-z0-9._-]{1,32}") String wanInterface,
-            @Size(max = 10) List<@Pattern(regexp = "[A-Za-z0-9._-]{1,32}") String> hotspotInterfaces,
+            @Size(max = 32) List<@Pattern(regexp = "[A-Za-z0-9._-]{1,32}") String> hotspotInterfaces,
             @Pattern(regexp = "[\\x20-\\x7E]{1,32}") String wifiSsid) {
     }
 

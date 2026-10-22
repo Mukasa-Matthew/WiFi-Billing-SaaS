@@ -52,8 +52,10 @@ public class RouterController {
 
         String token = "tok_" + UUID.randomUUID().toString().replace("-", "");
         String wanInterface = valueOrDefault(req.wanInterface(), "ether1");
+        // Empty list = auto mode: the provisioning script bridges every ethernet
+        // port except the WAN uplink, so any router model works without config.
         List<String> hotspotInterfaces = req.hotspotInterfaces() == null || req.hotspotInterfaces().isEmpty()
-                ? List.of("ether2", "ether3", "ether4", "ether5", "wlan1")
+                ? List.of()
                 : new LinkedHashSet<>(req.hotspotInterfaces()).stream().toList();
         if (hotspotInterfaces.contains(wanInterface)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
@@ -140,7 +142,7 @@ public class RouterController {
 
     private static List<String> hotspotInterfaces(String value) {
         return value == null || value.isBlank()
-                ? List.of("ether2", "ether3", "ether4", "ether5", "wlan1")
+                ? List.of()
                 : List.of(value.split(","));
     }
 }
