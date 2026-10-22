@@ -72,7 +72,7 @@ export default function TenantDashboardOverview() {
       <section className={`${panel} flex flex-wrap items-center justify-between gap-4 bg-white px-6 py-5`}>
         <div>
           <p className="mb-1 text-xs font-medium text-slate-500">YOUR BUSINESS AT A GLANCE</p>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Welcome back, {user?.name || "Hotspot Admin"}</h1>
+          <h1 className="text-xl font-bold tracking-tight text-slate-900">Welcome back, {user?.name || "Hotspot Admin"}</h1>
           <p className="mt-1 text-sm text-slate-500">Sales, customers, and your hotspot network in one place.</p>
         </div>
         <div className="flex items-center gap-2">

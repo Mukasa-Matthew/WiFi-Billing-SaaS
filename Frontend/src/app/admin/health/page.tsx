@@ -38,7 +38,7 @@ export default function AdminHealthPage() {
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2.5">
+        <h1 className="text-xl font-bold tracking-tight text-slate-900 flex items-center gap-2.5">
           <Server className="w-6 h-6 text-amber-700" />
           <span>System &amp; VPN Health</span>
         </h1>

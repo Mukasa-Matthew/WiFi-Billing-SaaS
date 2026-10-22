@@ -138,7 +138,7 @@ export default function TenantActiveSessionsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2.5">
+          <h1 className="text-xl font-bold tracking-tight text-slate-900 flex items-center gap-2.5">
             <Radio className="w-6 h-6 text-emerald-700 animate-pulse" />
             <span>Live Active Sessions</span>
           </h1>
@@ -191,7 +191,7 @@ export default function TenantActiveSessionsPage() {
         <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-between">
           <div className="space-y-1">
             <span className="text-xs font-medium text-slate-500">Connected Users</span>
-            <div className="text-2xl font-extrabold text-slate-900 flex items-center gap-2">
+            <div className="text-2xl font-bold tabular-nums text-slate-900 flex items-center gap-2">
               <span>{sessions.length}</span>
               <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
@@ -207,11 +207,11 @@ export default function TenantActiveSessionsPage() {
         <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-between">
           <div className="space-y-1">
             <span className="text-xs font-medium text-slate-500">Total Live Download</span>
-            <div className="text-2xl font-extrabold text-cyan-400">
+            <div className="text-2xl font-bold tabular-nums text-blue-700">
               {formatBytes(totalDownloadBytes)}
             </div>
           </div>
-          <div className="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
+          <div className="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-blue-700">
             <ArrowDownCircle className="w-5 h-5" />
           </div>
         </div>
@@ -219,11 +219,11 @@ export default function TenantActiveSessionsPage() {
         <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-between">
           <div className="space-y-1">
             <span className="text-xs font-medium text-slate-500">Total Live Upload</span>
-            <div className="text-2xl font-extrabold text-purple-400">
+            <div className="text-2xl font-bold tabular-nums text-amber-700">
               {formatBytes(totalUploadBytes)}
             </div>
           </div>
-          <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400">
+          <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-amber-700">
             <ArrowUpCircle className="w-5 h-5" />
           </div>
         </div>
@@ -293,11 +293,11 @@ export default function TenantActiveSessionsPage() {
                     </td>
                     <td className="py-3 px-4 font-mono text-slate-700">
                       <div className="flex items-center gap-2">
-                        <span className="text-cyan-400 flex items-center gap-0.5">
+                        <span className="text-blue-700 flex items-center gap-0.5">
                           ↓ {formatBytes(session.acctOutputOctets)}
                         </span>
                         <span className="text-slate-600">/</span>
-                        <span className="text-purple-400 flex items-center gap-0.5">
+                        <span className="text-amber-700 flex items-center gap-0.5">
                           ↑ {formatBytes(session.acctInputOctets)}
                         </span>
                       </div>
