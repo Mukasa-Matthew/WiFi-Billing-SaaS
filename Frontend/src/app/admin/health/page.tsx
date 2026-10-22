@@ -8,28 +8,28 @@ export default function AdminHealthPage() {
     {
       name: "WireGuard Mesh Hub (wg0)",
       description: "Virtual network hub on 10.9.0.1/16, listening on UDP 443",
-      status: "HEALTHY",
+      status: "NOT VERIFIED",
       icon: Radio,
       badge: "UDP 443",
     },
     {
-      name: "FreeRADIUS 3.2.5 Core",
+      name: "FreeRADIUS core",
       description: "SQL-backed authorization via radcheck/radreply and RFC 5176 CoA/PoD on port 3799",
-      status: "HEALTHY",
+      status: "NOT VERIFIED",
       icon: Activity,
       badge: "RADIUS 1812/3799",
     },
     {
       name: "PostgreSQL Database Engine",
       description: "Shared database (radius_db) servicing both Spring Boot backend and FreeRADIUS",
-      status: "HEALTHY",
+      status: "NOT VERIFIED",
       icon: Database,
       badge: "JDBC 5432",
     },
     {
       name: "Voucher Expiration & Disconnect Worker",
       description: "30-second scheduled background task detecting newly logged-in vouchers and kicking expired sessions",
-      status: "ACTIVE",
+      status: "NOT VERIFIED",
       icon: Server,
       badge: "WORKER",
     },
@@ -39,11 +39,11 @@ export default function AdminHealthPage() {
     <div className="space-y-6 max-w-7xl mx-auto">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2.5">
-          <Server className="w-6 h-6 text-emerald-700" />
+          <Server className="w-6 h-6 text-amber-700" />
           <span>System &amp; VPN Health</span>
         </h1>
         <p className="text-xs text-slate-500 mt-1">
-          Diagnostics for FreeRADIUS AAA core, WireGuard hub, and automated background workers
+          Configured services. Live probes are not connected; these cards do not report current health.
         </p>
       </div>
 
@@ -66,7 +66,7 @@ export default function AdminHealthPage() {
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 mb-3">{c.description}</p>
-                <div className="flex items-center gap-1.5 text-xs text-emerald-700 font-medium">
+                <div className="flex items-center gap-1.5 text-xs text-amber-700 font-medium">
                   <CheckCircle2 className="w-3.5 h-3.5" />
                   <span>{c.status}</span>
                 </div>

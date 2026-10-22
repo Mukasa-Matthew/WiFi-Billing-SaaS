@@ -17,3 +17,12 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
+
+/* Keep keyboard navigation visible on both white panels and the navy sidebar. */
+:focus-visible { outline: 2px solid #3b82f6; outline-offset: 3px; }
+.sidebar-scroll { scrollbar-width: thin; scrollbar-color: #54708e transparent; }
+.sidebar-scroll::-webkit-scrollbar { width: 6px; }
+.sidebar-scroll::-webkit-scrollbar-thumb { background: #54708e; border-radius: 8px; }
+.request-progress { animation: request-progress 1.2s ease-in-out infinite; }
+@keyframes request-progress { from { transform: translateX(-100%); } to { transform: translateX(400%); } }
+@media (prefers-reduced-motion: reduce) { .request-progress { animation: none; width: 100%; } }

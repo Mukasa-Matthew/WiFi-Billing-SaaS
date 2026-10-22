@@ -2,9 +2,11 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { DashboardLoading, LoadingIndicator } from "@/components/LoadingUI";
+import { EmptyState } from "@/components/BillingUI";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
-import { ArrowUpRight, Eye, EyeOff, RefreshCw, Router, Ticket, Users, Wallet, Activity, AlertCircle, Plus } from "lucide-react";
+import { ArrowUpRight, Eye, EyeOff, RefreshCw, Router, Ticket, Users, Wallet, Activity, AlertCircle } from "lucide-react";
 
 interface WeeklySale { date: string; day: string; revenue: number; transactions: number }
 interface Consumer { radAcctId: number; username: string; framedIpAddress: string; totalOctets: number; acctSessionTime: number }
@@ -63,18 +65,19 @@ export default function TenantDashboardOverview() {
     { label: "Router health", value: `${stats?.totalRouters || 0} router${stats?.totalRouters === 1 ? "" : "s"}`, detail: `${stats?.onlineRouters || 0} online · ${Math.max(0, (stats?.totalRouters || 0) - (stats?.onlineRouters || 0))} offline / pending`, icon: Router, color: "text-amber-700" },
   ];
 
+  if (loading && !stats) return <DashboardLoading />;
+
   return (
     <div className="mx-auto max-w-7xl space-y-5">
       <section className={`${panel} flex flex-wrap items-center justify-between gap-4 bg-white px-6 py-5`}>
         <div>
           <p className="mb-1 text-xs font-medium text-slate-500">YOUR BUSINESS AT A GLANCE</p>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900">Welcome back, {user?.name || "Hotspot Admin"}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Welcome back, {user?.name || "Hotspot Admin"}</h1>
           <p className="mt-1 text-sm text-slate-500">Sales, customers, and your hotspot network in one place.</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setHidden(!hidden)} aria-label={hidden ? "Show revenue" : "Hide revenue"} className="rounded-lg border border-slate-300 p-2.5 text-slate-500 hover:text-slate-900">{hidden ? <EyeOff size={16} /> : <Eye size={16} />}</button>
           <button onClick={fetchStats} disabled={loading} aria-label="Refresh dashboard" className="rounded-lg border border-slate-300 p-2.5 text-slate-500 hover:text-slate-900 disabled:opacity-50"><RefreshCw size={16} className={loading ? "animate-spin" : ""} /></button>
-          <Link href="/dashboard/routers/new" className="flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2.5 text-xs font-semibold text-white hover:bg-blue-500"><Plus size={15} />Add router</Link>
         </div>
       </section>
 
@@ -82,9 +85,9 @@ export default function TenantDashboardOverview() {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-busy={loading}>
         {cards.map(({ label, value, detail, icon: Icon, color }) => (
-          <section key={label} className={`${panel} min-h-36 p-5`}>
-            <p className="text-xs font-medium text-slate-500">{label}</p>
-            <p className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">{display(value)}</p>
+          <section key={label} className={`${panel} min-h-36 p-5 lg:p-6`}>
+            <p className="text-sm font-medium text-slate-600">{label}</p>
+            <p className="mt-3 text-3xl font-semibold tracking-tight tabular-nums text-slate-900">{display(value)}</p>
             <p className={`mt-3 flex items-center gap-2 text-xs ${color}`}><Icon size={14} />{stats ? detail : "Awaiting dashboard data"}</p>
           </section>
         ))}
@@ -95,14 +98,27 @@ export default function TenantDashboardOverview() {
           { title: "Completed sales", subtitle: "Number of successful payments", max: maxTransactions, color: "bg-blue-500", value: (day: WeeklySale) => day.transactions, format: (day: WeeklySale) => `${day.transactions} payments` }].map((chart) => (
           <section key={chart.title} className={panel}>
             <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4"><div><h2 className="text-sm font-semibold text-slate-900">{chart.title}</h2><p className="mt-1 text-xs text-slate-500">{chart.subtitle}</p></div><span className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700">Last 7 days</span></div>
-            <div className="relative px-5 pb-5 pt-8">
-              <div className="absolute inset-x-5 top-8 bottom-12 flex flex-col justify-between" aria-hidden="true">{[0, 1, 2, 3, 4].map((i) => <div key={i} className="border-t border-slate-200" />)}</div>
-              <div className="relative flex h-48 items-end justify-around gap-3" aria-label={`${chart.title} for the last seven days`}>
-                {sales.map((day) => <div key={day.date} className="flex h-full min-w-0 flex-1 flex-col justify-end items-center gap-2"><div tabIndex={0} title={`${day.day}: ${chart.format(day)}`} aria-label={`${day.day}: ${chart.format(day)}`} style={{ height: `${chart.title === "Revenue" && hidden ? 0 : chart.value(day) / chart.max * 100}%`, minHeight: 2 }} className={`w-full max-w-12 rounded-t-sm ${chart.color} hover:opacity-80`} /><span className="text-[11px] text-slate-500">{day.day}</span></div>)}
-                {!sales.length && <p className="self-center text-sm text-slate-500">{loading ? "Loading sales…" : "No sales data available"}</p>}
-              </div>
-              {sales.length > 0 && !sales.some((day) => chart.value(day) > 0) && <p className="absolute inset-x-0 top-24 text-center text-xs text-slate-500">No successful payments in this period</p>}
-              {chart.title === "Revenue" && hidden && <p className="absolute inset-x-0 top-24 text-center text-xs text-slate-500">Revenue hidden</p>}
+            <div className="p-5">
+              {chart.title === "Revenue" && hidden ? (
+                <EmptyState title="Revenue hidden" description="Use the eye button to show your revenue chart." />
+              ) : !stats ? (
+                <EmptyState title="Sales data unavailable" description="Refresh the dashboard to try again." />
+              ) : !sales.some(day => chart.value(day) > 0) ? (
+                <EmptyState title="No successful payments yet" description="Your last seven days of sales will appear here as payments are recorded." action={<Link href="/dashboard/payments" className="mt-2 text-sm font-semibold text-blue-700">View payments →</Link>} />
+              ) : (
+                <div className="flex h-56 items-end gap-3" role="img" aria-label={`${chart.title} for the last seven days`}>
+                  {sales.map(day => (
+                    <div key={day.date} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end">
+                      <div className="flex w-full flex-1 items-end justify-center border-b border-slate-200">
+                        <div tabIndex={0} title={`${day.day}: ${chart.format(day)}`} aria-label={`${day.day}: ${chart.format(day)}`}
+                          style={{ height: `${chart.value(day) / chart.max * 100}%` }}
+                          className={`w-full max-w-12 rounded-t ${chart.color} transition-opacity hover:opacity-80`} />
+                      </div>
+                      <span className="mt-3 text-xs font-medium text-slate-600">{day.day}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </section>
         ))}
@@ -112,8 +128,8 @@ export default function TenantDashboardOverview() {
         <section className={panel}>
           <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4"><div><h2 className="text-sm font-semibold text-slate-900">Top data users</h2><p className="mt-1 text-xs text-slate-500">Highest usage among current sessions</p></div><Link href="/dashboard/sessions" className="flex items-center gap-1 text-xs text-blue-700">View sessions<ArrowUpRight size={14} /></Link></div>
           <div className="divide-y divide-slate-100 px-5">
-            {stats?.topConsumers.map((session, index) => <div key={session.radAcctId} className="flex items-center gap-3 py-4"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-xs text-slate-500">{index + 1}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-slate-700">{session.username}</p><p className="mt-1 text-xs text-slate-500">{session.framedIpAddress || "IP unavailable"}</p></div><span className="rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">{bytes(session.totalOctets)}</span></div>)}
-            {!stats?.topConsumers.length && <div className="py-12 text-center"><Users className="mx-auto mb-3 h-7 w-7 text-slate-600" /><p className="text-sm text-slate-500">{loading ? "Loading sessions…" : "No active users yet"}</p><p className="mt-1 text-xs text-slate-500">Connected customers will appear here.</p></div>}
+            {stats?.topConsumers?.map((session, index) => <div key={session.radAcctId} className="flex items-center gap-3 py-4"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-xs text-slate-500">{index + 1}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-slate-700">{session.username}</p><p className="mt-1 text-xs text-slate-500">{session.framedIpAddress || "IP unavailable"}</p></div><span className="rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">{bytes(session.totalOctets)}</span></div>)}
+            {!stats?.topConsumers?.length && <div className="py-12 text-center"><Users className="mx-auto mb-3 h-7 w-7 text-slate-600" /><p className="text-sm text-slate-500">{loading ? "Loading sessions…" : "No active users yet"}</p><p className="mt-1 text-xs text-slate-500">Connected customers will appear here.</p></div>}
           </div>
         </section>
         <section className={panel}>
@@ -144,11 +160,11 @@ export default function TenantDashboardOverview() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {stats?.routerRevenue.map((router) => (
+              {stats?.routerRevenue?.map((router) => (
                 <tr key={router.routerId} className="hover:bg-slate-50">
                   <td className="px-5 py-3.5 font-medium text-slate-700">{router.name}</td>
                   <td className="px-5 py-3.5">
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${router.status === "online" || router.status === "registered" ? "bg-emerald-50 text-emerald-700" : "bg-slate-500/10 text-slate-500"}`}>{router.status}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${router.status === "online" ? "bg-emerald-50 text-emerald-700" : router.status === "registered" ? "bg-amber-50 text-amber-700" : "bg-slate-100 text-slate-600"}`}>{router.status}</span>
                   </td>
                   <td className="px-5 py-3.5 text-right text-slate-700">{router.activeUsers}</td>
                   <td className="px-5 py-3.5 text-right font-medium text-slate-900">{money(router.revenueToday)}</td>
@@ -159,11 +175,12 @@ export default function TenantDashboardOverview() {
               ))}
             </tbody>
           </table>
-          {!stats?.routerRevenue.length && <div className="py-12 text-center"><Router className="mx-auto mb-3 h-7 w-7 text-slate-600" /><p className="text-sm text-slate-500">{loading ? "Loading routers…" : "No routers linked yet"}</p><p className="mt-1 text-xs text-slate-500">Revenue will be tracked per router once you link one.</p></div>}
+          {!stats?.routerRevenue?.length && <div className="py-12 text-center"><Router className="mx-auto mb-3 h-7 w-7 text-slate-600" /><p className="text-sm text-slate-500">{loading ? "Loading routers…" : "No routers linked yet"}</p><p className="mt-1 text-xs text-slate-500">Revenue will be tracked per router once you link one.</p></div>}
         </div>
       </section>
 
-      <p className="text-right text-[11px] text-slate-500">{updated ? `Updated ${updated} · Refreshes every 30 seconds` : "Waiting for first update"}</p>
+      {loading && <LoadingIndicator label="Refreshing dashboard…" />}
+      <p className="text-right text-xs text-slate-600">{updated ? `Updated ${updated} · Refreshes every 30 seconds` : "Waiting for first update"}</p>
     </div>
   );
 }
