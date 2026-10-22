@@ -97,10 +97,10 @@ export function StatCard({ label, value, icon, hintText, tone }: {
   );
 }
 
-export function EmptyState({ title, description, action }: { title: string; description?: string; action?: React.ReactNode }) {
+export function EmptyState({ title, description, action, icon }: { title: string; description?: string; action?: React.ReactNode; icon?: React.ReactNode }) {
   return (
     <div className="flex flex-col items-center justify-center gap-2 py-14 text-center">
-      <Inbox className="h-8 w-8 text-slate-700" />
+      {icon || <Inbox className="h-8 w-8 text-slate-300" />}
       <p className="text-sm font-semibold text-slate-700">{title}</p>
       {description && <p className="max-w-sm text-xs text-slate-500">{description}</p>}
       {action}
@@ -182,3 +182,8 @@ export function date(value: string | null) { return value ? new Date(value).toLo
 export function bytes(value: number) { return value < 1048576 ? `${(value / 1024).toFixed(1)} KB` : value < 1073741824 ? `${(value / 1048576).toFixed(2)} MB` : `${(value / 1073741824).toFixed(2)} GB`; }
 export function remaining(value: number | null) { if (value === null) return "Not started"; if (value === 0) return "Expired"; return `${Math.floor(value / 86400)}d ${Math.floor(value % 86400 / 3600)}h ${Math.floor(value % 3600 / 60)}m`; }
 export function ugx(v: number | string | null | undefined) { return `UGX ${Number(v || 0).toLocaleString()}`; }
+
+export function PageContainer({ children, width = "default" }: { children: React.ReactNode; width?: "narrow" | "default" | "wide" }) {
+  const w = width === "narrow" ? "max-w-3xl" : width === "wide" ? "max-w-[1440px]" : "max-w-6xl";
+  return <div className={`mx-auto ${w} space-y-6`}>{children}</div>;
+}
