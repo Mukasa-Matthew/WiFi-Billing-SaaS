@@ -5,6 +5,7 @@ import { LinkPending } from "@/components/LoadingUI";
 import React, { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import api from "@/lib/api";
 import {
   LayoutDashboard,
   Router as RouterIcon,
@@ -22,9 +23,18 @@ import {
   Banknote,
   Link2,
   FileText,
+  ChevronDown,
 } from "lucide-react";
 
 const NAVY = "#122B49";
+
+interface SidebarStats {
+  activeUsers?: number;
+  totalVouchers?: number;
+  activeVouchers?: number;
+  totalRouters?: number;
+  onlineRouters?: number;
+}
 
 export default function TenantDashboardLayout({
   children,
@@ -35,6 +45,15 @@ export default function TenantDashboardLayout({
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [stats, setStats] = useState<SidebarStats | null>(null);
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    if (!user) return;
+    api.get<SidebarStats>("/api/dashboard/stats")
+      .then((r) => setStats(r.data))
+      .catch(() => {});
+  }, [user]);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -52,6 +71,12 @@ export default function TenantDashboardLayout({
       </div>
     );
   }
+
+  const counts: Record<string, number | undefined> = {
+    "Active users": stats?.activeUsers,
+    "Vouchers": stats?.activeVouchers,
+    "MikroTik routers": stats?.totalRouters,
+  };
 
   const navItems = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, group: "Overview" },
@@ -117,33 +142,50 @@ export default function TenantDashboardLayout({
           <nav className="space-y-0.5 p-4">
             {navItems.map((item, index) => {
               const Icon = item.icon;
+              const newGroup = index === 0 || navItems[index - 1].group !== item.group;
+              const isGroupCollapsed = collapsed[item.group];
               const isActive =
                 item.href === "/dashboard"
                   ? pathname === "/dashboard"
                   : item.href === "/dashboard/routers"
                     ? pathname === "/dashboard/routers"
                     : pathname?.startsWith(item.href);
+              const count = counts[item.name];
               return (
                 <React.Fragment key={item.href}>
-                  {(index === 0 || navItems[index - 1].group !== item.group) && (
-                    <p className={`px-3 pb-1.5 ${index === 0 ? "" : "pt-3"} text-[10px] font-bold uppercase tracking-widest text-blue-200`}>
-                      {item.group}
-                    </p>
+                  {newGroup && (
+                    <button
+                      type="button"
+                      onClick={() => setCollapsed((c) => ({ ...c, [item.group]: !c[item.group] }))}
+                      aria-expanded={!isGroupCollapsed}
+                      className={`flex w-full items-center justify-between px-3 pb-1.5 ${index === 0 ? "" : "pt-3"} text-[10px] font-bold uppercase tracking-widest text-blue-200/70 hover:text-blue-100`}
+                    >
+                      <span>{item.group}</span>
+                      <ChevronDown className={`h-3 w-3 transition-transform ${isGroupCollapsed ? "-rotate-90" : ""}`} />
+                    </button>
                   )}
-                  <Link
-                    onClick={() => setMenuOpen(false)}
-                    aria-current={isActive ? "page" : undefined}
-                    href={item.href}
-                    className={`relative flex items-center gap-3 rounded-lg px-3.5 py-2 text-[13px] font-medium transition ${
-                      isActive
-                        ? "bg-white text-[#122B49] shadow-sm"
-                        : "text-slate-200 hover:bg-white/10 hover:text-white"
-                    }`}
-                  >
-                    {isActive && <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r bg-blue-400" />}
-                    <Icon className="h-4 w-4 shrink-0" />
-                    <span className="flex-1">{item.name}</span><LinkPending />
-                  </Link>
+                  {!isGroupCollapsed && (
+                    <Link
+                      onClick={() => setMenuOpen(false)}
+                      aria-current={isActive ? "page" : undefined}
+                      href={item.href}
+                      className={`relative flex items-center gap-3 rounded-lg px-3.5 py-2 text-[13px] font-medium transition ${
+                        isActive
+                          ? "bg-white text-[#122B49] shadow-sm"
+                          : "text-slate-200 hover:bg-white/10 hover:text-white"
+                      }`}
+                    >
+                      {isActive && <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r bg-blue-400" />}
+                      <Icon className="h-4 w-4 shrink-0" />
+                      <span className="flex-1">{item.name}</span>
+                      {count !== undefined && count > 0 && (
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${isActive ? "bg-blue-100 text-[#122B49]" : "bg-white/15 text-white"}`}>
+                          {count > 999 ? `${(count / 1000).toFixed(1)}k` : count}
+                        </span>
+                      )}
+                      <LinkPending />
+                    </Link>
+                  )}
                 </React.Fragment>
               );
             })}
