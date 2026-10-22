@@ -38,11 +38,11 @@ export default function AdminHealthPage() {
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2.5">
-          <Server className="w-6 h-6 text-emerald-400" />
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2.5">
+          <Server className="w-6 h-6 text-emerald-700" />
           <span>System &amp; VPN Health</span>
         </h1>
-        <p className="text-xs text-slate-400 mt-1">
+        <p className="text-xs text-slate-500 mt-1">
           Diagnostics for FreeRADIUS AAA core, WireGuard hub, and automated background workers
         </p>
       </div>
@@ -53,20 +53,20 @@ export default function AdminHealthPage() {
           return (
             <div
               key={c.name}
-              className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800/80 flex items-start gap-4"
+              className="p-5 rounded-2xl bg-white/70 border border-slate-200 flex items-start gap-4"
             >
-              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-indigo-400 shrink-0">
+              <div className="p-3 rounded-xl bg-[#F5F7FA] border border-slate-200 text-blue-700 shrink-0">
                 <Icon className="w-5 h-5" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-1">
-                  <h3 className="text-sm font-semibold text-white truncate">{c.name}</h3>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                  <h3 className="text-sm font-semibold text-slate-900 truncate">{c.name}</h3>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
                     {c.badge}
                   </span>
                 </div>
-                <p className="text-xs text-slate-400 mb-3">{c.description}</p>
-                <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-medium">
+                <p className="text-xs text-slate-500 mb-3">{c.description}</p>
+                <div className="flex items-center gap-1.5 text-xs text-emerald-700 font-medium">
                   <CheckCircle2 className="w-3.5 h-3.5" />
                   <span>{c.status}</span>
                 </div>

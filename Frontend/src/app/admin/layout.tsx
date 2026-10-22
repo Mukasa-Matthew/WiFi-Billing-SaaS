@@ -1,7 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
-import Link from "next/navigation";
+import React, { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -11,9 +10,11 @@ import {
   Server,
   LogOut,
   Radio,
-  Shield,
-  Layers
+  ShieldCheck,
+  Menu,
 } from "lucide-react";
+
+const NAVY = "#0B1F36";
 
 export default function AdminLayout({
   children,
@@ -23,6 +24,7 @@ export default function AdminLayout({
   const { user, loading, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     if (!loading) {
@@ -36,123 +38,126 @@ export default function AdminLayout({
 
   if (loading || !user || user.role !== "ROLE_SUPERADMIN") {
     return (
-      <div className="flex h-screen items-center justify-center bg-slate-950 text-slate-400">
+      <div className="flex h-screen items-center justify-center bg-[#F5F7FA] text-slate-500">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
-          <p className="text-sm">Verifying Superadmin Access...</p>
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-700 border-t-transparent" />
+          <p className="text-sm">Verifying platform access…</p>
         </div>
       </div>
     );
   }
 
   const navItems = [
-    { name: "Platform Overview", href: "/admin", icon: Activity },
-    { name: "Hotspot Operators", href: "/admin/tenants", icon: Users },
-    { name: "Fleet Routers", href: "/admin/routers", icon: RouterIcon },
-    { name: "VPN & Mesh Health", href: "/admin/health", icon: Server },
+    { name: "Platform overview", href: "/admin", icon: Activity, group: "Platform" },
+    { name: "Tenants", href: "/admin/tenants", icon: Users, group: "Platform" },
+    { name: "Router fleet", href: "/admin/routers", icon: RouterIcon, group: "Devices" },
+    { name: "Network health", href: "/admin/health", icon: Server, group: "Devices" },
   ];
 
+  const activeItem = navItems.find(
+    (item) => item.href === "/admin" ? pathname === "/admin" : pathname?.startsWith(item.href)
+  );
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex">
+    <div className="h-dvh overflow-hidden bg-[#F5F7FA] text-slate-900 flex">
+      {menuOpen && (
+        <button aria-label="Close navigation" onClick={() => setMenuOpen(false)}
+          className="fixed inset-0 z-30 bg-white/50 md:hidden" />
+      )}
+
       {/* Sidebar */}
-      <aside className="w-64 border-r border-slate-800/80 bg-slate-900/60 backdrop-blur-xl flex flex-col justify-between shrink-0">
-        <div>
-          {/* Logo */}
-          <div className="h-16 flex items-center gap-3 px-6 border-b border-slate-800/80">
-            <div className="p-2 rounded-xl bg-gradient-to-tr from-indigo-600 to-emerald-500 text-white shadow-md shadow-indigo-600/20">
-              <Radio className="w-5 h-5" />
+      <aside
+        className={`${menuOpen ? "flex" : "hidden"} fixed inset-y-0 left-0 z-40 w-64 flex-col justify-between shrink-0 md:static md:flex`}
+        style={{ backgroundColor: NAVY }}
+      >
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="flex h-16 items-center gap-3 border-b border-white/10 px-5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 text-slate-900">
+              <Radio className="h-4.5 w-4.5" />
             </div>
             <div>
-              <span className="font-bold text-sm tracking-tight text-white block">
-                WiFi-Billing
-              </span>
-              <span className="text-[10px] text-indigo-400 font-medium tracking-wide uppercase block">
-                Superadmin Core
+              <span className="block text-sm font-bold tracking-tight text-slate-900">WiFi-Billing</span>
+              <span className="block text-[10px] font-semibold uppercase tracking-widest text-blue-200/70">
+                Platform admin
               </span>
             </div>
           </div>
 
-          {/* Navigation Links */}
-          <nav className="p-4 space-y-1.5">
-            <p className="px-3 pb-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-              Administration
-            </p>
-            {navItems.map((item) => {
+          <nav className="space-y-0.5 p-4">
+            {navItems.map((item, index) => {
               const Icon = item.icon;
               const isActive =
-                item.href === "/admin"
-                  ? pathname === "/admin"
-                  : pathname?.startsWith(item.href);
-
+                item.href === "/admin" ? pathname === "/admin" : pathname?.startsWith(item.href);
               return (
-                <a
-                  key={item.href}
-                  href={item.href}
-                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all ${
-                    isActive
-                      ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/20 font-semibold"
-                      : "text-slate-400 hover:text-white hover:bg-slate-800/60"
-                  }`}
-                >
-                  <Icon className={`w-4 h-4 ${isActive ? "text-white" : "text-slate-400"}`} />
-                  <span>{item.name}</span>
-                </a>
+                <React.Fragment key={item.href}>
+                  {(index === 0 || navItems[index - 1].group !== item.group) && (
+                    <p className={`px-3 pb-1.5 ${index === 0 ? "" : "pt-4"} text-[10px] font-bold uppercase tracking-widest text-blue-200/50`}>
+                      {item.group}
+                    </p>
+                  )}
+                  <a
+                    onClick={() => setMenuOpen(false)}
+                    aria-current={isActive ? "page" : undefined}
+                    href={item.href}
+                    className={`relative flex items-center gap-3 rounded-lg px-3.5 py-2.5 text-[13px] font-medium transition ${
+                      isActive
+                        ? "bg-white/10 text-slate-900"
+                        : "text-blue-100/70 hover:bg-white/5 hover:text-slate-900"
+                    }`}
+                  >
+                    {isActive && <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r bg-blue-400" />}
+                    <Icon className="h-4 w-4 shrink-0" />
+                    <span>{item.name}</span>
+                  </a>
+                </React.Fragment>
               );
             })}
           </nav>
         </div>
 
-        {/* User Card & Logout */}
-        <div className="p-4 border-t border-slate-800/80 bg-slate-950/40">
-          <div className="flex items-center gap-3 mb-3 px-1">
-            <div className="w-9 h-9 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 font-bold text-xs">
-              <Shield className="w-4 h-4" />
+        <div className="border-t border-white/10 p-4">
+          <div className="mb-3 flex items-center gap-3 px-1">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-slate-900">
+              <ShieldCheck className="h-4 w-4" />
             </div>
-            <div className="overflow-hidden">
-              <p className="text-xs font-semibold text-white truncate">
-                {user.name}
-              </p>
-              <p className="text-[11px] text-slate-400 truncate">{user.email}</p>
+            <div className="min-w-0">
+              <p className="truncate text-xs font-semibold text-slate-900">{user.name}</p>
+              <p className="truncate text-[11px] text-blue-200/60">{user.email}</p>
             </div>
           </div>
-
           <button
             onClick={logout}
-            className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-slate-900 border border-slate-800 hover:bg-red-500/10 hover:border-red-500/25 hover:text-red-400 text-xs font-medium text-slate-300 transition cursor-pointer"
+            className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 py-2 px-3 text-xs font-semibold text-blue-100 transition hover:bg-red-500/20 hover:text-white"
           >
-            <LogOut className="w-3.5 h-3.5" />
-            <span>Sign Out</span>
+            <LogOut className="h-3.5 w-3.5" />
+            <span>Sign out</span>
           </button>
         </div>
       </aside>
 
-      {/* Main Area */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Top Navbar */}
-        <header className="h-16 border-b border-slate-800/80 bg-slate-900/40 backdrop-blur-xl px-8 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              WireGuard Tunnel Mesh Active
+      {/* Main */}
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 md:px-8">
+          <div className="flex min-w-0 items-center gap-3">
+            <button aria-label="Open navigation" onClick={() => setMenuOpen(true)}
+              className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 md:hidden">
+              <Menu className="h-5 w-5" />
+            </button>
+            <span className="truncate text-sm font-semibold text-slate-900">
+              {activeItem?.name || "Platform"}
             </span>
-            <span className="text-xs text-slate-400">• Hub IP: 10.9.0.1</span>
           </div>
-
           <div className="flex items-center gap-3">
-            <div className="text-right">
-              <span className="text-xs font-semibold text-slate-200 block">
-                Platform Cluster
-              </span>
-              <span className="text-[10px] text-slate-400">cloudserv • v1.0.0</span>
-            </div>
-            <div className="h-8 w-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs text-indigo-400 font-bold">
-              SA
-            </div>
+            <a href="/dashboard"
+              className="rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">
+              Tenant workspace →
+            </a>
           </div>
         </header>
 
-        {/* Content View */}
-        <main className="flex-1 overflow-y-auto p-8">{children}</main>
+        <main className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-10">
+          <div className="mx-auto max-w-6xl">{children}</div>
+        </main>
       </div>
     </div>
   );

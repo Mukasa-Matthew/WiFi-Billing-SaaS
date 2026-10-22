@@ -27,10 +27,10 @@ const TEMPLATES = [
   { key: "ember", name: "Ember", blurb: "Warm dark theme with gold accents" },
 ];
 
-const field = "w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-sm text-white outline-none transition focus:border-blue-500";
-const label = "mb-2 block text-sm font-semibold text-white";
+const field = "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500";
+const label = "mb-2 block text-sm font-semibold text-slate-900";
 const hint = "mt-2 text-xs text-slate-500";
-const card = "rounded-xl border border-slate-800 bg-slate-900/70 p-6";
+const card = "rounded-xl border border-slate-200 bg-white p-6";
 
 export default function TenantSettingsPage() {
   const [form, setForm] = useState<Settings | null>(null);
@@ -79,7 +79,7 @@ export default function TenantSettingsPage() {
 
   if (!form) {
     return (
-      <div className="mx-auto max-w-3xl p-8 text-sm text-slate-400">
+      <div className="mx-auto max-w-3xl p-8 text-sm text-slate-500">
         {error ?? "Loading settings…"}
       </div>
     );
@@ -88,8 +88,8 @@ export default function TenantSettingsPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-white">Settings</h1>
-        <p className="mt-1 text-sm text-slate-400">
+        <h1 className="text-2xl font-semibold text-slate-900">Settings</h1>
+        <p className="mt-1 text-sm text-slate-500">
           Branding, portal behavior, voucher defaults, and notifications for your hotspot business.
         </p>
       </div>
@@ -97,7 +97,7 @@ export default function TenantSettingsPage() {
       <form onSubmit={save} className="space-y-6">
         {/* Business profile */}
         <section className={card}>
-          <h2 className="mb-5 text-sm font-semibold text-white">Business profile</h2>
+          <h2 className="mb-5 text-sm font-semibold text-slate-900">Business profile</h2>
           <div className="grid gap-5 sm:grid-cols-2">
             <div>
               <label className={label}>Business name</label>
@@ -121,7 +121,7 @@ export default function TenantSettingsPage() {
             <div>
               <label className={label}>Brand color</label>
               <div className="flex items-center gap-3">
-                <input type="color" value={form.brandColor} onChange={(e) => set("brandColor", e.target.value)} className="h-11 w-14 cursor-pointer rounded-lg border border-slate-700 bg-slate-950" />
+                <input type="color" value={form.brandColor} onChange={(e) => set("brandColor", e.target.value)} className="h-11 w-14 cursor-pointer rounded-lg border border-slate-300 bg-[#F5F7FA]" />
                 <input pattern="#[0-9A-Fa-f]{6}" value={form.brandColor} onChange={(e) => set("brandColor", e.target.value)} className={`${field} font-mono`} />
               </div>
               <p className={hint}>Accent color on your captive portal.</p>
@@ -131,7 +131,7 @@ export default function TenantSettingsPage() {
 
         {/* Captive portal */}
         <section className={card}>
-          <h2 className="mb-5 text-sm font-semibold text-white">Captive portal</h2>
+          <h2 className="mb-5 text-sm font-semibold text-slate-900">Captive portal</h2>
           <div className="grid gap-5 sm:grid-cols-2">
             <div>
               <label className={label}>Redirect URL after login</label>
@@ -144,13 +144,13 @@ export default function TenantSettingsPage() {
                 role="switch"
                 aria-checked={form.portalShowPackages}
                 onClick={() => set("portalShowPackages", !form.portalShowPackages)}
-                className={`relative mt-0.5 h-6 w-11 shrink-0 rounded-full transition ${form.portalShowPackages ? "bg-blue-600" : "bg-slate-700"}`}
+                className={`relative mt-0.5 h-6 w-11 shrink-0 rounded-full transition ${form.portalShowPackages ? "bg-blue-600" : "bg-slate-300"}`}
               >
                 <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition ${form.portalShowPackages ? "left-6" : "left-1"}`} />
               </button>
               <span>
-                <span className="block text-sm font-semibold text-white">Show packages for purchase</span>
-                <span className="mt-1 block text-xs text-slate-400">When off, the portal only accepts voucher codes — no Mobile Money purchases.</span>
+                <span className="block text-sm font-semibold text-slate-900">Show packages for purchase</span>
+                <span className="mt-1 block text-xs text-slate-500">When off, the portal only accepts voucher codes — no Mobile Money purchases.</span>
               </span>
             </div>
           </div>
@@ -158,7 +158,7 @@ export default function TenantSettingsPage() {
 
         {/* Portal template gallery + live preview */}
         <section className={card}>
-          <h2 className="mb-1 text-sm font-semibold text-white">Portal template</h2>
+          <h2 className="mb-1 text-sm font-semibold text-slate-900">Portal template</h2>
           <p className="mb-5 text-xs text-slate-500">Pick the design customers see on your captive portal. The preview below shows exactly what your portal will look like with your branding.</p>
           <div className="grid gap-6 lg:grid-cols-2">
             <div className="space-y-3">
@@ -169,29 +169,29 @@ export default function TenantSettingsPage() {
                   onClick={() => set("portalTemplate", t.key)}
                   className={`flex w-full items-center justify-between rounded-xl border p-4 text-left transition ${
                     form.portalTemplate === t.key
-                      ? "border-blue-500 bg-blue-500/10"
-                      : "border-slate-700 bg-slate-950/50 hover:border-slate-500"
+                      ? "border-blue-500 bg-blue-50"
+                      : "border-slate-300 bg-[#F5F7FA]/50 hover:border-slate-500"
                   }`}
                 >
                   <span>
-                    <span className="block text-sm font-semibold text-white">{t.name}</span>
+                    <span className="block text-sm font-semibold text-slate-900">{t.name}</span>
                     <span className="mt-0.5 block text-xs text-slate-500">{t.blurb}</span>
                   </span>
-                  <span className={`flex h-5 w-5 items-center justify-center rounded-full border ${form.portalTemplate === t.key ? "border-blue-500 bg-blue-600" : "border-slate-600"}`}>
+                  <span className={`flex h-5 w-5 items-center justify-center rounded-full border ${form.portalTemplate === t.key ? "border-blue-600 bg-blue-600" : "border-slate-300"}`}>
                     {form.portalTemplate === t.key && <CheckCircle2 size={12} className="text-white" />}
                   </span>
                 </button>
               ))}
             </div>
             <div>
-              <div className="overflow-hidden rounded-xl border border-slate-700 bg-slate-950">
-                <div className="border-b border-slate-800 px-3 py-2 text-[10px] text-slate-500">Live preview — {form.portalTemplate}</div>
+              <div className="overflow-hidden rounded-xl border border-slate-300 bg-[#F5F7FA]">
+                <div className="border-b border-slate-200 px-3 py-2 text-[10px] text-slate-500">Live preview — {form.portalTemplate}</div>
                 {previewHtml ? (
                   <iframe
                     key={form.portalTemplate}
                     srcDoc={previewHtml}
                     title="Captive portal preview"
-                    className="h-[420px] w-full bg-slate-900"
+                    className="h-[420px] w-full bg-white"
                   />
                 ) : (
                   <div className="flex h-[420px] items-center justify-center text-xs text-slate-500">
@@ -205,7 +205,7 @@ export default function TenantSettingsPage() {
 
         {/* Hotspot security */}
         <section className={card}>
-          <h2 className="mb-5 text-sm font-semibold text-white">Hotspot security</h2>
+          <h2 className="mb-5 text-sm font-semibold text-slate-900">Hotspot security</h2>
           <div>
             <label className={label}>Tethering protection</label>
             <select value={form.tetheringProtection} onChange={(e) => set("tetheringProtection", e.target.value)} className={field}>
@@ -221,7 +221,7 @@ export default function TenantSettingsPage() {
 
         {/* Voucher defaults */}
         <section className={card}>
-          <h2 className="mb-5 text-sm font-semibold text-white">Voucher defaults</h2>
+          <h2 className="mb-5 text-sm font-semibold text-slate-900">Voucher defaults</h2>
           <div className="grid gap-5 sm:grid-cols-3">
             <div>
               <label className={label}>Code prefix</label>
@@ -248,7 +248,7 @@ export default function TenantSettingsPage() {
 
         {/* Notifications */}
         <section className={card}>
-          <h2 className="mb-5 text-sm font-semibold text-white">Notifications</h2>
+          <h2 className="mb-5 text-sm font-semibold text-slate-900">Notifications</h2>
           <div className="grid gap-5 sm:grid-cols-2">
             <div>
               <label className={label}>Alert emails</label>
@@ -263,14 +263,14 @@ export default function TenantSettingsPage() {
           </div>
         </section>
 
-        {error && <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300">{error}</div>}
+        {error && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-300">{error}</div>}
 
         <div className="flex items-center gap-4">
           <button disabled={saving} className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50">
             {saving ? <LoaderCircle size={16} className="animate-spin" /> : <Save size={16} />}
             {saving ? "Saving…" : "Save settings"}
           </button>
-          {saved && <span className="flex items-center gap-1.5 text-sm text-emerald-400"><CheckCircle2 size={15} />Saved</span>}
+          {saved && <span className="flex items-center gap-1.5 text-sm text-emerald-700"><CheckCircle2 size={15} />Saved</span>}
         </div>
       </form>
     </div>

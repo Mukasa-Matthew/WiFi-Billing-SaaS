@@ -64,10 +64,10 @@ export default function AdminOverviewPage() {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
             Platform Overview
           </h1>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-slate-500 mt-1">
             Global metrics, multi-tenant fleet status, and core services health
           </p>
         </div>
@@ -77,7 +77,7 @@ export default function AdminOverviewPage() {
               setLoading(true);
               fetchData();
             }}
-            className="px-3.5 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition"
+            className="px-3.5 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition"
           >
             Refresh Data
           </button>
@@ -87,100 +87,100 @@ export default function AdminOverviewPage() {
       {/* Metric Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Revenue */}
-        <div className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800/80 backdrop-blur-xl relative overflow-hidden">
+        <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm relative overflow-hidden">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-medium text-slate-400">Total System Revenue</span>
-            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
+            <span className="text-xs font-medium text-slate-500">Total System Revenue</span>
+            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700">
               <DollarSign className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-bold text-white mb-1">
+          <div className="text-2xl font-bold text-slate-900 mb-1">
             {metrics ? Number(metrics.totalRevenueUgx || 0).toLocaleString() : "0"}{" "}
-            <span className="text-xs font-normal text-slate-400">UGX</span>
+            <span className="text-xs font-normal text-slate-500">UGX</span>
           </div>
-          <p className="text-[11px] text-slate-400">
+          <p className="text-[11px] text-slate-500">
             {metrics?.totalTransactions || 0} mobile money collections
           </p>
         </div>
 
         {/* Hotspot Businesses */}
-        <div className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800/80 backdrop-blur-xl">
+        <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-medium text-slate-400">Hotspot Businesses</span>
-            <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400">
+            <span className="text-xs font-medium text-slate-500">Hotspot Businesses</span>
+            <div className="p-2 rounded-xl bg-blue-50 text-blue-700">
               <Users className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-bold text-white mb-1">
+          <div className="text-2xl font-bold text-slate-900 mb-1">
             {metrics?.totalTenants ?? 0}
           </div>
-          <p className="text-[11px] text-slate-400">Registered SaaS operators</p>
+          <p className="text-[11px] text-slate-500">Registered SaaS operators</p>
         </div>
 
         {/* Routers */}
-        <div className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800/80 backdrop-blur-xl">
+        <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-medium text-slate-400">Routers Provisioned</span>
-            <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400">
+            <span className="text-xs font-medium text-slate-500">Routers Provisioned</span>
+            <div className="p-2 rounded-xl bg-blue-50 text-blue-700">
               <RouterIcon className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-bold text-white mb-1">
+          <div className="text-2xl font-bold text-slate-900 mb-1">
             {metrics?.onlineRouters ?? 0}{" "}
-            <span className="text-xs font-normal text-slate-400">
+            <span className="text-xs font-normal text-slate-500">
               / {metrics?.totalRouters ?? 0} online
             </span>
           </div>
-          <p className="text-[11px] text-emerald-400 flex items-center gap-1">
+          <p className="text-[11px] text-emerald-700 flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
             WireGuard mesh tunnel connected
           </p>
         </div>
 
         {/* Active Hotspot Guests */}
-        <div className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800/80 backdrop-blur-xl">
+        <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-medium text-slate-400">Active Guest Sessions</span>
+            <span className="text-xs font-medium text-slate-500">Active Guest Sessions</span>
             <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-400">
               <Wifi className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-bold text-white mb-1">
+          <div className="text-2xl font-bold text-slate-900 mb-1">
             {metrics?.activeHotspotSessions ?? 0}
           </div>
-          <p className="text-[11px] text-slate-400">
+          <p className="text-[11px] text-slate-500">
             {metrics?.totalVouchers ?? 0} vouchers total generated
           </p>
         </div>
       </div>
 
       {/* Infrastructure Core Status */}
-      <div className="p-6 rounded-2xl bg-slate-900/70 border border-slate-800/80">
-        <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-          <Server className="w-4 h-4 text-indigo-400" />
+      <div className="p-6 rounded-xl bg-white border border-slate-200">
+        <h2 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
+          <Server className="w-4 h-4 text-blue-700" />
           <span>Core Infrastructure & Network Mesh</span>
         </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 flex items-start justify-between">
+          <div className="p-4 rounded-xl bg-[#F5F7FA]/60 border border-slate-200 flex items-start justify-between">
             <div>
-              <div className="text-xs font-medium text-slate-200">WireGuard Hub (wg0)</div>
-              <div className="text-[11px] text-slate-400 mt-0.5">10.9.0.1/16 • UDP :443</div>
-              <div className="mt-3 flex items-center gap-1.5 text-[11px] text-emerald-400 font-medium">
+              <div className="text-xs font-medium text-slate-700">WireGuard Hub (wg0)</div>
+              <div className="text-[11px] text-slate-500 mt-0.5">10.9.0.1/16 • UDP :443</div>
+              <div className="mt-3 flex items-center gap-1.5 text-[11px] text-emerald-700 font-medium">
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 <span>Listening & Routing</span>
               </div>
             </div>
-            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
               VPN HUB
             </span>
           </div>
 
-          <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 flex items-start justify-between">
+          <div className="p-4 rounded-xl bg-[#F5F7FA]/60 border border-slate-200 flex items-start justify-between">
             <div>
-              <div className="text-xs font-medium text-slate-200">FreeRADIUS 3.2.5 Core</div>
-              <div className="text-[11px] text-slate-400 mt-0.5">PoD/CoA port 3799 • Auth :1812</div>
-              <div className="mt-3 flex items-center gap-1.5 text-[11px] text-emerald-400 font-medium">
+              <div className="text-xs font-medium text-slate-700">FreeRADIUS 3.2.5 Core</div>
+              <div className="text-[11px] text-slate-500 mt-0.5">PoD/CoA port 3799 • Auth :1812</div>
+              <div className="mt-3 flex items-center gap-1.5 text-[11px] text-emerald-700 font-medium">
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 <span>Dynamic NAS Resolution</span>
               </div>
@@ -190,16 +190,16 @@ export default function AdminOverviewPage() {
             </span>
           </div>
 
-          <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 flex items-start justify-between">
+          <div className="p-4 rounded-xl bg-[#F5F7FA]/60 border border-slate-200 flex items-start justify-between">
             <div>
-              <div className="text-xs font-medium text-slate-200">PostgreSQL Data Pool</div>
-              <div className="text-[11px] text-slate-400 mt-0.5">radius_db • HikariCP</div>
-              <div className="mt-3 flex items-center gap-1.5 text-[11px] text-emerald-400 font-medium">
+              <div className="text-xs font-medium text-slate-700">PostgreSQL Data Pool</div>
+              <div className="text-[11px] text-slate-500 mt-0.5">radius_db • HikariCP</div>
+              <div className="mt-3 flex items-center gap-1.5 text-[11px] text-emerald-700 font-medium">
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 <span>Shared with RADIUS Engine</span>
               </div>
             </div>
-            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
               DB READY
             </span>
           </div>
@@ -207,15 +207,15 @@ export default function AdminOverviewPage() {
       </div>
 
       {/* Recent Hotspot Operators */}
-      <div className="p-6 rounded-2xl bg-slate-900/70 border border-slate-800/80">
+      <div className="p-6 rounded-xl bg-white border border-slate-200">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-sm font-semibold text-white">Recently Provisioned Operators</h2>
-            <p className="text-xs text-slate-400">Latest hotspot businesses onboarded to the SaaS</p>
+            <h2 className="text-sm font-semibold text-slate-900">Recently Provisioned Operators</h2>
+            <p className="text-xs text-slate-500">Latest hotspot businesses onboarded to the SaaS</p>
           </div>
           <a
             href="/admin/tenants"
-            className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-medium"
+            className="text-xs text-blue-700 hover:text-blue-600 flex items-center gap-1 font-medium"
           >
             <span>View All Operators</span>
             <ArrowUpRight className="w-3.5 h-3.5" />
@@ -230,7 +230,7 @@ export default function AdminOverviewPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
-                <tr className="border-b border-slate-800 text-slate-400">
+                <tr className="border-b border-slate-200 text-slate-500">
                   <th className="pb-3 font-medium">Business / Name</th>
                   <th className="pb-3 font-medium">Email</th>
                   <th className="pb-3 font-medium">Phone</th>
@@ -239,19 +239,19 @@ export default function AdminOverviewPage() {
                   <th className="pb-3 font-medium text-right">Joined</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/50">
+              <tbody className="divide-y divide-slate-100/50">
                 {recentTenants.map((t) => (
-                  <tr key={t.id} className="hover:bg-slate-800/20">
-                    <td className="py-3 font-medium text-slate-200">{t.name}</td>
-                    <td className="py-3 text-slate-400">{t.email}</td>
-                    <td className="py-3 text-slate-400">{t.phone}</td>
-                    <td className="py-3 text-slate-300 font-semibold">{t.routerCount}</td>
+                  <tr key={t.id} className="hover:bg-slate-100/20">
+                    <td className="py-3 font-medium text-slate-700">{t.name}</td>
+                    <td className="py-3 text-slate-500">{t.email}</td>
+                    <td className="py-3 text-slate-500">{t.phone}</td>
+                    <td className="py-3 text-slate-700 font-semibold">{t.routerCount}</td>
                     <td className="py-3">
                       <span
                         className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
                           t.status === "ACTIVE"
-                            ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                            : "bg-red-500/10 text-red-400 border border-red-500/20"
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                            : "bg-red-50 text-red-600 border border-red-200"
                         }`}
                       >
                         {t.status}
