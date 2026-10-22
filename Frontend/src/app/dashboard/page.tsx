@@ -8,10 +8,11 @@ import { ArrowUpRight, Eye, EyeOff, RefreshCw, Router, Ticket, Users, Wallet, Ac
 
 interface WeeklySale { date: string; day: string; revenue: number; transactions: number }
 interface Consumer { radAcctId: number; username: string; framedIpAddress: string; totalOctets: number; acctSessionTime: number }
+interface RouterRevenue { routerId: number; name: string; status: string; revenueToday: number; revenueMonth: number; revenueTotal: number; transactions: number; activeUsers: number }
 interface DashboardStats {
   revenueToday: number; revenueMonth: number; activeUsers: number; totalDataConsumedBytes: number;
   totalRouters: number; onlineRouters: number; totalVouchers: number; activeVouchers: number;
-  usedVouchers: number; expiredVouchers: number; weeklySales: WeeklySale[]; topConsumers: Consumer[];
+  usedVouchers: number; expiredVouchers: number; weeklySales: WeeklySale[]; routerRevenue: RouterRevenue[]; topConsumers: Consumer[];
 }
 const panel = "rounded-xl border border-[#303034] bg-[#202023]";
 const number = (value: number) => Number(value).toLocaleString();
@@ -123,6 +124,45 @@ export default function TenantDashboardOverview() {
           </div>
         </section>
       </div>
+
+      <section className={panel}>
+        <div className="flex items-center justify-between border-b border-[#303034] px-5 py-4">
+          <div><h2 className="text-sm font-semibold text-white">Revenue by router</h2><p className="mt-1 text-xs text-slate-500">How much each location is earning</p></div>
+          <Link href="/dashboard/routers" className="flex items-center gap-1 text-xs text-blue-400">Manage routers<ArrowUpRight size={14} /></Link>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-[#303034] text-left text-xs text-slate-500">
+                <th className="px-5 py-3 font-medium">Router</th>
+                <th className="px-5 py-3 font-medium">Status</th>
+                <th className="px-5 py-3 text-right font-medium">Users</th>
+                <th className="px-5 py-3 text-right font-medium">Today</th>
+                <th className="px-5 py-3 text-right font-medium">This month</th>
+                <th className="px-5 py-3 text-right font-medium">All time</th>
+                <th className="px-5 py-3 text-right font-medium">Sales</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#303034]">
+              {stats?.routerRevenue.map((router) => (
+                <tr key={router.routerId} className="hover:bg-[#26262a]">
+                  <td className="px-5 py-3.5 font-medium text-slate-200">{router.name}</td>
+                  <td className="px-5 py-3.5">
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${router.status === "online" || router.status === "registered" ? "bg-emerald-500/10 text-emerald-400" : "bg-slate-500/10 text-slate-400"}`}>{router.status}</span>
+                  </td>
+                  <td className="px-5 py-3.5 text-right text-slate-300">{router.activeUsers}</td>
+                  <td className="px-5 py-3.5 text-right font-medium text-white">{money(router.revenueToday)}</td>
+                  <td className="px-5 py-3.5 text-right text-slate-200">{money(router.revenueMonth)}</td>
+                  <td className="px-5 py-3.5 text-right text-slate-200">{money(router.revenueTotal)}</td>
+                  <td className="px-5 py-3.5 text-right text-slate-400">{router.transactions}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!stats?.routerRevenue.length && <div className="py-12 text-center"><Router className="mx-auto mb-3 h-7 w-7 text-slate-600" /><p className="text-sm text-slate-400">{loading ? "Loading routers…" : "No routers linked yet"}</p><p className="mt-1 text-xs text-slate-500">Revenue will be tracked per router once you link one.</p></div>}
+        </div>
+      </section>
+
       <p className="text-right text-[11px] text-slate-500">{updated ? `Updated ${updated} · Refreshes every 30 seconds` : "Waiting for first update"}</p>
     </div>
   );

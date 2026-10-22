@@ -19,5 +19,6 @@ public record TenantDashboardStatsDto(
     long usedVouchers,
     long expiredVouchers,
     List<Map<String, Object>> weeklySales,
+    List<Map<String, Object>> routerRevenue,
     List<ActiveSessionDto> topConsumers
 ) {}

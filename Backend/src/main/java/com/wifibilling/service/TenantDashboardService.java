@@ -97,6 +97,39 @@ public class TenantDashboardService {
         List<ActiveSessionDto> activeSessions = sessionService.getActiveSessions(tenantId, role);
         long activeUsers = activeSessions.size();
 
+        // Per-router revenue: how much each site earns for this tenant
+        Map<Long, BigDecimal[]> perRouter = new HashMap<>();
+        Map<Long, Long> perRouterCount = new HashMap<>();
+        for (Transaction t : transactions) {
+            if (!"SUCCESSFUL".equalsIgnoreCase(t.getStatus()) || t.getRouter() == null || t.getCreatedAt() == null) {
+                continue;
+            }
+            Long routerId = t.getRouter().getId();
+            BigDecimal amt = t.getAmount() != null ? t.getAmount() : BigDecimal.ZERO;
+            BigDecimal[] bucket = perRouter.computeIfAbsent(routerId, k -> new BigDecimal[]{BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO});
+            bucket[2] = bucket[2].add(amt); // total
+            if (!t.getCreatedAt().isBefore(startOfDay)) bucket[0] = bucket[0].add(amt);   // today
+            if (!t.getCreatedAt().isBefore(startOfMonth)) bucket[1] = bucket[1].add(amt); // month
+            perRouterCount.merge(routerId, 1L, Long::sum);
+        }
+        List<Map<String, Object>> routerRevenue = new ArrayList<>();
+        for (Router r : routers) {
+            BigDecimal[] bucket = perRouter.getOrDefault(r.getId(), new BigDecimal[]{BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO});
+            String wgIp = com.wifibilling.util.Ipv4Subnet.stripPrefix(r.getWgIp());
+            long users = wgIp == null ? 0 : activeSessions.stream()
+                    .filter(s -> wgIp.equals(s.nasIpAddress())).count();
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("routerId", r.getId());
+            row.put("name", r.getName());
+            row.put("status", r.getStatus());
+            row.put("revenueToday", bucket[0]);
+            row.put("revenueMonth", bucket[1]);
+            row.put("revenueTotal", bucket[2]);
+            row.put("transactions", perRouterCount.getOrDefault(r.getId(), 0L));
+            row.put("activeUsers", users);
+            routerRevenue.add(row);
+        }
+
         long totalDataConsumed = activeSessions.stream()
                 .mapToLong(s -> s.totalOctets() != null ? s.totalOctets() : 0L)
                 .sum();
@@ -118,6 +151,7 @@ public class TenantDashboardService {
                 .usedVouchers(usedVouchers)
                 .expiredVouchers(expiredVouchers)
                 .weeklySales(weeklySales)
+                .routerRevenue(routerRevenue)
                 .topConsumers(topConsumers)
                 .build();
     }
