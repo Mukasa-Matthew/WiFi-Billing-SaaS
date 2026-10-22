@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { LinkPending } from "@/components/LoadingUI";
 import React, { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
@@ -61,13 +63,12 @@ export default function TenantDashboardLayout({
     { name: "Vouchers", href: "/dashboard/vouchers", icon: Ticket, group: "Finance" },
     { name: "Payments", href: "/dashboard/payments", icon: Banknote, group: "Finance" },
     { name: "MikroTik routers", href: "/dashboard/routers", icon: RouterIcon, group: "Devices" },
-    { name: "Add router", href: "/dashboard/routers/new", icon: Wifi, group: "Devices" },
     { name: "Sessions", href: "/dashboard/sessions", icon: Radio, group: "Accounting" },
     { name: "Accounting logs", href: "/dashboard/logs", icon: FileText, group: "Accounting" },
     { name: "Settings", href: "/dashboard/settings", icon: Settings, group: "Settings" },
   ];
 
-  const activeItem = navItems.find(
+  const activeItem = [...navItems, { name: "Add router", href: "/dashboard/routers/new", icon: Wifi, group: "Devices" }].sort((a, b) => b.href.length - a.href.length).find(
     (item) => item.href === "/dashboard" ? pathname === item.href : pathname?.startsWith(item.href)
   );
 
@@ -75,7 +76,7 @@ export default function TenantDashboardLayout({
     <div className="h-dvh overflow-hidden bg-[#F5F7FA] text-slate-900 flex">
       {menuOpen && (
         <button aria-label="Close navigation" onClick={() => setMenuOpen(false)}
-          className="fixed inset-0 z-30 bg-white/50 md:hidden" />
+          className="fixed inset-0 z-30 bg-slate-950/50 md:hidden" />
       )}
 
       {/* Sidebar */}
@@ -83,17 +84,17 @@ export default function TenantDashboardLayout({
         className={`${menuOpen ? "flex" : "hidden"} fixed inset-y-0 left-0 z-40 w-64 flex-col justify-between shrink-0 md:static md:flex`}
         style={{ backgroundColor: NAVY }}
       >
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain">
           {/* Brand */}
           <div className="flex h-16 items-center gap-3 border-b border-white/10 px-5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 text-slate-900">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 text-white">
               <Wifi className="h-4.5 w-4.5" />
             </div>
             <div className="min-w-0">
-              <span className="block truncate text-sm font-bold tracking-tight text-slate-900">
+              <span className="block truncate text-sm font-bold tracking-tight text-white">
                 {user.name || "Hotspot Operator"}
               </span>
-              <span className="block text-[10px] font-semibold uppercase tracking-widest text-blue-200/70">
+              <span className="block text-[10px] font-semibold uppercase tracking-widest text-blue-100">
                 Tenant #{user.tenantId}
               </span>
             </div>
@@ -106,9 +107,9 @@ export default function TenantDashboardLayout({
                 <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
                 <span className="truncate text-[11px] font-medium">Superadmin view</span>
               </div>
-              <a href="/admin" className="flex items-center gap-1 text-[11px] font-bold text-slate-900 hover:text-amber-100">
+              <Link href="/admin" className="flex items-center gap-1 text-[11px] font-bold text-white hover:text-amber-100">
                 Platform <ArrowRight className="h-3 w-3" />
-              </a>
+              </Link>
             </div>
           )}
 
@@ -125,24 +126,24 @@ export default function TenantDashboardLayout({
               return (
                 <React.Fragment key={item.href}>
                   {(index === 0 || navItems[index - 1].group !== item.group) && (
-                    <p className={`px-3 pb-1.5 ${index === 0 ? "" : "pt-4"} text-[10px] font-bold uppercase tracking-widest text-blue-200/50`}>
+                    <p className={`px-3 pb-1.5 ${index === 0 ? "" : "pt-3"} text-[10px] font-bold uppercase tracking-widest text-blue-200`}>
                       {item.group}
                     </p>
                   )}
-                  <a
+                  <Link
                     onClick={() => setMenuOpen(false)}
                     aria-current={isActive ? "page" : undefined}
                     href={item.href}
-                    className={`relative flex items-center gap-3 rounded-lg px-3.5 py-2.5 text-[13px] font-medium transition ${
+                    className={`relative flex items-center gap-3 rounded-lg px-3.5 py-2 text-[13px] font-medium transition ${
                       isActive
-                        ? "bg-white/10 text-slate-900"
-                        : "text-blue-100/70 hover:bg-white/5 hover:text-slate-900"
+                        ? "bg-white text-[#122B49] shadow-sm"
+                        : "text-slate-200 hover:bg-white/10 hover:text-white"
                     }`}
                   >
                     {isActive && <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r bg-blue-400" />}
                     <Icon className="h-4 w-4 shrink-0" />
-                    <span>{item.name}</span>
-                  </a>
+                    <span className="flex-1">{item.name}</span><LinkPending />
+                  </Link>
                 </React.Fragment>
               );
             })}
@@ -152,12 +153,12 @@ export default function TenantDashboardLayout({
         {/* Account footer */}
         <div className="border-t border-white/10 p-4">
           <div className="mb-3 flex items-center gap-3 px-1">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-xs font-bold uppercase text-slate-900">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-xs font-bold uppercase text-white">
               {user.name ? user.name.substring(0, 2) : "HO"}
             </div>
             <div className="min-w-0">
-              <p className="truncate text-xs font-semibold text-slate-900">{user.name}</p>
-              <p className="truncate text-[11px] text-blue-200/60">{user.email}</p>
+              <p className="truncate text-xs font-semibold text-white">{user.name}</p>
+              <p className="truncate text-[11px] text-blue-100">{user.email}</p>
             </div>
           </div>
           <button
@@ -190,18 +191,14 @@ export default function TenantDashboardLayout({
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <a href="/dashboard/vouchers/new"
-              className="rounded-lg bg-blue-700 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-blue-600">
-              Create vouchers
-            </a>
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#122B49] text-xs font-bold text-slate-900" title={user.email}>
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#122B49] text-xs font-bold text-white" title={user.email}>
               {user.name.substring(0, 2).toUpperCase()}
             </div>
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-10">
-          <div className="mx-auto max-w-6xl">{children}</div>
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+          <div className="mx-auto w-full max-w-[1440px]">{children}</div>
         </main>
       </div>
     </div>
