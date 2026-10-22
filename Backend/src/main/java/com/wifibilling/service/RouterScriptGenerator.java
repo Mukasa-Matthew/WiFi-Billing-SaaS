@@ -59,8 +59,27 @@ public class RouterScriptGenerator {
             String tunnelSubnet,
             String publicBaseUrl,
             Set<String> walledGardenIps,
-            Set<String> walledGardenHosts
+            Set<String> walledGardenHosts,
+            String tetheringMode
     ) {}
+
+    /**
+     * Firewall rules implementing tethering protection. Tethered traffic arrives
+     * with TTL decremented by the sharing phone (63 on Android/iOS, 127 on Windows).
+     * mode: "OFF" (stale rules removed), "LOG" (detect only), "BLOCK" (drop).
+     */
+    public static String tetheringRules(String mode) {
+        StringBuilder s = new StringBuilder();
+        s.append("/ip/firewall/filter/remove [find where comment~\"^wb-tether\"]\n");
+        if ("LOG".equals(mode) || "BLOCK".equals(mode)) {
+            String action = "BLOCK".equals(mode) ? "drop" : "log";
+            s.append("/ip/firewall/filter/add chain=forward ttl=equal:63 action=").append(action)
+                    .append(" log=yes log-prefix=\"wb-tether\" comment=\"wb-tether: android/ios tethered\"\n");
+            s.append("/ip/firewall/filter/add chain=forward ttl=equal:127 action=").append(action)
+                    .append(" log=yes log-prefix=\"wb-tether\" comment=\"wb-tether: windows tethered\"\n");
+        }
+        return s.toString();
+    }
 
     public String generate(ScriptContext c) {
         String iface = q(IFACE_NAME);
@@ -203,6 +222,9 @@ public class RouterScriptGenerator {
         s.append("/ip/neighbor/discovery-settings/set discover-interface-list=LAN\n");
         s.append(":do { /tool/mac-server/set allowed-interface-list=LAN } on-error={}\n");
         s.append(":do { /tool/mac-server/mac-winbox/set allowed-interface-list=LAN } on-error={}\n");
+        s.append('\n');
+        // Tethering protection: TTL-based detection of devices sharing the connection.
+        s.append(tetheringRules(c.tetheringMode() == null ? "OFF" : c.tetheringMode()));
         s.append('\n');
 
         // 3. Captive Portal Template Download to flash/hotspot

@@ -17,7 +17,15 @@ interface Settings {
   portalShowPackages: boolean;
   notifyEmails: string | null;
   notifyPhones: string | null;
+  portalTemplate: string;
+  tetheringProtection: string;
 }
+
+const TEMPLATES = [
+  { key: "midnight", name: "Midnight", blurb: "Dark glass card with blue accents" },
+  { key: "daylight", name: "Daylight", blurb: "Clean light theme for bright storefronts" },
+  { key: "ember", name: "Ember", blurb: "Warm dark theme with gold accents" },
+];
 
 const field = "w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-sm text-white outline-none transition focus:border-blue-500";
 const label = "mb-2 block text-sm font-semibold text-white";
@@ -133,6 +141,63 @@ export default function TenantSettingsPage() {
                 <span className="mt-1 block text-xs text-slate-400">When off, the portal only accepts voucher codes — no Mobile Money purchases.</span>
               </span>
             </div>
+          </div>
+        </section>
+
+        {/* Portal template gallery + live preview */}
+        <section className={card}>
+          <h2 className="mb-1 text-sm font-semibold text-white">Portal template</h2>
+          <p className="mb-5 text-xs text-slate-500">Pick the design customers see on your captive portal. The preview below shows exactly what your portal will look like with your branding.</p>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <div className="space-y-3">
+              {TEMPLATES.map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => set("portalTemplate", t.key)}
+                  className={`flex w-full items-center justify-between rounded-xl border p-4 text-left transition ${
+                    form.portalTemplate === t.key
+                      ? "border-blue-500 bg-blue-500/10"
+                      : "border-slate-700 bg-slate-950/50 hover:border-slate-500"
+                  }`}
+                >
+                  <span>
+                    <span className="block text-sm font-semibold text-white">{t.name}</span>
+                    <span className="mt-0.5 block text-xs text-slate-500">{t.blurb}</span>
+                  </span>
+                  <span className={`flex h-5 w-5 items-center justify-center rounded-full border ${form.portalTemplate === t.key ? "border-blue-500 bg-blue-600" : "border-slate-600"}`}>
+                    {form.portalTemplate === t.key && <CheckCircle2 size={12} className="text-white" />}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <div>
+              <div className="overflow-hidden rounded-xl border border-slate-700 bg-slate-950">
+                <div className="border-b border-slate-800 px-3 py-2 text-[10px] text-slate-500">Live preview — {form.portalTemplate}</div>
+                <iframe
+                  key={form.portalTemplate}
+                  src={`/api/settings/portal-preview?template=${encodeURIComponent(form.portalTemplate)}`}
+                  title="Captive portal preview"
+                  className="h-[420px] w-full bg-slate-900"
+                />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Hotspot security */}
+        <section className={card}>
+          <h2 className="mb-5 text-sm font-semibold text-white">Hotspot security</h2>
+          <div>
+            <label className={label}>Tethering protection</label>
+            <select value={form.tetheringProtection} onChange={(e) => set("tetheringProtection", e.target.value)} className={field}>
+              <option value="OFF">Off — allow customers to share their connection</option>
+              <option value="LOG">Detect only — log tethered devices, don't block</option>
+              <option value="BLOCK">Block — stop devices sharing WiFi via mobile hotspot</option>
+            </select>
+            <p className={hint}>
+              Detects phones/laptops re-sharing your WiFi through their hotspot using TTL analysis. Applies to all your routers — pushed automatically to provisioned devices within a minute.
+            </p>
           </div>
         </section>
 

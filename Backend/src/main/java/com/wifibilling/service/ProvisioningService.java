@@ -90,7 +90,8 @@ public class ProvisioningService {
                 props.getWgSubnet(),
                 props.getPublicBaseUrl(),
                 walledGardenIps(),
-                walledGardenHosts()));
+                walledGardenHosts(),
+                defaultValue(router.getTenant().getTetheringProtection(), "OFF")));
     }
 
     /**

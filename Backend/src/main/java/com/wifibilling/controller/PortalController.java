@@ -74,7 +74,17 @@ public class PortalController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid filename");
         }
 
-        Resource resource = new ClassPathResource("static/hotspot/" + filename);
+        // Per-tenant template selection applies to login.html; other pages fall
+        // back to the shared defaults.
+        String tpl = router.getTenant().getPortalTemplate();
+        Resource resource = null;
+        if ("login.html".equalsIgnoreCase(filename) && tpl != null && tpl.matches("[a-z0-9-]{1,40}")) {
+            resource = new ClassPathResource("static/hotspot/" + tpl + "/login.html");
+            if (!resource.exists()) resource = null;
+        }
+        if (resource == null) {
+            resource = new ClassPathResource("static/hotspot/" + filename);
+        }
         if (!resource.exists()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Template file not found: " + filename);
         }
@@ -109,6 +119,7 @@ public class PortalController {
     }
 
     private static String escapeHtml(String s) {
+        if (s == null) return "";
         return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
                 .replace("\"", "&quot;");
     }
