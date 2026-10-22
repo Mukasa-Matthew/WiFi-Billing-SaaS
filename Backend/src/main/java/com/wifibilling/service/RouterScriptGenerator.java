@@ -104,8 +104,17 @@ public class RouterScriptGenerator {
         // 1. Internet uplink and hotspot LAN
         s.append("# --- 1. Internet uplink and hotspot LAN ---\n");
         s.append(":if ([:len [/interface find name=").append(q(c.wanInterface())).append("]] = 0) do={ :error \"WAN interface not found\" }\n");
+        // Fail fast if the chosen WAN port is wrong: no cable link, or no IP after DHCP.
+        // Skipped automatically for non-ethernet uplinks (pppoe, lte, vlan...).
+        s.append(":if ([:len [/interface/ethernet find name=").append(q(c.wanInterface())).append("]] > 0) do={ ")
+                .append(":if ([:len [/interface/ethernet find name=").append(q(c.wanInterface())).append(" running]] = 0) do={ ")
+                .append(":error \"WAN port has no cable link - plug the ISP cable into ").append(c.wanInterface())
+                .append(" or pick a different port\" } }\n");
         s.append(":if ([:len [/ip/dhcp-client find interface=").append(q(c.wanInterface())).append("]] = 0) do={ /ip/dhcp-client add interface=")
                 .append(q(c.wanInterface())).append(" disabled=no comment=").append(tag).append(" }\n");
+        s.append(":delay 8s\n");
+        s.append(":if ([:len [/ip/address find interface=").append(q(c.wanInterface()))
+                .append("]] = 0) do={ :error \"No IP address on WAN - the ISP cable is probably in a different port\" }\n");
         s.append("/interface/bridge add name=").append(q(BRIDGE_NAME)).append(" protocol-mode=rstp comment=").append(tag).append('\n');
         if (c.hotspotInterfaces() == null || c.hotspotInterfaces().isEmpty()) {
             // Auto mode: bridge every ethernet port except the WAN uplink, whatever the model.
