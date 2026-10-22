@@ -146,7 +146,7 @@ export default function TenantSessionLogsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2.5">
+          <h1 className="text-xl font-bold tracking-tight text-slate-900 flex items-center gap-2.5">
             <FileText className="w-6 h-6 text-blue-700" />
             <span>Accounting Logs & History</span>
           </h1>
@@ -179,19 +179,19 @@ export default function TenantSessionLogsPage() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
         <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
           <span className="text-xs font-medium text-slate-500">Total Logged Sessions</span>
-          <div className="text-2xl font-extrabold text-slate-900 mt-1">{logs.length} Records</div>
+          <div className="text-2xl font-bold tabular-nums text-slate-900 mt-1">{logs.length} Records</div>
         </div>
 
         <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
           <span className="text-xs font-medium text-slate-500">Historical Data Consumed</span>
-          <div className="text-2xl font-extrabold text-blue-700 mt-1">
+          <div className="text-2xl font-bold tabular-nums text-blue-700 mt-1">
             {formatBytes(totalHistoricalBytes)}
           </div>
         </div>
 
         <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
           <span className="text-xs font-medium text-slate-500">Compliance & Storage</span>
-          <div className="text-2xl font-extrabold text-emerald-700 mt-1">FreeRADIUS SQL</div>
+          <div className="text-2xl font-bold tabular-nums text-emerald-700 mt-1">FreeRADIUS SQL</div>
         </div>
       </div>
 
@@ -271,11 +271,11 @@ export default function TenantSessionLogsPage() {
                     </td>
                     <td className="py-3 px-4 font-mono text-slate-700">
                       <div className="flex items-center gap-2">
-                        <span className="text-cyan-400 flex items-center gap-0.5">
+                        <span className="text-blue-700 flex items-center gap-0.5">
                           ↓ {formatBytes(log.acctOutputOctets)}
                         </span>
                         <span className="text-slate-600">/</span>
-                        <span className="text-purple-400 flex items-center gap-0.5">
+                        <span className="text-amber-700 flex items-center gap-0.5">
                           ↑ {formatBytes(log.acctInputOctets)}
                         </span>
                       </div>

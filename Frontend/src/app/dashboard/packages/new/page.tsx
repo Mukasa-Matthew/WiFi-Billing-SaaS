@@ -30,7 +30,7 @@ export default function CreatePackagePage() {
     catch { setError("Could not save the package. Check your entries and try again."); }
     finally { setSaving(false); }
   };
-  return <div className="mx-auto max-w-6xl space-y-6"><div><Link href="/dashboard/packages" className="text-xs text-slate-500 hover:text-slate-900">Packages / Create</Link><h1 className="mt-3 text-2xl font-semibold text-slate-900">Create package</h1><p className="mt-2 text-sm text-slate-500">Set your internet plan's duration, speeds, price, and availability.</p></div>
+  return <div className="mx-auto max-w-6xl space-y-6"><div><Link href="/dashboard/packages" className="text-xs text-slate-500 hover:text-slate-900">Packages / Create</Link><h1 className="mt-3 text-xl font-bold tracking-tight text-slate-900">Create package</h1><p className="mt-2 text-sm text-slate-500">Set your internet plan's duration, speeds, price, and availability.</p></div>
     <form onSubmit={save} className="space-y-5">
       <Section title="Basic configuration" hint="Define the package's basic settings">
         <label className="block text-xs text-slate-700">Package name *<input required maxLength={80} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Daily Internet" className={input} /></label>

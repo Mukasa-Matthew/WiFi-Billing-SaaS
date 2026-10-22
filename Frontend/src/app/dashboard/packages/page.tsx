@@ -29,7 +29,7 @@ export default function PackagesPage() {
     finally { setSaving(null); }
   };
   return <div className="mx-auto max-w-7xl space-y-6">
-    <div className="flex flex-wrap items-center justify-between gap-4"><div><h1 className="text-2xl font-semibold text-slate-900">Packages</h1><p className="mt-2 text-sm text-slate-500">Manage internet plans, pricing, speeds, and customer access.</p></div><div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap items-center justify-between gap-4"><div><h1 className="text-xl font-bold tracking-tight text-slate-900">Packages</h1><p className="mt-2 text-sm text-slate-500">Manage internet plans, pricing, speeds, and customer access.</p></div><div className="flex flex-wrap gap-2">
       <button onClick={() => setTemplates(!templates)} className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-blue-700"><Zap size={14} />Quick templates</button>
       <button onClick={() => setGuide(!guide)} className="flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-xs text-slate-700"><BookOpen size={14} />Package guide</button>
       <Link href="/dashboard/packages/new" className="flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-500"><Plus size={14} />Create package</Link>
