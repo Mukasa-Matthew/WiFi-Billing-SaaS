@@ -14,7 +14,8 @@ import {
   Wifi,
   Shield,
   ArrowRight,
-  Menu
+  Menu,
+  Settings
 } from "lucide-react";
 
 export default function TenantDashboardLayout({
@@ -56,6 +57,7 @@ export default function TenantDashboardLayout({
     { name: "MikroTik routers", href: "/dashboard/routers", icon: RouterIcon, group: "Devices" },
     { name: "Accounting sessions", href: "/dashboard/sessions", icon: Radio, group: "Accounting" },
     { name: "Accounting logs", href: "/dashboard/logs", icon: History, group: "Accounting" },
+    { name: "Settings", href: "/dashboard/settings", icon: Settings, group: "Settings" },
   ];
 
   return (

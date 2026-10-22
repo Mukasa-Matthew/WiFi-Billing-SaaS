@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="pragma" content="no-cache">
     <meta http-equiv="expires" content="-1">
-    <title>High-Speed WiFi Access</title>
+    <title>TENANT_NAME_PLACEHOLDER WiFi</title>
     <style>
         :root {
             --bg-color: #0A0F1D;
             --card-bg: rgba(18, 26, 47, 0.85);
             --border-color: rgba(255, 255, 255, 0.08);
-            --primary: #3B82F6;
+            --primary: TENANT_BRAND_COLOR_PLACEHOLDER;
             --primary-hover: #2563EB;
             --accent: #10B981;
             --text-main: #F8FAFC;
@@ -119,6 +119,11 @@
         }
 
         /* Package selection */
+        .support-line {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
         .section-label {
             font-size: 13px;
             font-weight: 600;
@@ -354,8 +359,10 @@
 <div class="portal-card">
     <div class="header">
         <div class="logo-badge">📶</div>
-        <h1>High-Speed WiFi</h1>
+        <h1>TENANT_NAME_PLACEHOLDER</h1>
         <p>Choose an internet plan or enter your voucher code</p>
+        <p class="support-line" id="support-line">Support: TENANT_SUPPORT_PHONE_PLACEHOLDER TENANT_SUPPORT_EMAIL_PLACEHOLDER</p>
+        <script>if (document.getElementById('support-line').textContent.trim() === 'Support:') document.getElementById('support-line').style.display = 'none';</script>
     </div>
 
     <div class="tabs">
@@ -387,7 +394,7 @@
         <!-- $(endif) -->
 
         <form id="login-form" name="login" action="$(link-login-only)" method="post">
-            <input type="hidden" name="dst" value="$(link-orig)" />
+            <input type="hidden" name="dst" value="POST_LOGIN_REDIRECT_PLACEHOLDER" />
             <input type="hidden" name="popup" value="true" />
 
             <div class="form-group">

@@ -37,6 +37,9 @@ public class PortalController {
     @GetMapping(value = "/packages", produces = MediaType.APPLICATION_JSON_VALUE)
     public List<PortalPackageResponse> getPackages(@RequestParam("token") String token) {
         Router router = resolveRouter(token);
+        if (!Boolean.TRUE.equals(router.getTenant().getPortalShowPackages())) {
+            return List.of();
+        }
         List<PackagePlan> plans = packagePlanRepository.findAllByTenantIdOrderByPriceAsc(router.getTenant().getId());
 
         return plans.stream()
@@ -79,11 +82,21 @@ public class PortalController {
         try {
             String content = StreamUtils.copyToString(resource.getInputStream(), StandardCharsets.UTF_8);
 
-            if ("login.html".equalsIgnoreCase(filename)) {
-                content = content
-                        .replace("ROUTER_TOKEN_PLACEHOLDER", router.getToken())
-                        .replace("SERVER_BASE_URL_PLACEHOLDER", props.getPublicBaseUrl());
-            }
+            var tenant = router.getTenant();
+            content = content
+                    .replace("ROUTER_TOKEN_PLACEHOLDER", router.getToken())
+                    .replace("SERVER_BASE_URL_PLACEHOLDER", props.getPublicBaseUrl())
+                    .replace("TENANT_NAME_PLACEHOLDER", escapeHtml(tenant.getName()))
+                    .replace("TENANT_BRAND_COLOR_PLACEHOLDER",
+                            tenant.getBrandColor() != null && tenant.getBrandColor().matches("#[0-9A-Fa-f]{6}")
+                                    ? tenant.getBrandColor() : "#3B82F6")
+                    .replace("TENANT_SUPPORT_PHONE_PLACEHOLDER",
+                            tenant.getSupportPhone() != null ? escapeHtml(tenant.getSupportPhone()) : "")
+                    .replace("TENANT_SUPPORT_EMAIL_PLACEHOLDER",
+                            tenant.getSupportEmail() != null ? escapeHtml(tenant.getSupportEmail()) : "")
+                    .replace("POST_LOGIN_REDIRECT_PLACEHOLDER",
+                            tenant.getRedirectUrl() != null && !tenant.getRedirectUrl().isBlank()
+                                    ? escapeHtml(tenant.getRedirectUrl()) : "$(link-orig)");
 
             return ResponseEntity.ok()
                     .cacheControl(CacheControl.noStore())
@@ -93,6 +106,11 @@ public class PortalController {
             log.error("Failed to read template {}: {}", filename, e.getMessage());
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error reading template");
         }
+    }
+
+    private static String escapeHtml(String s) {
+        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                .replace("\"", "&quot;");
     }
 
     private Router resolveRouter(String token) {
