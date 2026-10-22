@@ -14,7 +14,7 @@ interface DashboardStats {
   totalRouters: number; onlineRouters: number; totalVouchers: number; activeVouchers: number;
   usedVouchers: number; expiredVouchers: number; weeklySales: WeeklySale[]; routerRevenue: RouterRevenue[]; topConsumers: Consumer[];
 }
-const panel = "rounded-xl border border-[#303034] bg-[#202023]";
+const panel = "rounded-xl border border-slate-200 bg-white shadow-sm";
 const number = (value: number) => Number(value).toLocaleString();
 function bytes(value: number) {
   if (!value) return "0 MB";
@@ -53,38 +53,38 @@ export default function TenantDashboardOverview() {
   const money = (value: number) => hidden ? "••••••" : `UGX ${number(value)}`;
   const display = (value: string | number) => stats ? value : loading ? "…" : "—";
   const cards = [
-    { label: "Today's revenue", value: money(stats?.revenueToday || 0), detail: "Successful payments today", icon: Wallet, color: "text-emerald-400" },
-    { label: "Last 7 days revenue", value: money(weeklyRevenue), detail: `${number(transactions)} successful payments`, icon: Wallet, color: "text-amber-400" },
-    { label: "Monthly revenue", value: money(stats?.revenueMonth || 0), detail: "Successful payments this month", icon: Wallet, color: "text-blue-400" },
-    { label: "Active users", value: number(stats?.activeUsers || 0), detail: "Current hotspot sessions", icon: Users, color: "text-blue-400" },
-    { label: "Data in active sessions", value: bytes(stats?.totalDataConsumedBytes || 0), detail: "Combined upload and download", icon: Activity, color: "text-emerald-400" },
-    { label: "Total vouchers", value: number(stats?.totalVouchers || 0), detail: "All vouchers created", icon: Ticket, color: "text-blue-400" },
-    { label: "Active vouchers", value: number(stats?.activeVouchers || 0), detail: "Vouchers marked active", icon: Ticket, color: "text-emerald-400" },
-    { label: "Router health", value: `${stats?.totalRouters || 0} router${stats?.totalRouters === 1 ? "" : "s"}`, detail: `${stats?.onlineRouters || 0} online · ${Math.max(0, (stats?.totalRouters || 0) - (stats?.onlineRouters || 0))} offline / pending`, icon: Router, color: "text-amber-400" },
+    { label: "Today's revenue", value: money(stats?.revenueToday || 0), detail: "Successful payments today", icon: Wallet, color: "text-emerald-700" },
+    { label: "Last 7 days revenue", value: money(weeklyRevenue), detail: `${number(transactions)} successful payments`, icon: Wallet, color: "text-amber-700" },
+    { label: "Monthly revenue", value: money(stats?.revenueMonth || 0), detail: "Successful payments this month", icon: Wallet, color: "text-blue-700" },
+    { label: "Active users", value: number(stats?.activeUsers || 0), detail: "Current hotspot sessions", icon: Users, color: "text-blue-700" },
+    { label: "Data in active sessions", value: bytes(stats?.totalDataConsumedBytes || 0), detail: "Combined upload and download", icon: Activity, color: "text-emerald-700" },
+    { label: "Total vouchers", value: number(stats?.totalVouchers || 0), detail: "All vouchers created", icon: Ticket, color: "text-blue-700" },
+    { label: "Active vouchers", value: number(stats?.activeVouchers || 0), detail: "Vouchers marked active", icon: Ticket, color: "text-emerald-700" },
+    { label: "Router health", value: `${stats?.totalRouters || 0} router${stats?.totalRouters === 1 ? "" : "s"}`, detail: `${stats?.onlineRouters || 0} online · ${Math.max(0, (stats?.totalRouters || 0) - (stats?.onlineRouters || 0))} offline / pending`, icon: Router, color: "text-amber-700" },
   ];
 
   return (
     <div className="mx-auto max-w-7xl space-y-5">
-      <section className={`${panel} flex flex-wrap items-center justify-between gap-4 bg-[#29292d] px-6 py-5`}>
+      <section className={`${panel} flex flex-wrap items-center justify-between gap-4 bg-white px-6 py-5`}>
         <div>
-          <p className="mb-1 text-xs font-medium text-slate-400">YOUR BUSINESS AT A GLANCE</p>
-          <h1 className="text-xl font-semibold tracking-tight text-white">Welcome back, {user?.name || "Hotspot Admin"}</h1>
-          <p className="mt-1 text-sm text-slate-400">Sales, customers, and your hotspot network in one place.</p>
+          <p className="mb-1 text-xs font-medium text-slate-500">YOUR BUSINESS AT A GLANCE</p>
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900">Welcome back, {user?.name || "Hotspot Admin"}</h1>
+          <p className="mt-1 text-sm text-slate-500">Sales, customers, and your hotspot network in one place.</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setHidden(!hidden)} aria-label={hidden ? "Show revenue" : "Hide revenue"} className="rounded-lg border border-[#414147] p-2.5 text-slate-400 hover:text-white">{hidden ? <EyeOff size={16} /> : <Eye size={16} />}</button>
-          <button onClick={fetchStats} disabled={loading} aria-label="Refresh dashboard" className="rounded-lg border border-[#414147] p-2.5 text-slate-400 hover:text-white disabled:opacity-50"><RefreshCw size={16} className={loading ? "animate-spin" : ""} /></button>
+          <button onClick={() => setHidden(!hidden)} aria-label={hidden ? "Show revenue" : "Hide revenue"} className="rounded-lg border border-slate-300 p-2.5 text-slate-500 hover:text-slate-900">{hidden ? <EyeOff size={16} /> : <Eye size={16} />}</button>
+          <button onClick={fetchStats} disabled={loading} aria-label="Refresh dashboard" className="rounded-lg border border-slate-300 p-2.5 text-slate-500 hover:text-slate-900 disabled:opacity-50"><RefreshCw size={16} className={loading ? "animate-spin" : ""} /></button>
           <Link href="/dashboard/routers/new" className="flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2.5 text-xs font-semibold text-white hover:bg-blue-500"><Plus size={15} />Add router</Link>
         </div>
       </section>
 
-      {error && <div role="alert" className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-300"><AlertCircle size={16} />{stats ? "Unable to refresh. Showing the last available data." : "Dashboard data could not be loaded. Please try refreshing."}</div>}
+      {error && <div role="alert" className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700"><AlertCircle size={16} />{stats ? "Unable to refresh. Showing the last available data." : "Dashboard data could not be loaded. Please try refreshing."}</div>}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-busy={loading}>
         {cards.map(({ label, value, detail, icon: Icon, color }) => (
           <section key={label} className={`${panel} min-h-36 p-5`}>
-            <p className="text-xs font-medium text-slate-400">{label}</p>
-            <p className="mt-3 text-2xl font-semibold tracking-tight text-white">{display(value)}</p>
+            <p className="text-xs font-medium text-slate-500">{label}</p>
+            <p className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">{display(value)}</p>
             <p className={`mt-3 flex items-center gap-2 text-xs ${color}`}><Icon size={14} />{stats ? detail : "Awaiting dashboard data"}</p>
           </section>
         ))}
@@ -94,15 +94,15 @@ export default function TenantDashboardOverview() {
         {[{ title: "Revenue", subtitle: "Successful payments · UGX", max: maxRevenue, color: "bg-emerald-500", value: (day: WeeklySale) => Number(day.revenue), format: (day: WeeklySale) => money(Number(day.revenue)) },
           { title: "Completed sales", subtitle: "Number of successful payments", max: maxTransactions, color: "bg-blue-500", value: (day: WeeklySale) => day.transactions, format: (day: WeeklySale) => `${day.transactions} payments` }].map((chart) => (
           <section key={chart.title} className={panel}>
-            <div className="flex items-center justify-between gap-3 border-b border-[#303034] px-5 py-4"><div><h2 className="text-sm font-semibold text-white">{chart.title}</h2><p className="mt-1 text-xs text-slate-500">{chart.subtitle}</p></div><span className="rounded-md border border-[#3d3d43] bg-[#29292d] px-3 py-1.5 text-xs text-slate-300">Last 7 days</span></div>
+            <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4"><div><h2 className="text-sm font-semibold text-slate-900">{chart.title}</h2><p className="mt-1 text-xs text-slate-500">{chart.subtitle}</p></div><span className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700">Last 7 days</span></div>
             <div className="relative px-5 pb-5 pt-8">
-              <div className="absolute inset-x-5 top-8 bottom-12 flex flex-col justify-between" aria-hidden="true">{[0, 1, 2, 3, 4].map((i) => <div key={i} className="border-t border-[#303034]" />)}</div>
+              <div className="absolute inset-x-5 top-8 bottom-12 flex flex-col justify-between" aria-hidden="true">{[0, 1, 2, 3, 4].map((i) => <div key={i} className="border-t border-slate-200" />)}</div>
               <div className="relative flex h-48 items-end justify-around gap-3" aria-label={`${chart.title} for the last seven days`}>
                 {sales.map((day) => <div key={day.date} className="flex h-full min-w-0 flex-1 flex-col justify-end items-center gap-2"><div tabIndex={0} title={`${day.day}: ${chart.format(day)}`} aria-label={`${day.day}: ${chart.format(day)}`} style={{ height: `${chart.title === "Revenue" && hidden ? 0 : chart.value(day) / chart.max * 100}%`, minHeight: 2 }} className={`w-full max-w-12 rounded-t-sm ${chart.color} hover:opacity-80`} /><span className="text-[11px] text-slate-500">{day.day}</span></div>)}
                 {!sales.length && <p className="self-center text-sm text-slate-500">{loading ? "Loading sales…" : "No sales data available"}</p>}
               </div>
-              {sales.length > 0 && !sales.some((day) => chart.value(day) > 0) && <p className="absolute inset-x-0 top-24 text-center text-xs text-slate-400">No successful payments in this period</p>}
-              {chart.title === "Revenue" && hidden && <p className="absolute inset-x-0 top-24 text-center text-xs text-slate-400">Revenue hidden</p>}
+              {sales.length > 0 && !sales.some((day) => chart.value(day) > 0) && <p className="absolute inset-x-0 top-24 text-center text-xs text-slate-500">No successful payments in this period</p>}
+              {chart.title === "Revenue" && hidden && <p className="absolute inset-x-0 top-24 text-center text-xs text-slate-500">Revenue hidden</p>}
             </div>
           </section>
         ))}
@@ -110,30 +110,30 @@ export default function TenantDashboardOverview() {
 
       <div className="grid gap-5 lg:grid-cols-2">
         <section className={panel}>
-          <div className="flex items-center justify-between border-b border-[#303034] px-5 py-4"><div><h2 className="text-sm font-semibold text-white">Top data users</h2><p className="mt-1 text-xs text-slate-500">Highest usage among current sessions</p></div><Link href="/dashboard/sessions" className="flex items-center gap-1 text-xs text-blue-400">View sessions<ArrowUpRight size={14} /></Link></div>
-          <div className="divide-y divide-[#303034] px-5">
-            {stats?.topConsumers.map((session, index) => <div key={session.radAcctId} className="flex items-center gap-3 py-4"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#303034] text-xs text-slate-400">{index + 1}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-slate-200">{session.username}</p><p className="mt-1 text-xs text-slate-500">{session.framedIpAddress || "IP unavailable"}</p></div><span className="rounded-md bg-blue-500/10 px-2 py-1 text-xs font-medium text-blue-400">{bytes(session.totalOctets)}</span></div>)}
-            {!stats?.topConsumers.length && <div className="py-12 text-center"><Users className="mx-auto mb-3 h-7 w-7 text-slate-600" /><p className="text-sm text-slate-400">{loading ? "Loading sessions…" : "No active users yet"}</p><p className="mt-1 text-xs text-slate-500">Connected customers will appear here.</p></div>}
+          <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4"><div><h2 className="text-sm font-semibold text-slate-900">Top data users</h2><p className="mt-1 text-xs text-slate-500">Highest usage among current sessions</p></div><Link href="/dashboard/sessions" className="flex items-center gap-1 text-xs text-blue-700">View sessions<ArrowUpRight size={14} /></Link></div>
+          <div className="divide-y divide-slate-100 px-5">
+            {stats?.topConsumers.map((session, index) => <div key={session.radAcctId} className="flex items-center gap-3 py-4"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-xs text-slate-500">{index + 1}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-slate-700">{session.username}</p><p className="mt-1 text-xs text-slate-500">{session.framedIpAddress || "IP unavailable"}</p></div><span className="rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">{bytes(session.totalOctets)}</span></div>)}
+            {!stats?.topConsumers.length && <div className="py-12 text-center"><Users className="mx-auto mb-3 h-7 w-7 text-slate-600" /><p className="text-sm text-slate-500">{loading ? "Loading sessions…" : "No active users yet"}</p><p className="mt-1 text-xs text-slate-500">Connected customers will appear here.</p></div>}
           </div>
         </section>
         <section className={panel}>
-          <div className="border-b border-[#303034] px-5 py-4"><h2 className="text-sm font-semibold text-white">Voucher inventory</h2><p className="mt-1 text-xs text-slate-500">Manage customer access to your hotspot</p></div>
+          <div className="border-b border-slate-200 px-5 py-4"><h2 className="text-sm font-semibold text-slate-900">Voucher inventory</h2><p className="mt-1 text-xs text-slate-500">Manage customer access to your hotspot</p></div>
           <div className="space-y-4 p-5">
-            {[{ label: "Active", value: stats?.activeVouchers, color: "bg-emerald-500" }, { label: "Used", value: stats?.usedVouchers, color: "bg-blue-500" }, { label: "Expired or revoked", value: stats?.expiredVouchers, color: "bg-amber-500" }].map((item) => <div key={item.label} className="flex items-center justify-between text-sm"><span className="flex items-center gap-2 text-slate-400"><span className={`h-2 w-2 rounded-full ${item.color}`} />{item.label}</span><span className="font-medium text-white">{display(item.value || 0)}</span></div>)}
-            <Link href="/dashboard/vouchers" className="mt-6 flex items-center justify-center gap-2 rounded-lg border border-[#3d3d43] bg-[#29292d] py-2.5 text-xs font-medium text-slate-200 hover:bg-[#303034]"><Ticket size={14} />Manage vouchers<ArrowUpRight size={14} /></Link>
+            {[{ label: "Active", value: stats?.activeVouchers, color: "bg-emerald-500" }, { label: "Used", value: stats?.usedVouchers, color: "bg-blue-500" }, { label: "Expired or revoked", value: stats?.expiredVouchers, color: "bg-amber-500" }].map((item) => <div key={item.label} className="flex items-center justify-between text-sm"><span className="flex items-center gap-2 text-slate-500"><span className={`h-2 w-2 rounded-full ${item.color}`} />{item.label}</span><span className="font-medium text-slate-900">{display(item.value || 0)}</span></div>)}
+            <Link href="/dashboard/vouchers" className="mt-6 flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white py-2.5 text-xs font-medium text-slate-700 hover:bg-slate-100"><Ticket size={14} />Manage vouchers<ArrowUpRight size={14} /></Link>
           </div>
         </section>
       </div>
 
       <section className={panel}>
-        <div className="flex items-center justify-between border-b border-[#303034] px-5 py-4">
-          <div><h2 className="text-sm font-semibold text-white">Revenue by router</h2><p className="mt-1 text-xs text-slate-500">How much each location is earning</p></div>
-          <Link href="/dashboard/routers" className="flex items-center gap-1 text-xs text-blue-400">Manage routers<ArrowUpRight size={14} /></Link>
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+          <div><h2 className="text-sm font-semibold text-slate-900">Revenue by router</h2><p className="mt-1 text-xs text-slate-500">How much each location is earning</p></div>
+          <Link href="/dashboard/routers" className="flex items-center gap-1 text-xs text-blue-700">Manage routers<ArrowUpRight size={14} /></Link>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-[#303034] text-left text-xs text-slate-500">
+              <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
                 <th className="px-5 py-3 font-medium">Router</th>
                 <th className="px-5 py-3 font-medium">Status</th>
                 <th className="px-5 py-3 text-right font-medium">Users</th>
@@ -143,23 +143,23 @@ export default function TenantDashboardOverview() {
                 <th className="px-5 py-3 text-right font-medium">Sales</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#303034]">
+            <tbody className="divide-y divide-slate-100">
               {stats?.routerRevenue.map((router) => (
-                <tr key={router.routerId} className="hover:bg-[#26262a]">
-                  <td className="px-5 py-3.5 font-medium text-slate-200">{router.name}</td>
+                <tr key={router.routerId} className="hover:bg-slate-50">
+                  <td className="px-5 py-3.5 font-medium text-slate-700">{router.name}</td>
                   <td className="px-5 py-3.5">
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${router.status === "online" || router.status === "registered" ? "bg-emerald-500/10 text-emerald-400" : "bg-slate-500/10 text-slate-400"}`}>{router.status}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${router.status === "online" || router.status === "registered" ? "bg-emerald-50 text-emerald-700" : "bg-slate-500/10 text-slate-500"}`}>{router.status}</span>
                   </td>
-                  <td className="px-5 py-3.5 text-right text-slate-300">{router.activeUsers}</td>
-                  <td className="px-5 py-3.5 text-right font-medium text-white">{money(router.revenueToday)}</td>
-                  <td className="px-5 py-3.5 text-right text-slate-200">{money(router.revenueMonth)}</td>
-                  <td className="px-5 py-3.5 text-right text-slate-200">{money(router.revenueTotal)}</td>
-                  <td className="px-5 py-3.5 text-right text-slate-400">{router.transactions}</td>
+                  <td className="px-5 py-3.5 text-right text-slate-700">{router.activeUsers}</td>
+                  <td className="px-5 py-3.5 text-right font-medium text-slate-900">{money(router.revenueToday)}</td>
+                  <td className="px-5 py-3.5 text-right text-slate-700">{money(router.revenueMonth)}</td>
+                  <td className="px-5 py-3.5 text-right text-slate-700">{money(router.revenueTotal)}</td>
+                  <td className="px-5 py-3.5 text-right text-slate-500">{router.transactions}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {!stats?.routerRevenue.length && <div className="py-12 text-center"><Router className="mx-auto mb-3 h-7 w-7 text-slate-600" /><p className="text-sm text-slate-400">{loading ? "Loading routers…" : "No routers linked yet"}</p><p className="mt-1 text-xs text-slate-500">Revenue will be tracked per router once you link one.</p></div>}
+          {!stats?.routerRevenue.length && <div className="py-12 text-center"><Router className="mx-auto mb-3 h-7 w-7 text-slate-600" /><p className="text-sm text-slate-500">{loading ? "Loading routers…" : "No routers linked yet"}</p><p className="mt-1 text-xs text-slate-500">Revenue will be tracked per router once you link one.</p></div>}
         </div>
       </section>
 

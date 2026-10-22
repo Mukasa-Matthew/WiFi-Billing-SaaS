@@ -1,0 +1,3 @@
+module.exports=[40777,a=>{"use strict";var b=a.i(87924),c=a.i(72131),d=a.i(50944),e=a.i(56025);a.s(["default",0,function(){let a=(0,d.useRouter)(),{user:f,loading:g}=(0,e.useAuth)();return(0,c.useEffect)(()=>{g||(f?"ROLE_SUPERADMIN"===f.role?a.replace("/admin"):a.replace("/dashboard"):a.replace("/login"))},[f,g,a]),(0,b.jsx)("div",{className:"flex h-screen items-center justify-center bg-[#F5F7FA] text-slate-500",children:(0,b.jsxs)("div",{className:"flex flex-col items-center gap-3",children:[(0,b.jsx)("div",{className:"h-8 w-8 animate-spin rounded-full border-2 border-blue-700 border-t-transparent"}),(0,b.jsx)("p",{className:"text-sm",children:"Loading WiFi-Billing Platform..."})]})})}])}];
+
+//# sourceMappingURL=src_app_page_tsx_1chiuahujsxm1._.js.map

@@ -12,11 +12,17 @@ import {
   History,
   LogOut,
   Wifi,
-  Shield,
+  ShieldCheck,
   ArrowRight,
   Menu,
-  Settings
+  Settings,
+  Users,
+  Banknote,
+  Link2,
+  FileText,
 } from "lucide-react";
+
+const NAVY = "#122B49";
 
 export default function TenantDashboardLayout({
   children,
@@ -36,10 +42,10 @@ export default function TenantDashboardLayout({
 
   if (loading || !user) {
     return (
-      <div className="flex h-screen items-center justify-center bg-slate-950 text-slate-400">
+      <div className="flex h-screen items-center justify-center bg-[#F5F7FA] text-slate-500">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
-          <p className="text-sm">Loading Hotspot Control Panel...</p>
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-700 border-t-transparent" />
+          <p className="text-sm">Loading workspace…</p>
         </div>
       </div>
     );
@@ -48,133 +54,155 @@ export default function TenantDashboardLayout({
   const navItems = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, group: "Overview" },
     { name: "Active users", href: "/dashboard/users", icon: Radio, group: "Users" },
-    { name: "Customers", href: "/dashboard/customers", icon: Radio, group: "Users" },
+    { name: "Customers", href: "/dashboard/customers", icon: Users, group: "Users" },
     { name: "Expired users", href: "/dashboard/expired", icon: History, group: "Users" },
-    { name: "IP bindings", href: "/dashboard/bindings", icon: Wifi, group: "Users" },
+    { name: "IP bindings", href: "/dashboard/bindings", icon: Link2, group: "Users" },
     { name: "Packages", href: "/dashboard/packages", icon: Layers, group: "Finance" },
     { name: "Vouchers", href: "/dashboard/vouchers", icon: Ticket, group: "Finance" },
-    { name: "Payments", href: "/dashboard/payments", icon: Ticket, group: "Finance" },
+    { name: "Payments", href: "/dashboard/payments", icon: Banknote, group: "Finance" },
     { name: "MikroTik routers", href: "/dashboard/routers", icon: RouterIcon, group: "Devices" },
-    { name: "Accounting sessions", href: "/dashboard/sessions", icon: Radio, group: "Accounting" },
-    { name: "Accounting logs", href: "/dashboard/logs", icon: History, group: "Accounting" },
+    { name: "Add router", href: "/dashboard/routers/new", icon: Wifi, group: "Devices" },
+    { name: "Sessions", href: "/dashboard/sessions", icon: Radio, group: "Accounting" },
+    { name: "Accounting logs", href: "/dashboard/logs", icon: FileText, group: "Accounting" },
     { name: "Settings", href: "/dashboard/settings", icon: Settings, group: "Settings" },
   ];
 
+  const activeItem = navItems.find(
+    (item) => item.href === "/dashboard" ? pathname === item.href : pathname?.startsWith(item.href)
+  );
+
   return (
-    <div className="operator-dashboard h-dvh overflow-hidden bg-[#111113] text-slate-100 flex">
-      {menuOpen && <button aria-label="Close navigation" onClick={() => setMenuOpen(false)} className="fixed inset-0 z-30 bg-black/60 md:hidden" />}
+    <div className="h-dvh overflow-hidden bg-[#F5F7FA] text-slate-900 flex">
+      {menuOpen && (
+        <button aria-label="Close navigation" onClick={() => setMenuOpen(false)}
+          className="fixed inset-0 z-30 bg-white/50 md:hidden" />
+      )}
+
       {/* Sidebar */}
-      <aside className={`${menuOpen ? "flex" : "hidden"} fixed inset-y-0 left-0 z-40 w-64 border-r border-[#303034] bg-[#151517] flex-col justify-between shrink-0 md:static md:flex`}>
+      <aside
+        className={`${menuOpen ? "flex" : "hidden"} fixed inset-y-0 left-0 z-40 w-64 flex-col justify-between shrink-0 md:static md:flex`}
+        style={{ backgroundColor: NAVY }}
+      >
         <div className="min-h-0 flex-1 overflow-y-auto">
-          {/* Brand Header */}
-          <div className="h-16 flex items-center gap-3 px-6 border-b border-slate-800/80">
-            <div className="p-2 rounded-xl bg-blue-600 text-white">
-              <Wifi className="w-5 h-5" />
+          {/* Brand */}
+          <div className="flex h-16 items-center gap-3 border-b border-white/10 px-5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 text-slate-900">
+              <Wifi className="h-4.5 w-4.5" />
             </div>
-            <div className="overflow-hidden">
-              <span className="font-bold text-sm tracking-tight text-white block truncate">
-                {user.name || "DELUXE WIFI"}
+            <div className="min-w-0">
+              <span className="block truncate text-sm font-bold tracking-tight text-slate-900">
+                {user.name || "Hotspot Operator"}
               </span>
-              <span className="text-[10px] text-blue-400 font-semibold tracking-wide uppercase block">
-                Hotspot Operator • ID #{user.tenantId}
+              <span className="block text-[10px] font-semibold uppercase tracking-widest text-blue-200/70">
+                Tenant #{user.tenantId}
               </span>
             </div>
           </div>
 
-          {/* Superadmin Switcher Notice (if user is superadmin viewing tenant dashboard) */}
+          {/* Superadmin viewing banner */}
           {user.role === "ROLE_SUPERADMIN" && (
-            <div className="mx-4 mt-3 p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-between text-xs text-blue-300">
-              <div className="flex items-center gap-1.5 truncate">
-                <Shield className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                <span className="text-[11px] truncate">Superadmin Mode</span>
+            <div className="mx-4 mt-3 flex items-center justify-between rounded-lg border border-amber-400/30 bg-amber-400/10 p-2.5 text-amber-200">
+              <div className="flex min-w-0 items-center gap-1.5">
+                <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate text-[11px] font-medium">Superadmin view</span>
               </div>
-              <a
-                href="/admin"
-                className="flex items-center gap-1 text-[11px] font-semibold text-blue-400 hover:text-white"
-              >
-                <span>Portal</span>
-                <ArrowRight className="w-3 h-3" />
+              <a href="/admin" className="flex items-center gap-1 text-[11px] font-bold text-slate-900 hover:text-amber-100">
+                Platform <ArrowRight className="h-3 w-3" />
               </a>
             </div>
           )}
 
-          {/* Navigation Links */}
-          <nav className="p-4 space-y-1.5 overflow-y-auto">
-            <p className="px-3 pb-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-              Workspace
-            </p>
+          {/* Nav */}
+          <nav className="space-y-0.5 p-4">
             {navItems.map((item, index) => {
               const Icon = item.icon;
               const isActive =
                 item.href === "/dashboard"
                   ? pathname === "/dashboard"
-                  : pathname?.startsWith(item.href);
-
+                  : item.href === "/dashboard/routers"
+                    ? pathname === "/dashboard/routers"
+                    : pathname?.startsWith(item.href);
               return (
                 <React.Fragment key={item.href}>
-                {(index === 0 || navItems[index - 1].group !== item.group) && <p className="px-3 pb-2 pt-4 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{item.group}</p>}
-                <a
-                  key={item.href}
-                  onClick={() => setMenuOpen(false)}
-                  aria-current={isActive ? "page" : undefined}
-                  href={item.href}
-                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all ${
-                    isActive
-                      ? "bg-[#27272b] text-blue-400 font-semibold"
-                      : "text-slate-400 hover:text-white hover:bg-slate-800/60"
-                  }`}
-                >
-                  <Icon className={`w-4 h-4 ${isActive ? "text-white" : "text-slate-400"}`} />
-                  <span>{item.name}</span>
-                </a>
+                  {(index === 0 || navItems[index - 1].group !== item.group) && (
+                    <p className={`px-3 pb-1.5 ${index === 0 ? "" : "pt-4"} text-[10px] font-bold uppercase tracking-widest text-blue-200/50`}>
+                      {item.group}
+                    </p>
+                  )}
+                  <a
+                    onClick={() => setMenuOpen(false)}
+                    aria-current={isActive ? "page" : undefined}
+                    href={item.href}
+                    className={`relative flex items-center gap-3 rounded-lg px-3.5 py-2.5 text-[13px] font-medium transition ${
+                      isActive
+                        ? "bg-white/10 text-slate-900"
+                        : "text-blue-100/70 hover:bg-white/5 hover:text-slate-900"
+                    }`}
+                  >
+                    {isActive && <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r bg-blue-400" />}
+                    <Icon className="h-4 w-4 shrink-0" />
+                    <span>{item.name}</span>
+                  </a>
                 </React.Fragment>
               );
             })}
           </nav>
         </div>
 
-        {/* User Footer & Logout */}
-        <div className="p-4 border-t border-slate-800/80 bg-slate-950/40">
-          <div className="flex items-center gap-3 mb-3 px-1">
-            <div className="w-9 h-9 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-blue-400 font-bold text-xs uppercase">
+        {/* Account footer */}
+        <div className="border-t border-white/10 p-4">
+          <div className="mb-3 flex items-center gap-3 px-1">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-xs font-bold uppercase text-slate-900">
               {user.name ? user.name.substring(0, 2) : "HO"}
             </div>
-            <div className="overflow-hidden">
-              <p className="text-xs font-semibold text-white truncate">
-                {user.name}
-              </p>
-              <p className="text-[11px] text-slate-400 truncate">{user.email}</p>
+            <div className="min-w-0">
+              <p className="truncate text-xs font-semibold text-slate-900">{user.name}</p>
+              <p className="truncate text-[11px] text-blue-200/60">{user.email}</p>
             </div>
           </div>
-
           <button
             onClick={logout}
-            className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-slate-900 border border-slate-800 hover:bg-red-500/10 hover:border-red-500/25 hover:text-red-400 text-xs font-medium text-slate-300 transition cursor-pointer"
+            className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 py-2 px-3 text-xs font-semibold text-blue-100 transition hover:bg-red-500/20 hover:text-white"
           >
-            <LogOut className="w-3.5 h-3.5" />
-            <span>Sign Out</span>
+            <LogOut className="h-3.5 w-3.5" />
+            <span>Sign out</span>
           </button>
         </div>
       </aside>
 
-      {/* Main Content Area */}
-      <div className="min-w-0 flex-1 flex flex-col overflow-hidden">
-        {/* Top Navbar */}
-        <header className="h-16 shrink-0 border-b border-[#303034] bg-[#1e1e21] px-4 md:px-8 flex items-center justify-between gap-3">
+      {/* Main */}
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 md:px-8">
           <div className="flex min-w-0 items-center gap-3">
-            <button aria-label="Open navigation" onClick={() => setMenuOpen(true)} className="md:hidden p-2 text-slate-400"><Menu className="h-5 w-5" /></button>
-            <span className="truncate text-sm font-semibold text-white">{navItems.find((item) => item.href === "/dashboard" ? pathname === item.href : pathname.startsWith(item.href))?.name || "Dashboard"}</span>
+            <button aria-label="Open navigation" onClick={() => setMenuOpen(true)}
+              className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 md:hidden">
+              <Menu className="h-5 w-5" />
+            </button>
+            <div className="min-w-0">
+              <span className="block truncate text-sm font-semibold text-slate-900">
+                {activeItem?.name || "Dashboard"}
+              </span>
+              {pathname !== "/dashboard" && (
+                <span className="block text-[11px] text-slate-500">
+                  Dashboard / {activeItem?.name || ""}
+                </span>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-4">
-            <a href="/dashboard/vouchers" className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-500">Create vouchers</a>
-            <div className="h-8 w-8 rounded-full bg-[#303034] flex items-center justify-center text-xs text-slate-200 font-semibold" title={user.email}>
+          <div className="flex items-center gap-3">
+            <a href="/dashboard/vouchers/new"
+              className="rounded-lg bg-blue-700 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-blue-600">
+              Create vouchers
+            </a>
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#122B49] text-xs font-bold text-slate-900" title={user.email}>
               {user.name.substring(0, 2).toUpperCase()}
             </div>
           </div>
         </header>
 
-        {/* Dynamic Route Content */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-10">{children}</main>
+        <main className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-10">
+          <div className="mx-auto max-w-6xl">{children}</div>
+        </main>
       </div>
     </div>
   );
