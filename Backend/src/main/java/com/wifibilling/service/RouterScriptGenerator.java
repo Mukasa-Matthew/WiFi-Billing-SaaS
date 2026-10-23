@@ -247,6 +247,10 @@ public class RouterScriptGenerator {
         for (String ip : c.walledGardenIps()) {
             s.append("/ip/hotspot/walled-garden/ip add action=accept dst-address=").append(ip)
                     .append(" comment=").append(tag).append('\n');
+            // Walled-garden ip rules only exempt the filter chain on some RouterOS builds —
+            // also bypass the hotspot dst-nat redirect or clients get TCP resets.
+            s.append("/ip/firewall/nat add chain=pre-hotspot action=accept dst-address=").append(ip)
+                    .append(" comment=").append(tag).append('\n');
         }
         for (String host : c.walledGardenHosts()) {
             s.append("/ip/hotspot/walled-garden add action=allow dst-host=").append(q(host))
