@@ -12,20 +12,36 @@ interface Task { id: number; action: string; status: string; createdAt: string }
 
 function Kebab({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
   const ref = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     const close = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
     document.addEventListener("mousedown", close);
     return () => document.removeEventListener("mousedown", close);
   }, []);
+  const toggle = () => {
+    if (!open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      const width = 208;
+      const estimatedHeight = 230;
+      const spaceBelow = window.innerHeight - r.bottom;
+      setPos({
+        left: Math.min(r.right - width, window.innerWidth - width - 8),
+        top: spaceBelow >= estimatedHeight ? r.bottom + 6 : Math.max(8, r.top - estimatedHeight - 6),
+      });
+    }
+    setOpen(!open);
+  };
   return (
-    <div className="relative" ref={ref}>
-      <button aria-label="Router actions" aria-expanded={open} onClick={() => setOpen(!open)}
+    <div ref={ref}>
+      <button ref={btnRef} aria-label="Router actions" aria-expanded={open} onClick={toggle}
         className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900">
         <MoreVertical size={16} />
       </button>
       {open && (
-        <div className="absolute right-0 top-9 z-20 w-52 rounded-xl border border-slate-200 bg-white py-1.5 shadow-lg" onClick={() => setOpen(false)}>
+        <div className="fixed z-50 w-52 rounded-xl border border-slate-200 bg-white py-1.5 shadow-lg"
+          style={{ top: pos.top, left: pos.left }} onClick={() => setOpen(false)}>
           {children}
         </div>
       )}
