@@ -49,7 +49,19 @@ public class SecurityConfig {
         config.setAllowCredentials(true);
         config.setMaxAge(3600L);
 
+        // Public endpoints (captive portal on router-local origins, router
+        // provisioning, payment callbacks) must be reachable from any origin.
+        CorsConfiguration open = new CorsConfiguration();
+        open.setAllowedOriginPatterns(List.of("*"));
+        open.setAllowedMethods(List.of("GET", "POST", "OPTIONS"));
+        open.setAllowedHeaders(List.of("*"));
+        open.setAllowCredentials(false);
+        open.setMaxAge(3600L);
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/api/portal/**", open);
+        source.registerCorsConfiguration("/api/router/**", open);
+        source.registerCorsConfiguration("/api/payments/**", open);
         source.registerCorsConfiguration("/**", config);
         return source;
     }
