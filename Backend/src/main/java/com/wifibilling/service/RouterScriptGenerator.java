@@ -154,6 +154,8 @@ public class RouterScriptGenerator {
         }
         // Keep the router manageable: the hotspot bridge must be in the LAN list, otherwise the
         // default firewall, MAC-WinBox and neighbor discovery ignore it and WinBox can't find the router.
+        // Some routers lack the default LAN list entirely (custom reset) — create it if missing.
+        s.append(":if ([:len [/interface/list find name=LAN]] = 0) do={ /interface/list add name=LAN comment=").append(tag).append(" }\n");
         s.append(":do { /interface/list/member add list=LAN interface=").append(q(BRIDGE_NAME))
                 .append(" comment=").append(tag).append(" } on-error={}\n");
         // Every radio on the router becomes an open hotspot AP with the chosen SSID. Run via :parse so
@@ -221,7 +223,7 @@ public class RouterScriptGenerator {
                 .append(" place-before=0 } else={ ").append(winboxRule).append(" }\n");
         s.append(":if ([:len [/ip/firewall/filter find]] > 0) do={ ").append(mndpRule)
                 .append(" place-before=0 } else={ ").append(mndpRule).append(" }\n");
-        s.append("/ip/neighbor/discovery-settings/set discover-interface-list=LAN\n");
+        s.append(":do { /ip/neighbor/discovery-settings/set discover-interface-list=LAN } on-error={}\n");
         s.append(":do { /tool/mac-server/set allowed-interface-list=LAN } on-error={}\n");
         s.append(":do { /tool/mac-server/mac-winbox/set allowed-interface-list=LAN } on-error={}\n");
         s.append('\n');
