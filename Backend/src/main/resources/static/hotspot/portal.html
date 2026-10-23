@@ -57,13 +57,13 @@
             border-radius: 50%; display: flex; align-items: center; justify-content: center;
             background: rgba(255,255,255,0.08); font-size: 20px;
         }
-        .brand h1 { font-size: 17px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
-        .brand p { font-size: 12.5px; opacity: .75; margin-top: 4px; }
+        .brand h1 { font-size: 20px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
+        .brand p { font-size: 14.5px; opacity: .75; margin-top: 4px; }
 
         .card-body { padding: 22px 24px 20px; }
 
         .section-label {
-            display: block; text-align: center; font-size: 10.5px; font-weight: 700;
+            display: block; text-align: center; font-size: 12.5px; font-weight: 700;
             letter-spacing: .16em; color: var(--muted); text-transform: uppercase; margin-bottom: 12px;
         }
 
@@ -71,14 +71,14 @@
         .input-wrap .icon { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); font-size: 15px; color: var(--muted); }
         .form-input {
             width: 100%; background: var(--input-bg); border: 1px solid var(--border); border-radius: 12px;
-            padding: 13px 14px 13px 38px; color: var(--text); font-size: 14px; outline: none; transition: border-color .2s;
+            padding: 14px 14px 14px 38px; color: var(--text); font-size: 16px; outline: none; transition: border-color .2s;
         }
         .form-input::placeholder { color: var(--muted); }
         .form-input:focus { border-color: var(--primary); }
 
         .btn {
             width: 100%; padding: 13px; border: none; border-radius: 12px; cursor: pointer;
-            font-size: 14.5px; font-weight: 700; transition: transform .1s, opacity .2s;
+            font-size: 16px; font-weight: 700; transition: transform .1s, opacity .2s;
         }
         .btn:active:not(:disabled) { transform: scale(.98); }
         .btn:disabled { opacity: .45; cursor: not-allowed; }
@@ -90,26 +90,26 @@
 
         .divider {
             display: flex; align-items: center; gap: 10px; margin: 20px 0 14px;
-            font-size: 11px; color: var(--muted);
+            font-size: 13px; color: var(--muted);
         }
         .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
 
         /* package table */
-        .pkg-head { display: flex; justify-content: space-between; font-size: 10px; font-weight: 700; letter-spacing: .12em; color: var(--muted); text-transform: uppercase; padding: 0 4px 8px; }
+        .pkg-head { display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; letter-spacing: .12em; color: var(--muted); text-transform: uppercase; padding: 0 4px 8px; }
         .pkg-row {
             display: flex; align-items: center; justify-content: space-between;
             padding: 12px 4px; border-bottom: 1px solid var(--border);
         }
         .pkg-row:last-child { border-bottom: none; }
-        .pkg-name { font-size: 14px; font-weight: 700; }
+        .pkg-name { font-size: 16.5px; font-weight: 700; }
         .pkg-featured { font-size: 9.5px; font-weight: 700; color: #B45309; background: #FEF3C7; border-radius: 6px; padding: 2px 6px; margin-left: 5px; vertical-align: middle; }
         body.theme-ember .pkg-featured { background: rgba(251,191,36,.15); color: #FBBF24; }
-        .pkg-meta { display: block; font-size: 11px; color: var(--muted); margin-top: 2px; }
+        .pkg-meta { display: block; font-size: 13px; color: var(--muted); margin-top: 2px; }
         .pkg-right { display: flex; align-items: center; gap: 10px; }
-        .pkg-price { font-size: 12.5px; font-weight: 600; color: var(--text); text-align: right; }
+        .pkg-price { font-size: 14.5px; font-weight: 600; color: var(--text); text-align: right; }
         .pkg-buy {
             background: var(--buy-bg); color: var(--buy-text); border: none; border-radius: 99px;
-            padding: 7px 18px; font-size: 11.5px; font-weight: 800; cursor: pointer; letter-spacing: .05em;
+            padding: 9px 20px; font-size: 13px; font-weight: 800; cursor: pointer; letter-spacing: .05em;
         }
         .pkg-buy:active { transform: scale(.95); }
 
@@ -117,19 +117,19 @@
             display: flex; gap: 10px; align-items: flex-start;
             background: var(--info-bg); border: 1px solid var(--info-border);
             border-radius: 12px; padding: 12px 14px; margin-top: 18px;
-            font-size: 12px; line-height: 1.5; color: var(--info-text);
+            font-size: 13.5px; line-height: 1.5; color: var(--info-text);
         }
 
         .faq { margin-top: 14px; }
         .faq-toggle {
             width: 100%; display: flex; align-items: center; justify-content: space-between;
             background: none; border: none; padding: 8px 4px; cursor: pointer;
-            font-size: 13px; font-weight: 600; color: var(--text);
+            font-size: 14.5px; font-weight: 600; color: var(--text);
         }
         .faq-list { display: none; padding-bottom: 6px; }
         .faq-list.open { display: block; }
         .faq-item {
-            display: flex; gap: 10px; align-items: flex-start; font-size: 12px; color: var(--muted);
+            display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; color: var(--muted);
             background: var(--card-2); border: 1px solid var(--border); border-radius: 10px;
             padding: 10px 12px; margin-bottom: 8px; line-height: 1.5;
         }
@@ -137,17 +137,17 @@
 
         .share-btn {
             width: 100%; margin-top: 14px; padding: 11px; border: none; border-radius: 12px;
-            background: var(--buy-bg); color: var(--buy-text); font-size: 13px; font-weight: 700;
+            background: var(--buy-bg); color: var(--buy-text); font-size: 14.5px; font-weight: 700;
             cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
         }
 
-        .support { text-align: center; margin-top: 16px; font-size: 12px; color: var(--muted); line-height: 1.9; }
+        .support { text-align: center; margin-top: 16px; font-size: 13.5px; color: var(--muted); line-height: 1.9; }
         .support a { color: var(--primary); text-decoration: none; font-weight: 600; }
 
-        .powered { text-align: center; margin-top: 14px; font-size: 10.5px; color: var(--muted); }
+        .powered { text-align: center; margin-top: 14px; font-size: 12px; color: var(--muted); }
         .powered b { color: var(--text); font-weight: 700; }
 
-        .status-msg { font-size: 13px; padding: 10px 14px; border-radius: 10px; margin-bottom: 14px; }
+        .status-msg { font-size: 14.5px; padding: 10px 14px; border-radius: 10px; margin-bottom: 14px; }
         .status-msg.error { background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.3); color: #DC2626; }
         body.theme-ember .status-msg.error { color: #FCA5A5; }
         .status-msg.success { background: rgba(16,185,129,.12); border: 1px solid rgba(16,185,129,.3); color: #059669; }
@@ -169,11 +169,11 @@
             box-shadow: 0 20px 60px rgba(0,0,0,.35);
         }
         .modal-close { position: absolute; top: 12px; right: 14px; background: none; border: none; font-size: 18px; color: var(--muted); cursor: pointer; }
-        .modal-box h3 { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
-        .modal-box p { font-size: 12.5px; color: var(--muted); margin-bottom: 14px; line-height: 1.5; }
+        .modal-box h3 { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
+        .modal-box p { font-size: 14px; color: var(--muted); margin-bottom: 14px; line-height: 1.5; }
         .spinner { width: 28px; height: 28px; margin: 16px auto; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
-        .empty-state { text-align: center; color: var(--muted); font-size: 13px; padding: 18px 0; }
+        .empty-state { text-align: center; color: var(--muted); font-size: 14.5px; padding: 18px 0; }
     </style>
 </head>
 <body class="PORTAL_THEME_PLACEHOLDER">
@@ -374,8 +374,9 @@ fetch(BASE + '/api/portal/packages?token=' + encodeURIComponent(TOKEN))
         var list = document.getElementById('packages-list');
         list.innerHTML = '';
         if (!plans.length) {
-            document.getElementById('plans-label').style.display = 'none';
-            document.getElementById('packages-section').style.display = 'none';
+            document.getElementById('plans-label').textContent = 'no packages available';
+            document.getElementById('packages-list').innerHTML =
+                '<div class="empty-state">No packages available yet — check back soon, or use a voucher above.</div>';
             return;
         }
         plans.forEach(function(p){
