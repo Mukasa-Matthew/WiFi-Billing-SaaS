@@ -299,7 +299,7 @@ function showMsg(text, isError) {
     document.getElementById('msg-area').innerHTML =
         '<div class="status-msg ' + (isError ? 'error' : 'success') + '">' + text + '</div>';
 }
-if (MT_ERROR) showMsg(MT_ERROR, true);
+if (MT_ERROR && MT_ERROR.charAt(0) !== '$') showMsg(MT_ERROR, true);
 
 // support block wiring
 (function(){
@@ -323,7 +323,7 @@ if (MT_ERROR) showMsg(MT_ERROR, true);
     }
 })();
 
-if (LINK_LOGIN) {
+if (LINK_LOGIN && LINK_LOGIN.charAt(0) !== '$') {
     document.getElementById('login-form').action = LINK_LOGIN;
     document.getElementById('dst-input').value = 'POST_LOGIN_REDIRECT_PLACEHOLDER' || LINK_ORIG;
 } else {

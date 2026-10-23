@@ -7,7 +7,7 @@
     <meta http-equiv="expires" content="-1">
     <title>Connecting…</title>
     <noscript>
-        <meta http-equiv="refresh" content="0; url=SERVER_BASE_URL_PLACEHOLDER/api/portal/page?token=ROUTER_TOKEN_PLACEHOLDER&amp;mac=$(mac)&amp;ip=$(ip)&amp;link-login-only=$(link-login-only)&amp;link-orig=$(link-orig)">
+        <meta http-equiv="refresh" content="0; url=login.html">
     </noscript>
     <style>
         :root {
@@ -152,17 +152,8 @@
         <div class="powered">TENANT_NAME_PLACEHOLDER · Powered by <b>WiFi-Billing SaaS</b></div>
     </div>
 
-    <form id="portal-context" class="portal-context" action="SERVER_BASE_URL_PLACEHOLDER/api/portal/page" method="get">
-        <input type="hidden" name="token" value="ROUTER_TOKEN_PLACEHOLDER">
-        <input type="hidden" name="mac" value="$(mac)">
-        <input type="hidden" name="ip" value="$(ip)">
-        <input type="hidden" name="username" value="$(username)">
-        <input type="hidden" name="link-login-only" value="$(link-login-only)">
-        <input type="hidden" name="link-orig" value="$(link-orig)">
-        <input type="hidden" name="error" value="$(error)">
-    </form>
     <script>
-        setTimeout(function () { document.getElementById('portal-context').submit(); }, 300);
+        setTimeout(function () { window.location.replace('login.html'); }, 300);
     </script>
 </body>
 </html>

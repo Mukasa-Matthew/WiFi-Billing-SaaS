@@ -135,7 +135,12 @@ public class PortalController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid filename");
         }
 
-        Resource resource = new ClassPathResource("static/hotspot/" + filename);
+        // The router serves the full portal page itself as login.html so clients see
+        // the branded plans instantly; only the JSON calls cross the WAN. The page is
+        // the same portal.html used by /api/portal/page, with its runtime config swapped
+        // from query-string parsing to RouterOS $(variables) + baked-in endpoints.
+        boolean isLogin = "login.html".equals(filename);
+        Resource resource = new ClassPathResource("static/hotspot/" + (isLogin ? "portal.html" : filename));
         if (!resource.exists()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Template file not found: " + filename);
         }
@@ -144,7 +149,25 @@ public class PortalController {
             String content = StreamUtils.copyToString(resource.getInputStream(), StandardCharsets.UTF_8);
 
             var tenant = router.getTenant();
+            String tpl = tenant.getPortalTemplate();
+            String theme = tpl != null && tpl.matches("[a-z0-9-]{1,40}") ? tpl : "midnight";
+
+            if (isLogin) {
+                content = content
+                        .replace("var TOKEN = Q.get('token') || '';",
+                                "var TOKEN = 'ROUTER_TOKEN_PLACEHOLDER';")
+                        .replace("var LINK_LOGIN = Q.get('link-login-only') || '';",
+                                "var LINK_LOGIN = '$(link-login-only)';")
+                        .replace("var LINK_ORIG = Q.get('link-orig') || '';",
+                                "var LINK_ORIG = '$(link-orig)';")
+                        .replace("var MT_ERROR = Q.get('error') || '';",
+                                "var MT_ERROR = '$(error)';")
+                        .replace("var BASE = location.origin;",
+                                "var BASE = 'SERVER_BASE_URL_PLACEHOLDER';");
+            }
+
             content = content
+                    .replace("PORTAL_THEME_PLACEHOLDER", "theme-" + theme)
                     .replace("ROUTER_TOKEN_PLACEHOLDER", router.getToken())
                     .replace("SERVER_BASE_URL_PLACEHOLDER", props.getPublicBaseUrl())
                     .replace("TENANT_NAME_PLACEHOLDER", escapeHtml(tenant.getName()))
