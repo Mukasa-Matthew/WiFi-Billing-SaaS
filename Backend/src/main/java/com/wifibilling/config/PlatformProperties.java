@@ -38,6 +38,11 @@ public class PlatformProperties {
     @Value("${wireguard.peer-management.wg-binary:wg}")
     private String wgBinary;
 
+    /** When set (e.g. matthew@162.245.186.123), wg commands are executed remotely via SSH
+     *  on the host that owns the hub interface. Requires key auth + sudoers NOPASSWD for wg. */
+    @Value("${wireguard.peer-management.ssh-target:}")
+    private String peerManagementSshTarget;
+
     @Value("${radius.server.ip:10.9.0.1}")
     private String radiusServerIp;
 
