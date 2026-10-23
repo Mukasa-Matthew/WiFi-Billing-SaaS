@@ -226,7 +226,7 @@ export default function AddRouterPage() {
                     {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}{copied ? "Copied" : "Click to copy"}
                   </button>
                 </div>
-                <pre className="overflow-x-auto whitespace-pre px-5 py-5 font-mono text-xs text-slate-100">{provisioningCommand}</pre>
+                <pre className="overflow-x-auto whitespace-pre bg-[#0B1F36] px-5 py-5 font-mono text-xs text-slate-200">{provisioningCommand}</pre>
                 <div className="flex gap-3 border-t border-slate-200 bg-white px-5 py-4 text-xs text-slate-500">
                   <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" />
                   <p>If the router reports <strong className="text-slate-700">device mode not allowed</strong>, run <code className="text-blue-600">/system/device-mode/update mode=advanced</code>, power-cycle the router, and retry the command.</p>
