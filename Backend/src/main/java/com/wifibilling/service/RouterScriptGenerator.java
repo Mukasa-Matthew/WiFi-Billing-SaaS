@@ -102,6 +102,8 @@ public class RouterScriptGenerator {
         s.append("# --- 0. Remove previous provisioning (safe to re-run) ---\n");
         s.append("/system/scheduler/remove [find name=").append(q(TELEMETRY_NAME)).append("]\n");
         s.append("/system/script/remove [find name=").append(q(TELEMETRY_NAME)).append("]\n");
+        s.append("/system/scheduler/remove [find name=wb-register]\n");
+        s.append("/system/script/remove [find name=wb-register]\n");
         s.append("/ip/hotspot/walled-garden/ip/remove [find comment=").append(tag).append("]\n");
         s.append("/ip/hotspot/walled-garden/remove [find comment=").append(tag).append("]\n");
         s.append("/ip/firewall/filter/remove [find comment=").append(tag).append("]\n");
@@ -271,16 +273,22 @@ public class RouterScriptGenerator {
                 .append(" interval=2m on-event=").append(q("/system script run " + TELEMETRY_NAME))
                 .append(" policy=").append(POLICY).append(" comment=").append(tag).append("\n\n");
 
-        // 6. Key registration
+        // 6. Key registration — retried every 30s until it succeeds, then self-removes.
+        //    Survives partial-import failure and transient network issues.
         s.append("# --- 7. Register this router's WireGuard public key with the hub ---\n");
         s.append(":delay 2s\n");
-        s.append(":do {\n");
+        s.append("/system/script/add name=wb-register policy=read,write,test source={\n");
         s.append("    :local wbPub [/interface/wireguard get [find name=").append(iface).append("] public-key]\n");
-        s.append("    /tool fetch url=").append(q(registerUrl))
+        s.append("    :do { /tool fetch url=").append(q(registerUrl))
                 .append(" http-method=post http-header-field=\"Content-Type: application/json\"")
-                .append(" http-data=(\"{\\\"publicKey\\\":\\\"\" . $wbPub . \"\\\"}\") output=none\n");
-        s.append("    :log info \"wifi-billing: WireGuard public key registered\"\n");
-        s.append("} on-error={ :log error \"wifi-billing: key registration failed - re-run provisioning\" }\n\n");
+                .append(" http-data=(\"{\\\"publicKey\\\":\\\"\" . $wbPub . \"\\\"}\") output=none;\n");
+        s.append("        /system/scheduler/remove [find name=wb-register];\n");
+        s.append("        /system/script/remove [find name=wb-register];\n");
+        s.append("        :log info \"wifi-billing: WireGuard public key registered\"\n");
+        s.append("    } on-error={ :log warning \"wifi-billing: key registration failed - will retry\" }\n");
+        s.append("}\n");
+        s.append("/system/scheduler/add name=wb-register interval=30s on-event=wb-register policy=read,write,test comment=").append(tag).append("\n");
+        s.append(":do { /system script run wb-register } on-error={}\n\n");
 
         s.append(":do { /system script run ").append(TELEMETRY_NAME).append(" } on-error={}\n");
         s.append(":log info \"wifi-billing: provisioning complete\"\n");

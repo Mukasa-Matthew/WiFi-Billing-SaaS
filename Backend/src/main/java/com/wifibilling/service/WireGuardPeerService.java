@@ -50,12 +50,32 @@ public class WireGuardPeerService {
 
     private boolean run(List<String> wgArgs) {
         List<String> cmd = new ArrayList<>();
-        if (props.isPeerManagementUseSudo()) {
-            cmd.add("sudo");
-            cmd.add("-n"); // never prompt for a password; fail fast instead
+        String sshTarget = props.getPeerManagementSshTarget();
+        if (sshTarget != null && !sshTarget.isBlank()) {
+            List<String> remote = new ArrayList<>();
+            if (props.isPeerManagementUseSudo()) {
+                remote.add("sudo");
+                remote.add("-n");
+            }
+            remote.add(props.getWgBinary());
+            remote.addAll(wgArgs);
+            cmd.add("ssh");
+            cmd.add("-o");
+            cmd.add("BatchMode=yes");
+            cmd.add("-o");
+            cmd.add("ConnectTimeout=5");
+            cmd.add("-o");
+            cmd.add("StrictHostKeyChecking=accept-new");
+            cmd.add(sshTarget);
+            cmd.add(String.join(" ", remote));
+        } else {
+            if (props.isPeerManagementUseSudo()) {
+                cmd.add("sudo");
+                cmd.add("-n"); // never prompt for a password; fail fast instead
+            }
+            cmd.add(props.getWgBinary());
+            cmd.addAll(wgArgs);
         }
-        cmd.add(props.getWgBinary());
-        cmd.addAll(wgArgs);
 
         if (!props.isPeerManagementEnabled()) {
             log.info("[wg dry-run] {}", String.join(" ", cmd));
