@@ -37,6 +37,7 @@ public class PortalController {
         boolean first = true;
         for (var p : plans) {
             if (!"ACTIVE".equals(p.effectiveAvailability())) continue;
+            if (p.getRouter() != null && !p.getRouter().getId().equals(router.getId())) continue;
             if (!Boolean.TRUE.equals(router.getTenant().getPortalShowPackages())) break;
             if (!first) b.append(',');
             first = false;
@@ -70,6 +71,7 @@ public class PortalController {
 
         return plans.stream()
                 .filter(p -> "ACTIVE".equals(p.effectiveAvailability()))
+                .filter(p -> p.getRouter() == null || p.getRouter().getId().equals(router.getId()))
                 .sorted(java.util.Comparator.<PackagePlan, Boolean>comparing(p -> !Boolean.TRUE.equals(p.getFeatured()))
                         .thenComparing(PackagePlan::getPrice)
                         .thenComparing(p -> p.getDisplayOrder() == null ? 0 : p.getDisplayOrder()))

@@ -50,6 +50,9 @@ public class PackagePlanController {
 
         PackagePlan plan = PackagePlan.builder()
                 .tenant(tenant)
+                .router(req.routerId() == null ? null
+                        : routerRepository.findByIdAndTenantId(req.routerId(), tenant.getId())
+                            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Router not found")))
                 .name(req.name().trim())
                 .price(req.price())
                 .rateLimit(req.rateLimit().trim())
@@ -115,6 +118,8 @@ public class PackagePlanController {
                 p.effectiveAvailability(),
                 Boolean.TRUE.equals(p.getFeatured()),
                 p.getDisplayOrder() == null ? 0 : p.getDisplayOrder(),
+                p.getRouter() == null ? null : p.getRouter().getId(),
+                p.getRouter() == null ? null : p.getRouter().getName(),
                 p.getCreatedAt()
         );
     }

@@ -15,7 +15,8 @@ public class PackagePlanDto {
             @Size(max = 500) String description,
             @Pattern(regexp = "ACTIVE|HIDDEN|DISABLED") String availability,
             Boolean featured,
-            @Min(0) Integer displayOrder) {
+            @Min(0) Integer displayOrder,
+            Long routerId) {
     }
 
     public record Response(
@@ -29,6 +30,8 @@ public class PackagePlanDto {
             String availability,
             Boolean featured,
             Integer displayOrder,
+            Long routerId,
+            String routerName,
             OffsetDateTime createdAt) {
     }
 }

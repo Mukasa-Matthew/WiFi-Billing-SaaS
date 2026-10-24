@@ -20,13 +20,15 @@ export default function CreatePackagePage() {
   const [description, setDescription] = useState(""); const [upload, setUpload] = useState("5"); const [download, setDownload] = useState("5");
   const [price, setPrice] = useState(""); const [devices, setDevices] = useState("1"); const [availability, setAvailability] = useState("ACTIVE");
   const [featured, setFeatured] = useState(false); const [order, setOrder] = useState("0"); const [saving, setSaving] = useState(false); const [error, setError] = useState("");
+  const [routers, setRouters] = useState<{ id: number; name: string }[]>([]); const [routerId, setRouterId] = useState("");
   useEffect(() => { const template = presets[new URLSearchParams(window.location.search).get("template") || ""]; if (template) { setName(template.name); setDuration(template.duration); setUnit(template.unit); setPrice(template.price); } }, []);
+  useEffect(() => { api.get<{ id: number; name: string }[]>("/api/routers").then(r => setRouters(r.data)).catch(() => {}); }, []);
   const save = async (e: React.FormEvent) => {
     e.preventDefault(); setError("");
     const seconds = Number(duration) * Number(unit);
     if (!Number.isSafeInteger(seconds) || seconds < 60 || seconds > 2147483647) { setError("Choose a valid duration of at least one minute."); return; }
     setSaving(true);
-    try { await api.post("/api/packages", { name: name.trim(), description: description.trim(), price: Number(price), sessionTimeout: seconds, rateLimit: `${upload}M/${download}M`, sharedUsers: Number(devices), availability, featured, displayOrder: Number(order) }); router.push("/dashboard/packages"); }
+    try { await api.post("/api/packages", { name: name.trim(), description: description.trim(), price: Number(price), sessionTimeout: seconds, rateLimit: `${upload}M/${download}M`, sharedUsers: Number(devices), availability, featured, displayOrder: Number(order), routerId: routerId ? Number(routerId) : null }); router.push("/dashboard/packages"); }
     catch { setError("Could not save the package. Check your entries and try again."); }
     finally { setSaving(false); }
   };
@@ -48,6 +50,7 @@ export default function CreatePackagePage() {
         <fieldset><legend className="mb-3 text-xs text-slate-700">Package availability *</legend><div className="flex flex-wrap gap-3">{["ACTIVE", "HIDDEN", "DISABLED"].map(s => <label key={s} className={`cursor-pointer rounded-lg border px-4 py-2 text-xs capitalize ${availability === s ? "border-emerald-500/50 bg-emerald-50 text-emerald-700" : "border-slate-300 text-slate-500"}`}><input type="radio" name="availability" value={s} checked={availability === s} onChange={() => setAvailability(s)} className="mr-2 accent-emerald-500" />{s.toLowerCase()}</label>)}</div><p className="mt-3 text-xs leading-6 text-slate-500">Active: visible on the portal. Hidden: voucher-only. Disabled: unavailable for portal purchase. Existing vouchers keep their access.</p></fieldset>
         <label className="flex items-start gap-3 text-sm text-slate-700"><input type="checkbox" checked={featured} onChange={e => setFeatured(e.target.checked)} className="mt-1 accent-blue-500" /><span>Featured package<small className="mt-1 block text-xs text-slate-500">Appears first on the portal with a Popular badge.</small></span></label>
         <label className="block text-xs text-slate-700">Display order<input type="number" required min="0" step="1" max="2147483647" value={order} onChange={e => setOrder(e.target.value)} className={input} /><span className="mt-2 block text-slate-500">Breaks ties between packages with the same featured status and price.</span></label>
+        <label className="block text-xs text-slate-700">Router<select value={routerId} onChange={e => setRouterId(e.target.value)} className={input}><option value="">All routers</option>{routers.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}</select><span className="mt-2 block text-slate-500">Limit this package to one site. Vouchers stay valid on every router you own, but only routers in scope show this plan on their portal.</span></label>
       </Section>
       {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-300">{error}</p>}
       <div className="flex justify-end gap-3 pb-6"><Link href="/dashboard/packages" className="rounded-lg border border-slate-300 px-5 py-2.5 text-sm text-slate-700">Cancel</Link><button disabled={saving} className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50">{saving ? "Saving…" : "Create package"}</button></div>
