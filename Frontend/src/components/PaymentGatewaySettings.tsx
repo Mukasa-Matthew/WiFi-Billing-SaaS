@@ -31,6 +31,7 @@ export default function PaymentGatewaySettings() {
   const [webhookSecret, setWebhookSecret] = useState("");
   const [environment, setEnvironment] = useState("live");
   const [copied, setCopied] = useState(false);
+  const [showOwn, setShowOwn] = useState(false);
 
   const load = async () => {
     try { setGw((await api.get<GatewayView>("/api/settings/gateway")).data); }
@@ -47,7 +48,7 @@ export default function PaymentGatewaySettings() {
 
   const selectMode = (mode: "PLATFORM" | "OWN") => {
     const msg = mode === "OWN"
-      ? "Switch to your own MarzPay gateway? New payments will settle to YOUR MarzPay account. Existing wallet balance and history are preserved."
+      ? "Switch to your own payment gateway? New payments will settle to YOUR provider account. Existing wallet balance and history are preserved."
       : "Switch back to the platform gateway? New payments will be collected into your platform wallet. Your own gateway credentials remain saved.";
     if (!window.confirm(msg)) return;
     void act("mode", () => api.post("/api/settings/gateway/mode", { mode, confirm: true }), "Gateway mode updated.");
@@ -83,13 +84,13 @@ export default function PaymentGatewaySettings() {
             {gw.mode === "PLATFORM" && <Badge tone="green">Active</Badge>}
           </div>
           <p className="mt-3 text-xs leading-relaxed text-[var(--fg-muted)]">
-            Accept customer payments using our integrated MarzPay gateway. Your earnings appear in
+            Accept customer payments using our integrated payment gateway. Your earnings appear in
             your business wallet, and you can request withdrawals.
           </p>
           <ul className="mt-4 space-y-1.5 text-xs text-[var(--fg-muted)]">
             <li className="flex items-center gap-2"><CheckCircle size={14} className="text-emerald-500" /> Transaction fee: {gw.platformFeePercent}% per successful collection</li>
             <li className="flex items-center gap-2"><CheckCircle size={14} className="text-emerald-500" /> Wallet withdrawals to your mobile money</li>
-            <li className="flex items-center gap-2"><CheckCircle size={14} className="text-emerald-500" /> No MarzPay account needed</li>
+            <li className="flex items-center gap-2"><CheckCircle size={14} className="text-emerald-500" /> No provider account needed — nothing to set up</li>
           </ul>
           {gw.mode !== "PLATFORM" && (
             <button className={`${buttonGhost} mt-4 w-full`} disabled={busy === "mode"} onClick={() => selectMode("PLATFORM")}>
@@ -108,8 +109,8 @@ export default function PaymentGatewaySettings() {
             {gw.mode === "OWN" && <Badge tone="green">Active</Badge>}
           </div>
           <p className="mt-3 text-xs leading-relaxed text-[var(--fg-muted)]">
-            Connect your own MarzPay account and receive customer payments directly into your
-            MarzPay wallet. Sales still appear in your dashboard.
+            Connect your own payment provider account and receive customer payments directly into
+            your own wallet. Sales still appear in your dashboard.
           </p>
           {gw.connectionStatus !== "UNCONFIGURED" && (
             <div className="mt-3">
@@ -121,32 +122,34 @@ export default function PaymentGatewaySettings() {
             </div>
           )}
           {gw.mode !== "OWN" && (
-            <button className={`${button} mt-4 w-full`} disabled={busy === "mode" || !gw.hasSecret || gw.connectionStatus !== "CONNECTED"}
-              onClick={() => selectMode("OWN")}
-              title={!gw.hasSecret ? "Save and verify credentials first" : undefined}>
-              {busy === "mode" ? "Switching…" : "Switch to my own gateway"}
+            <button className={`${button} mt-4 w-full`} disabled={busy === "mode"}
+              onClick={() => (gw.hasSecret && gw.connectionStatus === "CONNECTED") ? selectMode("OWN") : setShowOwn(true)}>
+              {busy === "mode" ? "Switching…"
+                : gw.hasSecret && gw.connectionStatus === "CONNECTED" ? "Switch to my own gateway"
+                : "Set up my own gateway"}
             </button>
           )}
         </div>
       </div>
 
-      {/* Credential form — only relevant for the tenant's OWN gateway.
-          Platform mode uses keys from the server environment; tenants never see or fill them. */}
+      {/* Credential form — only for the tenant's OWN gateway. Hidden in
+          platform mode; platform keys live in the server environment. */}
+      {(gw.mode === "OWN" || gw.hasSecret || showOwn) && (
       <div className={card}>
         <div className="flex items-center gap-2">
           <ShieldCheck size={18} className="text-[var(--fg-muted)]" />
-          <h3 className="text-sm font-bold text-[var(--fg)]">Your own MarzPay credentials</h3>
+          <h3 className="text-sm font-bold text-[var(--fg)]">Your own payment gateway credentials</h3>
         </div>
         <p className="mt-1.5 text-xs text-[var(--fg-muted)]">
-          Only needed if you choose <b>“Use My Own Payment Gateway”</b>. The platform gateway needs
-          nothing from you — it runs on our keys. From your MarzPay dashboard → API Keys.
+          Only needed for <b>“Use My Own Payment Gateway”</b> — the platform gateway needs nothing
+          from you. Find these in your payment provider's dashboard → API Keys.
           Credentials are encrypted at rest and never shown after saving.
         </p>
         <form onSubmit={saveCreds} className="mt-5 grid gap-4 md:grid-cols-2">
           <div>
             <label className={label}>API Key</label>
             <input className={field} required value={apiKey} onChange={(e) => setApiKey(e.target.value)}
-              placeholder={gw.apiKeyMasked || "marz_live_…"} autoComplete="off" />
+              placeholder={gw.apiKeyMasked || "Paste your API key"} autoComplete="off" />
           </div>
           <div>
             <label className={label}>API Secret</label>
@@ -158,7 +161,7 @@ export default function PaymentGatewaySettings() {
             <label className={label}>Webhook signing secret <span className="font-normal text-[var(--fg-faint)]">(optional)</span></label>
             <input className={field} type="password" value={webhookSecret} onChange={(e) => setWebhookSecret(e.target.value)}
               placeholder={gw.hasWebhookSecret ? "•••••••• (saved)" : "whsec_…"} autoComplete="new-password" />
-            <p className={hint}>Enable webhook signing in MarzPay, then paste the whsec_ secret here. Signed callbacks are verified automatically.</p>
+            <p className={hint}>Enable webhook signing in your provider dashboard, then paste the signing secret here. Signed callbacks are verified automatically.</p>
           </div>
           <div>
             <label className={label}>Environment</label>
@@ -178,7 +181,7 @@ export default function PaymentGatewaySettings() {
                   <Plugs size={14} /> {busy === "test" ? "Testing…" : "Test connection"}
                 </button>
                 <button type="button" className="text-xs font-semibold text-red-600 hover:underline" disabled={busy === "disconnect"}
-                  onClick={() => { if (window.confirm("Disconnect your MarzPay gateway and return to the platform gateway? Your credentials will be deleted.")) void act("disconnect", () => api.post("/api/settings/gateway/disconnect"), "Gateway disconnected."); }}>
+                  onClick={() => { if (window.confirm("Disconnect your gateway and return to the platform gateway? Your credentials will be deleted.")) void act("disconnect", () => api.post("/api/settings/gateway/disconnect"), "Gateway disconnected."); }}>
                   {busy === "disconnect" ? "Disconnecting…" : "Disconnect gateway"}
                 </button>
               </>
@@ -186,13 +189,14 @@ export default function PaymentGatewaySettings() {
           </div>
         </form>
       </div>
+      )}
 
       {/* Webhook setup — only relevant once a tenant has their own gateway */}
       {(gw.mode === "OWN" || gw.hasSecret) && (
       <div className={card}>
         <h3 className="text-sm font-bold text-[var(--fg)]">Webhook / callback setup</h3>
         <p className="mt-1.5 text-xs text-[var(--fg-muted)]">
-          In your MarzPay dashboard → Webhooks, register this URL for <b>collection.completed</b>, <b>collection.failed</b>,
+          In your provider dashboard → Webhooks, register this URL for <b>collection.completed</b>, <b>collection.failed</b>,
           and <b>disbursement.*</b> events so payment status reaches this platform:
         </p>
         <div className="mt-3 flex items-center gap-2">

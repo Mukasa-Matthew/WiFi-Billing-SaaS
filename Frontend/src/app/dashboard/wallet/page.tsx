@@ -74,7 +74,7 @@ export default function WalletPage() {
         <div>
           <h1 className="text-xl font-bold tracking-tight text-[var(--fg)]">Wallet</h1>
           <p className="mt-1 text-sm text-[var(--fg-muted)]">
-            Earnings collected through the platform payment gateway. Payments made through your own MarzPay account settle directly to your wallet there.
+            Earnings collected through the platform payment gateway. Payments made through your own payment gateway account settle directly to your wallet there.
           </p>
         </div>
         <button className={button} onClick={() => setOpen(true)}
