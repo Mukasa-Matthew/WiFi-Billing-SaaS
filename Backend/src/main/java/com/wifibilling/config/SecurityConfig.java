@@ -83,6 +83,10 @@ public class SecurityConfig {
                 .requestMatchers("/api/vouchers/**", "/api/routers/**", "/api/packages/**").authenticated()
                 .anyRequest().authenticated()
             )
+            .exceptionHandling(ex -> ex
+                .authenticationEntryPoint((req, res, e) -> res.sendError(401))
+                .accessDeniedHandler((req, res, e) -> res.sendError(403))
+            )
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
