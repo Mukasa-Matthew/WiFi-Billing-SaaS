@@ -27,9 +27,16 @@ public class TenantDashboardService {
     private final VoucherRepository voucherRepository;
     private final RouterRepository routerRepository;
     private final SessionService sessionService;
+    private final com.wifibilling.repository.RadAcctRepository radAcctRepository;
+    private final com.wifibilling.repository.PackagePlanRepository planRepository;
 
     @Transactional(readOnly = true)
     public TenantDashboardStatsDto getStats(Long tenantId, String role) {
+        return getStats(tenantId, role, "7d");
+    }
+
+    @Transactional(readOnly = true)
+    public TenantDashboardStatsDto getStats(Long tenantId, String role, String range) {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         OffsetDateTime startOfDay = now.toLocalDate().atStartOfDay().atOffset(ZoneOffset.UTC);
         OffsetDateTime startOfMonth = now.toLocalDate().withDayOfMonth(1).atStartOfDay().atOffset(ZoneOffset.UTC);
@@ -140,7 +147,115 @@ public class TenantDashboardService {
                 .limit(5)
                 .toList();
 
+        // ---- Ranged analytics (period filters on the dashboard) ----
+        String r = range == null ? "7d" : range;
+        LocalDate today = now.toLocalDate();
+        OffsetDateTime thisMonday = today.with(java.time.DayOfWeek.MONDAY).atStartOfDay().atOffset(ZoneOffset.UTC);
+        OffsetDateTime yearStart = today.withDayOfYear(1).atStartOfDay().atOffset(ZoneOffset.UTC);
+        record Win(OffsetDateTime s, OffsetDateTime e, boolean monthly) {}
+        Win w = switch (r) {
+            case "today" -> new Win(startOfDay, now, false);
+            case "week" -> new Win(thisMonday, now, false);
+            case "lastweek" -> new Win(thisMonday.minusDays(7), thisMonday, false);
+            case "month" -> new Win(startOfMonth, now, false);
+            case "lastmonth" -> new Win(startOfMonth.minusMonths(1), startOfMonth, false);
+            case "year" -> new Win(yearStart, now, true);
+            case "lastyear" -> new Win(yearStart.minusYears(1), yearStart, true);
+            default -> new Win(startOfDay.minusDays(6), now, false);
+        };
+        if (!List.of("today","7d","week","lastweek","month","lastmonth","year","lastyear").contains(r)) r = "7d";
+        final OffsetDateTime rs = w.s(); final OffsetDateTime re = w.e(); final boolean monthly = w.monthly();
+        List<LocalDate> buckets = new ArrayList<>();
+        if (monthly) {
+            LocalDate cursor = rs.toLocalDate().withDayOfMonth(1);
+            while (!cursor.isAfter(re.toLocalDate())) { buckets.add(cursor); cursor = cursor.plusMonths(1); }
+        } else {
+            LocalDate cursor = rs.toLocalDate();
+            while (!cursor.isAfter(re.toLocalDate())) { buckets.add(cursor); cursor = cursor.plusDays(1); }
+        }
+        Map<LocalDate, BigDecimal> rev = new LinkedHashMap<>();
+        Map<LocalDate, Integer> txCount = new LinkedHashMap<>();
+        Map<LocalDate, Integer> regs = new LinkedHashMap<>();
+        Map<LocalDate, Set<String>> users = new LinkedHashMap<>();
+        for (LocalDate d : buckets) { rev.put(d, BigDecimal.ZERO); txCount.put(d, 0); regs.put(d, 0); users.put(d, new HashSet<>()); }
+        java.util.function.BiFunction<OffsetDateTime, Map<LocalDate, ?>, LocalDate> bucketKey = (ts, m) -> {
+            if (ts == null || ts.isBefore(rs) || !ts.isBefore(re.plusNanos(1))) return null;
+            LocalDate k = monthly ? ts.toLocalDate().withDayOfMonth(1) : ts.toLocalDate();
+            return m.containsKey(k) ? k : null;
+        };
+        for (Transaction t : transactions) {
+            LocalDate k = bucketKey.apply(t.getCreatedAt(), rev);
+            if (k != null && "SUCCESSFUL".equalsIgnoreCase(t.getStatus())) {
+                rev.put(k, rev.get(k).add(t.getAmount() != null ? t.getAmount() : BigDecimal.ZERO));
+                txCount.put(k, txCount.get(k) + 1);
+            }
+        }
+        Map<String, Voucher> byCode = new HashMap<>();
+        for (Voucher v : vouchers) {
+            byCode.put(v.getCode(), v);
+            LocalDate k = bucketKey.apply(v.getCreatedAt(), regs);
+            if (k != null) regs.put(k, regs.get(k) + 1);
+        }
+        List<com.wifibilling.radius.RadAcct> accts = byCode.isEmpty() ? List.of()
+                : radAcctRepository.findAllByUsernameIn(byCode.keySet());
+        Map<String, Long> octets = new HashMap<>();
+        for (var a : accts) {
+            OffsetDateTime ts = a.getAcctStartTime() != null ? a.getAcctStartTime() : a.getAcctStopTime();
+            LocalDate k = bucketKey.apply(ts, users);
+            if (k != null && a.getUsername() != null) {
+                users.get(k).add(a.getUsername());
+                octets.merge(a.getUsername(), (a.getAcctInputOctets() != null ? a.getAcctInputOctets() : 0L)
+                        + (a.getAcctOutputOctets() != null ? a.getAcctOutputOctets() : 0L), Long::sum);
+            }
+        }
+        List<Map<String, Object>> revenueSeries = new ArrayList<>(), dailyUsers = new ArrayList<>(), registrations = new ArrayList<>();
+        for (LocalDate d : buckets) {
+            String label = monthly ? d.getMonth().getDisplayName(TextStyle.SHORT, Locale.ENGLISH) : d.getDayOfWeek().getDisplayName(TextStyle.SHORT, Locale.ENGLISH);
+            revenueSeries.add(Map.of("date", d.toString(), "label", label, "revenue", rev.get(d), "transactions", txCount.get(d)));
+            dailyUsers.add(Map.of("date", d.toString(), "label", label, "users", users.get(d).size()));
+            registrations.add(Map.of("date", d.toString(), "label", label, "registrations", regs.get(d)));
+        }
+        List<Map<String, Object>> topDataUsers = octets.entrySet().stream()
+                .sorted(Map.Entry.<String, Long>comparingByValue().reversed()).limit(5)
+                .map(e -> {
+                    Voucher v = byCode.get(e.getKey());
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("username", e.getKey());
+                    m.put("customer", v != null && v.getCustomer() != null ? v.getCustomer().getName() : null);
+                    m.put("phone", v != null && v.getCustomer() != null ? v.getCustomer().getPhone() : null);
+                    m.put("package", v != null && v.getPackagePlan() != null ? v.getPackagePlan().getName() : null);
+                    m.put("octets", e.getValue());
+                    return m;
+                }).toList();
+        Map<String, Long> activeByPlan = new HashMap<>();
+        for (var s : activeSessions) {
+            Voucher v = byCode.get(s.username());
+            if (v != null && v.getPackagePlan() != null) activeByPlan.merge(v.getPackagePlan().getName(), 1L, Long::sum);
+        }
+        List<Map<String, Object>> packagePerformance = new ArrayList<>();
+        for (var p : planRepository.findAllByTenantIdOrderByPriceAsc(tenantId)) {
+            BigDecimal mRev = BigDecimal.ZERO; long sold = 0, monthSold = 0;
+            for (Transaction t : transactions) {
+                if (!"SUCCESSFUL".equalsIgnoreCase(t.getStatus()) || t.getPackagePlan() == null
+                        || !t.getPackagePlan().getId().equals(p.getId())) continue;
+                sold++;
+                if (t.getCreatedAt() != null && !t.getCreatedAt().isBefore(startOfMonth)) { mRev = mRev.add(t.getAmount() != null ? t.getAmount() : BigDecimal.ZERO); monthSold++; }
+            }
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", p.getId()); m.put("name", p.getName()); m.put("price", p.getPrice());
+            m.put("activeUsers", activeByPlan.getOrDefault(p.getName(), 0L));
+            m.put("monthlyRevenue", mRev); m.put("totalSold", sold);
+            m.put("arpu", monthSold > 0 ? mRev.divide(BigDecimal.valueOf(monthSold), 0, java.math.RoundingMode.HALF_UP) : BigDecimal.ZERO);
+            packagePerformance.add(m);
+        }
+
         return TenantDashboardStatsDto.builder()
+                .range(r)
+                .revenueSeries(revenueSeries)
+                .dailyActiveUsers(dailyUsers)
+                .registrations(registrations)
+                .topDataUsers(topDataUsers)
+                .packagePerformance(packagePerformance)
                 .revenueToday(revToday)
                 .revenueMonth(revMonth)
                 .activeUsers(activeUsers)
