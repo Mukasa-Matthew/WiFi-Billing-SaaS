@@ -88,7 +88,7 @@ export default function LoginPage() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@airpairy.app"
+                  placeholder={process.env.NEXT_PUBLIC_SUPPORT_EMAIL || "name@company.com"}
                   className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white border border-slate-200 text-sm text-slate-900 placeholder-slate-500 focus:outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-600/15 transition-all"
                 />
               </div>
