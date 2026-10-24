@@ -74,9 +74,11 @@ public class RouterScriptGenerator {
         s.append("/ip/firewall/filter/remove [find where comment~\"^wb-tether\"]\n");
         if ("LOG".equals(mode) || "BLOCK".equals(mode)) {
             String action = "BLOCK".equals(mode) ? "drop" : "log";
-            s.append("/ip/firewall/filter/add chain=forward ttl=equal:63 action=").append(action)
+            // TTL is decremented before the forward chain, so direct clients
+            // appear as 63/127. Tethered traffic passed an extra NAT hop: 62/126.
+            s.append("/ip/firewall/filter/add chain=forward ttl=equal:62 action=").append(action)
                     .append(" log=yes log-prefix=\"wb-tether\" comment=\"wb-tether: android/ios tethered\"\n");
-            s.append("/ip/firewall/filter/add chain=forward ttl=equal:127 action=").append(action)
+            s.append("/ip/firewall/filter/add chain=forward ttl=equal:126 action=").append(action)
                     .append(" log=yes log-prefix=\"wb-tether\" comment=\"wb-tether: windows tethered\"\n");
         }
         return s.toString();
