@@ -1,8 +1,11 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import api from "@/lib/api";
-import { Table, Badge, Notice, date, panel, button, buttonGhost, field, label, hint, message } from "@/components/BillingUI";
-import { ArrowDown, X, WarningCircle, ArrowsClockwise } from "@phosphor-icons/react";
+import { Table, Badge, ErrorNotice, date, panel, button, buttonGhost, field, label, hint, message, PageHeader } from "@/components/BillingUI";
+import { Dialog } from "@/components/ui/Dialog";
+import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { useToast } from "@/components/ui/Toast";
+import { ArrowDown, WarningCircle, ArrowsClockwise } from "@phosphor-icons/react";
 
 interface Overview {
   walletCount: number; tenantLiabilities: number; reservedFunds: number;
@@ -57,8 +60,10 @@ export default function AdminFinancePage() {
   const [wdBusy, setWdBusy] = useState(false);
   const [wdErr, setWdErr] = useState("");
   const [reconBusy, setReconBusy] = useState(false);
+  const toast = useToast();
+  const { confirm, dialog: confirmationDialog } = useConfirmDialog();
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const [o, w, wd, pl, po] = await Promise.all([
         api.get<Overview>("/api/admin/finance/overview"),
@@ -70,8 +75,8 @@ export default function AdminFinancePage() {
       setOverview(o.data); setWallets(w.data); setWithdrawals(wd.data);
       setPlat(pl.data); setPayouts(po.data);
     } catch (e) { setErr(message(e)); }
-  };
-  useEffect(() => { void load(); }, [filter]);
+  }, [filter]);
+  useEffect(() => { const initial = window.setTimeout(load, 0); return () => window.clearTimeout(initial); }, [load]);
 
   const reconcile = async () => {
     setReconBusy(true); setErr("");
@@ -88,20 +93,28 @@ export default function AdminFinancePage() {
         amount: Number(wdAmount), phone: wdPhone, password: wdPassword,
       });
       setWdOpen(false); setWdAmount(""); setWdPhone(""); setWdPassword("");
+      toast("success", "Platform payout request submitted.");
       await load();
     } catch (err) { setWdErr(message(err)); }
     finally { setWdBusy(false); }
   };
 
-  const act = async (id: number, action: "approve" | "fail") => {
-    if (action === "fail" && !window.confirm("Mark this payout as failed and release the reserved funds back to the tenant?")) return;
-    setBusyId(id); setErr("");
-    try {
-      await api.post(`/api/admin/finance/withdrawals/${id}/${action}`, action === "fail" ? { reason: "Rejected by administrator" } : {});
-      await load();
-    } catch (e) { setErr(message(e)); }
-    finally { setBusyId(null); }
-  };
+  const act = (row: WithdrawalRow, action: "approve" | "fail") => confirm({
+    title: action === "approve" ? "Approve withdrawal?" : "Reject withdrawal?",
+    body: action === "approve"
+      ? `Approve ${money(row.amount)} for ${row.businessName}? The provider payout will only be shown as complete after backend confirmation.`
+      : `Reject ${money(row.amount)} for ${row.businessName}? Reserved funds will be released back to the tenant after confirmation.`,
+    confirmLabel: action === "approve" ? "Approve withdrawal" : "Reject withdrawal",
+    onConfirm: async () => {
+      setBusyId(row.id); setErr("");
+      try {
+        await api.post(`/api/admin/finance/withdrawals/${row.id}/${action}`, action === "fail" ? { reason: "Rejected by administrator" } : {});
+        toast("success", action === "approve" ? "Withdrawal approved." : "Withdrawal rejected and funds released.");
+        await load();
+      } catch (e) { toast("error", message(e)); }
+      finally { setBusyId(null); }
+    },
+  });
 
   const cards = [
     { label: "Provider balance", value: overview?.providerBalance, note: overview?.platformConfigured ? "Actual platform account" : "Not configured" },
@@ -113,17 +126,12 @@ export default function AdminFinancePage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold tracking-tight text-[var(--fg)]">Finance</h1>
-        <p className="mt-1 text-sm text-[var(--fg-muted)]">
-          Platform-managed collections, tenant wallet liabilities, and withdrawal review.
-          Funds in tenants' own provider accounts are not shown here — only money the platform holds.
-        </p>
-      </div>
+      {confirmationDialog}
+      <PageHeader title="Finance" description="Platform-managed collections, tenant wallet liabilities, and withdrawal review. Funds in tenants' own provider accounts are not shown here—only money the platform holds." />
 
-      <Notice text={err || (overview?.providerError ? `Provider balance unavailable: ${overview.providerError}` : "")} />
+      <ErrorNotice text={err || (overview?.providerError ? `Provider balance unavailable: ${overview.providerError}` : "")} />
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {cards.map((c) => (
           <div key={c.label} className={`${panel} p-5`}>
             <div className="text-xs font-semibold text-[var(--fg-muted)]">{c.label}</div>
@@ -144,7 +152,7 @@ export default function AdminFinancePage() {
           )}
           {plat.balanceStale && (
             <p className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs font-medium text-amber-800">
-              <WarningCircle size={15} /> Provider balance is stale — click "Reconcile" before reviewing payout safety.
+              <WarningCircle size={15} /> Provider balance is stale—use Reconcile before reviewing payout safety.
             </p>
           )}
           <div className="grid gap-4 lg:grid-cols-3">
@@ -261,8 +269,8 @@ export default function AdminFinancePage() {
             { label: "", render: (w: WithdrawalRow) => (
               (w.status === "PENDING_APPROVAL" || w.status === "REQUESTED") && (
                 <span className="flex gap-2">
-                  <button className={button} disabled={busyId === w.id} onClick={() => act(w.id, "approve")}>Approve</button>
-                  <button className={buttonGhost} disabled={busyId === w.id} onClick={() => act(w.id, "fail")}>Reject</button>
+                  <button className={button} disabled={busyId === w.id} onClick={() => act(w, "approve")}>Approve</button>
+                  <button className={buttonGhost} disabled={busyId === w.id} onClick={() => act(w, "fail")}>Reject</button>
                 </span>
               )
             )},
@@ -290,14 +298,9 @@ export default function AdminFinancePage() {
       </div>
 
       {wdOpen && plat && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={() => setWdOpen(false)}>
-          <form onSubmit={requestPayout} onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md rounded-2xl bg-[var(--surface)] p-6 shadow-xl">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-[var(--fg)]">Withdraw platform earnings</h3>
-              <button type="button" onClick={() => setWdOpen(false)} className="text-[var(--fg-faint)] hover:text-[var(--fg-muted)]"><X size={18} /></button>
-            </div>
-            <dl className="mt-4 space-y-1.5 rounded-lg bg-[var(--subtle)] p-3 text-xs">
+        <Dialog title="Withdraw platform earnings" description="This payout is submitted to the configured provider after server validation." onClose={() => { if (!wdBusy) setWdOpen(false); }}>
+          <form onSubmit={requestPayout}>
+            <dl className="space-y-1.5 rounded-lg bg-[var(--subtle)] p-3 text-xs">
               <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Settled earnings</dt><dd className="font-semibold">{money(plat.settledEarnings)}</dd></div>
               <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Provider balance</dt><dd className="font-semibold">{money(plat.providerBalance)}</dd></div>
               <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Max withdrawal</dt><dd className="font-bold text-emerald-700">{money(plat.safeWithdrawable)}</dd></div>
@@ -320,14 +323,14 @@ export default function AdminFinancePage() {
                 onChange={(e) => setWdPassword(e.target.value)} autoComplete="current-password" />
             </div>
             {wdErr && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{wdErr}</p>}
-            <div className="mt-6 flex justify-end gap-3">
-              <button type="button" className={buttonGhost} onClick={() => setWdOpen(false)}>Cancel</button>
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button type="button" className={buttonGhost} disabled={wdBusy} onClick={() => setWdOpen(false)}>Cancel</button>
               <button type="submit" className={button} disabled={wdBusy}>
                 {wdBusy ? "Processing…" : "Withdraw"}
               </button>
             </div>
           </form>
-        </div>
+        </Dialog>
       )}
     </div>
   );

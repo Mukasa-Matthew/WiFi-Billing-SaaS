@@ -1,19 +1,12 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useCallback, useEffect, useState, useMemo } from "react";
 import api from "@/lib/api";
 import {
   FileText,
-  ArrowClockwise,
   MagnifyingGlass,
   Download,
-  Calendar,
   Clock,
-  HardDrive,
-  ArrowCircleDown,
-  ArrowCircleUp,
-  CheckCircle,
-  WarningCircle
 } from "@phosphor-icons/react";
 
 interface SessionHistory {
@@ -38,7 +31,7 @@ export default function TenantSessionLogsPage() {
   const [search, setSearch] = useState("");
   const [causeFilter, setCauseFilter] = useState("ALL");
 
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     try {
       setLoading(true);
       const res = await api.get<SessionHistory[]>("/api/sessions/history");
@@ -48,13 +41,13 @@ export default function TenantSessionLogsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchLogs();
-    const interval = setInterval(fetchLogs, 30000);
-    return () => clearInterval(interval);
-  }, []);
+    const initial = window.setTimeout(fetchLogs, 0);
+    const interval = window.setInterval(fetchLogs, 30000);
+    return () => { window.clearTimeout(initial); window.clearInterval(interval); };
+  }, [fetchLogs]);
 
   const formatBytes = (bytes: number | null) => {
     if (!bytes || bytes === 0) return "0 MB";
@@ -232,12 +225,7 @@ export default function TenantSessionLogsPage() {
             </thead>
             <tbody className="divide-y divide-[var(--border)]">
               {loading ? (
-                <tr>
-                  <td colSpan={8} className="py-12 text-center text-[var(--fg-muted)]">
-                    <ArrowClockwise className="w-5 h-5 mx-auto animate-spin text-[var(--accent-text)] mb-2" />
-                    <span>Loading accounting logs...</span>
-                  </td>
-                </tr>
+                Array.from({ length: 6 }, (_, row) => <tr key={row} aria-hidden="true">{Array.from({ length: 8 }, (_, column) => <td key={column} className="px-4 py-4"><span className="block h-3.5 animate-pulse rounded bg-[var(--fill)] motion-reduce:animate-none" style={{ width: `${55 + ((row + column) % 4) * 10}%` }} /></td>)}</tr>)
               ) : filteredLogs.length > 0 ? (
                 filteredLogs.map((log) => (
                   <tr key={log.radAcctId} className="hover:bg-[var(--subtle)] transition">

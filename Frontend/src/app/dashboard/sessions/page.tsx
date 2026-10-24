@@ -1,21 +1,18 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useCallback, useEffect, useState, useMemo } from "react";
 import api from "@/lib/api";
+import { Dialog } from "@/components/ui/Dialog";
+import { buttonGhost, message } from "@/components/BillingUI";
 import {
   Users,
-  ArrowClockwise,
   MagnifyingGlass,
-  WifiHigh,
   Radio,
   ArrowCircleDown,
   ArrowCircleUp,
   Clock,
   UserMinus,
-  Warning,
-  CheckCircle,
   ShieldWarning,
-  HardDrive
 } from "@phosphor-icons/react";
 
 interface ActiveSession {
@@ -45,7 +42,7 @@ export default function TenantActiveSessionsPage() {
   const [disconnectTarget, setDisconnectTarget] = useState<ActiveSession | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
 
-  const fetchActiveSessions = async () => {
+  const fetchActiveSessions = useCallback(async () => {
     try {
       const res = await api.get<ActiveSession[]>("/api/sessions/active");
       setSessions(res.data);
@@ -54,24 +51,19 @@ export default function TenantActiveSessionsPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchActiveSessions();
   }, []);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      fetchActiveSessions();
-    }, 10000);
-    return () => clearInterval(interval);
-  }, []);
+    const initial = window.setTimeout(fetchActiveSessions, 0);
+    const interval = window.setInterval(fetchActiveSessions, 10000);
+    return () => { window.clearTimeout(initial); window.clearInterval(interval); };
+  }, [fetchActiveSessions]);
 
   const handleDisconnect = async () => {
     if (!disconnectTarget) return;
     try {
       setDisconnecting(true);
-      const res = await api.post("/api/sessions/disconnect", {
+      await api.post("/api/sessions/disconnect", {
         username: disconnectTarget.username
       });
       setMsg({
@@ -80,9 +72,9 @@ export default function TenantActiveSessionsPage() {
       });
       setDisconnectTarget(null);
       fetchActiveSessions();
-    } catch (err: any) {
+    } catch (err: unknown) {
       setMsg({
-        text: err.response?.data?.message || "Failed to disconnect session",
+        text: message(err),
         type: "error"
       });
     } finally {
@@ -239,12 +231,7 @@ export default function TenantActiveSessionsPage() {
             </thead>
             <tbody className="divide-y divide-[var(--border)]">
               {loading && sessions.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="py-12 text-center text-[var(--fg-muted)]">
-                    <ArrowClockwise className="w-5 h-5 mx-auto animate-spin text-emerald-500 mb-2" />
-                    <span>Streaming active sessions from FreeRADIUS...</span>
-                  </td>
-                </tr>
+                Array.from({ length: 5 }, (_, row) => <tr key={row} aria-hidden="true">{Array.from({ length: 8 }, (_, column) => <td key={column} className="px-4 py-4"><span className="block h-3.5 animate-pulse rounded bg-[var(--fill)] motion-reduce:animate-none" style={{ width: `${55 + ((row + column) % 4) * 10}%` }} /></td>)}</tr>)
               ) : filteredSessions.length > 0 ? (
                 filteredSessions.map((session) => (
                   <tr key={session.radAcctId || session.username} className="hover:bg-[var(--subtle)] transition">
@@ -310,16 +297,13 @@ export default function TenantActiveSessionsPage() {
 
       {/* Disconnect Modal */}
       {disconnectTarget && (
-        <div className="fixed inset-0 bg-[var(--canvas)]/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-[var(--surface)] border border-[var(--border)] rounded-xl p-6 space-y-6 shadow-sm">
+        <Dialog title="Revoke user session" description="Immediately ends the customer's active hotspot session." onClose={() => { if (!disconnecting) setDisconnectTarget(null); }}>
+          <div className="space-y-5">
             <div className="flex items-center gap-3 text-red-500">
               <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/30">
                 <ShieldWarning className="w-6 h-6" />
               </div>
-              <div>
-                <h3 className="text-base font-bold text-[var(--fg)]">Revoke User Session</h3>
-                <p className="text-xs text-[var(--fg-muted)]">Immediately ends the customer's session</p>
-              </div>
+              <p className="text-xs font-semibold text-red-600">This action interrupts the customer&apos;s connection.</p>
             </div>
 
             <p className="text-xs text-[var(--fg-body)] leading-relaxed">
@@ -346,11 +330,11 @@ export default function TenantActiveSessionsPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-2">
+            <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
               <button
                 type="button"
                 onClick={() => setDisconnectTarget(null)}
-                className="px-4 py-2.5 rounded-xl bg-[var(--fill)] text-xs font-medium text-[var(--fg-body)] hover:text-[var(--fg)] transition"
+                className={buttonGhost}
               >
                 Cancel
               </button>
@@ -364,7 +348,7 @@ export default function TenantActiveSessionsPage() {
               </button>
             </div>
           </div>
-        </div>
+        </Dialog>
       )}
     </div>
   );
