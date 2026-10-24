@@ -49,16 +49,18 @@ public class VoucherService {
 
     @Transactional
     public List<VoucherResponse> generate(Long tenantId, GenerateVouchersRequest req) {
-        return generate(tenantId, req, null);
+        return generate(tenantId, req, null, null);
     }
 
     /**
      * Generates vouchers; when {@code mac} is provided each code is pinned to
      * that hotspot client via a Calling-Station-Id check item — the credential
-     * only authenticates from the device that made the purchase.
+     * only authenticates from the device that made the purchase. When
+     * {@code nasIp} is provided a NAS-IP-Address check pins it to that router,
+     * preventing replay on another tenant's hotspot.
      */
     @Transactional
-    public List<VoucherResponse> generate(Long tenantId, GenerateVouchersRequest req, String mac) {
+    public List<VoucherResponse> generate(Long tenantId, GenerateVouchersRequest req, String mac, String nasIp) {
         Tenant tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tenant not found"));
         PackagePlan plan = packagePlanRepository.findByIdAndTenantId(req.packageId(), tenant.getId())
@@ -77,7 +79,7 @@ public class VoucherService {
                     .status(STATUS_UNUSED)
                     .batchReference(batchReference).saleType(Boolean.TRUE.equals(req.giveaway()) ? "GIVEAWAY" : "INVENTORY").delivery("MANUAL").archived(false)
                     .build());
-            writeRadiusAttributes(code, plan, mac);
+            writeRadiusAttributes(code, plan, mac, nasIp);
             created.add(toResponse(voucher));
         }
         return created;
@@ -135,12 +137,16 @@ public class VoucherService {
         v.setArchived(true);voucherRepository.save(v);
     }
 
-    private void writeRadiusAttributes(String code, PackagePlan plan, String mac) {
+    private void writeRadiusAttributes(String code, PackagePlan plan, String mac, String nasIp) {
         radCheckRepository.save(RadCheck.builder()
                 .username(code).attribute("Cleartext-Password").op(":=").value(code).build());
         if (mac != null) {
             radCheckRepository.save(RadCheck.builder()
                     .username(code).attribute("Calling-Station-Id").op("==").value(mac).build());
+        }
+        if (nasIp != null) {
+            radCheckRepository.save(RadCheck.builder()
+                    .username(code).attribute("NAS-IP-Address").op("==").value(nasIp).build());
         }
         if (plan.getSharedUsers() != null && plan.getSharedUsers() > 0) {
             radCheckRepository.save(RadCheck.builder()
