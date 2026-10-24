@@ -46,8 +46,8 @@ class RouterScriptGeneratorTest {
         assertTrue(s.contains(":local wbPub [/interface/wireguard get [find name=\"wg-billing\"] public-key]"));
         assertTrue(s.contains("http-data=(\"{\\\"publicKey\\\":\\\"\" . $wbPub . \"\\\"}\")"));
         // tethering BLOCK mode emits drop rules
-        assertTrue(s.contains("/ip/firewall/filter/add chain=forward ttl=equal:63 action=drop"));
-        assertTrue(s.contains("/ip/firewall/filter/add chain=forward ttl=equal:127 action=drop"));
+        assertTrue(s.contains("/ip/firewall/filter/add chain=forward ttl=equal:62 action=drop"));
+        assertTrue(s.contains("/ip/firewall/filter/add chain=forward ttl=equal:126 action=drop"));
     }
 
     @Test
