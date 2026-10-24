@@ -47,6 +47,18 @@ class PaymentServiceTest {
     @Mock
     private PaymentGatewayClient gatewayClient;
 
+    @Mock
+    private GatewayConfigService gatewayConfig;
+
+    @Mock
+    private com.wifibilling.service.payment.MarzPayClient marzPay;
+
+    @Mock
+    private WalletService walletService;
+
+    @Mock
+    private com.wifibilling.config.PlatformProperties platformProperties;
+
     private PaymentService paymentService;
 
     private Tenant tenant;
@@ -60,8 +72,14 @@ class PaymentServiceTest {
                 routerRepository,
                 packagePlanRepository,
                 voucherService,
-                gatewayClient
+                gatewayClient,
+                gatewayConfig,
+                marzPay,
+                walletService,
+                platformProperties
         );
+        lenient().when(gatewayConfig.modeFor(any(Tenant.class))).thenReturn("PLATFORM");
+        lenient().when(gatewayConfig.platformConfigured()).thenReturn(false);
 
         tenant = Tenant.builder().id(1L).name("Test Tenant").email("test@example.com").build();
         router = Router.builder().id(10L).token("tok_valid123456").tenant(tenant).name("Test Router").build();
@@ -74,7 +92,7 @@ class PaymentServiceTest {
         when(packagePlanRepository.findByIdAndTenantId(100L, 1L)).thenReturn(Optional.of(packagePlan));
         for (String availability : java.util.List.of("HIDDEN", "DISABLED")) {
             packagePlan.setAvailability(availability);
-            var request = new PaymentDto.InitiateRequest("tok_valid123456", 100L, "256771234567", null);
+            var request = new PaymentDto.InitiateRequest("tok_valid123456", 100L, "256771234567", null, null, null);
             assertEquals(HttpStatus.CONFLICT, assertThrows(ResponseStatusException.class,
                     () -> paymentService.initiatePayment(request)).getStatusCode());
         }
@@ -88,7 +106,7 @@ class PaymentServiceTest {
         when(transactionRepository.save(any(Transaction.class))).thenAnswer(i -> i.getArgument(0));
         when(gatewayClient.requestPayment(any(Transaction.class))).thenReturn("EXT-REF-123");
 
-        PaymentDto.InitiateRequest req = new PaymentDto.InitiateRequest("tok_valid123456", 100L, "256771234567", null);
+        PaymentDto.InitiateRequest req = new PaymentDto.InitiateRequest("tok_valid123456", 100L, "256771234567", null, null, null);
         PaymentDto.InitiateResponse response = paymentService.initiatePayment(req);
 
         assertNotNull(response);
@@ -100,7 +118,7 @@ class PaymentServiceTest {
         verify(transactionRepository, atLeastOnce()).save(captor.capture());
         Transaction saved = captor.getValue();
         assertEquals("MTN", saved.getNetwork());
-        assertEquals("256771234567", saved.getPhone());
+        assertEquals("+256771234567", saved.getPhone());
     }
 
     @Test
@@ -108,7 +126,7 @@ class PaymentServiceTest {
         when(routerRepository.findByToken("tok_valid123456")).thenReturn(Optional.of(router));
         when(packagePlanRepository.findByIdAndTenantId(999L, 1L)).thenReturn(Optional.empty());
 
-        PaymentDto.InitiateRequest req = new PaymentDto.InitiateRequest("tok_valid123456", 999L, "256771234567", null);
+        PaymentDto.InitiateRequest req = new PaymentDto.InitiateRequest("tok_valid123456", 999L, "256771234567", null, null, null);
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> {
             paymentService.initiatePayment(req);
@@ -123,7 +141,7 @@ class PaymentServiceTest {
         when(routerRepository.findByToken("tok_valid123456")).thenReturn(Optional.of(router));
         when(packagePlanRepository.findByIdAndTenantId(100L, 1L)).thenReturn(Optional.of(packagePlan));
 
-        var req = new PaymentDto.InitiateRequest("tok_valid123456", 100L, "256771234567", null);
+        var req = new PaymentDto.InitiateRequest("tok_valid123456", 100L, "256771234567", null, null, null);
         assertEquals(HttpStatus.NOT_FOUND,
                 assertThrows(ResponseStatusException.class, () -> paymentService.initiatePayment(req)).getStatusCode());
         verifyNoInteractions(transactionRepository, gatewayClient);
@@ -142,13 +160,13 @@ class PaymentServiceTest {
                 .status(PaymentService.STATUS_PENDING)
                 .build();
 
-        when(transactionRepository.findByReference("PAY-REF123456")).thenReturn(Optional.of(tx));
+        when(transactionRepository.findByReferenceForUpdate("PAY-REF123456")).thenReturn(Optional.of(tx));
 
         VoucherResponse vResp = new VoucherResponse(
                 1L, "VOUCH999", "unused", 100L, "1 Hour",
                 new BigDecimal("1000.00"), null, null, null, OffsetDateTime.now(), null, null, null, null, "ONLINE", "MANUAL", false
         );
-        when(voucherService.generate(eq(1L), any(GenerateVouchersRequest.class))).thenReturn(List.of(vResp));
+        when(voucherService.generate(eq(1L), any(GenerateVouchersRequest.class), isNull())).thenReturn(List.of(vResp));
 
         PaymentDto.WebhookRequest webhook = new PaymentDto.WebhookRequest("PAY-REF123456", "SUCCESSFUL", "MOMO-EXT-1", null);
         paymentService.processWebhook(webhook);
@@ -158,7 +176,113 @@ class PaymentServiceTest {
         assertEquals("MOMO-EXT-1", tx.getExternalReference());
         assertNotNull(tx.getCompletedAt());
 
-        verify(voucherService).generate(eq(1L), argThat(r -> r.packageId().equals(100L) && r.count().equals(1)));
+        verify(voucherService).generate(eq(1L), argThat(r -> r.packageId().equals(100L) && r.count().equals(1)), isNull());
         verify(transactionRepository).save(tx);
+    }
+
+    private Transaction pendingCheckoutTx(String checkoutRef) {
+        return Transaction.builder()
+                .id(60L).tenant(tenant).packagePlan(packagePlan).router(router)
+                .reference("PAY-CHK1").checkoutRef(checkoutRef)
+                .phone("+256771234567").amount(new BigDecimal("1000.00"))
+                .network("MTN").status(PaymentService.STATUS_PENDING)
+                .gatewayMode("PLATFORM")
+                .createdAt(OffsetDateTime.now())
+                .build();
+    }
+
+    @Test
+    void duplicateCheckoutReturnsSameTransactionAndNeverChargesAgain() {
+        Transaction tx = pendingCheckoutTx("chk-abc");
+        when(transactionRepository.findByCheckoutRefForUpdate("chk-abc")).thenReturn(Optional.of(tx));
+
+        var req = new PaymentDto.InitiateRequest("tok_valid123456", 100L, "256771234567", null, "chk-abc", null);
+        var res = paymentService.initiatePayment(req);
+
+        assertEquals("PAY-CHK1", res.reference());
+        assertEquals(PaymentService.STATUS_PENDING, res.status());
+        verify(transactionRepository, never()).save(any());
+        verifyNoInteractions(gatewayClient);
+        verifyNoInteractions(marzPay);
+    }
+
+    @Test
+    void resumeOnSuccessfulCheckoutReportsSuccessWithoutRecharging() {
+        Transaction tx = pendingCheckoutTx("chk-done");
+        tx.setStatus(PaymentService.STATUS_SUCCESSFUL);
+        tx.setVoucherCode("CODE1234");
+        when(transactionRepository.findByCheckoutRefForUpdate("chk-done")).thenReturn(Optional.of(tx));
+
+        var res = paymentService.initiatePayment(
+                new PaymentDto.InitiateRequest("tok_valid123456", 100L, "256771234567", null, "chk-done", null));
+
+        assertEquals(PaymentService.STATUS_SUCCESSFUL, res.status());
+        verifyNoInteractions(gatewayClient, marzPay);
+    }
+
+    @Test
+    void checkoutResumeWithDifferentDetailsIsRejected() {
+        Transaction tx = pendingCheckoutTx("chk-x");
+        when(transactionRepository.findByCheckoutRefForUpdate("chk-x")).thenReturn(Optional.of(tx));
+
+        assertEquals(HttpStatus.CONFLICT, assertThrows(ResponseStatusException.class, () ->
+                paymentService.initiatePayment(new PaymentDto.InitiateRequest(
+                        "tok_valid123456", 200L, "256771234567", null, "chk-x", null))).getStatusCode());
+    }
+
+    @Test
+    void marzPayDispatchFailureStaysPendingAndKeepsProviderReference() {
+        when(gatewayConfig.platformConfigured()).thenReturn(true); // real MarzPay path
+        when(gatewayConfig.credentialsFor(any(), any())).thenReturn(
+                new com.wifibilling.service.payment.MarzPayClient.Credentials("k", "s"));
+        when(gatewayConfig.countryFor(any(), any())).thenReturn("UG");
+        when(platformProperties.getPublicBaseUrl()).thenReturn("https://pay.example.com");
+        when(routerRepository.findByToken("tok_valid123456")).thenReturn(Optional.of(router));
+        when(packagePlanRepository.findByIdAndTenantId(100L, 1L)).thenReturn(Optional.of(packagePlan));
+        when(transactionRepository.save(any(Transaction.class))).thenAnswer(i -> i.getArgument(0));
+        when(marzPay.collectMoney(any(), anyLong(), anyString(), anyString(), anyString(), anyString(), anyString()))
+                .thenThrow(new RuntimeException("connect timed out"));
+
+        var res = paymentService.initiatePayment(
+                new PaymentDto.InitiateRequest("tok_valid123456", 100L, "256771234567", null, "chk-net", null));
+
+        assertEquals(PaymentService.STATUS_PENDING, res.status());
+        ArgumentCaptor<Transaction> captor = ArgumentCaptor.forClass(Transaction.class);
+        verify(transactionRepository, atLeastOnce()).save(captor.capture());
+        Transaction last = captor.getValue();
+        assertEquals(PaymentService.STATUS_PENDING, last.getStatus());
+        assertNotNull(last.getExternalReference());
+        assertTrue(last.getNotes().contains("uncertain"));
+    }
+
+    @Test
+    void duplicateWebhookDoesNotRegenerateVoucher() {
+        Transaction tx = Transaction.builder()
+                .id(50L).tenant(tenant).packagePlan(packagePlan).router(router)
+                .reference("PAY-DUP").phone("256771234567")
+                .amount(new BigDecimal("1000.00"))
+                .status(PaymentService.STATUS_SUCCESSFUL).voucherCode("CODE777")
+                .build();
+        when(transactionRepository.findByReferenceForUpdate("PAY-DUP")).thenReturn(Optional.of(tx));
+
+        paymentService.processWebhook(new PaymentDto.WebhookRequest("PAY-DUP", "SUCCESSFUL", "X", null));
+
+        verify(voucherService, never()).generate(any(), any(), any());
+        verify(walletService, never()).creditCollection(any(), anyLong(), any(), any(), any());
+    }
+
+    @Test
+    void macIsNormalizedAndStoredOnTransaction() {
+        when(routerRepository.findByToken("tok_valid123456")).thenReturn(Optional.of(router));
+        when(packagePlanRepository.findByIdAndTenantId(100L, 1L)).thenReturn(Optional.of(packagePlan));
+        when(transactionRepository.save(any(Transaction.class))).thenAnswer(i -> i.getArgument(0));
+        when(gatewayClient.requestPayment(any(Transaction.class))).thenReturn("EXT-1");
+
+        paymentService.initiatePayment(new PaymentDto.InitiateRequest(
+                "tok_valid123456", 100L, "256771234567", null, null, "aa-bb-cc-dd-ee-ff"));
+
+        ArgumentCaptor<Transaction> captor = ArgumentCaptor.forClass(Transaction.class);
+        verify(transactionRepository, atLeastOnce()).save(captor.capture());
+        assertEquals("AA:BB:CC:DD:EE:FF", captor.getValue().getClientMac());
     }
 }

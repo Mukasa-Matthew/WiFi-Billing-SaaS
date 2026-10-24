@@ -52,6 +52,8 @@ export default function TenantSessionLogsPage() {
 
   useEffect(() => {
     fetchLogs();
+    const interval = setInterval(fetchLogs, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const formatBytes = (bytes: number | null) => {
@@ -156,14 +158,6 @@ export default function TenantSessionLogsPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <button
-            onClick={fetchLogs}
-            className="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 border border-slate-300 transition cursor-pointer"
-            title="Refresh Logs"
-          >
-            <ArrowClockwise className={`w-4 h-4 ${loading ? "animate-spin text-blue-700" : ""}`} />
-          </button>
-
           <button
             onClick={exportCsv}
             disabled={filteredLogs.length === 0}
