@@ -16,7 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.net.URI;
-import java.time.OffsetDateTime;
 import java.security.SecureRandom;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -38,6 +37,7 @@ public class ProvisioningService {
 
     public static final String STATUS_PROVISIONING = "provisioning";
     public static final String STATUS_REGISTERED = "registered";
+    public static final String STATUS_PROVISIONED = "provisioned";
 
     private static final String SECRET_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
     private static final SecureRandom RANDOM = new SecureRandom();
@@ -129,8 +129,10 @@ public class ProvisioningService {
     @Transactional
     public void markComplete(String token) {
         Router router = findRouter(token);
-        router.setStatus(STATUS_REGISTERED);
-        router.setLastSeen(OffsetDateTime.now());
+        if (!TelemetryService.STATUS_ONLINE.equals(router.getStatus())
+                && !TelemetryService.STATUS_DEGRADED.equals(router.getStatus())) {
+            router.setStatus(STATUS_PROVISIONED);
+        }
         routerRepository.save(router);
         log.info("Router {} reported provisioning complete", router.getId());
     }

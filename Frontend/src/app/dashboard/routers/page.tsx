@@ -117,7 +117,7 @@ export default function Page() {
         loading={loading}
         columns={[
           { label: "Name", render: r => <button onClick={() => open(r)} className="font-medium text-blue-700 hover:underline">{r.name}</button> },
-          { label: "Provisioning", render: r => <Badge tone={r.wgPublicKey ? "green" : "amber"}>{r.wgPublicKey ? "Provisioned" : "Awaiting router"}</Badge> },
+          { label: "Provisioning", render: r => <Badge tone={r.status === "online" ? "green" : r.status === "degraded" ? "red" : "amber"}>{r.status === "online" ? "Verified" : r.status === "degraded" ? "Needs attention" : r.status === "provisioned" ? "Awaiting checks" : r.wgPublicKey ? "Registered" : "Awaiting router"}</Badge> },
           { label: "CPU", render: r => r.lastSeen ? `${r.cpuLoad || 0}%` : "—" },
           { label: "Memory", render: r => r.lastSeen ? `${r.memoryUsage || 0}%` : "—" },
           { label: "Status", render: r => <Badge tone={r.status === "online" ? "green" : "amber"}>{r.status}</Badge> },

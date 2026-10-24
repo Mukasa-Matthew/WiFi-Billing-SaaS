@@ -21,6 +21,7 @@ import java.time.OffsetDateTime;
 public class TelemetryService {
 
     public static final String STATUS_ONLINE = "online";
+    public static final String STATUS_DEGRADED = "degraded";
 
     private final RouterRepository routerRepository;
     private final PlatformProperties props;
@@ -47,7 +48,12 @@ public class TelemetryService {
             router.setActiveUsers(req.activeUsers());
         }
         router.setLastSeen(OffsetDateTime.now());
-        router.setStatus(STATUS_ONLINE);
+        boolean reportsReadiness = req.hotspotReady() != null || req.radiusReady() != null || req.portalReady() != null;
+        boolean ready = Boolean.TRUE.equals(req.hotspotReady())
+                && Boolean.TRUE.equals(req.radiusReady())
+                && Boolean.TRUE.equals(req.portalReady());
+        // Older installed agents do not send readiness flags; preserve compatibility.
+        router.setStatus(!reportsReadiness || ready ? STATUS_ONLINE : STATUS_DEGRADED);
     }
 
     /** Routers push every 2m; mark them offline after a few missed reports. */
