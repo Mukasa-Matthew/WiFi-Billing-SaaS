@@ -45,6 +45,9 @@ body {
   --sidebar-fg-dim: #C3D6F0;
   --sidebar-fg-faint: #9DB6D9;
   --sidebar-warn: #FCD34D;
+  --shadow-panel: 0 1px 2px rgb(15 23 42 / 0.04), 0 10px 28px -22px rgb(15 23 42 / 0.35);
+  --shadow-overlay: 0 24px 64px -24px rgb(15 23 42 / 0.45);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   color-scheme: light;
 }
 
@@ -69,6 +72,8 @@ body {
   --sidebar-fg-dim: #B8BDC6;
   --sidebar-fg-faint: #8B929C;
   --sidebar-warn: #FCD34D;
+  --shadow-panel: 0 1px 2px rgb(0 0 0 / 0.24), 0 12px 32px -24px rgb(0 0 0 / 0.8);
+  --shadow-overlay: 0 28px 72px -24px rgb(0 0 0 / 0.8);
   color-scheme: dark;
 
   /* Tailwind v4 emits every palette utility as var(--color-*), so redefining
@@ -99,12 +104,24 @@ body { background: var(--canvas); color: var(--fg); }
 
 /* Keep keyboard navigation visible on both white panels and the navy sidebar. */
 :focus-visible { outline: 2px solid #3b82f6; outline-offset: 3px; }
+button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+button, a { touch-action: manipulation; }
+.panel-shadow { box-shadow: var(--shadow-panel); }
 .sidebar-scroll { scrollbar-width: thin; scrollbar-color: #54708e transparent; }
 .sidebar-scroll::-webkit-scrollbar { width: 6px; }
 .sidebar-scroll::-webkit-scrollbar-thumb { background: #54708e; border-radius: 8px; }
 .request-progress { animation: request-progress 1.2s ease-in-out infinite; }
 @keyframes request-progress { from { transform: translateX(-100%); } to { transform: translateX(400%); } }
-@media (prefers-reduced-motion: reduce) { .request-progress { animation: none; width: 100%; } }
+@keyframes ui-enter { from { opacity: 0; transform: translate3d(0, 6px, 0); } to { opacity: 1; transform: none; } }
+@keyframes dialog-enter { from { opacity: 0; transform: translate3d(0, 10px, 0) scale(.985); } to { opacity: 1; transform: none; } }
+@keyframes toast-enter { from { opacity: 0; transform: translate3d(12px, 0, 0); } to { opacity: 1; transform: none; } }
+.page-enter { animation: ui-enter 220ms var(--ease-out) both; }
+.dialog-enter { animation: dialog-enter 180ms var(--ease-out) both; }
+.toast-enter { animation: toast-enter 180ms var(--ease-out) both; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+  .request-progress { animation: none; width: 100%; }
+}
 
 /* ---------------------------------------------------------------------------
    Captive portal themes. Scoped to [data-portal-theme] so none of this leaks

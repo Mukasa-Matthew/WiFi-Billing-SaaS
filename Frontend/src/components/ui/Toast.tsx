@@ -27,14 +27,14 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={push}>
       {children}
-      <div aria-live="polite" className="pointer-events-none fixed bottom-4 right-4 z-[90] flex w-80 flex-col gap-2">
+      <div aria-live="polite" aria-atomic="false" className="pointer-events-none fixed inset-x-4 bottom-4 z-[90] flex flex-col gap-2 sm:left-auto sm:w-80">
         {toasts.map((t) => (
-          <div key={t.id} role="status"
-            className="pointer-events-auto flex items-start gap-2.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-3 shadow-md">
+          <div key={t.id} role={t.kind === "error" ? "alert" : "status"}
+            className="toast-enter pointer-events-auto flex items-start gap-2.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-3 shadow-[var(--shadow-overlay)]">
             {icons[t.kind]}
             <p className="flex-1 text-xs font-medium leading-5 text-[var(--fg)]">{t.text}</p>
             <button aria-label="Dismiss" onClick={() => setToasts((x) => x.filter((y) => y.id !== t.id))}
-              className="text-[var(--fg-faint)] hover:text-[var(--fg-body)]">
+              className="-m-2 flex min-h-10 min-w-10 items-center justify-center rounded-lg text-[var(--fg-faint)] transition hover:bg-[var(--fill)] hover:text-[var(--fg-body)]">
               <X className="h-3.5 w-3.5" />
             </button>
           </div>

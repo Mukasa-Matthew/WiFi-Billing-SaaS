@@ -1,15 +1,14 @@
 "use client";
 import React, { useCallback, useEffect, useState, useRef } from "react";
 import api from "@/lib/api";
-import { LoadingIndicator } from "@/components/LoadingUI";
 import Link from "next/link";
 import { ArrowLeft, CaretLeft, CaretRight, MagnifyingGlass, Tray } from "@phosphor-icons/react";
 
 /* ---------- design tokens ---------- */
-export const field = "mt-1.5 w-full rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm text-[var(--fg)] placeholder:text-[var(--fg-muted)] outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15";
-export const button = "inline-flex items-center gap-1.5 rounded-lg bg-blue-700 px-4 py-2.5 text-xs font-semibold text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition";
-export const buttonGhost = "inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-4 py-2.5 text-xs font-semibold text-[var(--fg-body)] hover:bg-[var(--subtle)] disabled:opacity-50 transition";
-export const panel = "rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-sm";
+export const field = "mt-1.5 min-h-11 w-full rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm text-[var(--fg)] placeholder:text-[var(--fg-muted)] outline-none transition-[border-color,box-shadow] focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15 disabled:cursor-not-allowed disabled:opacity-60";
+export const button = "inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg bg-blue-700 px-4 py-2.5 text-xs font-semibold text-white transition-[background-color,transform,opacity] hover:bg-blue-600 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100";
+export const buttonGhost = "inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-4 py-2.5 text-xs font-semibold text-[var(--fg-body)] transition-[background-color,transform,opacity] hover:bg-[var(--subtle)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100";
+export const panel = "panel-shadow rounded-xl border border-[var(--border)] bg-[var(--surface)]";
 export const label = "block text-xs font-semibold text-[var(--fg-muted)]";
 export const hint = "mt-1.5 text-xs text-[var(--fg-muted)]";
 
@@ -37,9 +36,9 @@ export function useResource<T>(url: string, refresh = false) {
     }
   }, [url]);
   useEffect(() => {
-    void load();
-    const timer = refresh ? setInterval(load, 30000) : undefined;
-    return () => { clearInterval(timer); latestRequest.current += 1; };
+    const initial = window.setTimeout(load, 0);
+    const timer = refresh ? window.setInterval(load, 30000) : undefined;
+    return () => { window.clearTimeout(initial); window.clearInterval(timer); latestRequest.current += 1; };
   }, [load, refresh]);
   return { data, loading, refreshing, error, load };
 }
@@ -65,8 +64,8 @@ export function ErrorNotice({ text }: { text: string }) {
 
 export function PageHeader({ title, description, action }: { title: string; description?: string; action?: React.ReactNode }) {
   return (
-    <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-      <div>
+    <div className="mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row">
+      <div className="min-w-0">
         <h1 className="text-xl font-bold tracking-tight text-[var(--fg)]">{title}</h1>
         {description && <p className="mt-1 text-sm text-[var(--fg-muted)]">{description}</p>}
       </div>
@@ -138,7 +137,7 @@ export function Table<T>({ rows, columns, loading = false, emptyTitle = "No reco
   return (
     <section className={`${panel} overflow-hidden`} aria-busy={loading}>
       <div className="flex justify-end border-b border-[var(--border)] px-4 py-3">
-        <div className="relative">
+        <div className="relative w-full sm:w-auto">
           <MagnifyingGlass className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--fg-muted)]" />
           <input aria-label="Search records" placeholder="Search…" value={search}
             onChange={e => { setSearch(e.target.value); setPage(1); }}
@@ -151,13 +150,18 @@ export function Table<T>({ rows, columns, loading = false, emptyTitle = "No reco
             <tr>{columns.map((c, i) => <th key={i} scope="col" className={`px-4 py-3 font-semibold ${c.className || ""}`}>{c.label}</th>)}</tr>
           </thead>
           <tbody className="divide-y divide-[var(--border-soft)]">
-            {filtered.slice((current - 1) * size, current * size).map((r, i) => (
+            {loading && !rows.length && Array.from({ length: 6 }, (_, row) => (
+              <tr key={`skeleton-${row}`} aria-hidden="true">
+                {columns.map((_, column) => <td key={column} className="px-4 py-3.5"><span className="block h-3.5 max-w-36 animate-pulse rounded bg-[var(--fill)] motion-reduce:animate-none" style={{ width: `${58 + ((row + column) % 4) * 11}%` }} /></td>)}
+              </tr>
+            ))}
+            {!loading && filtered.slice((current - 1) * size, current * size).map((r, i) => (
               <tr key={i} className="hover:bg-[var(--subtle)]">
                 {columns.map((c, j) => <td key={j} className="px-4 py-3.5 text-[var(--fg-body)]">{c.render(r)}</td>)}
               </tr>
             ))}
-            {!filtered.length && (
-              <tr><td colSpan={columns.length} className="py-12 text-center text-sm text-[var(--fg-muted)]">{loading ? <LoadingIndicator label="Loading records…" /> : <EmptyState title={search ? "No matching records" : emptyTitle} description={search ? "Try a different search." : emptyDescription} />}</td></tr>
+            {!loading && !filtered.length && (
+              <tr><td colSpan={columns.length} className="py-12 text-center text-sm text-[var(--fg-muted)]"><EmptyState title={search ? "No matching records" : emptyTitle} description={search ? "Try a different search." : emptyDescription} /></td></tr>
             )}
           </tbody>
         </table>
