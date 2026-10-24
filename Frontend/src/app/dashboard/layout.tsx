@@ -120,7 +120,7 @@ export default function TenantDashboardLayout({
                 {user.name || "Hotspot Operator"}
               </span>
               <span className="block text-[10px] font-semibold uppercase tracking-widest text-blue-100">
-                Tenant #{user.tenantId}
+                Hotspot Manager
               </span>
             </div>
           </div>
