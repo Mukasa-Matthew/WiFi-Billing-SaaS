@@ -14,6 +14,7 @@ import {
   Radio,
   ShieldCheck,
   List,
+  Bank,
 } from "@phosphor-icons/react";
 
 const NAVY = "#0B1F36";
@@ -52,6 +53,7 @@ export default function AdminLayout({
   const navItems = [
     { name: "Platform overview", href: "/admin", icon: ChartLine, group: "Platform" },
     { name: "Tenants", href: "/admin/tenants", icon: Users, group: "Platform" },
+    { name: "Finance", href: "/admin/finance", icon: Bank, group: "Platform" },
     { name: "Router fleet", href: "/admin/routers", icon: RouterIcon, group: "Devices" },
     { name: "Network health", href: "/admin/health", icon: HardDrives, group: "Devices" },
   ];

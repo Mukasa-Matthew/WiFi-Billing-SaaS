@@ -47,6 +47,18 @@ class PaymentServiceTest {
     @Mock
     private PaymentGatewayClient gatewayClient;
 
+    @Mock
+    private GatewayConfigService gatewayConfig;
+
+    @Mock
+    private com.wifibilling.service.payment.MarzPayClient marzPay;
+
+    @Mock
+    private WalletService walletService;
+
+    @Mock
+    private com.wifibilling.config.PlatformProperties platformProperties;
+
     private PaymentService paymentService;
 
     private Tenant tenant;
@@ -60,8 +72,14 @@ class PaymentServiceTest {
                 routerRepository,
                 packagePlanRepository,
                 voucherService,
-                gatewayClient
+                gatewayClient,
+                gatewayConfig,
+                marzPay,
+                walletService,
+                platformProperties
         );
+        lenient().when(gatewayConfig.modeFor(any(Tenant.class))).thenReturn("PLATFORM");
+        lenient().when(gatewayConfig.platformConfigured()).thenReturn(false);
 
         tenant = Tenant.builder().id(1L).name("Test Tenant").email("test@example.com").build();
         router = Router.builder().id(10L).token("tok_valid123456").tenant(tenant).name("Test Router").build();
@@ -100,7 +118,7 @@ class PaymentServiceTest {
         verify(transactionRepository, atLeastOnce()).save(captor.capture());
         Transaction saved = captor.getValue();
         assertEquals("MTN", saved.getNetwork());
-        assertEquals("256771234567", saved.getPhone());
+        assertEquals("+256771234567", saved.getPhone());
     }
 
     @Test
