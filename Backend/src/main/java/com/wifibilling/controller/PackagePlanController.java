@@ -29,6 +29,7 @@ public class PackagePlanController {
      *  (sub-second over the WireGuard tunnel; 1-min poll is the fallback). */
     private void syncPortals(Long tenantId) {
         for (var r : routerRepository.findAllByTenantId(tenantId)) {
+            try { routerManagement.enqueue(r, "SYNC_PORTAL"); } catch (ResponseStatusException ignored) {}
             routerManagement.triggerPortalSync(r);
         }
     }
