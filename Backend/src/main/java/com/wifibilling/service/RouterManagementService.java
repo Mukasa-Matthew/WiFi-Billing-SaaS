@@ -103,7 +103,7 @@ public class RouterManagementService {
  @Transactional public RouterTask enqueue(Router r,String action){
   String script;
   if("SYNC_PORTAL".equals(action)){
-   var s=new StringBuilder();for(String name:List.of("login.html","status.html","logout.html","alogin.html","redirect.html","rlogin.html","error.html","packages.json"))s.append("/tool/fetch url=").append(q(props.getPublicBaseUrl()+"/api/portal/templates/"+name+"?token="+r.getToken())).append(" dst-path=").append(q("flash/hotspot/"+name)).append('\n');script=s.toString();
+   var s=new StringBuilder();for(String name:List.of("login.html","status.html","logout.html","alogin.html","redirect.html","rlogin.html","error.html","packages.json"))s.append(":do { /tool/fetch url=").append(q(props.getPublicBaseUrl()+"/api/portal/templates/"+name+"?token="+r.getToken())).append(" dst-path=").append(q("flash/hotspot/"+name)).append(" } on-error={}\n");script=s.toString();
   }else if("SYNC_TIME".equals(action)){
    script=timeScript();
   }else if("SYNC_TETHERING".equals(action)){
