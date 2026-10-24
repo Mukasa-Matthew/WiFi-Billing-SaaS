@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { NetworkActivity } from "@/components/LoadingUI";
 import { AuthProvider } from "@/context/AuthContext";
+import { ThemeProvider, themeBootstrapScript } from "@/context/ThemeContext";
 import { ToastProvider } from "@/components/ui/Toast";
 
 export const metadata: Metadata = {
@@ -20,8 +21,11 @@ export default function RootLayout({
   // mismatches inside the app tree are still reported.
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="bg-[#F5F7FA] text-slate-900 antialiased min-h-screen" suppressHydrationWarning>
-        <AuthProvider><ToastProvider>{children}<NetworkActivity /></ToastProvider></AuthProvider>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeBootstrapScript }} />
+      </head>
+      <body className="bg-[var(--canvas)] text-[var(--fg)] antialiased min-h-screen" suppressHydrationWarning>
+        <ThemeProvider><AuthProvider><ToastProvider>{children}<NetworkActivity /></ToastProvider></AuthProvider></ThemeProvider>
       </body>
     </html>
   );

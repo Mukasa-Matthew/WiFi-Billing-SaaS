@@ -19,7 +19,7 @@ interface Feedback {
 }
 
 function Stars({ n }: { n: number | null }) {
-  if (!n) return <span className="text-xs text-slate-400">—</span>;
+  if (!n) return <span className="text-xs text-[var(--fg-faint)]">—</span>;
   return (
     <span className="flex items-center gap-0.5" aria-label={`${n} out of 5 stars`}>
       {[1, 2, 3, 4, 5].map((i) => (
@@ -62,49 +62,49 @@ export default function FeedbackPage() {
 
       {data.length > 0 && (
         <div className="grid gap-4 sm:grid-cols-3">
-          <div className="rounded-xl border border-slate-200 bg-white p-5">
-            <p className="text-sm text-slate-500">Total feedback</p>
-            <p className="mt-1 text-2xl font-semibold text-slate-900">{data.length}</p>
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">
+            <p className="text-sm text-[var(--fg-muted)]">Total feedback</p>
+            <p className="mt-1 text-2xl font-semibold text-[var(--fg)]">{data.length}</p>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-5">
-            <p className="text-sm text-slate-500">Average rating</p>
-            <p className="mt-1 text-2xl font-semibold text-slate-900">{avg ? `${avg} / 5` : "—"}</p>
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">
+            <p className="text-sm text-[var(--fg-muted)]">Average rating</p>
+            <p className="mt-1 text-2xl font-semibold text-[var(--fg)]">{avg ? `${avg} / 5` : "—"}</p>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-5">
-            <p className="text-sm text-slate-500">Latest</p>
-            <p className="mt-1 text-2xl font-semibold text-slate-900">{date(data[0].createdAt)}</p>
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">
+            <p className="text-sm text-[var(--fg-muted)]">Latest</p>
+            <p className="mt-1 text-2xl font-semibold text-[var(--fg)]">{date(data[0].createdAt)}</p>
           </div>
         </div>
       )}
 
       <div className="space-y-3">
         {data.map((f) => (
-          <article key={f.id} className="rounded-xl border border-slate-200 bg-white p-5">
+          <article key={f.id} className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 text-blue-700"><ChatCircleText size={16} /></span>
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 text-[var(--accent-text)]"><ChatCircleText size={16} /></span>
                 <div>
-                  <p className="text-sm font-semibold text-slate-900">{f.name || "Anonymous"}</p>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-sm font-semibold text-[var(--fg)]">{f.name || "Anonymous"}</p>
+                  <p className="text-xs text-[var(--fg-muted)]">
                     {[f.phone, f.router, date(f.createdAt)].filter(Boolean).join(" · ")}
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-4">
                 <Stars n={f.rating} />
-                <button onClick={() => remove(f)} aria-label="Delete feedback" className="text-slate-400 hover:text-red-600"><Trash size={15} /></button>
+                <button onClick={() => remove(f)} aria-label="Delete feedback" className="text-[var(--fg-faint)] hover:text-red-600"><Trash size={15} /></button>
               </div>
             </div>
-            <p className="mt-3 text-sm leading-relaxed text-slate-700">{f.message}</p>
+            <p className="mt-3 text-sm leading-relaxed text-[var(--fg-body)]">{f.message}</p>
           </article>
         ))}
       </div>
 
       {!loading && !data.length && (
-        <div className="rounded-xl border border-slate-200 bg-white py-16 text-center">
-          <ChatCircleText className="mx-auto mb-3 h-8 w-8 text-slate-400" />
-          <p className="text-sm text-slate-500">No feedback yet</p>
-          <p className="mt-1 text-xs text-slate-400">When customers tap "Share Feedback" on the captive portal, their messages appear here.</p>
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] py-16 text-center">
+          <ChatCircleText className="mx-auto mb-3 h-8 w-8 text-[var(--fg-faint)]" />
+          <p className="text-sm text-[var(--fg-muted)]">No feedback yet</p>
+          <p className="mt-1 text-xs text-[var(--fg-faint)]">When customers tap "Share Feedback" on the captive portal, their messages appear here.</p>
         </div>
       )}
     </PageContainer>

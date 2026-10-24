@@ -32,8 +32,8 @@ export default function Page(){
   <form onSubmit={save}>
    <FormLayout aside={
     <SummaryCard title="Binding summary" rows={[
-     {label:"Router",value:chosenRouter?chosenRouter.name:<span className="font-normal text-slate-500">Not selected</span>},
-     {label:"Device",value:name||<span className="font-normal text-slate-500">Unnamed</span>},
+     {label:"Router",value:chosenRouter?chosenRouter.name:<span className="font-normal text-[var(--fg-muted)]">Not selected</span>},
+     {label:"Device",value:name||<span className="font-normal text-[var(--fg-muted)]">Unnamed</span>},
      {label:"MAC",value:<span className="font-mono text-xs">{mac||"—"}</span>},
      {label:"Access",value:chosenPlan?chosenPlan.name:"Free bypass"},
      {label:"Expires",value:expires?new Date(expires).toLocaleString():"Never"},
@@ -67,7 +67,7 @@ export default function Page(){
       <option value="">Select a reported DHCP lease</option>
       {hosts.map((h,i)=><option key={i} value={i}>{h.address} · {h["mac-address"]} {h["host-name"]}</option>)}
      </select>
-     <button type="button" disabled={!router} onClick={()=>loadHosts(router)} className="mt-2 text-xs font-medium text-blue-700 hover:underline disabled:opacity-40">Refresh reported hosts</button>
+     <button type="button" disabled={!router} onClick={()=>loadHosts(router)} className="mt-2 text-xs font-medium text-[var(--accent-text)] hover:underline disabled:opacity-40">Refresh reported hosts</button>
      <p className={hint}>{seen?`Last report: ${new Date(seen).toLocaleString()}`:"No host report yet. Enter the IP and MAC manually."}</p>
     </div>
     <div>
@@ -88,10 +88,10 @@ export default function Page(){
    </FormSection>
    <FormSection icon={<Money size={18} weight="duotone" aria-hidden/>} title="Payment recording"
     hint="Records an already received payment in revenue. Leave off for free or internal access.">
-    <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 p-4 transition hover:bg-slate-50">
+    <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-[var(--border)] p-4 transition hover:bg-[var(--subtle)]">
      <input type="checkbox" checked={paid} onChange={e=>setPaid(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-blue-700"/>
-     <span><span className="block text-sm font-medium text-slate-900">Record payment</span>
-     <span className="mt-0.5 block text-xs text-slate-500">Adds this amount to your revenue figures.</span></span>
+     <span><span className="block text-sm font-medium text-[var(--fg)]">Record payment</span>
+     <span className="mt-0.5 block text-xs text-[var(--fg-muted)]">Adds this amount to your revenue figures.</span></span>
     </label>
     {paid&&<div className="grid gap-5 sm:grid-cols-2">
      <div>

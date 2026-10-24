@@ -68,31 +68,31 @@ export default function CreatePackagePage() {
             /* The same information the customer sees on the captive portal,
                so pricing and limits can be checked before saving. */
             <section className={panel}>
-              <h2 className="border-b border-slate-200 px-5 py-3.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <h2 className="border-b border-[var(--border)] px-5 py-3.5 text-xs font-semibold uppercase tracking-wide text-[var(--fg-muted)]">
                 Portal preview
               </h2>
               <div className="p-5">
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--subtle)] p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="truncate text-sm font-semibold text-slate-900">{name.trim() || "Package name"}</span>
+                        <span className="truncate text-sm font-semibold text-[var(--fg)]">{name.trim() || "Package name"}</span>
                         {featured && (
-                          <span className="shrink-0 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-700">
+                          <span className="shrink-0 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--accent-text)]">
                             Popular
                           </span>
                         )}
                       </div>
-                      <p className="mt-1 truncate text-xs text-slate-500">
+                      <p className="mt-1 truncate text-xs text-[var(--fg-muted)]">
                         {validity} · {download} Mbps · {devices} device{Number(devices) === 1 ? "" : "s"}
                       </p>
                     </div>
-                    <span className="shrink-0 text-sm font-bold tabular-nums text-slate-900">
+                    <span className="shrink-0 text-sm font-bold tabular-nums text-[var(--fg)]">
                       {price ? ugx(price) : "—"}
                     </span>
                   </div>
                 </div>
-                <p className="mt-3 text-xs leading-relaxed text-slate-500">
+                <p className="mt-3 text-xs leading-relaxed text-[var(--fg-muted)]">
                   {availability === "ACTIVE"
                     ? "Visible to customers on the captive portal."
                     : availability === "HIDDEN"
@@ -176,8 +176,8 @@ export default function CreatePackagePage() {
                   <label key={s}
                     className={`flex min-h-[44px] cursor-pointer items-center rounded-lg border px-4 text-xs font-medium capitalize transition ${
                       availability === s
-                        ? "border-blue-500 bg-blue-50 text-blue-700"
-                        : "border-slate-300 text-slate-600 hover:bg-slate-50"
+                        ? "border-blue-500 bg-blue-50 text-[var(--accent-text)]"
+                        : "border-[var(--border-strong)] text-[var(--fg-muted)] hover:bg-[var(--subtle)]"
                     }`}>
                     <input type="radio" name="availability" value={s} checked={availability === s}
                       onChange={() => setAvailability(s)} className="mr-2 accent-blue-700" />
@@ -191,12 +191,12 @@ export default function CreatePackagePage() {
               </p>
             </fieldset>
 
-            <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 p-4 transition hover:bg-slate-50">
+            <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-[var(--border)] p-4 transition hover:bg-[var(--subtle)]">
               <input type="checkbox" checked={featured} onChange={(e) => setFeatured(e.target.checked)}
                 className="mt-0.5 h-4 w-4 shrink-0 accent-blue-700" />
               <span>
-                <span className="block text-sm font-medium text-slate-900">Featured package</span>
-                <span className="mt-0.5 block text-xs text-slate-500">Appears first on the portal with a Popular badge.</span>
+                <span className="block text-sm font-medium text-[var(--fg)]">Featured package</span>
+                <span className="mt-0.5 block text-xs text-[var(--fg-muted)]">Appears first on the portal with a Popular badge.</span>
               </span>
             </label>
 
@@ -219,7 +219,7 @@ export default function CreatePackagePage() {
           </FormSection>
 
           {routers.length === 0 && (
-            <p className="flex items-start gap-2 px-1 text-xs text-slate-500">
+            <p className="flex items-start gap-2 px-1 text-xs text-[var(--fg-muted)]">
               <CellTower size={14} className="mt-0.5 shrink-0" aria-hidden />
               No routers linked yet, so this package will apply everywhere.
             </p>

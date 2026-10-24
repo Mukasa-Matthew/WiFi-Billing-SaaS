@@ -36,7 +36,7 @@ export default function Page() {
       />
       <Notice text={error || note} />
       {!loading && !data.length ? (
-        <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
+        <section className="rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-sm">
           <EmptyState
             icon={<Users className="h-8 w-8 text-slate-300" />}
             title="No customers yet"
@@ -55,7 +55,7 @@ export default function Page() {
             { label: "Full name", render: c => <span className="font-medium">{c.name}</span> },
             { label: "Phone", render: c => c.phone || "—" },
             { label: "Notes", render: c => c.notes || "—" },
-            { label: "", render: c => <button onClick={() => setEdit(c)} className="text-xs font-medium text-blue-700 hover:underline">Edit</button> },
+            { label: "", render: c => <button onClick={() => setEdit(c)} className="text-xs font-medium text-[var(--accent-text)] hover:underline">Edit</button> },
           ]}
         />
       )}

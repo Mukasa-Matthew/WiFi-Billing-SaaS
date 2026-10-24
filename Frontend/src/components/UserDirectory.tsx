@@ -15,13 +15,13 @@ function expiredAgo(value:string|null) {
 }
 
 function Detail({label,value,mono}:{label:string;value:string;mono?:boolean}) {
- return <div><dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</dt><dd className={`mt-0.5 text-xs font-medium text-slate-800 ${mono?"font-mono":""}`}>{value}</dd></div>;
+ return <div><dt className="text-[10px] font-bold uppercase tracking-wider text-[var(--fg-faint)]">{label}</dt><dd className={`mt-0.5 text-xs font-medium text-[var(--fg)] ${mono?"font-mono":""}`}>{value}</dd></div>;
 }
 
 function OnlineDot({online}:{online:boolean}) {
  return <span className="inline-flex items-center gap-1.5 text-xs font-semibold">
   <span className={`h-2 w-2 rounded-full ${online?"bg-emerald-500":"bg-slate-300"}`} />
-  {online?<span className="text-emerald-700">Online</span>:<span className="text-slate-500">Offline</span>}
+  {online?<span className="text-emerald-700">Online</span>:<span className="text-[var(--fg-muted)]">Offline</span>}
  </span>;
 }
 
@@ -50,7 +50,7 @@ export default function UserDirectory({expired=false}:{expired?:boolean}) {
   }
  });
  const actionColumn={label:"Actions",render:(u:User)=><span className="inline-flex items-center gap-3">
-  <button aria-label={`View ${u.voucher}`} onClick={()=>setView(u)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700"><Eye size={14}/>View</button>
+  <button aria-label={`View ${u.voucher}`} onClick={()=>setView(u)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--accent-text)]"><Eye size={14}/>View</button>
   <button disabled={pending!==null||(!expired&&!u.online)} onClick={()=>action(u)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-700 disabled:opacity-40">{expired?<Archive size={14}/>:<Plugs size={14}/ >}{pending===u.id?"Processing…":expired?"Archive":"Disconnect"}</button>
  </span>};
  return <PageContainer>
@@ -73,36 +73,36 @@ export default function UserDirectory({expired=false}:{expired?:boolean}) {
    {label:"Expiry date",render:u=><span className="text-red-700">{date(u.expiresAt)}</span>},
    {label:"Expired",render:u=>u.expiresAt?<Badge tone="red">{expiredAgo(u.expiresAt)}</Badge>:"—"},actionColumn
   ]:[
-   {label:"Customer",render:u=><div><span className="font-medium">{u.customerName||"Unassigned"}</span>{u.phone&&<span className="block text-xs text-slate-500">{u.phone}</span>}</div>},
+   {label:"Customer",render:u=><div><span className="font-medium">{u.customerName||"Unassigned"}</span>{u.phone&&<span className="block text-xs text-[var(--fg-muted)]">{u.phone}</span>}</div>},
    {label:"Voucher",render:u=><Badge tone="amber">{u.voucher}</Badge>},
    {label:"Connection",render:u=><OnlineDot online={u.online}/>},
    {label:"Package",render:u=>u.packageName},
    {label:"IP",render:u=>u.ip?<span className="font-mono text-xs">{u.ip}</span>:"—"},
    {label:"MAC",render:u=>u.mac?<span className="font-mono text-xs">{u.mac}</span>:"—"},
    {label:"Devices",render:u=><span className="tabular-nums">{u.devices}/{u.deviceLimit}</span>},
-   {label:"Router",render:u=>u.router||"—"},{label:"First activation",render:u=><span className="text-slate-500">{date(u.firstLogin)}</span>},{label:"Access expires",render:u=><span className="text-slate-500">{date(u.expiresAt)}</span>},
+   {label:"Router",render:u=>u.router||"—"},{label:"First activation",render:u=><span className="text-[var(--fg-muted)]">{date(u.firstLogin)}</span>},{label:"Access expires",render:u=><span className="text-[var(--fg-muted)]">{date(u.expiresAt)}</span>},
    {label:"Data usage",render:u=>bytes(u.dataBytes)},{label:"Time left",render:u=><Badge tone={(u.timeLeftSeconds??0)<3600?"amber":"green"}>{remaining(u.timeLeftSeconds)}</Badge>},actionColumn
   ]}/>
  {view&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" onClick={()=>setView(null)}>
-  <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-xl" onClick={e=>e.stopPropagation()}>
-   <div className="flex items-start justify-between border-b border-slate-100 bg-slate-50 px-6 py-4">
+  <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-[var(--surface)] shadow-xl" onClick={e=>e.stopPropagation()}>
+   <div className="flex items-start justify-between border-b border-[var(--border-soft)] bg-[var(--subtle)] px-6 py-4">
     <div className="flex items-center gap-3">
      <div className={`flex h-11 w-11 items-center justify-center rounded-full border ${view.status==="active"?"border-emerald-200 bg-emerald-50 text-emerald-700":"border-red-200 bg-red-50 text-red-600"}`}><UserIcon size={20}/></div>
      <div>
-      <h2 className="text-sm font-bold text-slate-900">{view.customerName||"Walk-in customer"}</h2>
+      <h2 className="text-sm font-bold text-[var(--fg)]">{view.customerName||"Walk-in customer"}</h2>
       <div className="mt-0.5 flex items-center gap-2">
-       <span className="font-mono text-xs font-semibold text-slate-600">{view.voucher}</span>
+       <span className="font-mono text-xs font-semibold text-[var(--fg-muted)]">{view.voucher}</span>
        <Badge tone={view.status==="active"?"green":"red"}>{view.status}</Badge>
        <OnlineDot online={view.online}/>
       </div>
      </div>
     </div>
-    <button aria-label="Close" onClick={()=>setView(null)} className="text-slate-400 hover:text-slate-700"><X size={18}/></button>
+    <button aria-label="Close" onClick={()=>setView(null)} className="text-[var(--fg-faint)] hover:text-[var(--fg-body)]"><X size={18}/></button>
    </div>
    <div className="space-y-5 px-6 py-5">
     <section>
-     <h3 className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400"><Package size={12}/>Package & access</h3>
-     <div className="grid grid-cols-3 gap-3 rounded-xl border border-slate-100 bg-slate-50/60 p-3">
+     <h3 className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--fg-faint)]"><Package size={12}/>Package & access</h3>
+     <div className="grid grid-cols-3 gap-3 rounded-xl border border-[var(--border-soft)] bg-slate-50/60 p-3">
       <Detail label="Package" value={view.packageName}/>
       <Detail label="Time left" value={remaining(view.timeLeftSeconds)}/>
       <Detail label="Data used" value={bytes(view.dataBytes)}/>
@@ -112,16 +112,16 @@ export default function UserDirectory({expired=false}:{expired?:boolean}) {
      </div>
     </section>
     <section>
-     <h3 className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400"><Globe size={12}/>Connection</h3>
-     <div className="grid grid-cols-3 gap-3 rounded-xl border border-slate-100 bg-slate-50/60 p-3">
+     <h3 className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--fg-faint)]"><Globe size={12}/>Connection</h3>
+     <div className="grid grid-cols-3 gap-3 rounded-xl border border-[var(--border-soft)] bg-slate-50/60 p-3">
       <Detail label="Router" value={view.router||"—"}/>
       <Detail label="IP address" value={view.ip||"—"} mono/>
       <Detail label="MAC address" value={view.mac||"—"} mono/>
      </div>
     </section>
     <section>
-     <h3 className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400"><DeviceMobile size={12}/>Customer</h3>
-     <div className="grid grid-cols-2 gap-3 rounded-xl border border-slate-100 bg-slate-50/60 p-3">
+     <h3 className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--fg-faint)]"><DeviceMobile size={12}/>Customer</h3>
+     <div className="grid grid-cols-2 gap-3 rounded-xl border border-[var(--border-soft)] bg-slate-50/60 p-3">
       <Detail label="Name" value={view.customerName||"Walk-in customer"}/>
       <Detail label="Phone" value={view.phone||"—"}/>
      </div>

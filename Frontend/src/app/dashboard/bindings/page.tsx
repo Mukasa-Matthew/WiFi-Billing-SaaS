@@ -42,6 +42,6 @@ export default function Page(){
    {label:"Expiry",render:b=>b.expiresAt?date(b.expiresAt):"Never"},
    {label:"",render:b=><button disabled={b.status==="REMOVED"} onClick={()=>remove(b)} className="text-xs font-medium text-red-600 hover:underline disabled:opacity-30">Remove</button>}
   ]}/>
-  <p className="text-xs text-slate-500">Pending means the router has not confirmed this configuration. The management agent must be installed; physical enforcement is verified in the later router test.</p>
+  <p className="text-xs text-[var(--fg-muted)]">Pending means the router has not confirmed this configuration. The management agent must be installed; physical enforcement is verified in the later router test.</p>
  </PageContainer>;
 }

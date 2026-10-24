@@ -19,7 +19,7 @@ interface GatewayView {
   platformFeePercent: number;
 }
 
-const card = "rounded-xl border border-slate-200 bg-white p-6";
+const card = "rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6";
 
 export default function PaymentGatewaySettings() {
   const [gw, setGw] = useState<GatewayView | null>(null);
@@ -65,7 +65,7 @@ export default function PaymentGatewaySettings() {
     try { await navigator.clipboard.writeText(gw?.callbackUrl || ""); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* noop */ }
   };
 
-  if (!gw) return <div className={card}><SpinnerGap className="animate-spin text-slate-400" size={20} /></div>;
+  if (!gw) return <div className={card}><SpinnerGap className="animate-spin text-[var(--fg-faint)]" size={20} /></div>;
 
   return (
     <div className="space-y-5">
@@ -78,15 +78,15 @@ export default function PaymentGatewaySettings() {
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-2">
               <span className="rounded-lg bg-blue-50 p-2 text-blue-600"><Wallet size={20} /></span>
-              <h3 className="text-sm font-bold text-slate-900">Use Platform Payment Gateway</h3>
+              <h3 className="text-sm font-bold text-[var(--fg)]">Use Platform Payment Gateway</h3>
             </div>
             {gw.mode === "PLATFORM" && <Badge tone="green">Active</Badge>}
           </div>
-          <p className="mt-3 text-xs leading-relaxed text-slate-500">
+          <p className="mt-3 text-xs leading-relaxed text-[var(--fg-muted)]">
             Accept customer payments using our integrated MarzPay gateway. Your earnings appear in
             your business wallet, and you can request withdrawals.
           </p>
-          <ul className="mt-4 space-y-1.5 text-xs text-slate-600">
+          <ul className="mt-4 space-y-1.5 text-xs text-[var(--fg-muted)]">
             <li className="flex items-center gap-2"><CheckCircle size={14} className="text-emerald-500" /> Transaction fee: {gw.platformFeePercent}% per successful collection</li>
             <li className="flex items-center gap-2"><CheckCircle size={14} className="text-emerald-500" /> Wallet withdrawals to your mobile money</li>
             <li className="flex items-center gap-2"><CheckCircle size={14} className="text-emerald-500" /> No MarzPay account needed</li>
@@ -103,11 +103,11 @@ export default function PaymentGatewaySettings() {
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-2">
               <span className="rounded-lg bg-violet-50 p-2 text-violet-600"><CreditCard size={20} /></span>
-              <h3 className="text-sm font-bold text-slate-900">Use My Own Payment Gateway</h3>
+              <h3 className="text-sm font-bold text-[var(--fg)]">Use My Own Payment Gateway</h3>
             </div>
             {gw.mode === "OWN" && <Badge tone="green">Active</Badge>}
           </div>
-          <p className="mt-3 text-xs leading-relaxed text-slate-500">
+          <p className="mt-3 text-xs leading-relaxed text-[var(--fg-muted)]">
             Connect your own MarzPay account and receive customer payments directly into your
             MarzPay wallet. Sales still appear in your dashboard.
           </p>
@@ -116,7 +116,7 @@ export default function PaymentGatewaySettings() {
               <Badge tone={gw.connectionStatus === "CONNECTED" ? "green" : "red"}>
                 {gw.connectionStatus === "CONNECTED" ? "Connected" : "Connection failed"}
               </Badge>
-              {gw.apiKeyMasked && <span className="ml-2 font-mono text-[11px] text-slate-400">{gw.apiKeyMasked}</span>}
+              {gw.apiKeyMasked && <span className="ml-2 font-mono text-[11px] text-[var(--fg-faint)]">{gw.apiKeyMasked}</span>}
               {gw.connectionError && <p className="mt-1.5 text-[11px] text-red-500">{gw.connectionError}</p>}
             </div>
           )}
@@ -133,10 +133,10 @@ export default function PaymentGatewaySettings() {
       {/* Credential form */}
       <div className={card}>
         <div className="flex items-center gap-2">
-          <ShieldCheck size={18} className="text-slate-500" />
-          <h3 className="text-sm font-bold text-slate-900">MarzPay credentials</h3>
+          <ShieldCheck size={18} className="text-[var(--fg-muted)]" />
+          <h3 className="text-sm font-bold text-[var(--fg)]">MarzPay credentials</h3>
         </div>
-        <p className="mt-1.5 text-xs text-slate-500">
+        <p className="mt-1.5 text-xs text-[var(--fg-muted)]">
           From your MarzPay dashboard → API Keys. Credentials are encrypted at rest and never shown after saving.
         </p>
         <form onSubmit={saveCreds} className="mt-5 grid gap-4 md:grid-cols-2">
@@ -152,7 +152,7 @@ export default function PaymentGatewaySettings() {
             <p className={hint}>{gw.hasSecret ? "Entering a new secret rotates the saved one." : "Stored encrypted — never returned to the browser."}</p>
           </div>
           <div>
-            <label className={label}>Webhook signing secret <span className="font-normal text-slate-400">(optional)</span></label>
+            <label className={label}>Webhook signing secret <span className="font-normal text-[var(--fg-faint)]">(optional)</span></label>
             <input className={field} type="password" value={webhookSecret} onChange={(e) => setWebhookSecret(e.target.value)}
               placeholder={gw.hasWebhookSecret ? "•••••••• (saved)" : "whsec_…"} autoComplete="new-password" />
             <p className={hint}>Enable webhook signing in MarzPay, then paste the whsec_ secret here. Signed callbacks are verified automatically.</p>
@@ -186,18 +186,18 @@ export default function PaymentGatewaySettings() {
 
       {/* Webhook setup */}
       <div className={card}>
-        <h3 className="text-sm font-bold text-slate-900">Webhook / callback setup</h3>
-        <p className="mt-1.5 text-xs text-slate-500">
+        <h3 className="text-sm font-bold text-[var(--fg)]">Webhook / callback setup</h3>
+        <p className="mt-1.5 text-xs text-[var(--fg-muted)]">
           In your MarzPay dashboard → Webhooks, register this URL for <b>collection.completed</b>, <b>collection.failed</b>,
           and <b>disbursement.*</b> events so payment status reaches this platform:
         </p>
         <div className="mt-3 flex items-center gap-2">
-          <code className="flex-1 truncate rounded-lg bg-slate-100 px-3 py-2 font-mono text-[11px] text-slate-700">{gw.callbackUrl}</code>
+          <code className="flex-1 truncate rounded-lg bg-[var(--fill)] px-3 py-2 font-mono text-[11px] text-[var(--fg-body)]">{gw.callbackUrl}</code>
           <button type="button" onClick={copy} className={buttonGhost}>
             <Copy size={14} /> {copied ? "Copied" : "Copy"}
           </button>
         </div>
-        <p className="mt-3 text-[11px] leading-relaxed text-slate-400">
+        <p className="mt-3 text-[11px] leading-relaxed text-[var(--fg-faint)]">
           Callbacks are also sent per-request for each collection, so payments work even without a registered webhook —
           registering one adds reliable re-delivery and HMAC signature verification.
         </p>
