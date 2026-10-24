@@ -74,7 +74,7 @@ export default function AdminLayout({
             </div>
             <div>
               <span className="block text-sm font-bold tracking-tight text-white">WiFi-Billing</span>
-              <span className="block text-[10px] font-semibold uppercase tracking-widest text-blue-100">
+              <span className="block text-[10px] font-semibold uppercase tracking-widest text-[var(--sidebar-fg-dim)]">
                 Platform admin
               </span>
             </div>
@@ -88,7 +88,7 @@ export default function AdminLayout({
               return (
                 <React.Fragment key={item.href}>
                   {(index === 0 || navItems[index - 1].group !== item.group) && (
-                    <p className={`px-3 pb-1.5 ${index === 0 ? "" : "pt-3"} text-[10px] font-bold uppercase tracking-widest text-blue-200`}>
+                    <p className={`px-3 pb-1.5 ${index === 0 ? "" : "pt-3"} text-[10px] font-bold uppercase tracking-widest text-[var(--sidebar-fg-faint)]`}>
                       {item.group}
                     </p>
                   )}
@@ -119,12 +119,12 @@ export default function AdminLayout({
             </div>
             <div className="min-w-0">
               <p className="truncate text-xs font-semibold text-white">{user?.name}</p>
-              <p className="truncate text-[11px] text-blue-100">{user?.email}</p>
+              <p className="truncate text-[11px] text-[var(--sidebar-fg-dim)]">{user?.email}</p>
             </div>
           </div>
           <button
             onClick={logout}
-            className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 py-2 px-3 text-xs font-semibold text-blue-100 transition hover:bg-red-500/20 hover:text-white"
+            className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 py-2 px-3 text-xs font-semibold text-[var(--sidebar-fg-dim)] transition hover:bg-red-500/20 hover:text-white"
           >
             <SignOut className="h-3.5 w-3.5" />
             <span>Sign out</span>

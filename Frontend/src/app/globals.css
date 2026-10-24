@@ -42,6 +42,9 @@ body {
   --sidebar-admin: #0B1F36;
   --sidebar-active: #FFFFFF;
   --sidebar-active-fg: #122B49;
+  --sidebar-fg-dim: #C3D6F0;
+  --sidebar-fg-faint: #9DB6D9;
+  --sidebar-warn: #FCD34D;
   color-scheme: light;
 }
 
