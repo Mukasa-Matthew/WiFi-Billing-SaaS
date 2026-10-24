@@ -6,7 +6,7 @@ import { DashboardLoading, LoadingIndicator } from "@/components/LoadingUI";
 import { EmptyState } from "@/components/BillingUI";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
-import { ArrowUpRight, Eye, EyeSlash, ArrowClockwise, CellTower, Ticket, Users, Wallet, ChartLine, WarningCircle } from "@phosphor-icons/react";
+import { ArrowUpRight, Eye, EyeSlash, CellTower, Ticket, Users, Wallet, ChartLine, WarningCircle } from "@phosphor-icons/react";
 
 interface WeeklySale { date: string; day: string; revenue: number; transactions: number }
 interface Consumer { radAcctId: number; username: string; framedIpAddress: string; totalOctets: number; acctSessionTime: number }
@@ -94,7 +94,6 @@ export default function TenantDashboardOverview() {
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setHidden(!hidden)} aria-label={hidden ? "Show revenue" : "Hide revenue"} className="rounded-lg border border-slate-300 p-2.5 text-slate-500 hover:text-slate-900">{hidden ? <EyeSlash size={16} /> : <Eye size={16} />}</button>
-          <button onClick={() => void fetchStats()} disabled={loading} aria-label="Refresh dashboard" className="rounded-lg border border-slate-300 p-2.5 text-slate-500 hover:text-slate-900 disabled:opacity-50"><ArrowClockwise size={16} className={loading ? "animate-spin" : ""} /></button>
         </div>
       </section>
 

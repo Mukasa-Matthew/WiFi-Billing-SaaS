@@ -1,8 +1,8 @@
 "use client";
 import React, { useState } from "react";
-import { Users, WifiHigh, WifiSlash, ArrowClockwise, Archive, Plugs, Eye, X, ClockCountdown, Prohibit, CalendarX, Package, DeviceMobile, Globe, User as UserIcon } from "@phosphor-icons/react";
+import { Users, WifiHigh, WifiSlash, Archive, Plugs, Eye, X, ClockCountdown, Prohibit, CalendarX, Package, DeviceMobile, Globe, User as UserIcon } from "@phosphor-icons/react";
 import api from "@/lib/api";
-import { useResource, Table, Badge, Notice, ErrorNotice, date, bytes, remaining, message, StatCard, FilterTabs, buttonGhost, PageContainer, PageHeader } from "./BillingUI";
+import { useResource, Table, Badge, Notice, ErrorNotice, date, bytes, remaining, message, StatCard, FilterTabs, PageContainer, PageHeader } from "./BillingUI";
 import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
 
@@ -26,7 +26,7 @@ function OnlineDot({online}:{online:boolean}) {
 }
 
 export default function UserDirectory({expired=false}:{expired?:boolean}) {
- const {data,loading,refreshing,error,load}=useResource<User>("/api/users",true);
+ const {data,loading,error,load}=useResource<User>("/api/users",true);
  const [tab,setTab]=useState("ONLINE"), [note,setNote]=useState(""), [actionError,setActionError]=useState("");
  const [pending,setPending]=useState<number|null>(null);
  const [view,setView]=useState<User|null>(null);
@@ -55,7 +55,7 @@ export default function UserDirectory({expired=false}:{expired?:boolean}) {
  </span>};
  return <PageContainer>
   {dialog}
-  <PageHeader title={expired?"Expired users":"Active users"} description={expired?"Review expired access and revoked vouchers. Latest expiry appears first.":"Monitor voucher validity, connected devices, and customer usage."} action={<button onClick={()=>load()} disabled={refreshing} className={buttonGhost}><ArrowClockwise size={14} className={refreshing?"animate-spin":""}/>Refresh</button>}/>
+  <PageHeader title={expired?"Expired users":"Active users"} description={expired?"Review expired access and revoked vouchers. Latest expiry appears first.":"Monitor voucher validity, connected devices, and customer usage."}/>
   <ErrorNotice text={error||actionError}/><Notice text={note}/>
   {expired?<div className="grid gap-4 sm:grid-cols-4">
    <StatCard label="Expired today" value={loading?"—":expToday} icon={<ClockCountdown size={20}/>} tone="amber" hintText="Access ended in the last 24h"/>
