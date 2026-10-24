@@ -47,6 +47,7 @@ export default function AdminSubscriptionsPage() {
   const [fMethod, setFMethod] = useState("CASH");
   const [fRef, setFRef] = useState("");
   const [fNote, setFNote] = useState("");
+  const [fChannel, setFChannel] = useState("EXTERNAL");
 
   const load = async () => {
     try {
@@ -242,6 +243,7 @@ export default function AdminSubscriptionsPage() {
             {dialog === "pay" && (
               <form className="mt-5 space-y-4" onSubmit={(e) => { e.preventDefault(); void act(() => api.post(`/api/admin/subscriptions/${sel!.id}/payments`, {
                 amount: Number(fAmount), method: fMethod, externalRef: fRef || undefined, note: fNote || undefined,
+                settlementChannel: fChannel,
               }), "Payment recorded."); }}>
                 {sel!.outstanding > 0 && (
                   <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
@@ -260,6 +262,14 @@ export default function AdminSubscriptionsPage() {
                     <option value="AIRTEL">Airtel Money</option>
                     <option value="BANK">Bank transfer</option>
                   </select>
+                </div>
+                <div>
+                  <label className={label}>Where did the money settle?</label>
+                  <select className={field} value={fChannel} onChange={(e) => setFChannel(e.target.value)}>
+                    <option value="EXTERNAL">Outside MarzPay (cash, bank, other wallet)</option>
+                    <option value="MARZPAY">Into the platform MarzPay account</option>
+                  </select>
+                  <p className={hint}>Only MarzPay-settled funds become withdrawable earnings — choose honestly, it affects reconciliation.</p>
                 </div>
                 <div>
                   <label className={label}>External reference <span className="font-normal text-slate-400">(optional)</span></label>

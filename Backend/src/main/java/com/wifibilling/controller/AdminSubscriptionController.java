@@ -133,7 +133,8 @@ public class AdminSubscriptionController {
     }
 
     public record PaymentRequest(Long invoiceId, Long amount, String method,
-                                 String externalRef, String recordRef, String note) {}
+                                 String externalRef, String recordRef, String note,
+                                 String settlementChannel) {}
 
     @PostMapping("/{id}/payments")
     public Map<String, Object> recordPayment(@PathVariable Long id,
@@ -144,7 +145,8 @@ public class AdminSubscriptionController {
                     org.springframework.http.HttpStatus.BAD_REQUEST, "amount is required");
         }
         var p = service.recordPayment(id, req.invoiceId(), req.amount(), req.method(),
-                req.externalRef(), req.recordRef(), principal.getTenantId(), req.note());
+                req.externalRef(), req.recordRef(), principal.getTenantId(), req.note(),
+                req.settlementChannel());
         return Map.of("id", p.getId(), "invoiceId", p.getInvoice().getId());
     }
 

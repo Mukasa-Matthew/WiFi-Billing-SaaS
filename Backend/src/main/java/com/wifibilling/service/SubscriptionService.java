@@ -37,6 +37,7 @@ public class SubscriptionService {
     private final SubscriptionPaymentRepository payments;
     private final PlatformSettingRepository settings;
     private final TenantRepository tenants;
+    private final PlatformEarningsService platformEarnings;
 
     // ---------- display status ----------
 
@@ -125,6 +126,14 @@ public class SubscriptionService {
     public SubscriptionPayment recordPayment(Long subscriptionId, Long invoiceId, long amount,
                                              String method, String externalRef, String recordRef,
                                              Long adminId, String note) {
+        return recordPayment(subscriptionId, invoiceId, amount, method, externalRef, recordRef,
+                adminId, note, "EXTERNAL");
+    }
+
+    @Transactional
+    public SubscriptionPayment recordPayment(Long subscriptionId, Long invoiceId, long amount,
+                                             String method, String externalRef, String recordRef,
+                                             Long adminId, String note, String settlementChannel) {
         if (amount <= 0) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Amount must be positive");
         if (recordRef != null) {
             var existing = payments.findByRecordRef(recordRef);
@@ -146,8 +155,12 @@ public class SubscriptionService {
                 .externalRef(externalRef == null || externalRef.isBlank() ? null : externalRef.trim())
                 .recordRef(recordRef != null ? recordRef : UUID.randomUUID().toString())
                 .recordedBy(adminId).note(note)
+                .settlementChannel("MARZPAY".equalsIgnoreCase(settlementChannel) ? "MARZPAY" : "EXTERNAL")
                 .build();
         p = payments.save(p);
+
+        // Credit platform earnings in the settlement bucket the admin declared.
+        platformEarnings.creditSubscriptionPayment(p, p.getSettlementChannel());
 
         if (payments.sumByInvoiceId(inv.getId()) >= inv.getAmountDue()) {
             inv.setStatus(SubscriptionInvoice.PAID);
