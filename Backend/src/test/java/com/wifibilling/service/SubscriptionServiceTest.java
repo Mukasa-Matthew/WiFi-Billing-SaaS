@@ -26,13 +26,14 @@ class SubscriptionServiceTest {
     @Mock private SubscriptionPaymentRepository payments;
     @Mock private PlatformSettingRepository settings;
     @Mock private TenantRepository tenants;
+    @Mock private PlatformEarningsService platformEarnings;
 
     private SubscriptionService service;
     private Tenant tenant;
 
     @BeforeEach
     void setUp() {
-        service = new SubscriptionService(subs, invoices, payments, settings, tenants);
+        service = new SubscriptionService(subs, invoices, payments, settings, tenants, platformEarnings);
         tenant = Tenant.builder().id(1L).name("Trent Hotspot").build();
         lenient().when(tenants.findById(1L)).thenReturn(Optional.of(tenant));
         lenient().when(subs.save(any())).thenAnswer(i -> i.getArgument(0));

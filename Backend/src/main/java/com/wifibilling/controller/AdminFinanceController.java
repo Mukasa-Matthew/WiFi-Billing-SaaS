@@ -31,6 +31,8 @@ public class AdminFinanceController {
     private final GatewayConfigService gatewayConfig;
     private final MarzPayClient marzPay;
     private final TenantRepository tenantRepository;
+    private final com.wifibilling.service.PlatformEarningsService platformEarnings;
+    private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
     @GetMapping("/overview")
     public Map<String, Object> overview() {
@@ -116,5 +118,93 @@ public class AdminFinanceController {
     public Map<String, String> fail(@PathVariable Long id, @RequestBody(required = false) FailRequest req) {
         var w = withdrawalService.fail(id, req != null ? req.reason() : "Rejected by administrator");
         return Map.of("status", w.getStatus());
+    }
+
+    // ---------- platform subscription earnings ----------
+
+    @GetMapping("/platform")
+    public Map<String, Object> platform() {
+        var a = platformEarnings.account();
+        long tenantAvail = wallets.findAll().stream().mapToLong(WalletAccount::getAvailableBalance).sum();
+        long tenantReserved = wallets.findAll().stream().mapToLong(WalletAccount::getReservedBalance).sum();
+        var out = new java.util.HashMap<String, Object>();
+        out.put("settledEarnings", a.getSettledEarnings());
+        out.put("externalEarnings", a.getExternalEarnings());
+        out.put("reservedEarnings", a.getReservedEarnings());
+        out.put("totalEarned", a.getTotalEarned());
+        out.put("totalFees", a.getTotalFees());
+        out.put("totalWithdrawn", a.getTotalWithdrawn());
+        out.put("providerBalance", a.getLastProviderBalance() == null ? -1 : a.getLastProviderBalance());
+        out.put("lastSyncedAt", a.getLastSyncedAt() == null ? "" : a.getLastSyncedAt().toString());
+        out.put("reconcileStatus", a.getReconcileStatus());
+        out.put("reconcileNote", a.getReconcileNote() == null ? "" : a.getReconcileNote());
+        out.put("balanceStale", platformEarnings.balanceStale(a));
+        out.put("tenantAvailable", tenantAvail);
+        out.put("tenantReserved", tenantReserved);
+        out.put("safeWithdrawable", platformEarnings.safeWithdrawable());
+        out.put("safetyBuffer", platformEarnings.safetyBuffer());
+        out.put("payoutsEnabled", platformEarnings.payoutsEnabled());
+        return out;
+    }
+
+    @PostMapping("/platform/reconcile")
+    public Map<String, Object> reconcileNow() {
+        var log = platformEarnings.reconcile();
+        return Map.of(
+                "providerBalance", log.getProviderBalance() == null ? -1 : log.getProviderBalance(),
+                "expectedBalance", log.getExpectedBalance(),
+                "difference", log.getDifference() == null ? 0 : log.getDifference(),
+                "status", log.getStatus()
+        );
+    }
+
+    public record PlatformPayoutRow(Long id, Long amount, Long fee, Long totalDeduction,
+                                    String phone, String status, String payoutRef,
+                                    String providerTransactionId, String failureReason,
+                                    String createdAt, String completedAt) {}
+
+    @GetMapping("/platform/payouts")
+    public List<PlatformPayoutRow> platformPayouts() {
+        return platformEarnings.recentPayouts().stream().map(p ->
+                new PlatformPayoutRow(p.getId(), p.getAmount(), p.getFee(), p.getTotalDeduction(),
+                        p.getPhone(), p.getStatus(), p.getPayoutRef(), p.getProviderTransactionId(),
+                        p.getFailureReason(),
+                        p.getCreatedAt() != null ? p.getCreatedAt().toString() : null,
+                        p.getCompletedAt() != null ? p.getCompletedAt().toString() : null))
+                .toList();
+    }
+
+    @GetMapping("/platform/reconciliation")
+    public List<Map<String, Object>> reconciliationLog() {
+        return platformEarnings.recentReconciliations().stream().map(l -> Map.<String, Object>of(
+                "providerBalance", l.getProviderBalance() == null ? -1 : l.getProviderBalance(),
+                "expectedBalance", l.getExpectedBalance(),
+                "difference", l.getDifference() == null ? 0 : l.getDifference(),
+                "status", l.getStatus(),
+                "note", l.getNote() == null ? "" : l.getNote(),
+                "createdAt", l.getCreatedAt().toString()
+        )).toList();
+    }
+
+    public record PayoutRequest(Long amount, String phone, String password) {}
+
+    /** Step-up auth: the super admin must re-enter their password to move money. */
+    @PostMapping("/platform/payouts")
+    public Map<String, Object> requestPayout(@RequestBody PayoutRequest req,
+                                             @org.springframework.security.core.annotation.AuthenticationPrincipal
+                                             com.wifibilling.security.TenantPrincipal principal) {
+        if (req == null || req.amount() == null || req.phone() == null) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST, "amount and phone are required");
+        }
+        var admin = tenantRepository.findById(principal.getTenantId())
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.UNAUTHORIZED, "Admin not found"));
+        if (req.password() == null || !passwordEncoder.matches(req.password(), admin.getPasswordHash())) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN, "Incorrect password");
+        }
+        var p = platformEarnings.requestPayout(req.amount(), req.phone(), principal.getTenantId());
+        return Map.of("id", p.getId(), "status", p.getStatus(), "payoutRef", p.getPayoutRef());
     }
 }
