@@ -97,9 +97,9 @@ export default function WalletPage() {
           <p className="mt-1 text-xs text-slate-400">Held for in-flight withdrawals</p>
         </div>
         <div className={`${panel} p-5`}>
-          <div className="flex items-center gap-2 text-xs font-semibold text-slate-500"><Bank size={15} /> Total earnings</div>
+          <div className="flex items-center gap-2 text-xs font-semibold text-slate-500"><Bank size={15} /> Lifetime earnings</div>
           <div className="mt-2 text-2xl font-bold text-slate-900">{money(summary?.totalCollected)}</div>
-          <p className="mt-1 text-xs text-slate-400">Net of gateway fees</p>
+          <p className="mt-1 text-xs text-slate-400">All you've ever collected, net of gateway fees</p>
         </div>
         <div className={`${panel} p-5`}>
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-500"><ArrowDown size={15} /> Total withdrawn</div>
