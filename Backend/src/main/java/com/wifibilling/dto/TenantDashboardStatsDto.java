@@ -20,5 +20,11 @@ public record TenantDashboardStatsDto(
     long expiredVouchers,
     List<Map<String, Object>> weeklySales,
     List<Map<String, Object>> routerRevenue,
-    List<ActiveSessionDto> topConsumers
+    List<ActiveSessionDto> topConsumers,
+    String range,
+    List<Map<String, Object>> revenueSeries,
+    List<Map<String, Object>> dailyActiveUsers,
+    List<Map<String, Object>> registrations,
+    List<Map<String, Object>> topDataUsers,
+    List<Map<String, Object>> packagePerformance
 ) {}

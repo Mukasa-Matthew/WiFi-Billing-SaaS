@@ -17,7 +17,8 @@ public class TenantDashboardController {
     private final TenantDashboardService dashboardService;
 
     @GetMapping("/stats")
-    public TenantDashboardStatsDto getStats(@AuthenticationPrincipal TenantPrincipal principal) {
-        return dashboardService.getStats(principal.getTenantId(), principal.getRole());
+    public TenantDashboardStatsDto getStats(@AuthenticationPrincipal TenantPrincipal principal,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "7d") String range) {
+        return dashboardService.getStats(principal.getTenantId(), principal.getRole(), range);
     }
 }
