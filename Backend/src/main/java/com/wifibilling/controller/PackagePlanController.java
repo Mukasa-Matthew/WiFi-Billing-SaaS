@@ -22,6 +22,16 @@ public class PackagePlanController {
 
     private final PackagePlanRepository packagePlanRepository;
     private final TenantRepository tenantRepository;
+    private final com.wifibilling.repository.RouterRepository routerRepository;
+    private final com.wifibilling.service.RouterManagementService routerManagement;
+
+    /** Queue a portal sync on every router the tenant owns; picked up by
+     *  wb-management within ~1 minute so package edits reach portals fast. */
+    private void syncPortals(Long tenantId) {
+        for (var r : routerRepository.findAllByTenantId(tenantId)) {
+            try { routerManagement.enqueue(r, "SYNC_PORTAL"); } catch (Exception ignored) {}
+        }
+    }
 
     @GetMapping
     public List<PackagePlanDto.Response> list(@AuthenticationPrincipal TenantPrincipal principal) {
@@ -52,6 +62,7 @@ public class PackagePlanController {
                 .build();
 
         plan = packagePlanRepository.save(plan);
+        syncPortals(plan.getTenant().getId());
         return toResponse(plan);
     }
 
@@ -72,7 +83,9 @@ public class PackagePlanController {
         PackagePlan plan = packagePlanRepository.findByIdAndTenantId(id, principal.getTenantId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Package not found"));
         plan.setAvailability(req.availability());
-        return toResponse(packagePlanRepository.save(plan));
+        PackagePlan saved = packagePlanRepository.save(plan);
+        syncPortals(plan.getTenant().getId());
+        return toResponse(saved);
     }
 
     public record AvailabilityRequest(
@@ -87,6 +100,7 @@ public class PackagePlanController {
         PackagePlan plan = packagePlanRepository.findByIdAndTenantId(id, principal.getTenantId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Package not found"));
         packagePlanRepository.delete(plan);
+        syncPortals(principal.getTenantId());
     }
 
     private PackagePlanDto.Response toResponse(PackagePlan p) {
