@@ -24,7 +24,7 @@ import java.util.Set;
 public class RouterScriptGenerator {
 
     /** Bump only for a deliberate, reviewed RouterOS infrastructure migration. */
-    public static final String PROVISIONING_VERSION = "2026.10.1";
+    public static final String PROVISIONING_VERSION = "2026.10.2";
 
     private static final String IFACE_NAME = "wg-billing";
     private static final String TELEMETRY_NAME = "wb-telemetry";
@@ -117,6 +117,16 @@ public class RouterScriptGenerator {
                 .append(tag).append(") do={ :error \"10.10.0.1/24 is already used by an unmanaged configuration; no changes made\" }\n");
         s.append(":log info \"wifi-billing: provisioning started\"\n\n");
         s.append(":do { /export file=before-wifi-billing } on-error={}\n\n");
+
+        // Clock sync FIRST: an NTP time jump while /import or /tool/fetch is
+        // running aborts it mid-script. Sync and settle the clock before any
+        // downloads or config changes (bounded wait — WAN may be slow to come up).
+        s.append("# --- 0a. Sync clock before anything else ---\n");
+        s.append("/system/clock/set time-zone-name=Etc/UTC time-zone-autodetect=no\n");
+        s.append("/system/ntp/client/set enabled=yes\n");
+        s.append(":if ([:len [/system/ntp/client/servers find address=pool.ntp.org]] = 0) do={ /system/ntp/client/servers add address=pool.ntp.org }\n");
+        s.append(":local wbNtpWait 0\n");
+        s.append(":while ([:tonum [:pick [/system/clock get date] ([:len [/system/clock get date]] - 4) [:len [/system/clock get date]]]] < 2026 && $wbNtpWait < 24) do={ :delay 5s; :set wbNtpWait ($wbNtpWait + 1) }\n\n");
 
         // 0. Cleanup of any previous run
         s.append("# --- 0. Remove previous provisioning (safe to re-run) ---\n");
