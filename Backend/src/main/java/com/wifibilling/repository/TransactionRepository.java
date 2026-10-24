@@ -16,6 +16,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
 
     List<Transaction> findAllByTenantIdOrderByCreatedAtDesc(Long tenantId);
 
+    List<Transaction> findTop1000ByTenantIdOrderByCreatedAtDesc(Long tenantId);
+
     List<Transaction> findAllByTenantIdAndStatusOrderByCreatedAtDesc(Long tenantId, String status);
 
     Optional<Transaction> findFirstByTenantIdAndPhoneAndStatusOrderByCreatedAtDesc(

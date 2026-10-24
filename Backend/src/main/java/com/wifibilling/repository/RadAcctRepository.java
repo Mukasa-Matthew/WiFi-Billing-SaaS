@@ -71,4 +71,26 @@ public interface RadAcctRepository extends JpaRepository<RadAcct, Long> {
             """, nativeQuery = true)
     List<Object[]> dataSince(@Param("tenantId") Long tenantId,
                              @Param("fromTs") java.time.OffsetDateTime fromTs);
+
+    /** Per-username aggregates for the user directory: first login, total octets, live device count. */
+    @Query(value = """
+            SELECT username, MIN(acctstarttime),
+                   COALESCE(SUM(acctinputoctets + acctoutputoctets), 0),
+                   COUNT(*) FILTER (WHERE acctstoptime IS NULL
+                                    AND COALESCE(acctupdatetime, acctstarttime) >= :cut)
+            FROM radacct
+            WHERE username IN (SELECT code FROM vouchers WHERE tenant_id = :tenantId)
+            GROUP BY username
+            """, nativeQuery = true)
+    List<Object[]> userStats(@Param("tenantId") Long tenantId,
+                             @Param("cut") java.time.OffsetDateTime cut);
+
+    /** Latest session row per username (ip, mac, nas) for the user directory. */
+    @Query(value = """
+            SELECT DISTINCT ON (username) username, framedipaddress, callingstationid, nasipaddress, acctstarttime
+            FROM radacct
+            WHERE username IN (SELECT code FROM vouchers WHERE tenant_id = :tenantId)
+            ORDER BY username, acctstarttime DESC
+            """, nativeQuery = true)
+    List<Object[]> latestSessions(@Param("tenantId") Long tenantId);
 }
