@@ -71,6 +71,15 @@ export default function TenantDashboardOverview() {
   const rangeLabel = RANGES.find((o) => o.key === (stats?.range || range))?.label || "7 days";
   const money = (value: number) => hidden ? "••••••" : `UGX ${number(value)}`;
   const display = (value: string | number) => stats ? value : loading ? "…" : "—";
+  const totalRouters = stats?.totalRouters || 0;
+  const onlineRouters = stats?.onlineRouters || 0;
+  const allOffline = totalRouters > 0 && onlineRouters === 0;
+  const someOffline = totalRouters > 0 && onlineRouters < totalRouters;
+  const routerHealth = !totalRouters
+    ? { value: "No routers", detail: "Link a router to see live health", color: "text-[var(--fg-muted)]" }
+    : allOffline
+      ? { value: "Offline", detail: `All ${totalRouters === 1 ? "router is" : `${totalRouters} routers are`} unreachable — no live data`, color: "text-red-600" }
+      : { value: `${onlineRouters}/${totalRouters} online`, detail: someOffline ? `${totalRouters - onlineRouters} offline · showing online-router stats only` : `CPU ${stats?.avgCpuLoad ?? 0}% · RAM ${stats?.avgMemoryUsage ?? 0}%`, color: someOffline ? "text-amber-700" : "text-amber-700" };
   const cards = [
     { label: "Today's revenue", value: money(stats?.revenueToday || 0), detail: "Successful payments today", icon: Wallet, color: "text-emerald-700" },
     { label: "Last 7 days revenue", value: money(weeklyRevenue), detail: `${number(transactions)} successful payments`, icon: Wallet, color: "text-amber-700" },
@@ -80,7 +89,7 @@ export default function TenantDashboardOverview() {
     { label: "Data Usage (This Month)", value: bytes((stats?.dataMonthDownBytes || 0) + (stats?.dataMonthUpBytes || 0)), detail: `↓ ${bytes(stats?.dataMonthDownBytes || 0)} · ↑ ${bytes(stats?.dataMonthUpBytes || 0)}`, icon: ChartLine, color: "text-emerald-700" },
     { label: "Total Customers", value: number(stats?.totalCustomers || 0), detail: `+${number(stats?.newCustomersThisWeek || 0)} this week`, icon: Users, color: "text-emerald-700" },
     { label: "Remaining vouchers", value: number(stats?.totalVouchers || 0), detail: "Unused or still active", icon: Ticket, color: "text-[var(--accent-text)]" },
-    { label: "Router Health", value: `${stats?.totalRouters || 0} router${stats?.totalRouters === 1 ? "" : "s"}`, detail: `CPU ${stats?.avgCpuLoad ?? 0}% · RAM ${stats?.avgMemoryUsage ?? 0}%`, icon: CellTower, color: "text-amber-700" },
+    { label: "Router Health", value: routerHealth.value, detail: routerHealth.detail, icon: CellTower, color: routerHealth.color },
   ];
 
   if (loading && !stats) return <DashboardLoading />;
