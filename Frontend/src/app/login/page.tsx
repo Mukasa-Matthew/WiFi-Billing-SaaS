@@ -53,10 +53,10 @@ export default function LoginPage() {
             <Radio className="w-7 h-7 text-white" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-[var(--fg)]">
-            WiFi-Billing SaaS
+            AirPairy
           </h1>
           <p className="text-sm text-[var(--fg-muted)] mt-1">
-            Enterprise Hotspot Billing & Cloud Core
+            Connecting WiFi. Simplifying Business.
           </p>
         </div>
 
@@ -88,7 +88,7 @@ export default function LoginPage() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@wifibilling.com"
+                  placeholder={process.env.NEXT_PUBLIC_SUPPORT_EMAIL || "name@company.com"}
                   className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-sm text-[var(--fg)] placeholder-[var(--fg-muted)] focus:outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-600/15 transition-all"
                 />
               </div>
@@ -149,6 +149,9 @@ export default function LoginPage() {
         {/* Footer info */}
         <p className="text-center text-xs text-[var(--fg-muted)] mt-6">
           Hotspot operator accounts are provisioned exclusively by platform administrators.
+        </p>
+        <p className="text-center text-[11px] text-[var(--fg-faint)] mt-3">
+          AirPairy is a product by Thewton.
         </p>
       </div>
     </div>

@@ -118,7 +118,7 @@ export default function TenantDashboardLayout({
                 {user?.name || "Hotspot Operator"}
               </span>
               <span className="block text-[10px] font-semibold uppercase tracking-widest text-[var(--sidebar-fg-dim)]">
-                Hotspot Manager
+                AirPairy
               </span>
             </div>
           </div>
@@ -208,6 +208,7 @@ export default function TenantDashboardLayout({
             <SignOut className="h-3.5 w-3.5" />
             <span>Sign out</span>
           </button>
+          <p className="mt-3 text-center text-[10px] text-[var(--sidebar-fg-dim)]/70">A product by Thewton</p>
         </div>
       </aside>
 

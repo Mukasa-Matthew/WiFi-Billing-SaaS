@@ -6,8 +6,19 @@ import { ThemeProvider, themeBootstrapScript } from "@/context/ThemeContext";
 import { ToastProvider } from "@/components/ui/Toast";
 
 export const metadata: Metadata = {
-  title: "WiFi-Billing SaaS - Enterprise Hotspot Management",
-  description: "Carrier-grade WiFi Hotspot, WireGuard Mesh & Micro-billing platform",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://qticket.dev"),
+  title: {
+    default: "AirPairy — Connecting WiFi. Simplifying Business.",
+    template: "%s · AirPairy",
+  },
+  description: "AirPairy is a multi-tenant WiFi hotspot billing and management platform for independent WiFi businesses. A product by Thewton.",
+  applicationName: "AirPairy",
+  openGraph: {
+    title: "AirPairy",
+    description: "Connecting WiFi. Simplifying Business.",
+    siteName: "AirPairy",
+    type: "website",
+  },
 };
 
 export default function RootLayout({

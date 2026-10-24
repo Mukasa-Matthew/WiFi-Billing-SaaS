@@ -239,7 +239,7 @@
             <div id="support-email-line" style="display:none">✉️ <a id="support-email-link" href="">TENANT_SUPPORT_EMAIL_PLACEHOLDER</a></div>
         </div>
 
-        <div class="powered">Powered by <b>WiFi-Billing SaaS</b> © 2026</div>
+        <div class="powered">Powered by <b>AirPairy</b></div>
     </div>
 </div>
 
@@ -304,7 +304,18 @@ function showMsg(text, isError) {
     document.getElementById('msg-area').innerHTML =
         '<div class="status-msg ' + (isError ? 'error' : 'success') + '">' + text + '</div>';
 }
-if (MT_ERROR && MT_ERROR.charAt(0) !== '$') showMsg(MT_ERROR, true);
+if (MT_ERROR && MT_ERROR.charAt(0) !== '$') {
+    var _prevPurchase = loadPurchase();
+    if (_prevPurchase) {
+        purchasedCode = _prevPurchase.code;
+        document.getElementById('username-input').value = _prevPurchase.code;
+        document.getElementById('voucher-code-display').textContent = _prevPurchase.code;
+        document.getElementById('voucher-result').classList.add('show');
+        showMsg('Your payment was successful, but we could not complete the connection. Tap "Connect with this code" to retry.', true);
+    } else {
+        showMsg(MT_ERROR, true);
+    }
+}
 
 function renderSettings(settings) {
     var phone = settings.supportPhone || '';
@@ -525,6 +536,27 @@ function saveCheckout(c) {
 function clearCheckout() {
     try { localStorage.removeItem(CHECKOUT_KEY); } catch (e) {}
 }
+
+/* ---------- purchased-connection persistence ----------
+   The voucher survives the login post — if MikroTik re-renders this page with
+   $(error) after a failed auto-login, we offer "Retry Connection" instead of
+   losing the purchase. Cleared after 7 days; never triggers a new payment. */
+var PURCHASE_KEY = 'wb_purchase_' + TOKEN;
+function savePurchase(code) {
+    try { localStorage.setItem(PURCHASE_KEY, JSON.stringify({ code: code, t: Date.now() })); } catch (e) {}
+}
+function loadPurchase() {
+    try {
+        var raw = localStorage.getItem(PURCHASE_KEY);
+        if (!raw) return null;
+        var p = JSON.parse(raw);
+        if (p && p.code && (Date.now() - p.t) < 7 * 86400000) return p;
+    } catch (e) {}
+    return null;
+}
+function clearPurchase() {
+    try { localStorage.removeItem(PURCHASE_KEY); } catch (e) {}
+}
 function newCheckoutRef() {
     return 'chk-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
 }
@@ -650,6 +682,7 @@ function finishSuccess(reference, codeFromPoll) {
 function applySuccess(code) {
     cancelPaymentPolling();
     clearCheckout();
+    if (code) savePurchase(code);
     purchasedCode = code;
     if (code) {
         document.getElementById('voucher-code-display').textContent = code;

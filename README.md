@@ -1,4 +1,8 @@
-# WiFi Billing SaaS
+# AirPairy
+
+_Connecting WiFi. Simplifying Business._ — a product by Thewton.
+
+Multi-tenant WiFi Billing SaaS
 
 Multi-tenant WiFi billing for MikroTik RouterOS v7. The platform combines a Spring Boot API, a Next.js tenant/admin dashboard, PostgreSQL-backed FreeRADIUS data, WireGuard router management, and a dynamically configured captive portal.
 
