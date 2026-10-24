@@ -250,7 +250,7 @@ public class RouterScriptGenerator {
         // Runs entirely in flash writes; harmless if the server is briefly unreachable.
         s.append("/system/script add name=wb-portal-sync policy=").append(POLICY)
                 .append(" comment=").append(tag).append(" source={\n").append(sync).append("}\n");
-        s.append("/system/scheduler add name=wb-portal-sync interval=5m on-event=")
+        s.append("/system/scheduler add name=wb-portal-sync interval=1m on-event=")
                 .append(q("/system script run wb-portal-sync"))
                 .append(" policy=").append(POLICY).append(" comment=").append(tag).append("\n");
         s.append("\n");
