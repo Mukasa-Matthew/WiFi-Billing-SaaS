@@ -17,6 +17,7 @@ public class EmailOtp {
 
     public static final String PURPOSE_WITHDRAWAL = "WITHDRAWAL";
     public static final String PURPOSE_PASSWORD_RESET = "PASSWORD_RESET";
+    public static final String PURPOSE_EMAIL_CHANGE = "EMAIL_CHANGE";
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
