@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.net.URI;
+import java.time.OffsetDateTime;
 import java.security.SecureRandom;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -122,6 +123,16 @@ public class ProvisioningService {
         log.info("Router {} registered WireGuard key (hub peer configured: {})", router.getId(), applied);
         log.info("[WG Setup] Run on cloudserv: sudo wg set wg0 peer {} allowed-ips {}/32", publicKey, wgIp);
         return new RegisterKeyResponse(STATUS_REGISTERED, wgIp, applied);
+    }
+
+    /** Router signals the import ran end-to-end — mark it provisioned. */
+    @Transactional
+    public void markComplete(String token) {
+        Router router = findRouter(token);
+        router.setStatus(STATUS_REGISTERED);
+        router.setLastSeen(OffsetDateTime.now());
+        routerRepository.save(router);
+        log.info("Router {} reported provisioning complete", router.getId());
     }
 
     private Router findRouter(String token) {

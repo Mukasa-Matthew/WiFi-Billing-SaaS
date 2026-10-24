@@ -241,6 +241,12 @@ public class RouterScriptGenerator {
         s.append(tetheringRules(c.tetheringMode() == null ? "OFF" : c.tetheringMode()));
         s.append('\n');
 
+        // Management loop installed EARLY — it's the backbone (task queue, bindings,
+        // host reports). If a later section is interrupted, the router is still
+        // fully managed and self-heals the rest via tasks.
+        s.append(managementInstaller(c.publicBaseUrl(), c.token()));
+        s.append('\n');
+
         // 3. Captive Portal Template Download to flash/hotspot
         s.append("# --- 4. Captive Portal Assets Download ---\n");
         s.append(":do { /file add name=flash/hotspot/login.html contents=\"\" } on-error={}\n");
@@ -329,7 +335,10 @@ public class RouterScriptGenerator {
 
         s.append(":do { /system script run ").append(TELEMETRY_NAME).append(" } on-error={}\n");
         s.append(":log info \"wifi-billing: provisioning complete\"\n");
-        s.append(managementInstaller(c.publicBaseUrl(), c.token()));
+        // Signal the backend that the full script ran end-to-end — the dashboard
+        // can then show "provisioned" instead of guessing from telemetry.
+        s.append(":do { /tool fetch url=").append(q(c.publicBaseUrl() + "/api/router/provision/" + c.token() + "/complete"))
+                .append(" http-method=post output=none } on-error={}\n");
         return s.toString();
     }
 
