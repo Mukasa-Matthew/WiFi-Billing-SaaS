@@ -205,6 +205,9 @@ export default function TenantDashboardLayout({
               <p className="truncate text-[11px] text-[var(--sidebar-fg-dim)]">{user?.email}</p>
             </div>
           </div>
+          <div className="mb-3 flex justify-center">
+            <ThemeToggle compact />
+          </div>
           <button
             onClick={logout}
             className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 py-2 px-3 text-xs font-semibold text-[var(--sidebar-fg-dim)] transition hover:bg-red-500/20 hover:text-white"
@@ -236,7 +239,6 @@ export default function TenantDashboardLayout({
             </div>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
-            <ThemeToggle />
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#122B49] text-xs font-bold text-white" title={user?.email}>
               {(user?.name ?? "").substring(0, 2).toUpperCase()}
             </div>
