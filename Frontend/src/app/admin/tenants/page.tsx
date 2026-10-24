@@ -131,7 +131,7 @@ export default function AdminTenantsPage() {
         </button>
       </div>
 
-      {/* Filter / MagnifyingGlass Bar */}
+      {/* Filter / Search Bar */}
       <div className="p-4 rounded-xl bg-white border border-slate-200 flex items-center justify-between gap-4">
         <div className="relative flex-1 max-w-md">
           <MagnifyingGlass className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
@@ -139,7 +139,7 @@ export default function AdminTenantsPage() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="MagnifyingGlass operator name, email, or phone..."
+            placeholder="Search operator name, email, or phone..."
             className="w-full pl-10 pr-4 py-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-900 placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition"
           />
         </div>

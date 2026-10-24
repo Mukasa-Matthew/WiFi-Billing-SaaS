@@ -90,7 +90,7 @@ export default function TenantDashboardLayout({
     { name: "MikroTik routers", href: "/dashboard/routers", icon: RouterIcon, group: "Devices" },
     { name: "Sessions", href: "/dashboard/sessions", icon: Radio, group: "Accounting" },
     { name: "Accounting logs", href: "/dashboard/logs", icon: FileText, group: "Accounting" },
-    { name: "GearSix", href: "/dashboard/settings", icon: GearSix, group: "GearSix" },
+    { name: "Settings", href: "/dashboard/settings", icon: GearSix, group: "Settings" },
   ];
 
   const activeItem = [...navItems, { name: "Add router", href: "/dashboard/routers/new", icon: WifiHigh, group: "Devices" }].sort((a, b) => b.href.length - a.href.length).find(

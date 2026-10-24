@@ -139,7 +139,7 @@ export function Table<T>({ rows, columns, loading = false, emptyTitle = "No reco
       <div className="flex justify-end border-b border-slate-200 px-4 py-3">
         <div className="relative">
           <MagnifyingGlass className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
-          <input aria-label="MagnifyingGlass records" placeholder="MagnifyingGlass…" value={search}
+          <input aria-label="Search records" placeholder="Search…" value={search}
             onChange={e => { setSearch(e.target.value); setPage(1); }}
             className="w-full sm:w-56 rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-xs text-slate-900 outline-none focus:border-blue-600" />
         </div>

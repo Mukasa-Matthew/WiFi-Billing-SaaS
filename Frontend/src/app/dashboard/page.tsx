@@ -20,6 +20,8 @@ interface DashboardStats {
   usedVouchers: number; expiredVouchers: number; weeklySales: WeeklySale[]; routerRevenue: RouterRevenue[]; topConsumers: Consumer[];
   range: string; revenueSeries: SeriesPoint[]; dailyActiveUsers: SeriesPoint[]; registrations: SeriesPoint[];
   topDataUsers: TopDataUser[]; packagePerformance: PackagePerf[];
+  avgCpuLoad: number; avgMemoryUsage: number; dataMonthDownBytes: number; dataMonthUpBytes: number;
+  totalCustomers: number; newCustomersThisWeek: number;
 }
 const RANGES = [
   { key: "today", label: "Today" }, { key: "7d", label: "7 days" },
@@ -74,10 +76,10 @@ export default function TenantDashboardOverview() {
     { label: "Last 7 days revenue", value: money(weeklyRevenue), detail: `${number(transactions)} successful payments`, icon: Wallet, color: "text-amber-700" },
     { label: "Monthly revenue", value: money(stats?.revenueMonth || 0), detail: "Successful payments this month", icon: Wallet, color: "text-blue-700" },
     { label: "Active users", value: number(stats?.activeUsers || 0), detail: "Current hotspot sessions", icon: Users, color: "text-blue-700" },
-    { label: "Data in active sessions", value: bytes(stats?.totalDataConsumedBytes || 0), detail: "Combined upload and download", icon: ChartLine, color: "text-emerald-700" },
+    { label: "Data Usage (This Month)", value: bytes((stats?.dataMonthDownBytes || 0) + (stats?.dataMonthUpBytes || 0)), detail: `↓ ${bytes(stats?.dataMonthDownBytes || 0)} · ↑ ${bytes(stats?.dataMonthUpBytes || 0)}`, icon: ChartLine, color: "text-emerald-700" },
+    { label: "Total Customers", value: number(stats?.totalCustomers || 0), detail: `+${number(stats?.newCustomersThisWeek || 0)} this week`, icon: Users, color: "text-emerald-700" },
     { label: "Remaining vouchers", value: number(stats?.totalVouchers || 0), detail: "Unused or still active", icon: Ticket, color: "text-blue-700" },
-    { label: "Active vouchers", value: number(stats?.activeVouchers || 0), detail: "Vouchers marked active", icon: Ticket, color: "text-emerald-700" },
-    { label: "CellTower health", value: `${stats?.totalRouters || 0} router${stats?.totalRouters === 1 ? "" : "s"}`, detail: `${stats?.onlineRouters || 0} online · ${Math.max(0, (stats?.totalRouters || 0) - (stats?.onlineRouters || 0))} offline / pending`, icon: CellTower, color: "text-amber-700" },
+    { label: "Router Health", value: `${stats?.totalRouters || 0} router${stats?.totalRouters === 1 ? "" : "s"}`, detail: `CPU ${stats?.avgCpuLoad ?? 0}% · RAM ${stats?.avgMemoryUsage ?? 0}%`, icon: CellTower, color: "text-amber-700" },
   ];
 
   if (loading && !stats) return <DashboardLoading />;
@@ -206,7 +208,7 @@ export default function TenantDashboardOverview() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
-                <th className="px-5 py-3 font-medium">CellTower</th>
+                <th className="px-5 py-3 font-medium">Router</th>
                 <th className="px-5 py-3 font-medium">Status</th>
                 <th className="px-5 py-3 text-right font-medium">Users</th>
                 <th className="px-5 py-3 text-right font-medium">Today</th>

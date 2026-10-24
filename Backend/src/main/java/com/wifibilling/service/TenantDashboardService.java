@@ -2,6 +2,7 @@ package com.wifibilling.service;
 
 import com.wifibilling.dto.ActiveSessionDto;
 import com.wifibilling.dto.TenantDashboardStatsDto;
+import com.wifibilling.model.Customer;
 import com.wifibilling.model.Router;
 import com.wifibilling.model.Transaction;
 import com.wifibilling.model.Voucher;
@@ -29,6 +30,7 @@ public class TenantDashboardService {
     private final SessionService sessionService;
     private final com.wifibilling.repository.RadAcctRepository radAcctRepository;
     private final com.wifibilling.repository.PackagePlanRepository planRepository;
+    private final com.wifibilling.repository.CustomerRepository customerRepository;
 
     @Transactional(readOnly = true)
     public TenantDashboardStatsDto getStats(Long tenantId, String role) {
@@ -249,8 +251,31 @@ public class TenantDashboardService {
             packagePerformance.add(m);
         }
 
+        // Card extras: router CPU/RAM averages, monthly data split, customer totals
+        List<Router> live = routers.stream()
+                .filter(rt -> "online".equalsIgnoreCase(rt.getStatus()) || (rt.getLastSeen() != null && rt.getLastSeen().isAfter(activeCutoff)))
+                .toList();
+        int avgCpu = live.isEmpty() ? 0 : (int) Math.round(live.stream().mapToInt(rt -> rt.getCpuLoad() != null ? rt.getCpuLoad() : 0).average().orElse(0));
+        int avgMem = live.isEmpty() ? 0 : (int) Math.round(live.stream().mapToInt(rt -> rt.getMemoryUsage() != null ? rt.getMemoryUsage() : 0).average().orElse(0));
+        long downMonth = 0, upMonth = 0;
+        for (var a : accts) {
+            OffsetDateTime ts = a.getAcctStartTime() != null ? a.getAcctStartTime() : a.getAcctStopTime();
+            if (ts != null && !ts.isBefore(startOfMonth)) {
+                downMonth += a.getAcctOutputOctets() != null ? a.getAcctOutputOctets() : 0L;
+                upMonth += a.getAcctInputOctets() != null ? a.getAcctInputOctets() : 0L;
+            }
+        }
+        List<Customer> customers = customerRepository.findAllByTenantIdOrderByCreatedAtDesc(tenantId);
+        long newThisWeek = customers.stream().filter(c -> c.getCreatedAt() != null && !c.getCreatedAt().isBefore(thisMonday)).count();
+
         return TenantDashboardStatsDto.builder()
                 .range(r)
+                .avgCpuLoad(avgCpu)
+                .avgMemoryUsage(avgMem)
+                .dataMonthDownBytes(downMonth)
+                .dataMonthUpBytes(upMonth)
+                .totalCustomers(customers.size())
+                .newCustomersThisWeek(newThisWeek)
                 .revenueSeries(revenueSeries)
                 .dailyActiveUsers(dailyUsers)
                 .registrations(registrations)

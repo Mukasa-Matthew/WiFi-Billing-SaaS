@@ -35,10 +35,10 @@ export default function Page(){
    {label:"Name",render:b=><span className="font-medium">{b.name}</span>},
    {label:"IP",render:b=>b.address?<span className="font-mono text-xs">{b.address}</span>:"MAC only"},
    {label:"MAC",render:b=><span className="font-mono text-xs">{b.mac}</span>},
-   {label:"CellTower",render:b=>b.router},
+   {label:"Router",render:b=>b.router},
    {label:"Package",render:b=>b.packageName||"Free / internal"},
    {label:"Status",render:b=><Badge tone={b.status==="ACTIVE"?"green":"red"}>{b.status}</Badge>},
-   {label:"CellTower sync",render:b=><Badge tone={b.synced?"green":"amber"}>{b.synced?"Acknowledged":"Pending"}</Badge>},
+   {label:"Router sync",render:b=><Badge tone={b.synced?"green":"amber"}>{b.synced?"Acknowledged":"Pending"}</Badge>},
    {label:"Expiry",render:b=>b.expiresAt?date(b.expiresAt):"Never"},
    {label:"",render:b=><button disabled={b.status==="REMOVED"} onClick={()=>remove(b)} className="text-xs font-medium text-red-600 hover:underline disabled:opacity-30">Remove</button>}
   ]}/>

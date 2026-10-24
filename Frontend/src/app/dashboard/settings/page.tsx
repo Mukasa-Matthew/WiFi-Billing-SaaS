@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { Warning, CheckCircle, CircleNotch, FloppyDisk } from "@phosphor-icons/react";
 
-interface GearSix {
+interface TenantSettings {
   name: string;
   email: string;
   supportPhone: string | null;
@@ -33,7 +33,7 @@ const hint = "mt-2 text-xs text-slate-500";
 const card = "rounded-xl border border-slate-200 bg-white p-6";
 
 export default function TenantSettingsPage() {
-  const [form, setForm] = useState<GearSix | null>(null);
+  const [form, setForm] = useState<TenantSettings | null>(null);
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [previewKey, setPreviewKey] = useState(0);
@@ -42,7 +42,7 @@ export default function TenantSettingsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    api.get<GearSix>("/api/settings")
+    api.get<TenantSettings>("/api/settings")
       .then((r) => setForm(r.data))
       .catch(() => setError("Could not load settings"));
   }, []);
@@ -69,7 +69,7 @@ export default function TenantSettingsPage() {
       .catch(() => { setPreviewHtml(null); setPreviewError("Could not load the portal preview."); });
   }, [form?.portalTemplate, previewKey]);
 
-  const set = <K extends keyof GearSix>(key: K, value: GearSix[K]) =>
+  const set = <K extends keyof TenantSettings>(key: K, value: TenantSettings[K]) =>
     setForm((f) => (f ? { ...f, [key]: value } : f));
 
   const save = async (e: React.FormEvent) => {
@@ -79,7 +79,7 @@ export default function TenantSettingsPage() {
     setError(null);
     setSaved(false);
     try {
-      const r = await api.put<GearSix>("/api/settings", form);
+      const r = await api.put<TenantSettings>("/api/settings", form);
       setForm(r.data);
       setPreviewKey((k) => k + 1);
       setSaved(true);
@@ -102,7 +102,7 @@ export default function TenantSettingsPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-slate-900">GearSix</h1>
+        <h1 className="text-xl font-bold tracking-tight text-slate-900">Settings</h1>
         <p className="mt-1 text-sm text-slate-500">
           Branding, portal behavior, voucher defaults, and notifications for your hotspot business.
         </p>

@@ -7,7 +7,7 @@ import { useToast } from "@/components/ui/Toast";
 import { useResource, Table, Badge, Notice, FilterTabs, button, date, message, panel } from "@/components/BillingUI";
 import { DotsThreeVertical, Eye, ArrowClockwise, FileArrowDown, Clock, Terminal, Trash } from "@phosphor-icons/react";
 
-interface CellTower { id: number; name: string; token: string; wgIp: string; wgPublicKey: string | null; cpuLoad: number; memoryUsage: number; status: string; lastSeen: string | null; uptime: string | null; hotspotReady: boolean | null; radiusReady: boolean | null; portalReady: boolean | null }
+interface RouterRec { id: number; name: string; token: string; wgIp: string; wgPublicKey: string | null; cpuLoad: number; memoryUsage: number; status: string; lastSeen: string | null; uptime: string | null; hotspotReady: boolean | null; radiusReady: boolean | null; portalReady: boolean | null }
 interface Task { id: number; action: string; status: string; createdAt: string }
 
 function Kebab({ children }: { children: React.ReactNode }) {
@@ -35,7 +35,7 @@ function Kebab({ children }: { children: React.ReactNode }) {
   };
   return (
     <div ref={ref}>
-      <button ref={btnRef} aria-label="CellTower actions" aria-expanded={open} onClick={toggle}
+      <button ref={btnRef} aria-label="Router actions" aria-expanded={open} onClick={toggle}
         className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900">
         <DotsThreeVertical size={16} />
       </button>
@@ -59,19 +59,19 @@ function MenuItem({ icon, label, danger, onClick }: { icon: React.ReactNode; lab
 }
 
 export default function Page() {
-  const { data, loading, error, load } = useResource<CellTower>("/api/routers", true);
+  const { data, loading, error, load } = useResource<RouterRec>("/api/routers", true);
   const [tab, setTab] = useState("ALL");
-  const [selected, setSelected] = useState<CellTower | null>(null);
+  const [selected, setSelected] = useState<RouterRec | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [note, setNote] = useState("");
   const [command, setCommand] = useState("");
 
-  const open = async (r: CellTower) => {
+  const open = async (r: RouterRec) => {
     setSelected(r); setCommand("");
     try { setTasks((await api.get<Task[]>(`/api/routers/${r.id}/tasks`)).data); }
     catch (e) { setNote(message(e)); }
   };
-  const action = async (r: CellTower, action: string) => {
+  const action = async (r: RouterRec, action: string) => {
     try {
       await api.post(`/api/routers/${r.id}/tasks`, { action });
       setNote("Action queued. Applied status requires a successful router acknowledgement.");
@@ -80,7 +80,7 @@ export default function Page() {
   };
   const toast = useToast();
   const { confirm, dialog } = useConfirmDialog();
-  const remove = (r: CellTower) => confirm({
+  const remove = (r: RouterRec) => confirm({
     title: "Delete router",
     body: `Delete ${r.name}? Payment history may prevent deletion.`,
     confirmLabel: "Delete",
@@ -89,7 +89,7 @@ export default function Page() {
       catch (e) { toast("error", message(e)); }
     },
   });
-  const showCommand = (r: CellTower, install = false) => {
+  const showCommand = (r: RouterRec, install = false) => {
     const url = `${window.location.origin}/api/router/provision/${r.token}${install ? "/install-management.rsc" : ""}`;
     setCommand(`:do { /tool fetch url="${url}" dst-path=wb-setup.rsc; /import wb-setup.rsc } on-error={ :put "Setup failed. Check router logs." }`);
     if (!selected || selected.id !== r.id) void open(r);
@@ -159,7 +159,7 @@ export default function Page() {
           {command && (
             <div>
               <p className="mb-2 text-xs font-medium text-amber-700">Run this in the router terminal. Full reprovisioning moves customer interfaces; management-agent installation only enables sync and UTC/NTP time.</p>
-              <textarea aria-label="CellTower setup command" readOnly value={command} onFocus={e => e.target.select()}
+              <textarea aria-label="Router setup command" readOnly value={command} onFocus={e => e.target.select()}
                 className="h-24 w-full rounded-lg border border-slate-300 bg-[#0B1F36] p-3 font-mono text-xs text-slate-200" />
               <p className="mt-1 text-xs text-slate-500">Select the command and copy it. Keep this token private.</p>
             </div>

@@ -6,14 +6,14 @@ import api from "@/lib/api";
 import {useResource,Notice,field,button,buttonGhost,message,PageContainer,PageHeader,label,hint} from "@/components/BillingUI";
 import { ArrowLeft } from "@phosphor-icons/react";
 
-interface CellTower{id:number;name:string}
+interface RouterRec{id:number;name:string}
 interface Plan{id:number;name:string;price:number;sessionTimeout:number}
 interface Host{address?:string;"mac-address"?:string;"host-name"?:string}
 const req=<span className="text-red-500"> *</span>;
 
 export default function Page(){
  const nav=useRouter();
- const routers=useResource<CellTower>("/api/routers");
+ const routers=useResource<RouterRec>("/api/routers");
  const plans=useResource<Plan>("/api/packages");
  const [router,setRouter]=useState("");const [name,setName]=useState("");
  const [plan,setPlan]=useState("");const [mac,setMac]=useState("");const [address,setAddress]=useState("");const [expires,setExpires]=useState("");
