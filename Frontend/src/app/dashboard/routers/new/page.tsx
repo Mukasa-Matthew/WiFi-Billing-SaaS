@@ -85,7 +85,7 @@ export default function AddRouterPage() {
         name: identity.trim(),
         wanInterface: wanInterface.trim() || "ether1",
         hotspotInterfaces: [],
-        wifiSsid: hasWireless ? `${identity.trim().replace(/[^\x20-\x7E]/g, "").slice(0, 27)} WiFi` : "WiFi Hotspot",
+        wifiSsid: hasWireless ? identity.trim().replace(/[^\x20-\x7E]/g, "").slice(0, 32) : "WiFi Hotspot",
       });
       setRouter(response.data);
       setAttempt(0);
