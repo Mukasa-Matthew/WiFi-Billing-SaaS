@@ -22,6 +22,11 @@ public class PackagePlan {
     @JoinColumn(name = "tenant_id", nullable = false)
     private Tenant tenant;
 
+    /** Optional: restricts this package to one router. Null = available on all the tenant's routers. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "router_id")
+    private Router router;
+
     @Column(nullable = false, length = 80)
     private String name;
 
