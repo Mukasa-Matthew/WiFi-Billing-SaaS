@@ -266,10 +266,10 @@ export default function AdminSubscriptionsPage() {
                 <div>
                   <label className={label}>Where did the money settle?</label>
                   <select className={field} value={fChannel} onChange={(e) => setFChannel(e.target.value)}>
-                    <option value="EXTERNAL">Outside MarzPay (cash, bank, other wallet)</option>
-                    <option value="MARZPAY">Into the platform MarzPay account</option>
+                    <option value="EXTERNAL">Outside the payment gateway (cash, bank, other wallet)</option>
+                    <option value="MARZPAY">Into the platform payment account</option>
                   </select>
-                  <p className={hint}>Only MarzPay-settled funds become withdrawable earnings — choose honestly, it affects reconciliation.</p>
+                  <p className={hint}>Only gateway-settled funds become withdrawable earnings — choose honestly, it affects reconciliation.</p>
                 </div>
                 <div>
                   <label className={label}>External reference <span className="font-normal text-[var(--fg-faint)]">(optional)</span></label>

@@ -104,7 +104,7 @@ export default function AdminFinancePage() {
   };
 
   const cards = [
-    { label: "Provider balance (MarzPay)", value: overview?.providerBalance, note: overview?.platformConfigured ? "Actual platform account" : "Not configured" },
+    { label: "Provider balance", value: overview?.providerBalance, note: overview?.platformConfigured ? "Actual platform account" : "Not configured" },
     { label: "Owed to tenants", value: overview?.tenantLiabilities, note: `${overview?.walletCount ?? 0} wallets` },
     { label: "Reserved (in-flight payouts)", value: overview?.reservedFunds, note: `${overview?.pendingWithdrawals ?? 0} open requests` },
     { label: "Total collected (net)", value: overview?.totalCollected, note: `Fees: ${money(overview?.totalFees)}` },
@@ -117,7 +117,7 @@ export default function AdminFinancePage() {
         <h1 className="text-xl font-bold tracking-tight text-[var(--fg)]">Finance</h1>
         <p className="mt-1 text-sm text-[var(--fg-muted)]">
           Platform-managed collections, tenant wallet liabilities, and withdrawal review.
-          Funds in tenants' own MarzPay accounts are not shown here — only money the platform holds.
+          Funds in tenants' own provider accounts are not shown here — only money the platform holds.
         </p>
       </div>
 
@@ -154,7 +154,7 @@ export default function AdminFinancePage() {
                 <p className="mt-0.5 text-xs text-[var(--fg-muted)]">SaaS subscription revenue — owned by the platform.</p>
               </div>
               <dl className="space-y-2.5 px-5 py-4 text-sm">
-                <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Settled earnings (MarzPay-backed)</dt><dd className="font-bold">{money(plat.settledEarnings)}</dd></div>
+                <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Settled earnings (provider-backed)</dt><dd className="font-bold">{money(plat.settledEarnings)}</dd></div>
                 <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">External earnings (cash/bank)</dt><dd className="font-semibold">{money(plat.externalEarnings)}</dd></div>
                 <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Reserved (in-flight payouts)</dt><dd>{money(plat.reservedEarnings)}</dd></div>
                 <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Total earned</dt><dd>{money(plat.totalEarned)}</dd></div>
@@ -166,7 +166,7 @@ export default function AdminFinancePage() {
             <div className={panel}>
               <div className="flex items-center justify-between border-b border-[var(--border-soft)] px-5 py-4">
                 <div>
-                  <h2 className="text-sm font-bold text-[var(--fg)]">MarzPay account</h2>
+                  <h2 className="text-sm font-bold text-[var(--fg)]">Provider account</h2>
                   <p className="mt-0.5 text-xs text-[var(--fg-muted)]">Actual provider balance.</p>
                 </div>
                 <button className={buttonGhost} onClick={reconcile} disabled={reconBusy}>
@@ -312,7 +312,7 @@ export default function AdminFinancePage() {
               <label className={label}>Recipient mobile money number</label>
               <input className={field} type="tel" required value={wdPhone} onChange={(e) => setWdPhone(e.target.value)}
                 placeholder="07XX XXX XXX" />
-              <p className={hint}>MTN or Airtel — paid out via MarzPay send-money.</p>
+              <p className={hint}>MTN or Airtel — paid out via the payment provider.</p>
             </div>
             <div className="mt-4">
               <label className={label}>Confirm your admin password</label>
