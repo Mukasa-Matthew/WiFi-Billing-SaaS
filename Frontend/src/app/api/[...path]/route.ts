@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { mockRoute } from "@/lib/devMock";
 
 function getBackendBaseUrl(): string {
   if (process.env.BACKEND_INTERNAL_URL) {
@@ -13,21 +12,6 @@ async function handler(
   context: { params: Promise<{ path: string[] }> }
 ) {
   const { path } = await context.params;
-
-  // Dev-only: serve fixtures instead of proxying, so the UI can be built
-  // without the Spring Boot backend, FreeRADIUS and Postgres running.
-  if (process.env.MOCK_API === "1") {
-    const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
-    const mocked = mockRoute(req.method, path, req.nextUrl.searchParams, body);
-    if (mocked !== undefined) {
-      if (typeof mocked === "string") {
-        return new NextResponse(mocked, { headers: { "content-type": "text/html; charset=utf-8" } });
-      }
-      return NextResponse.json(mocked);
-    }
-    return NextResponse.json({ message: `No mock for ${req.method} /api/${path.join("/")}` }, { status: 404 });
-  }
-
   const baseUrl = getBackendBaseUrl();
   const url = new URL(`/api/${path.join("/")}`, baseUrl);
   url.search = req.nextUrl.search;
