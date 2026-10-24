@@ -24,6 +24,26 @@ public class RouterManagementService {
  }
  public boolean bindingsSynced(Router r){return hash(r).equals(r.getBindingsHash());}
  public Router resolve(String token){if(!RouterTokens.isValid(token))throw new ResponseStatusException(HttpStatus.NOT_FOUND);return routers.findByToken(token).orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND));}
+
+ // Push model: backend calls the router's REST API over the WireGuard tunnel and
+ // runs wb-pkg-sync immediately — package changes reach the portal in seconds.
+ // Falls back silently to the 1-minute poll if the tunnel is down.
+ private static final java.net.http.HttpClient HTTP = java.net.http.HttpClient.newBuilder()
+     .connectTimeout(java.time.Duration.ofSeconds(3)).build();
+ public void triggerPortalSync(Router r) {
+  try {
+   String ip = com.wifibilling.util.Ipv4Subnet.stripPrefix(r.getWgIp());
+   if (ip == null || ip.isBlank()) return;
+   String creds = Base64.getEncoder().encodeToString(("wb-api:" + r.getRadiusSecret()).getBytes(StandardCharsets.UTF_8));
+   var req = java.net.http.HttpRequest.newBuilder(java.net.URI.create("http://" + ip + "/rest/system/script/run"))
+       .timeout(java.time.Duration.ofSeconds(5))
+       .header("Authorization", "Basic " + creds)
+       .header("Content-Type", "application/json")
+       .POST(java.net.http.HttpRequest.BodyPublishers.ofString("{\"numbers\":\"wb-pkg-sync\"}"))
+       .build();
+   HTTP.send(req, java.net.http.HttpResponse.BodyHandlers.discarding());
+  } catch (Exception ignored) {}
+ }
  private String base(Router r){return props.getPublicBaseUrl()+"/api/router/provision/"+r.getToken();}
  @Transactional public String installer(String token){var r=resolve(token);r.setBindingsHash(null);routers.save(r);return RouterScriptGenerator.managementInstaller(props.getPublicBaseUrl(),token);}
  @Transactional public void acknowledgeBindings(String token,String hash){var r=resolve(token);if(hash(r).equals(hash)){r.setBindingsHash(hash);r.setBindingsSyncedAt(OffsetDateTime.now());routers.save(r);}}
