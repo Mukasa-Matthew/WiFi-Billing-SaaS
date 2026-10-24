@@ -49,6 +49,11 @@ public class TelemetryService {
         }
         router.setLastSeen(OffsetDateTime.now());
         boolean reportsReadiness = req.hotspotReady() != null || req.radiusReady() != null || req.portalReady() != null;
+        if (reportsReadiness) {
+            router.setHotspotReady(req.hotspotReady());
+            router.setRadiusReady(req.radiusReady());
+            router.setPortalReady(req.portalReady());
+        }
         boolean ready = Boolean.TRUE.equals(req.hotspotReady())
                 && Boolean.TRUE.equals(req.radiusReady())
                 && Boolean.TRUE.equals(req.portalReady());

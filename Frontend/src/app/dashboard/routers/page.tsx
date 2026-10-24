@@ -7,7 +7,7 @@ import { useToast } from "@/components/ui/Toast";
 import { useResource, Table, Badge, Notice, FilterTabs, button, date, message, panel } from "@/components/BillingUI";
 import { MoreVertical, Eye, RefreshCw, FileDown, Clock, Terminal, Trash2 } from "lucide-react";
 
-interface Router { id: number; name: string; token: string; wgIp: string; wgPublicKey: string | null; cpuLoad: number; memoryUsage: number; status: string; lastSeen: string | null; uptime: string | null }
+interface Router { id: number; name: string; token: string; wgIp: string; wgPublicKey: string | null; cpuLoad: number; memoryUsage: number; status: string; lastSeen: string | null; uptime: string | null; hotspotReady: boolean | null; radiusReady: boolean | null; portalReady: boolean | null }
 interface Task { id: number; action: string; status: string; createdAt: string }
 
 function Kebab({ children }: { children: React.ReactNode }) {
@@ -122,7 +122,16 @@ export default function Page() {
           { label: "Memory", render: r => r.lastSeen ? `${r.memoryUsage || 0}%` : "—" },
           { label: "Status", render: r => <Badge tone={r.status === "online" ? "green" : "amber"}>{r.status}</Badge> },
           { label: "Connection", render: r => r.wgIp ? <Badge tone="green">WireGuard</Badge> : <Badge tone="slate">Pending</Badge> },
-          { label: "Remote access", render: r => r.wgIp ? <span className="font-mono text-xs text-slate-600">{r.wgIp}:8291</span> : "—" },
+          { label: "Health", render: r => {
+            const flags = [r.hotspotReady, r.radiusReady, r.portalReady];
+            if (flags.every(f => f === true)) return <Badge tone="green">Healthy</Badge>;
+            if (flags.some(f => f === false)) return <Badge tone="red">Degraded</Badge>;
+            return <Badge tone={r.lastSeen ? "slate" : "amber"}>{r.lastSeen ? "Reporting" : "No data"}</Badge>;
+          }},
+          { label: "Remote access", render: r => r.wgIp ? <Badge tone="green">Enabled</Badge> : <Badge tone="slate">Off</Badge> },
+          { label: "WinBox address", render: r => r.wgIp
+            ? <button title="Copy WinBox address" onClick={() => { void navigator.clipboard?.writeText(`${r.wgIp}`); toast("success", "WinBox address copied — connect via the WireGuard tunnel."); }} className="font-mono text-xs text-blue-700 hover:underline">{r.wgIp}</button>
+            : "—" },
           { label: "Last telemetry", render: r => <span className="text-slate-500">{date(r.lastSeen)}</span> },
           {
             label: "", render: r => (
