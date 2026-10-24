@@ -46,8 +46,8 @@ export default function SubscriptionPage() {
     return (
       <div className={panel + " p-8 text-center"}>
         <CreditCard size={32} className="mx-auto text-slate-300" />
-        <h1 className="mt-3 text-lg font-bold text-slate-900">No subscription yet</h1>
-        <p className="mt-1 text-sm text-slate-500">Your subscription has not been activated. Please contact support.</p>
+        <h1 className="mt-3 text-lg font-bold text-[var(--fg)]">No subscription yet</h1>
+        <p className="mt-1 text-sm text-[var(--fg-muted)]">Your subscription has not been activated. Please contact support.</p>
       </div>
     );
   }
@@ -57,8 +57,8 @@ export default function SubscriptionPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-slate-900">Subscription &amp; Billing</h1>
-        <p className="mt-1 text-sm text-slate-500">Your monthly SaaS subscription to this platform.</p>
+        <h1 className="text-xl font-bold tracking-tight text-[var(--fg)]">Subscription &amp; Billing</h1>
+        <p className="mt-1 text-sm text-[var(--fg-muted)]">Your monthly SaaS subscription to this platform.</p>
       </div>
 
       {sub.reminder && (
@@ -71,40 +71,40 @@ export default function SubscriptionPage() {
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <div className={`${panel} p-5`}>
-          <div className="text-xs font-semibold text-slate-500">Monthly subscription</div>
-          <div className="mt-2 text-2xl font-bold text-slate-900">{money(sub.monthlyFee)}</div>
-          <p className="mt-1 text-xs text-slate-400">per month</p>
+          <div className="text-xs font-semibold text-[var(--fg-muted)]">Monthly subscription</div>
+          <div className="mt-2 text-2xl font-bold text-[var(--fg)]">{money(sub.monthlyFee)}</div>
+          <p className="mt-1 text-xs text-[var(--fg-faint)]">per month</p>
         </div>
         <div className={`${panel} p-5`}>
-          <div className="text-xs font-semibold text-slate-500">Status</div>
+          <div className="text-xs font-semibold text-[var(--fg-muted)]">Status</div>
           <div className="mt-2"><Badge tone={TONE[sub.status!] || "slate"}>{STATUS_NAME[sub.status!] || sub.status}</Badge></div>
-          <p className="mt-2 text-xs text-slate-400">Managed by your provider</p>
+          <p className="mt-2 text-xs text-[var(--fg-faint)]">Managed by your provider</p>
         </div>
         <div className={`${panel} p-5`}>
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500"><CalendarCheck size={14} /> Next renewal</div>
-          <div className="mt-2 text-2xl font-bold text-slate-900">{d(sub.nextRenewalDate)}</div>
-          <p className="mt-1 text-xs text-slate-400">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--fg-muted)]"><CalendarCheck size={14} /> Next renewal</div>
+          <div className="mt-2 text-2xl font-bold text-[var(--fg)]">{d(sub.nextRenewalDate)}</div>
+          <p className="mt-1 text-xs text-[var(--fg-faint)]">
             {sub.daysToRenewal !== undefined && sub.daysToRenewal >= 0 ? `in ${sub.daysToRenewal} day${sub.daysToRenewal === 1 ? "" : "s"}` : "period ended"}
           </p>
         </div>
         <div className={`${panel} p-5`}>
-          <div className="text-xs font-semibold text-slate-500">Amount due</div>
-          <div className={`mt-2 text-2xl font-bold ${sub.outstanding! > 0 ? "text-red-600" : "text-slate-900"}`}>
+          <div className="text-xs font-semibold text-[var(--fg-muted)]">Amount due</div>
+          <div className={`mt-2 text-2xl font-bold ${sub.outstanding! > 0 ? "text-red-600" : "text-[var(--fg)]"}`}>
             {money(sub.outstanding)}
           </div>
-          <p className="mt-1 text-xs text-slate-400">{sub.outstanding! > 0 ? "Payment required" : "Nothing owed"}</p>
+          <p className="mt-1 text-xs text-[var(--fg-faint)]">{sub.outstanding! > 0 ? "Payment required" : "Nothing owed"}</p>
         </div>
       </div>
 
       <div className={panel}>
-        <div className="border-b border-slate-100 px-5 py-4">
-          <h2 className="text-sm font-bold text-slate-900">Billing periods</h2>
+        <div className="border-b border-[var(--border-soft)] px-5 py-4">
+          <h2 className="text-sm font-bold text-[var(--fg)]">Billing periods</h2>
         </div>
         <Table
           rows={sub.invoices || []}
           emptyTitle="No billing periods yet."
           columns={[
-            { label: "Period", render: (i) => <span className="text-slate-700">{d(i.periodStart)} → {d(i.periodEnd)}</span> },
+            { label: "Period", render: (i) => <span className="text-[var(--fg-body)]">{d(i.periodStart)} → {d(i.periodEnd)}</span> },
             { label: "Amount due", render: (i) => <span className="font-semibold">{money(i.amountDue)}</span> },
             { label: "Status", render: (i) => <Badge tone={TONE[i.status] || "slate"}>{i.status === "PAID" ? "Paid" : "Unpaid"}</Badge> },
           ]}
@@ -112,16 +112,16 @@ export default function SubscriptionPage() {
       </div>
 
       <div className={panel}>
-        <div className="border-b border-slate-100 px-5 py-4">
-          <h2 className="text-sm font-bold text-slate-900">Payment history</h2>
+        <div className="border-b border-[var(--border-soft)] px-5 py-4">
+          <h2 className="text-sm font-bold text-[var(--fg)]">Payment history</h2>
         </div>
         <Table
           rows={sub.payments || []}
           emptyTitle="No payments recorded yet."
           columns={[
-            { label: "Date", render: (p) => <span className="text-slate-600">{d(p.paidAt)}</span> },
+            { label: "Date", render: (p) => <span className="text-[var(--fg-muted)]">{d(p.paidAt)}</span> },
             { label: "Amount", render: (p) => <span className="font-semibold">{money(p.amount)}</span> },
-            { label: "Method", render: (p) => <span className="text-slate-600">{p.method}</span> },
+            { label: "Method", render: (p) => <span className="text-[var(--fg-muted)]">{p.method}</span> },
           ]}
         />
       </div>

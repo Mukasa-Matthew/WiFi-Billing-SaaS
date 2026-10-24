@@ -114,8 +114,8 @@ export default function AdminFinancePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-slate-900">Finance</h1>
-        <p className="mt-1 text-sm text-slate-500">
+        <h1 className="text-xl font-bold tracking-tight text-[var(--fg)]">Finance</h1>
+        <p className="mt-1 text-sm text-[var(--fg-muted)]">
           Platform-managed collections, tenant wallet liabilities, and withdrawal review.
           Funds in tenants' own MarzPay accounts are not shown here — only money the platform holds.
         </p>
@@ -126,9 +126,9 @@ export default function AdminFinancePage() {
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
         {cards.map((c) => (
           <div key={c.label} className={`${panel} p-5`}>
-            <div className="text-xs font-semibold text-slate-500">{c.label}</div>
-            <div className="mt-2 text-xl font-bold text-slate-900">{money(c.value)}</div>
-            <p className="mt-1 text-xs text-slate-400">{c.note}</p>
+            <div className="text-xs font-semibold text-[var(--fg-muted)]">{c.label}</div>
+            <div className="mt-2 text-xl font-bold text-[var(--fg)]">{money(c.value)}</div>
+            <p className="mt-1 text-xs text-[var(--fg-faint)]">{c.note}</p>
           </div>
         ))}
       </div>
@@ -149,37 +149,37 @@ export default function AdminFinancePage() {
           )}
           <div className="grid gap-4 lg:grid-cols-3">
             <div className={panel}>
-              <div className="border-b border-slate-100 px-5 py-4">
-                <h2 className="text-sm font-bold text-slate-900">Platform earnings</h2>
-                <p className="mt-0.5 text-xs text-slate-500">SaaS subscription revenue — owned by the platform.</p>
+              <div className="border-b border-[var(--border-soft)] px-5 py-4">
+                <h2 className="text-sm font-bold text-[var(--fg)]">Platform earnings</h2>
+                <p className="mt-0.5 text-xs text-[var(--fg-muted)]">SaaS subscription revenue — owned by the platform.</p>
               </div>
               <dl className="space-y-2.5 px-5 py-4 text-sm">
-                <div className="flex justify-between"><dt className="text-slate-500">Settled earnings (MarzPay-backed)</dt><dd className="font-bold">{money(plat.settledEarnings)}</dd></div>
-                <div className="flex justify-between"><dt className="text-slate-500">External earnings (cash/bank)</dt><dd className="font-semibold">{money(plat.externalEarnings)}</dd></div>
-                <div className="flex justify-between"><dt className="text-slate-500">Reserved (in-flight payouts)</dt><dd>{money(plat.reservedEarnings)}</dd></div>
-                <div className="flex justify-between"><dt className="text-slate-500">Total earned</dt><dd>{money(plat.totalEarned)}</dd></div>
-                <div className="flex justify-between"><dt className="text-slate-500">Provider fees</dt><dd>{money(plat.totalFees)}</dd></div>
-                <div className="flex justify-between border-t border-slate-100 pt-2.5"><dt className="text-slate-500">Total withdrawn</dt><dd className="font-bold">{money(plat.totalWithdrawn)}</dd></div>
+                <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Settled earnings (MarzPay-backed)</dt><dd className="font-bold">{money(plat.settledEarnings)}</dd></div>
+                <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">External earnings (cash/bank)</dt><dd className="font-semibold">{money(plat.externalEarnings)}</dd></div>
+                <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Reserved (in-flight payouts)</dt><dd>{money(plat.reservedEarnings)}</dd></div>
+                <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Total earned</dt><dd>{money(plat.totalEarned)}</dd></div>
+                <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Provider fees</dt><dd>{money(plat.totalFees)}</dd></div>
+                <div className="flex justify-between border-t border-[var(--border-soft)] pt-2.5"><dt className="text-[var(--fg-muted)]">Total withdrawn</dt><dd className="font-bold">{money(plat.totalWithdrawn)}</dd></div>
               </dl>
             </div>
 
             <div className={panel}>
-              <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+              <div className="flex items-center justify-between border-b border-[var(--border-soft)] px-5 py-4">
                 <div>
-                  <h2 className="text-sm font-bold text-slate-900">MarzPay account</h2>
-                  <p className="mt-0.5 text-xs text-slate-500">Actual provider balance.</p>
+                  <h2 className="text-sm font-bold text-[var(--fg)]">MarzPay account</h2>
+                  <p className="mt-0.5 text-xs text-[var(--fg-muted)]">Actual provider balance.</p>
                 </div>
                 <button className={buttonGhost} onClick={reconcile} disabled={reconBusy}>
                   <ArrowsClockwise size={14} className={reconBusy ? "animate-spin" : ""} /> Reconcile
                 </button>
               </div>
               <dl className="space-y-2.5 px-5 py-4 text-sm">
-                <div className="flex justify-between"><dt className="text-slate-500">Available balance</dt><dd className="font-bold">{money(plat.providerBalance)}</dd></div>
-                <div className="flex justify-between"><dt className="text-slate-500">Last synced</dt><dd className="text-xs text-slate-500">{plat.lastSyncedAt ? date(plat.lastSyncedAt) : "Never"}</dd></div>
-                <div className="flex justify-between"><dt className="text-slate-500">Reconciliation</dt>
+                <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Available balance</dt><dd className="font-bold">{money(plat.providerBalance)}</dd></div>
+                <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Last synced</dt><dd className="text-xs text-[var(--fg-muted)]">{plat.lastSyncedAt ? date(plat.lastSyncedAt) : "Never"}</dd></div>
+                <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Reconciliation</dt>
                   <dd><Badge tone={plat.reconcileStatus === "CLEAN" ? "green" : plat.reconcileStatus === "DISCREPANCY" ? "red" : "amber"}>{plat.reconcileStatus}</Badge></dd></div>
-                <div className="flex justify-between border-t border-slate-100 pt-2.5"><dt className="text-slate-500">Safe withdrawable</dt><dd className="font-bold text-emerald-700">{money(plat.safeWithdrawable)}</dd></div>
-                <p className="text-[11px] leading-relaxed text-slate-400">
+                <div className="flex justify-between border-t border-[var(--border-soft)] pt-2.5"><dt className="text-[var(--fg-muted)]">Safe withdrawable</dt><dd className="font-bold text-emerald-700">{money(plat.safeWithdrawable)}</dd></div>
+                <p className="text-[11px] leading-relaxed text-[var(--fg-faint)]">
                   Min of settled earnings and provider balance minus tenant liabilities
                   ({money(plat.tenantAvailable + plat.tenantReserved)}) and a {money(plat.safetyBuffer)} safety buffer.
                 </p>
@@ -187,13 +187,13 @@ export default function AdminFinancePage() {
             </div>
 
             <div className={panel}>
-              <div className="border-b border-slate-100 px-5 py-4">
-                <h2 className="text-sm font-bold text-slate-900">Withdraw earnings</h2>
-                <p className="mt-0.5 text-xs text-slate-500">Pay out platform revenue to mobile money.</p>
+              <div className="border-b border-[var(--border-soft)] px-5 py-4">
+                <h2 className="text-sm font-bold text-[var(--fg)]">Withdraw earnings</h2>
+                <p className="mt-0.5 text-xs text-[var(--fg-muted)]">Pay out platform revenue to mobile money.</p>
               </div>
               <div className="px-5 py-4">
                 {!plat.payoutsEnabled && (
-                  <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                  <p className="rounded-lg bg-[var(--subtle)] px-3 py-2 text-xs text-[var(--fg-muted)]">
                     Live payouts are disabled (PLATFORM_PAYOUTS_ENABLED=false). The form below is view-only until enabled.
                   </p>
                 )}
@@ -201,30 +201,30 @@ export default function AdminFinancePage() {
                   onClick={() => setWdOpen(true)}>
                   <ArrowDown size={15} weight="bold" /> Withdraw earnings
                 </button>
-                <p className="mt-2 text-[11px] text-slate-400">Requires your admin password. Max {money(plat.safeWithdrawable)} minus payout fee.</p>
+                <p className="mt-2 text-[11px] text-[var(--fg-faint)]">Requires your admin password. Max {money(plat.safeWithdrawable)} minus payout fee.</p>
               </div>
             </div>
           </div>
 
           <div className={panel}>
-            <div className="border-b border-slate-100 px-5 py-4">
-              <h2 className="text-sm font-bold text-slate-900">Platform withdrawals</h2>
+            <div className="border-b border-[var(--border-soft)] px-5 py-4">
+              <h2 className="text-sm font-bold text-[var(--fg)]">Platform withdrawals</h2>
             </div>
             <Table
               rows={payouts}
               emptyTitle="No platform withdrawals yet."
               columns={[
-                { label: "Date", render: (p: Payout) => <span className="text-slate-600">{date(p.createdAt)}</span> },
+                { label: "Date", render: (p: Payout) => <span className="text-[var(--fg-muted)]">{date(p.createdAt)}</span> },
                 { label: "Phone", render: (p: Payout) => <span className="font-mono text-xs">{p.phone}</span> },
                 { label: "Amount", render: (p: Payout) => <span className="font-semibold">{money(p.amount)}</span> },
-                { label: "Fee", render: (p: Payout) => <span className="text-slate-600">{money(p.fee)}</span> },
+                { label: "Fee", render: (p: Payout) => <span className="text-[var(--fg-muted)]">{money(p.fee)}</span> },
                 { label: "Status", render: (p: Payout) => (
                   <span>
                     <Badge tone={STATUS_TONE[p.status] || "slate"}>{p.status}</Badge>
                     {p.failureReason && <div className="mt-1 text-[11px] text-red-500">{p.failureReason}</div>}
                   </span>
                 )},
-                { label: "Provider ref", render: (p: Payout) => <span className="font-mono text-[11px] text-slate-400">{p.providerTransactionId || p.payoutRef.slice(0, 8)}</span> },
+                { label: "Provider ref", render: (p: Payout) => <span className="font-mono text-[11px] text-[var(--fg-faint)]">{p.providerTransactionId || p.payoutRef.slice(0, 8)}</span> },
               ]}
             />
           </div>
@@ -232,10 +232,10 @@ export default function AdminFinancePage() {
       )}
 
       <div className={panel}>
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
-          <h2 className="text-sm font-bold text-slate-900">Withdrawal requests</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-soft)] px-5 py-4">
+          <h2 className="text-sm font-bold text-[var(--fg)]">Withdrawal requests</h2>
           <select value={filter} onChange={(e) => setFilter(e.target.value)}
-            className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs">
+            className="rounded-lg border border-[var(--border-strong)] px-3 py-1.5 text-xs">
             <option value="">All</option>
             <option value="PENDING_APPROVAL,REQUESTED">Awaiting approval</option>
             <option value="PROCESSING">Processing</option>
@@ -247,11 +247,11 @@ export default function AdminFinancePage() {
           rows={withdrawals}
           emptyTitle="No withdrawal requests."
           columns={[
-            { label: "Date", render: (w: WithdrawalRow) => <span className="text-slate-600">{date(w.createdAt)}</span> },
+            { label: "Date", render: (w: WithdrawalRow) => <span className="text-[var(--fg-muted)]">{date(w.createdAt)}</span> },
             { label: "Tenant", render: (w: WithdrawalRow) => <span className="font-medium">{w.businessName}</span> },
             { label: "Phone", render: (w: WithdrawalRow) => <span className="font-mono text-xs">{w.phone}</span> },
             { label: "Amount", render: (w: WithdrawalRow) => <span className="font-semibold">{money(w.amount)}</span> },
-            { label: "Fee", render: (w: WithdrawalRow) => <span className="text-slate-600">{money(w.fee)}</span> },
+            { label: "Fee", render: (w: WithdrawalRow) => <span className="text-[var(--fg-muted)]">{money(w.fee)}</span> },
             { label: "Status", render: (w: WithdrawalRow) => (
               <span>
                 <Badge tone={STATUS_TONE[w.status] || "slate"}>{w.status.replaceAll("_", " ")}</Badge>
@@ -271,9 +271,9 @@ export default function AdminFinancePage() {
       </div>
 
       <div className={panel}>
-        <div className="border-b border-slate-100 px-5 py-4">
-          <h2 className="text-sm font-bold text-slate-900">Tenant wallets</h2>
-          <p className="mt-0.5 text-xs text-slate-500">Internal liabilities — money the platform owes each tenant.</p>
+        <div className="border-b border-[var(--border-soft)] px-5 py-4">
+          <h2 className="text-sm font-bold text-[var(--fg)]">Tenant wallets</h2>
+          <p className="mt-0.5 text-xs text-[var(--fg-muted)]">Internal liabilities — money the platform owes each tenant.</p>
         </div>
         <Table
           rows={wallets}
@@ -281,10 +281,10 @@ export default function AdminFinancePage() {
           columns={[
             { label: "Tenant", render: (w: WalletRow) => <span className="font-medium">{w.businessName}</span> },
             { label: "Available", render: (w: WalletRow) => <span className="font-semibold">{money(w.available)}</span> },
-            { label: "Pending", render: (w: WalletRow) => <span className="text-slate-600">{money(w.pending)}</span> },
-            { label: "Reserved", render: (w: WalletRow) => <span className="text-slate-600">{money(w.reserved)}</span> },
-            { label: "Collected", render: (w: WalletRow) => <span className="text-slate-600">{money(w.totalCollected)}</span> },
-            { label: "Withdrawn", render: (w: WalletRow) => <span className="text-slate-600">{money(w.totalWithdrawn)}</span> },
+            { label: "Pending", render: (w: WalletRow) => <span className="text-[var(--fg-muted)]">{money(w.pending)}</span> },
+            { label: "Reserved", render: (w: WalletRow) => <span className="text-[var(--fg-muted)]">{money(w.reserved)}</span> },
+            { label: "Collected", render: (w: WalletRow) => <span className="text-[var(--fg-muted)]">{money(w.totalCollected)}</span> },
+            { label: "Withdrawn", render: (w: WalletRow) => <span className="text-[var(--fg-muted)]">{money(w.totalWithdrawn)}</span> },
           ]}
         />
       </div>
@@ -292,15 +292,15 @@ export default function AdminFinancePage() {
       {wdOpen && plat && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={() => setWdOpen(false)}>
           <form onSubmit={requestPayout} onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            className="w-full max-w-md rounded-2xl bg-[var(--surface)] p-6 shadow-xl">
             <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-slate-900">Withdraw platform earnings</h3>
-              <button type="button" onClick={() => setWdOpen(false)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+              <h3 className="text-base font-bold text-[var(--fg)]">Withdraw platform earnings</h3>
+              <button type="button" onClick={() => setWdOpen(false)} className="text-[var(--fg-faint)] hover:text-[var(--fg-muted)]"><X size={18} /></button>
             </div>
-            <dl className="mt-4 space-y-1.5 rounded-lg bg-slate-50 p-3 text-xs">
-              <div className="flex justify-between"><dt className="text-slate-500">Settled earnings</dt><dd className="font-semibold">{money(plat.settledEarnings)}</dd></div>
-              <div className="flex justify-between"><dt className="text-slate-500">Provider balance</dt><dd className="font-semibold">{money(plat.providerBalance)}</dd></div>
-              <div className="flex justify-between"><dt className="text-slate-500">Max withdrawal</dt><dd className="font-bold text-emerald-700">{money(plat.safeWithdrawable)}</dd></div>
+            <dl className="mt-4 space-y-1.5 rounded-lg bg-[var(--subtle)] p-3 text-xs">
+              <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Settled earnings</dt><dd className="font-semibold">{money(plat.settledEarnings)}</dd></div>
+              <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Provider balance</dt><dd className="font-semibold">{money(plat.providerBalance)}</dd></div>
+              <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Max withdrawal</dt><dd className="font-bold text-emerald-700">{money(plat.safeWithdrawable)}</dd></div>
             </dl>
             <div className="mt-4">
               <label className={label}>Amount (UGX)</label>

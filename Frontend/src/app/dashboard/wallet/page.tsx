@@ -72,8 +72,8 @@ export default function WalletPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-900">Wallet</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <h1 className="text-xl font-bold tracking-tight text-[var(--fg)]">Wallet</h1>
+          <p className="mt-1 text-sm text-[var(--fg-muted)]">
             Earnings collected through the platform payment gateway. Payments made through your own MarzPay account settle directly to your wallet there.
           </p>
         </div>
@@ -87,31 +87,31 @@ export default function WalletPage() {
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <div className={`${panel} p-5`}>
-          <div className="flex items-center gap-2 text-xs font-semibold text-slate-500"><Wallet size={15} /> Available balance</div>
-          <div className="mt-2 text-2xl font-bold text-slate-900">{money(summary?.available)}</div>
-          <p className="mt-1 text-xs text-slate-400">Ready to withdraw</p>
+          <div className="flex items-center gap-2 text-xs font-semibold text-[var(--fg-muted)]"><Wallet size={15} /> Available balance</div>
+          <div className="mt-2 text-2xl font-bold text-[var(--fg)]">{money(summary?.available)}</div>
+          <p className="mt-1 text-xs text-[var(--fg-faint)]">Ready to withdraw</p>
         </div>
         <div className={`${panel} p-5`}>
-          <div className="flex items-center gap-2 text-xs font-semibold text-slate-500"><ShieldCheck size={15} /> Reserved</div>
-          <div className="mt-2 text-2xl font-bold text-slate-900">{money(summary?.reserved)}</div>
-          <p className="mt-1 text-xs text-slate-400">Held for in-flight withdrawals</p>
+          <div className="flex items-center gap-2 text-xs font-semibold text-[var(--fg-muted)]"><ShieldCheck size={15} /> Reserved</div>
+          <div className="mt-2 text-2xl font-bold text-[var(--fg)]">{money(summary?.reserved)}</div>
+          <p className="mt-1 text-xs text-[var(--fg-faint)]">Held for in-flight withdrawals</p>
         </div>
         <div className={`${panel} p-5`}>
-          <div className="flex items-center gap-2 text-xs font-semibold text-slate-500"><Bank size={15} /> Lifetime earnings</div>
-          <div className="mt-2 text-2xl font-bold text-slate-900">{money(summary?.totalCollected)}</div>
-          <p className="mt-1 text-xs text-slate-400">All you've ever collected, net of gateway fees</p>
+          <div className="flex items-center gap-2 text-xs font-semibold text-[var(--fg-muted)]"><Bank size={15} /> Lifetime earnings</div>
+          <div className="mt-2 text-2xl font-bold text-[var(--fg)]">{money(summary?.totalCollected)}</div>
+          <p className="mt-1 text-xs text-[var(--fg-faint)]">All you've ever collected, net of gateway fees</p>
         </div>
         <div className={`${panel} p-5`}>
-          <div className="flex items-center gap-2 text-xs font-semibold text-slate-500"><ArrowDown size={15} /> Total withdrawn</div>
-          <div className="mt-2 text-2xl font-bold text-slate-900">{money(summary?.totalWithdrawn)}</div>
-          <p className="mt-1 text-xs text-slate-400">Fees paid: {money(summary?.totalFees)}</p>
+          <div className="flex items-center gap-2 text-xs font-semibold text-[var(--fg-muted)]"><ArrowDown size={15} /> Total withdrawn</div>
+          <div className="mt-2 text-2xl font-bold text-[var(--fg)]">{money(summary?.totalWithdrawn)}</div>
+          <p className="mt-1 text-xs text-[var(--fg-faint)]">Fees paid: {money(summary?.totalFees)}</p>
         </div>
       </div>
 
       <div className={panel}>
-        <div className="border-b border-slate-100 px-5 py-4">
-          <h2 className="text-sm font-bold text-slate-900">Withdrawals</h2>
-          <p className="mt-0.5 text-xs text-slate-500">
+        <div className="border-b border-[var(--border-soft)] px-5 py-4">
+          <h2 className="text-sm font-bold text-[var(--fg)]">Withdrawals</h2>
+          <p className="mt-0.5 text-xs text-[var(--fg-muted)]">
             {summary?.limits.approvalRequired ? "Withdrawals are reviewed before payout. " : ""}
             Min {money(summary?.limits.min)} · Max {money(summary?.limits.max)} per request.
           </p>
@@ -121,10 +121,10 @@ export default function WalletPage() {
           rows={withdrawals}
           emptyTitle="No withdrawals yet."
           columns={[
-            { label: "Date", render: (w: Withdrawal) => <span className="text-slate-600">{date(w.createdAt)}</span> },
+            { label: "Date", render: (w: Withdrawal) => <span className="text-[var(--fg-muted)]">{date(w.createdAt)}</span> },
             { label: "Phone", render: (w: Withdrawal) => <span className="font-mono text-xs">{w.phone}</span> },
             { label: "Amount", render: (w: Withdrawal) => <span className="font-semibold">{money(w.amount)}</span> },
-            { label: "Fee", render: (w: Withdrawal) => <span className="text-slate-600">{money(w.fee)}</span> },
+            { label: "Fee", render: (w: Withdrawal) => <span className="text-[var(--fg-muted)]">{money(w.fee)}</span> },
             { label: "Status", render: (w: Withdrawal) => (
               <span>
                 <Badge tone={STATUS_TONE[w.status] || "slate"}>{w.status.replaceAll("_", " ")}</Badge>
@@ -140,25 +140,25 @@ export default function WalletPage() {
       </div>
 
       <div className={panel}>
-        <div className="border-b border-slate-100 px-5 py-4">
-          <h2 className="text-sm font-bold text-slate-900">Wallet activity</h2>
-          <p className="mt-0.5 text-xs text-slate-500">Every balance change is recorded here and traceable to a payment or payout.</p>
+        <div className="border-b border-[var(--border-soft)] px-5 py-4">
+          <h2 className="text-sm font-bold text-[var(--fg)]">Wallet activity</h2>
+          <p className="mt-0.5 text-xs text-[var(--fg-muted)]">Every balance change is recorded here and traceable to a payment or payout.</p>
         </div>
         <Table
           loading={loading}
           rows={activity}
           emptyTitle="No wallet activity yet."
           columns={[
-            { label: "Date", render: (e: LedgerEntry) => <span className="text-slate-600">{date(e.createdAt)}</span> },
+            { label: "Date", render: (e: LedgerEntry) => <span className="text-[var(--fg-muted)]">{date(e.createdAt)}</span> },
             { label: "Event", render: (e: LedgerEntry) => (
               <span>
                 <Badge tone={LEDGER_LABEL[e.type]?.tone || "slate"}>{LEDGER_LABEL[e.type]?.name || e.type}</Badge>
-                {e.note && <div className="mt-1 text-[11px] text-slate-400">{e.note}</div>}
+                {e.note && <div className="mt-1 text-[11px] text-[var(--fg-faint)]">{e.note}</div>}
               </span>
             )},
             { label: "Amount", render: (e: LedgerEntry) => <span className="font-semibold">{money(e.amount)}</span> },
-            { label: "Balance after", render: (e: LedgerEntry) => <span className="text-slate-600">{money(e.availableAfter)}</span> },
-            { label: "Reference", render: (e: LedgerEntry) => <span className="font-mono text-[11px] text-slate-400">{e.externalRef}</span> },
+            { label: "Balance after", render: (e: LedgerEntry) => <span className="text-[var(--fg-muted)]">{money(e.availableAfter)}</span> },
+            { label: "Reference", render: (e: LedgerEntry) => <span className="font-mono text-[11px] text-[var(--fg-faint)]">{e.externalRef}</span> },
           ]}
         />
       </div>
@@ -166,12 +166,12 @@ export default function WalletPage() {
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={() => setOpen(false)}>
           <form onSubmit={submit} onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            className="w-full max-w-md rounded-2xl bg-[var(--surface)] p-6 shadow-xl">
             <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-slate-900">Withdraw earnings</h3>
-              <button type="button" onClick={() => setOpen(false)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+              <h3 className="text-base font-bold text-[var(--fg)]">Withdraw earnings</h3>
+              <button type="button" onClick={() => setOpen(false)} className="text-[var(--fg-faint)] hover:text-[var(--fg-muted)]"><X size={18} /></button>
             </div>
-            <p className="mt-1 text-xs text-slate-500">Available: <b>{money(summary?.available)}</b></p>
+            <p className="mt-1 text-xs text-[var(--fg-muted)]">Available: <b>{money(summary?.available)}</b></p>
 
             <div className="mt-5">
               <label className={label}>Amount (UGX)</label>

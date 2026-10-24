@@ -1,59 +1,234 @@
 "use client";
+
 import React, { useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import api from "@/lib/api";
+import {
+  field, label, hint, panel, ErrorNotice, ugx,
+  FormHeader, FormSection, FormActions, FormLayout,
+} from "@/components/BillingUI";
+import { Stack, Lightning, Money, Eye, CellTower } from "@phosphor-icons/react";
 
-const input = "mt-2 w-full rounded-lg border border-slate-300 bg-slate-100 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-blue-500";
 const presets: Record<string, { name: string; duration: string; unit: string; price: string }> = {
   hourly: { name: "Hourly Internet", duration: "1", unit: "3600", price: "500" },
   daily: { name: "Daily Internet", duration: "1", unit: "86400", price: "2000" },
   weekly: { name: "Weekly Internet", duration: "7", unit: "86400", price: "12000" },
   monthly: { name: "Monthly Internet", duration: "30", unit: "86400", price: "30000" },
 };
-function Section({ title, hint, children }: { title: string; hint: string; children: React.ReactNode }) {
-  return <section className="rounded-xl border border-slate-200 bg-white"><div className="border-b border-slate-200 px-5 py-4"><h2 className="text-sm font-semibold text-slate-900">{title}</h2><p className="mt-1 text-xs text-slate-500">{hint}</p></div><div className="space-y-5 p-5">{children}</div></section>;
-}
+
+const UNITS: Record<string, string> = { "60": "minute", "3600": "hour", "86400": "day" };
+
 export default function CreatePackagePage() {
-  const router = useRouter();
+  const nav = useRouter();
   const [name, setName] = useState(""); const [duration, setDuration] = useState("1"); const [unit, setUnit] = useState("86400");
   const [description, setDescription] = useState(""); const [upload, setUpload] = useState("5"); const [download, setDownload] = useState("5");
   const [price, setPrice] = useState(""); const [devices, setDevices] = useState("1"); const [availability, setAvailability] = useState("ACTIVE");
-  const [featured, setFeatured] = useState(false); const [order, setOrder] = useState("0"); const [saving, setSaving] = useState(false); const [error, setError] = useState("");
+  const [featured, setFeatured] = useState(false); const [order, setOrder] = useState("0");
+  const [saving, setSaving] = useState(false); const [error, setError] = useState("");
   const [routers, setRouters] = useState<{ id: number; name: string }[]>([]); const [routerId, setRouterId] = useState("");
-  useEffect(() => { const template = presets[new URLSearchParams(window.location.search).get("template") || ""]; if (template) { setName(template.name); setDuration(template.duration); setUnit(template.unit); setPrice(template.price); } }, []);
-  useEffect(() => { api.get<{ id: number; name: string }[]>("/api/routers").then(r => setRouters(r.data)).catch(() => {}); }, []);
+
+  useEffect(() => {
+    const template = presets[new URLSearchParams(window.location.search).get("template") || ""];
+    if (template) { setName(template.name); setDuration(template.duration); setUnit(template.unit); setPrice(template.price); }
+  }, []);
+  useEffect(() => { api.get<{ id: number; name: string }[]>("/api/routers").then((r) => setRouters(r.data)).catch(() => {}); }, []);
+
+  const n = Number(duration) || 0;
+  const validity = `${n} ${UNITS[unit] || "day"}${n === 1 ? "" : "s"}`;
+
   const save = async (e: React.FormEvent) => {
     e.preventDefault(); setError("");
     const seconds = Number(duration) * Number(unit);
-    if (!Number.isSafeInteger(seconds) || seconds < 60 || seconds > 2147483647) { setError("Choose a valid duration of at least one minute."); return; }
+    if (!Number.isSafeInteger(seconds) || seconds < 60 || seconds > 2147483647) {
+      setError("Choose a valid duration of at least one minute."); return;
+    }
     setSaving(true);
-    try { await api.post("/api/packages", { name: name.trim(), description: description.trim(), price: Number(price), sessionTimeout: seconds, rateLimit: `${upload}M/${download}M`, sharedUsers: Number(devices), availability, featured, displayOrder: Number(order), routerId: routerId ? Number(routerId) : null }); router.push("/dashboard/packages"); }
-    catch { setError("Could not save the package. Check your entries and try again."); }
+    try {
+      await api.post("/api/packages", {
+        name: name.trim(), description: description.trim(), price: Number(price),
+        sessionTimeout: seconds, rateLimit: `${upload}M/${download}M`, sharedUsers: Number(devices),
+        availability, featured, displayOrder: Number(order), routerId: routerId ? Number(routerId) : null,
+      });
+      nav.push("/dashboard/packages");
+    } catch { setError("Could not save the package. Check your entries and try again."); }
     finally { setSaving(false); }
   };
-  return <div className="mx-auto max-w-6xl space-y-6"><div><Link href="/dashboard/packages" className="text-xs text-slate-500 hover:text-slate-900">Packages / Create</Link><h1 className="mt-3 text-xl font-bold tracking-tight text-slate-900">Create package</h1><p className="mt-2 text-sm text-slate-500">Set your internet plan's duration, speeds, price, and availability.</p></div>
-    <form onSubmit={save} className="space-y-5">
-      <Section title="Basic configuration" hint="Define the package's basic settings">
-        <label className="block text-xs text-slate-700">Package name *<input required maxLength={80} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Daily Internet" className={input} /></label>
-        <div className="grid gap-5 sm:grid-cols-2"><label className="text-xs text-slate-700">Duration *<input type="number" required min={1} step={1} value={duration} onChange={e => setDuration(e.target.value)} className={input} /></label><label className="text-xs text-slate-700">Unit *<select value={unit} onChange={e => setUnit(e.target.value)} className={input}><option value="60">Minutes</option><option value="3600">Hours</option><option value="86400">Days</option></select></label></div>
-        <label className="block text-xs text-slate-700">Description<textarea maxLength={500} rows={3} value={description} onChange={e => setDescription(e.target.value)} placeholder="Optional description for this package" className={input} /></label>
-      </Section>
-      <Section title="Speed & performance" hint="Set the maximum upload and download speeds per user">
-        <div className="grid gap-5 sm:grid-cols-2"><label className="text-xs text-slate-700">Upload speed (Mbps) *<input type="number" required min="0.1" max="10000" step="0.1" value={upload} onChange={e => setUpload(e.target.value)} className={input} /></label><label className="text-xs text-slate-700">Download speed (Mbps) *<input type="number" required min="0.1" max="10000" step="0.1" value={download} onChange={e => setDownload(e.target.value)} className={input} /></label></div>
-        <p className="text-xs text-slate-500">Data volume is unlimited. The duration above controls the session time allowance.</p>
-      </Section>
-      <Section title="Pricing & devices" hint="Set the package price and simultaneous device limit">
-        <div className="grid gap-5 sm:grid-cols-2"><label className="text-xs text-slate-700">Price (UGX) *<input type="number" required min="0" max="9999999999" step="0.01" value={price} onChange={e => setPrice(e.target.value)} placeholder="2000" className={input} /></label><label className="text-xs text-slate-700">Devices *<input type="number" required min="1" max="100" step="1" value={devices} onChange={e => setDevices(e.target.value)} className={input} /><span className="mt-2 block text-slate-500">Simultaneous devices allowed per voucher</span></label></div>
-      </Section>
-      <Section title="Availability & visibility" hint="Choose how customers can access this package">
-        <fieldset><legend className="mb-3 text-xs text-slate-700">Package availability *</legend><div className="flex flex-wrap gap-3">{["ACTIVE", "HIDDEN", "DISABLED"].map(s => <label key={s} className={`cursor-pointer rounded-lg border px-4 py-2 text-xs capitalize ${availability === s ? "border-emerald-500/50 bg-emerald-50 text-emerald-700" : "border-slate-300 text-slate-500"}`}><input type="radio" name="availability" value={s} checked={availability === s} onChange={() => setAvailability(s)} className="mr-2 accent-emerald-500" />{s.toLowerCase()}</label>)}</div><p className="mt-3 text-xs leading-6 text-slate-500">Active: visible on the portal. Hidden: voucher-only. Disabled: unavailable for portal purchase. Existing vouchers keep their access.</p></fieldset>
-        <label className="flex items-start gap-3 text-sm text-slate-700"><input type="checkbox" checked={featured} onChange={e => setFeatured(e.target.checked)} className="mt-1 accent-blue-500" /><span>Featured package<small className="mt-1 block text-xs text-slate-500">Appears first on the portal with a Popular badge.</small></span></label>
-        <label className="block text-xs text-slate-700">Display order<input type="number" required min="0" step="1" max="2147483647" value={order} onChange={e => setOrder(e.target.value)} className={input} /><span className="mt-2 block text-slate-500">Breaks ties between packages with the same featured status and price.</span></label>
-        <label className="block text-xs text-slate-700">Router<select value={routerId} onChange={e => setRouterId(e.target.value)} className={input}><option value="">All routers</option>{routers.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}</select><span className="mt-2 block text-slate-500">Limit this package to one site. Vouchers stay valid on every router you own, but only routers in scope show this plan on their portal.</span></label>
-      </Section>
-      {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-300">{error}</p>}
-      <div className="flex justify-end gap-3 pb-6"><Link href="/dashboard/packages" className="rounded-lg border border-slate-300 px-5 py-2.5 text-sm text-slate-700">Cancel</Link><button disabled={saving} className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50">{saving ? "Saving…" : "Create package"}</button></div>
-    </form>
-  </div>;
+
+  return (
+    <div className="mx-auto max-w-6xl space-y-6">
+      <FormHeader
+        backHref="/dashboard/packages" backLabel="Packages"
+        title="Create package"
+        description="Set the plan's duration, speeds, price and where customers can see it."
+      />
+
+      <form onSubmit={save}>
+        <FormLayout
+          aside={
+            /* The same information the customer sees on the captive portal,
+               so pricing and limits can be checked before saving. */
+            <section className={panel}>
+              <h2 className="border-b border-[var(--border)] px-5 py-3.5 text-xs font-semibold uppercase tracking-wide text-[var(--fg-muted)]">
+                Portal preview
+              </h2>
+              <div className="p-5">
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--subtle)] p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="truncate text-sm font-semibold text-[var(--fg)]">{name.trim() || "Package name"}</span>
+                        {featured && (
+                          <span className="shrink-0 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--accent-text)]">
+                            Popular
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 truncate text-xs text-[var(--fg-muted)]">
+                        {validity} · {download} Mbps · {devices} device{Number(devices) === 1 ? "" : "s"}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-sm font-bold tabular-nums text-[var(--fg)]">
+                      {price ? ugx(price) : "—"}
+                    </span>
+                  </div>
+                </div>
+                <p className="mt-3 text-xs leading-relaxed text-[var(--fg-muted)]">
+                  {availability === "ACTIVE"
+                    ? "Visible to customers on the captive portal."
+                    : availability === "HIDDEN"
+                      ? "Hidden from the portal. Reachable by voucher only."
+                      : "Disabled. Existing vouchers keep their access."}
+                </p>
+              </div>
+            </section>
+          }
+        >
+          <FormSection icon={<Stack size={18} weight="duotone" aria-hidden />}
+            title="Basic configuration" hint="Name the plan and set how long access lasts.">
+            <div>
+              <label htmlFor="p-name" className={label}>Package name *</label>
+              <input id="p-name" required maxLength={80} value={name} onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Daily Internet" className={field} />
+            </div>
+            <div className="grid gap-5 sm:grid-cols-2">
+              <div>
+                <label htmlFor="p-duration" className={label}>Duration *</label>
+                <input id="p-duration" type="number" required min={1} step={1} value={duration}
+                  onChange={(e) => setDuration(e.target.value)} className={field} />
+              </div>
+              <div>
+                <label htmlFor="p-unit" className={label}>Unit *</label>
+                <select id="p-unit" value={unit} onChange={(e) => setUnit(e.target.value)} className={field}>
+                  <option value="60">Minutes</option>
+                  <option value="3600">Hours</option>
+                  <option value="86400">Days</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label htmlFor="p-desc" className={label}>Description</label>
+              <textarea id="p-desc" maxLength={500} rows={3} value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Optional description for this package" className={field} />
+            </div>
+          </FormSection>
+
+          <FormSection icon={<Lightning size={18} weight="duotone" aria-hidden />}
+            title="Speed and performance" hint="Maximum speeds applied per connected user.">
+            <div className="grid gap-5 sm:grid-cols-2">
+              <div>
+                <label htmlFor="p-up" className={label}>Upload speed (Mbps) *</label>
+                <input id="p-up" type="number" required min="0.1" max="10000" step="0.1" value={upload}
+                  onChange={(e) => setUpload(e.target.value)} className={field} />
+              </div>
+              <div>
+                <label htmlFor="p-down" className={label}>Download speed (Mbps) *</label>
+                <input id="p-down" type="number" required min="0.1" max="10000" step="0.1" value={download}
+                  onChange={(e) => setDownload(e.target.value)} className={field} />
+              </div>
+            </div>
+            <p className={hint}>Data volume is unlimited. The duration above controls the session allowance.</p>
+          </FormSection>
+
+          <FormSection icon={<Money size={18} weight="duotone" aria-hidden />}
+            title="Pricing and devices" hint="What customers pay, and how many devices one voucher covers.">
+            <div className="grid gap-5 sm:grid-cols-2">
+              <div>
+                <label htmlFor="p-price" className={label}>Price (UGX) *</label>
+                <input id="p-price" type="number" required min="0" max="9999999999" step="0.01" value={price}
+                  onChange={(e) => setPrice(e.target.value)} placeholder="2000" className={field} />
+              </div>
+              <div>
+                <label htmlFor="p-devices" className={label}>Devices *</label>
+                <input id="p-devices" type="number" required min="1" max="100" step="1" value={devices}
+                  onChange={(e) => setDevices(e.target.value)} className={field} />
+                <p className={hint}>Simultaneous devices per voucher.</p>
+              </div>
+            </div>
+          </FormSection>
+
+          <FormSection icon={<Eye size={18} weight="duotone" aria-hidden />}
+            title="Availability and visibility" hint="Choose how customers can reach this package.">
+            <fieldset>
+              <legend className={label}>Package availability *</legend>
+              <div className="mt-2 flex flex-wrap gap-2.5">
+                {["ACTIVE", "HIDDEN", "DISABLED"].map((s) => (
+                  <label key={s}
+                    className={`flex min-h-[44px] cursor-pointer items-center rounded-lg border px-4 text-xs font-medium capitalize transition ${
+                      availability === s
+                        ? "border-blue-500 bg-blue-50 text-[var(--accent-text)]"
+                        : "border-[var(--border-strong)] text-[var(--fg-muted)] hover:bg-[var(--subtle)]"
+                    }`}>
+                    <input type="radio" name="availability" value={s} checked={availability === s}
+                      onChange={() => setAvailability(s)} className="mr-2 accent-blue-700" />
+                    {s.toLowerCase()}
+                  </label>
+                ))}
+              </div>
+              <p className={hint}>
+                Active: visible on the portal. Hidden: voucher-only. Disabled: not purchasable.
+                Existing vouchers keep their access.
+              </p>
+            </fieldset>
+
+            <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-[var(--border)] p-4 transition hover:bg-[var(--subtle)]">
+              <input type="checkbox" checked={featured} onChange={(e) => setFeatured(e.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-blue-700" />
+              <span>
+                <span className="block text-sm font-medium text-[var(--fg)]">Featured package</span>
+                <span className="mt-0.5 block text-xs text-[var(--fg-muted)]">Appears first on the portal with a Popular badge.</span>
+              </span>
+            </label>
+
+            <div className="grid gap-5 sm:grid-cols-2">
+              <div>
+                <label htmlFor="p-order" className={label}>Display order</label>
+                <input id="p-order" type="number" required min="0" step="1" max="2147483647" value={order}
+                  onChange={(e) => setOrder(e.target.value)} className={field} />
+                <p className={hint}>Breaks ties between packages with the same featured status and price.</p>
+              </div>
+              <div>
+                <label htmlFor="p-router" className={label}>Router</label>
+                <select id="p-router" value={routerId} onChange={(e) => setRouterId(e.target.value)} className={field}>
+                  <option value="">All routers</option>
+                  {routers.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                </select>
+                <p className={hint}>Limit this plan to one site. Vouchers stay valid on every router you own.</p>
+              </div>
+            </div>
+          </FormSection>
+
+          {routers.length === 0 && (
+            <p className="flex items-start gap-2 px-1 text-xs text-[var(--fg-muted)]">
+              <CellTower size={14} className="mt-0.5 shrink-0" aria-hidden />
+              No routers linked yet, so this package will apply everywhere.
+            </p>
+          )}
+
+          <ErrorNotice text={error} />
+          <FormActions busy={saving} busyLabel="Saving…" submitLabel="Create package" cancelHref="/dashboard/packages" />
+        </FormLayout>
+      </form>
+    </div>
+  );
 }

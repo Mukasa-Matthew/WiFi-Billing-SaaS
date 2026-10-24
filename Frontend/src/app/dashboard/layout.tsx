@@ -5,6 +5,7 @@ import { LinkPending } from "@/components/LoadingUI";
 import React, { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import ThemeToggle from "@/components/ThemeToggle";
 import api from "@/lib/api";
 import {
   SquaresFour,
@@ -29,7 +30,7 @@ import {
   CaretDown,
 } from "@phosphor-icons/react";
 
-const NAVY = "#122B49";
+
 
 interface SidebarStats {
   activeUsers?: number;
@@ -64,16 +65,7 @@ export default function TenantDashboardLayout({
     }
   }, [user, loading, router]);
 
-  if (loading || !user) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-[#F5F7FA] text-slate-500">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-700 border-t-transparent" />
-          <p className="text-sm">Loading workspace…</p>
-        </div>
-      </div>
-    );
-  }
+  const ready = !loading && !!user;
 
   const counts: Record<string, number | undefined> = {
     "Active users": stats?.activeUsers,
@@ -104,7 +96,7 @@ export default function TenantDashboardLayout({
   );
 
   return (
-    <div className="h-dvh overflow-hidden bg-[#F5F7FA] text-slate-900 flex">
+    <div className="h-dvh overflow-hidden bg-[var(--canvas)] text-[var(--fg)] flex">
       {menuOpen && (
         <button aria-label="Close navigation" onClick={() => setMenuOpen(false)}
           className="fixed inset-0 z-30 bg-slate-950/50 md:hidden" />
@@ -113,7 +105,7 @@ export default function TenantDashboardLayout({
       {/* Sidebar */}
       <aside
         className={`${menuOpen ? "flex" : "hidden"} fixed inset-y-0 left-0 z-40 w-64 flex-col justify-between shrink-0 md:static md:flex`}
-        style={{ backgroundColor: NAVY }}
+        style={{ backgroundColor: "var(--sidebar)" }}
       >
         <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain">
           {/* Brand */}
@@ -123,22 +115,22 @@ export default function TenantDashboardLayout({
             </div>
             <div className="min-w-0">
               <span className="block truncate text-sm font-bold tracking-tight text-white">
-                {user.name || "Hotspot Operator"}
+                {user?.name || "Hotspot Operator"}
               </span>
-              <span className="block text-[10px] font-semibold uppercase tracking-widest text-blue-100">
+              <span className="block text-[10px] font-semibold uppercase tracking-widest text-[var(--sidebar-fg-dim)]">
                 AirPairy
               </span>
             </div>
           </div>
 
           {/* Superadmin viewing banner */}
-          {user.role === "ROLE_SUPERADMIN" && (
-            <div className="mx-4 mt-3 flex items-center justify-between rounded-lg border border-amber-400/30 bg-amber-400/10 p-2.5 text-amber-200">
+          {user?.role === "ROLE_SUPERADMIN" && (
+            <div className="mx-4 mt-3 flex items-center justify-between rounded-lg border border-amber-400/30 bg-amber-400/10 p-2.5 text-[var(--sidebar-warn)]">
               <div className="flex min-w-0 items-center gap-1.5">
                 <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
                 <span className="truncate text-[11px] font-medium">Superadmin view</span>
               </div>
-              <Link href="/admin" className="flex items-center gap-1 text-[11px] font-bold text-white hover:text-amber-100">
+              <Link href="/admin" className="flex items-center gap-1 text-[11px] font-bold text-white hover:text-[var(--sidebar-warn)]">
                 Platform <ArrowRight className="h-3 w-3" />
               </Link>
             </div>
@@ -164,7 +156,7 @@ export default function TenantDashboardLayout({
                       type="button"
                       onClick={() => setCollapsed((c) => ({ ...c, [item.group]: !c[item.group] }))}
                       aria-expanded={!isGroupCollapsed}
-                      className={`flex w-full items-center justify-between px-3 pb-1.5 ${index === 0 ? "" : "pt-3"} text-[10px] font-bold uppercase tracking-widest text-blue-200/70 hover:text-blue-100`}
+                      className={`flex w-full items-center justify-between px-3 pb-1.5 ${index === 0 ? "" : "pt-3"} text-[10px] font-bold uppercase tracking-widest text-[var(--sidebar-fg-faint)]/80 hover:text-[var(--sidebar-fg-dim)]`}
                     >
                       <span>{item.group}</span>
                       <CaretDown className={`h-3 w-3 transition-transform ${isGroupCollapsed ? "-rotate-90" : ""}`} />
@@ -177,7 +169,7 @@ export default function TenantDashboardLayout({
                       href={item.href}
                       className={`relative flex items-center gap-3 rounded-lg px-3.5 py-2 text-[13px] font-medium transition ${
                         isActive
-                          ? "bg-white text-[#122B49] shadow-sm"
+                          ? "bg-[var(--sidebar-active)] text-[var(--sidebar-active-fg)] shadow-sm"
                           : "text-slate-200 hover:bg-white/10 hover:text-white"
                       }`}
                     >
@@ -185,7 +177,7 @@ export default function TenantDashboardLayout({
                       <Icon className="h-4 w-4 shrink-0" />
                       <span className="flex-1">{item.name}</span>
                       {count !== undefined && count > 0 && (
-                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${isActive ? "bg-blue-100 text-[#122B49]" : "bg-white/15 text-white"}`}>
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${isActive ? "bg-[var(--sidebar-active-fg)]/12 text-[var(--sidebar-active-fg)]" : "bg-white/15 text-white"}`}>
                           {count > 999 ? `${(count / 1000).toFixed(1)}k` : count}
                         </span>
                       )}
@@ -202,46 +194,47 @@ export default function TenantDashboardLayout({
         <div className="border-t border-white/10 p-4">
           <div className="mb-3 flex items-center gap-3 px-1">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-xs font-bold uppercase text-white">
-              {user.name ? user.name.substring(0, 2) : "HO"}
+              {user?.name ? user.name.substring(0, 2) : "HO"}
             </div>
             <div className="min-w-0">
-              <p className="truncate text-xs font-semibold text-white">{user.name}</p>
-              <p className="truncate text-[11px] text-blue-100">{user.email}</p>
+              <p className="truncate text-xs font-semibold text-white">{user?.name}</p>
+              <p className="truncate text-[11px] text-[var(--sidebar-fg-dim)]">{user?.email}</p>
             </div>
           </div>
           <button
             onClick={logout}
-            className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 py-2 px-3 text-xs font-semibold text-blue-100 transition hover:bg-red-500/20 hover:text-white"
+            className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 py-2 px-3 text-xs font-semibold text-[var(--sidebar-fg-dim)] transition hover:bg-red-500/20 hover:text-white"
           >
             <SignOut className="h-3.5 w-3.5" />
             <span>Sign out</span>
           </button>
-          <p className="mt-3 text-center text-[10px] text-blue-100/60">A product by Thewton</p>
+          <p className="mt-3 text-center text-[10px] text-[var(--sidebar-fg-dim)]/70">A product by Thewton</p>
         </div>
       </aside>
 
       {/* Main */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 md:px-8">
+        <header className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-[var(--border)] bg-[var(--surface)] px-4 md:px-8">
           <div className="flex min-w-0 items-center gap-3">
             <button aria-label="Open navigation" onClick={() => setMenuOpen(true)}
-              className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 md:hidden">
+              className="rounded-lg p-2 text-[var(--fg-muted)] hover:bg-[var(--fill)] md:hidden">
               <List className="h-5 w-5" />
             </button>
             <div className="min-w-0">
-              <span className="block truncate text-sm font-semibold text-slate-900">
+              <span className="block truncate text-sm font-semibold text-[var(--fg)]">
                 {activeItem?.name || "Dashboard"}
               </span>
               {pathname !== "/dashboard" && (
-                <span className="block text-[11px] text-slate-500">
+                <span className="block text-[11px] text-[var(--fg-muted)]">
                   Dashboard / {activeItem?.name || ""}
                 </span>
               )}
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#122B49] text-xs font-bold text-white" title={user.email}>
-              {user.name.substring(0, 2).toUpperCase()}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <ThemeToggle />
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#122B49] text-xs font-bold text-white" title={user?.email}>
+              {(user?.name ?? "").substring(0, 2).toUpperCase()}
             </div>
           </div>
         </header>
@@ -250,6 +243,20 @@ export default function TenantDashboardLayout({
           <div className="mx-auto w-full max-w-[1440px]">{children}</div>
         </main>
       </div>
+
+      {/* Covers the workspace instead of replacing it: the layout has to keep
+          rendering {children} so Next can validate the segments below it for
+          instant navigation. No tenant data is server-rendered — every panel
+          fetches with the bearer token — so nothing is exposed behind this. */}
+      {!ready && (
+        <div role="status" aria-live="polite"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--canvas)] text-[var(--fg-muted)]">
+          <div className="flex flex-col items-center gap-3">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-700 border-t-transparent" />
+            <p className="text-sm">Loading workspace…</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

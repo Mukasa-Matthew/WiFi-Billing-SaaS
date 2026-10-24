@@ -30,11 +30,11 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       <div aria-live="polite" className="pointer-events-none fixed bottom-4 right-4 z-[90] flex w-80 flex-col gap-2">
         {toasts.map((t) => (
           <div key={t.id} role="status"
-            className="pointer-events-auto flex items-start gap-2.5 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-md">
+            className="pointer-events-auto flex items-start gap-2.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-3 shadow-md">
             {icons[t.kind]}
-            <p className="flex-1 text-xs font-medium leading-5 text-slate-800">{t.text}</p>
+            <p className="flex-1 text-xs font-medium leading-5 text-[var(--fg)]">{t.text}</p>
             <button aria-label="Dismiss" onClick={() => setToasts((x) => x.filter((y) => y.id !== t.id))}
-              className="text-slate-400 hover:text-slate-700">
+              className="text-[var(--fg-faint)] hover:text-[var(--fg-body)]">
               <X className="h-3.5 w-3.5" />
             </button>
           </div>

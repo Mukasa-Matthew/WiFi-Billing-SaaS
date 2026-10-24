@@ -1,10 +1,9 @@
 "use client";
 import React,{useState} from "react";
-import Link from "next/link";
 import {useRouter} from "next/navigation";
 import api from "@/lib/api";
-import {useResource,Notice,field,button,buttonGhost,message,PageContainer,PageHeader,label,hint} from "@/components/BillingUI";
-import { ArrowLeft } from "@phosphor-icons/react";
+import {useResource,Notice,field,message,label,hint,FormHeader,FormSection,FormActions,FormLayout,SummaryCard} from "@/components/BillingUI";
+import { Money, CellTower } from "@phosphor-icons/react";
 
 interface RouterRec{id:number;name:string}
 interface Plan{id:number;name:string;price:number;sessionTimeout:number}
@@ -23,14 +22,26 @@ export default function Page(){
  const loadHosts=async(id:string)=>{setHosts([]);setSeen("");if(!id)return;try{const res=await api.get<{hosts:Host[];seenAt:string}>(`/api/routers/${id}/hosts`);setHosts(res.data.hosts);setSeen(res.data.seenAt);}catch(e){setNote(message(e));}};
  const save=async(e:React.FormEvent)=>{e.preventDefault();setSaving(true);try{await api.post("/api/bindings",{routerId:Number(router),name,packageId:plan?Number(plan):null,mac,address:address||null,expiresAt:expires?new Date(expires).toISOString():null,recordPayment:paid,amount:paid?Number(amount):null,method:paid?method:null,reference:reference||null});nav.push("/dashboard/bindings");}catch(e){setNote(message(e));}finally{setSaving(false);}};
 
- return <PageContainer width="narrow">
-  <div>
-   <Link href="/dashboard/bindings" className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-900"><ArrowLeft size={13}/>IP bindings</Link>
-   <div className="mt-3"><PageHeader title="Bind a device" description="Grant a device automatic access that skips the captive portal, with optional expiry and paid access rules."/></div>
-  </div>
+ const chosenRouter=routers.data.find(r=>String(r.id)===router);
+ const chosenPlan=plans.data.find(p=>String(p.id)===plan);
+
+ return <div className="mx-auto max-w-6xl space-y-6">
+  <FormHeader backHref="/dashboard/bindings" backLabel="IP bindings" title="Bind a device"
+   description="Grant a device automatic access that skips the captive portal, with optional expiry and paid access rules."/>
   <Notice text={note||routers.error||plans.error}/>
-  <form onSubmit={save} className="space-y-6">
-   <section className="grid gap-5 rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:grid-cols-2">
+  <form onSubmit={save}>
+   <FormLayout aside={
+    <SummaryCard title="Binding summary" rows={[
+     {label:"Router",value:chosenRouter?chosenRouter.name:<span className="font-normal text-[var(--fg-muted)]">Not selected</span>},
+     {label:"Device",value:name||<span className="font-normal text-[var(--fg-muted)]">Unnamed</span>},
+     {label:"MAC",value:<span className="font-mono text-xs">{mac||"—"}</span>},
+     {label:"Access",value:chosenPlan?chosenPlan.name:"Free bypass"},
+     {label:"Expires",value:expires?new Date(expires).toLocaleString():"Never"},
+    ]} footer="A bound device connects without entering a voucher code."/>
+   }>
+   <FormSection icon={<CellTower size={18} weight="duotone" aria-hidden/>} title="Device and access"
+    hint="Identify the device on a router and choose what access it gets.">
+    <div className="grid gap-5 sm:grid-cols-2">
     <div className="sm:col-span-2">
      <label className={label}>MikroTik{req}</label>
      <select required value={router} onChange={e=>{setRouter(e.target.value);void loadHosts(e.target.value);}} className={field}>
@@ -56,7 +67,7 @@ export default function Page(){
       <option value="">Select a reported DHCP lease</option>
       {hosts.map((h,i)=><option key={i} value={i}>{h.address} · {h["mac-address"]} {h["host-name"]}</option>)}
      </select>
-     <button type="button" disabled={!router} onClick={()=>loadHosts(router)} className="mt-2 text-xs font-medium text-blue-700 hover:underline disabled:opacity-40">Refresh reported hosts</button>
+     <button type="button" disabled={!router} onClick={()=>loadHosts(router)} className="mt-2 text-xs font-medium text-[var(--accent-text)] hover:underline disabled:opacity-40">Refresh reported hosts</button>
      <p className={hint}>{seen?`Last report: ${new Date(seen).toLocaleString()}`:"No host report yet. Enter the IP and MAC manually."}</p>
     </div>
     <div>
@@ -73,14 +84,15 @@ export default function Page(){
      <input type="datetime-local" value={expires} onChange={e=>setExpires(e.target.value)} className={field}/>
      <p className={hint}>Overrides package expiry. Without a package or date, access never expires.</p>
     </div>
-   </section>
-   <section className="space-y-5 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-    <h2 className="text-sm font-semibold text-slate-900">Payment recording</h2>
-    <label className="flex items-center gap-2.5 text-sm text-slate-700">
-     <input type="checkbox" checked={paid} onChange={e=>setPaid(e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-blue-700"/>
-     Record payment
+    </div>
+   </FormSection>
+   <FormSection icon={<Money size={18} weight="duotone" aria-hidden/>} title="Payment recording"
+    hint="Records an already received payment in revenue. Leave off for free or internal access.">
+    <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-[var(--border)] p-4 transition hover:bg-[var(--subtle)]">
+     <input type="checkbox" checked={paid} onChange={e=>setPaid(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-blue-700"/>
+     <span><span className="block text-sm font-medium text-[var(--fg)]">Record payment</span>
+     <span className="mt-0.5 block text-xs text-[var(--fg-muted)]">Adds this amount to your revenue figures.</span></span>
     </label>
-    <p className={hint}>Records an already received payment in revenue. Leave off for free or internal access.</p>
     {paid&&<div className="grid gap-5 sm:grid-cols-2">
      <div>
       <label className={label}>Amount paid (UGX){req}</label>
@@ -95,11 +107,9 @@ export default function Page(){
       <input maxLength={128} value={reference} onChange={e=>setReference(e.target.value)} className={field}/>
      </div>
     </div>}
-   </section>
-   <div className="flex items-center gap-3">
-    <button disabled={saving} className={button}>{saving?"Saving…":"Create binding"}</button>
-    <Link href="/dashboard/bindings" className={buttonGhost}>Cancel</Link>
-   </div>
+   </FormSection>
+   <FormActions busy={saving} busyLabel="Saving…" submitLabel="Create binding" cancelHref="/dashboard/bindings"/>
+   </FormLayout>
   </form>
- </PageContainer>;
+ </div>;
 }
