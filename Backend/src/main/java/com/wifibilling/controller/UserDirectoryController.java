@@ -25,7 +25,7 @@ public class UserDirectoryController {
   record Agg(OffsetDateTime first,long data,long devices) {}
   var stats=new HashMap<String,Agg>();
   for(Object[] row:accounting.userStats(p.getTenantId(),now.minusMinutes(6)))
-   stats.put((String)row[0],new Agg(row[1]==null?null:(row[1] instanceof java.sql.Timestamp ts?ts.toLocalDateTime().atOffset(java.time.ZoneOffset.UTC):row[1] instanceof java.sql.Date d2?d2.toLocalDate().atStartOfDay().atOffset(java.time.ZoneOffset.UTC):(java.time.OffsetDateTime)row[1]),((Number)row[2]).longValue(),((Number)row[3]).longValue()));
+   stats.put((String)row[0],new Agg(toUtc(row[1]),((Number)row[2]).longValue(),((Number)row[3]).longValue()));
   // Latest session per user — one DISTINCT ON query
   var latestBy=new HashMap<String,Object[]>();
   for(Object[] row:accounting.latestSessions(p.getTenantId())) latestBy.put((String)row[0],row);
@@ -41,5 +41,13 @@ public class UserDirectoryController {
    long data=agg==null?0:agg.data();
    return new User(v.getId(),v.getCustomer()==null?null:v.getCustomer().getId(),v.getCustomer()==null?null:v.getCustomer().getName(),v.getCustomer()==null?null:v.getCustomer().getPhone(),v.getCode(),v.getPackagePlan().getName(),status,devices>0,latest==null?null:(String)latest[1],latest==null?v.getClaimedMac():(String)latest[2],router==null?null:router.getName(),v.getPackagePlan().getSharedUsers(),devices,first,expiry,data,expiry==null?null:Math.max(0,java.time.Duration.between(now,expiry).getSeconds()));
   }).toList();
+ }
+ private static OffsetDateTime toUtc(Object v){
+  return v==null?null
+    :v instanceof OffsetDateTime o?o
+    :v instanceof java.time.Instant i?i.atOffset(java.time.ZoneOffset.UTC)
+    :v instanceof java.sql.Timestamp ts?ts.toLocalDateTime().atOffset(java.time.ZoneOffset.UTC)
+    :v instanceof java.sql.Date d?d.toLocalDate().atStartOfDay().atOffset(java.time.ZoneOffset.UTC)
+    :null;
  }
 }
