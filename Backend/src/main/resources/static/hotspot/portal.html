@@ -284,6 +284,29 @@
     </div>
 </div>
 
+<!-- Feedback modal -->
+<div id="feedback-modal" class="overlay">
+    <div class="modal-box">
+        <button class="modal-close" onclick="hideFeedback()">✕</button>
+        <h3>Share Feedback</h3>
+        <p>Tell us about your experience with this WiFi service.</p>
+        <div id="fb-stars" style="display:flex;gap:6px;justify-content:center;font-size:26px;margin-bottom:12px;cursor:pointer">
+            <span data-r="1">☆</span><span data-r="2">☆</span><span data-r="3">☆</span><span data-r="4">☆</span><span data-r="5">☆</span>
+        </div>
+        <div class="input-wrap">
+            <span class="icon">👤</span>
+            <input class="form-input" id="fb-name" type="text" placeholder="Your name (optional)" maxlength="120">
+        </div>
+        <div class="input-wrap">
+            <span class="icon">📞</span>
+            <input class="form-input" id="fb-phone" type="tel" placeholder="Phone number (optional)" maxlength="32">
+        </div>
+        <textarea class="form-input" id="fb-message" rows="3" maxlength="1000" placeholder="Your feedback…" style="padding:14px;margin-bottom:12px;resize:vertical"></textarea>
+        <button type="button" class="btn btn-dark" id="fb-send" onclick="sendFeedback()">Send Feedback</button>
+        <div id="fb-result" style="margin-top:10px"></div>
+    </div>
+</div>
+
 <script>
 var Q = new URLSearchParams(location.search);
 var TOKEN = Q.get('token') || '';
@@ -330,12 +353,15 @@ function renderSettings(settings) {
         document.getElementById('support-email-line').style.display = 'block';
         document.getElementById('support-email-link').textContent = email;
         document.getElementById('support-email-link').href = 'mailto:' + email;
-        var sb = document.getElementById('share-btn');
-        sb.style.display = 'flex';
-        sb.onclick = function(){ location.href = 'mailto:' + email + '?subject=WiFi%20Feedback'; };
     } else {
         document.getElementById('support-email-line').style.display = 'none';
-        document.getElementById('share-btn').style.display = 'none';
+    }
+    var sb = document.getElementById('share-btn');
+    if (settings.showFeedback !== false) {
+        sb.style.display = 'flex';
+        sb.onclick = showFeedback;
+    } else {
+        sb.style.display = 'none';
     }
     document.getElementById('dst-input').value = settings.redirectUrl || LINK_ORIG;
 
@@ -399,6 +425,45 @@ function toggleFaq(){
 function showFind(){ document.getElementById('find-modal').classList.add('show'); }
 function hideFind(){ document.getElementById('find-modal').classList.remove('show'); }
 function hidePay(){ document.getElementById('pay-modal').classList.remove('show'); }
+
+var fbRating = 0;
+function showFeedback(){ document.getElementById('feedback-modal').classList.add('show'); }
+function hideFeedback(){ document.getElementById('feedback-modal').classList.remove('show'); }
+Array.prototype.forEach.call(document.querySelectorAll('#fb-stars span'), function(star){
+    star.onclick = function(){
+        fbRating = parseInt(star.getAttribute('data-r'), 10);
+        Array.prototype.forEach.call(document.querySelectorAll('#fb-stars span'), function(s){
+            s.textContent = parseInt(s.getAttribute('data-r'), 10) <= fbRating ? '★' : '☆';
+        });
+    };
+});
+function sendFeedback(){
+    var msg = document.getElementById('fb-message').value.trim();
+    var out = document.getElementById('fb-result');
+    if (!msg) { out.innerHTML = '<div class="status-msg error">Please write your feedback first.</div>'; return; }
+    var btn = document.getElementById('fb-send');
+    btn.disabled = true; out.innerHTML = '<div class="spinner" style="margin:10px auto"></div>';
+    var mac = Q.get('mac') || '';
+    fetch(BASE + '/api/portal/feedback?token=' + encodeURIComponent(TOKEN), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            name: document.getElementById('fb-name').value.trim(),
+            phone: document.getElementById('fb-phone').value.trim(),
+            mac: mac, rating: fbRating || null, message: msg
+        })
+    }).then(function(r){
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        out.innerHTML = '<div class="status-msg success">Thank you! Your feedback has been sent.</div>';
+        document.getElementById('fb-message').value = '';
+        document.getElementById('fb-name').value = '';
+        document.getElementById('fb-phone').value = '';
+        fbRating = 0;
+        Array.prototype.forEach.call(document.querySelectorAll('#fb-stars span'), function(s){ s.textContent = '☆'; });
+        setTimeout(hideFeedback, 1600);
+    }).catch(function(){
+        out.innerHTML = '<div class="status-msg error">Could not send right now. Please try again in a moment.</div>';
+    }).finally(function(){ btn.disabled = false; });
+}
 
 function findVoucher(){
     var phone = document.getElementById('find-phone').value.trim();
