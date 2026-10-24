@@ -33,6 +33,7 @@ public class PortalController {
     private final RouterRepository routerRepository;
     private final PackagePlanRepository packagePlanRepository;
     private final TransactionRepository transactionRepository;
+    private final com.wifibilling.repository.PortalFeedbackRepository feedbackRepository;
     private final PlatformProperties props;
 
     private List<PortalPackageResponse> portalPackages(Router router) {
@@ -280,6 +281,38 @@ public class PortalController {
         if (s == null) return "";
         return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
                 .replace("\"", "&quot;");
+    }
+
+    /** Public endpoint — a hotspot client leaves feedback for the tenant. */
+    @PostMapping("/feedback")
+    @org.springframework.transaction.annotation.Transactional
+    public ResponseEntity<java.util.Map<String, Object>> submitFeedback(
+            @RequestParam("token") String token,
+            @RequestBody java.util.Map<String, Object> body) {
+        Router router = resolveRouter(token);
+        String message = String.valueOf(body == null ? "" : body.getOrDefault("message", "")).trim();
+        if (message.isEmpty() || message.length() > 1000) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Feedback message is required (max 1000 chars)");
+        }
+        Integer rating = null;
+        Object r = body.get("rating");
+        if (r instanceof Number n && n.intValue() >= 1 && n.intValue() <= 5) rating = n.intValue();
+        feedbackRepository.save(com.wifibilling.model.PortalFeedback.builder()
+                .tenant(router.getTenant())
+                .router(router)
+                .name(cut(body.get("name"), 120))
+                .phone(cut(body.get("phone"), 32))
+                .mac(cut(body.get("mac"), 20))
+                .rating(rating)
+                .message(message)
+                .build());
+        return ResponseEntity.ok(java.util.Map.of("ok", true));
+    }
+
+    private static String cut(Object v, int max) {
+        if (v == null) return null;
+        String s = String.valueOf(v).trim();
+        return s.isEmpty() ? null : s.substring(0, Math.min(s.length(), max));
     }
 
     private Router resolveRouter(String token) {
