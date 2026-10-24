@@ -17,7 +17,7 @@ interface LedgerEntry {
 }
 interface Withdrawal {
   id: number; amount: number; fee: number; totalDeduction: number;
-  phone: string; status: string; failureReason: string | null;
+  phone: string; status: string; failureReason: string | null; payoutRef: string;
   createdAt: string; completedAt: string | null;
 }
 
@@ -35,6 +35,10 @@ const STATUS_TONE: Record<string, string> = {
   REQUESTED: "amber", FAILED: "red", CANCELLED: "slate",
 };
 const money = (v?: number | null) => `UGX ${(v ?? 0).toLocaleString()}`;
+const OPEN_STATUSES = ["REQUESTED", "PENDING_APPROVAL", "PROCESSING"];
+// Mirrors WithdrawalService.estimateFee — actual charge is set by the provider and reconciled.
+const estimateFee = (amount: number) => Math.max(500, Math.round(amount * 0.01));
+const shortRef = (ref: string) => `WD-${ref.replaceAll("-", "").slice(0, 8).toUpperCase()}`;
 
 export default function WalletPage() {
   const [summary, setSummary] = useState<WalletSummary | null>(null);
@@ -85,7 +89,7 @@ export default function WalletPage() {
 
       <Notice text={formError || actErr} />
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
         <div className={`${panel} p-5`}>
           <div className="flex items-center gap-2 text-xs font-semibold text-[var(--fg-muted)]"><Wallet size={15} /> Available balance</div>
           <div className="mt-2 text-2xl font-bold text-[var(--fg)]">{money(summary?.available)}</div>
@@ -95,6 +99,13 @@ export default function WalletPage() {
           <div className="flex items-center gap-2 text-xs font-semibold text-[var(--fg-muted)]"><ShieldCheck size={15} /> Reserved</div>
           <div className="mt-2 text-2xl font-bold text-[var(--fg)]">{money(summary?.reserved)}</div>
           <p className="mt-1 text-xs text-[var(--fg-faint)]">Held for in-flight withdrawals</p>
+        </div>
+        <div className={`${panel} p-5`}>
+          <div className="flex items-center gap-2 text-xs font-semibold text-[var(--fg-muted)]"><ArrowDown size={15} /> Pending payouts</div>
+          <div className="mt-2 text-2xl font-bold text-[var(--fg)]">
+            {money((withdrawals ?? []).filter((w) => OPEN_STATUSES.includes(w.status)).reduce((s, w) => s + w.amount, 0))}
+          </div>
+          <p className="mt-1 text-xs text-[var(--fg-faint)]">{summary?.openWithdrawals ?? 0} in progress</p>
         </div>
         <div className={`${panel} p-5`}>
           <div className="flex items-center gap-2 text-xs font-semibold text-[var(--fg-muted)]"><Bank size={15} /> Lifetime earnings</div>
@@ -121,10 +132,13 @@ export default function WalletPage() {
           rows={withdrawals}
           emptyTitle="No withdrawals yet."
           columns={[
-            { label: "Date", render: (w: Withdrawal) => <span className="text-[var(--fg-muted)]">{date(w.createdAt)}</span> },
+            { label: "Reference", render: (w: Withdrawal) => <span className="font-mono text-xs font-semibold">{shortRef(w.payoutRef)}</span> },
+            { label: "Requested", render: (w: Withdrawal) => <span className="text-[var(--fg-muted)]">{date(w.createdAt)}</span> },
+            { label: "Method", render: () => <span className="text-[var(--fg-muted)]">Mobile money</span> },
             { label: "Phone", render: (w: Withdrawal) => <span className="font-mono text-xs">{w.phone}</span> },
             { label: "Amount", render: (w: Withdrawal) => <span className="font-semibold">{money(w.amount)}</span> },
             { label: "Fee", render: (w: Withdrawal) => <span className="text-[var(--fg-muted)]">{money(w.fee)}</span> },
+            { label: "Paid", render: (w: Withdrawal) => <span className="text-[var(--fg-muted)]">{w.completedAt ? date(w.completedAt) : "—"}</span> },
             { label: "Status", render: (w: Withdrawal) => (
               <span>
                 <Badge tone={STATUS_TONE[w.status] || "slate"}>{w.status.replaceAll("_", " ")}</Badge>
@@ -171,13 +185,16 @@ export default function WalletPage() {
               <h3 className="text-base font-bold text-[var(--fg)]">Withdraw earnings</h3>
               <button type="button" onClick={() => setOpen(false)} className="text-[var(--fg-faint)] hover:text-[var(--fg-muted)]"><X size={18} /></button>
             </div>
-            <p className="mt-1 text-xs text-[var(--fg-muted)]">Available: <b>{money(summary?.available)}</b></p>
+            <div className="mt-4 rounded-xl bg-[var(--subtle)] px-4 py-3 text-center">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--fg-faint)]">Available balance</p>
+              <p className="mt-0.5 text-xl font-bold text-[var(--fg)]">{money(summary?.available)}</p>
+            </div>
 
             <div className="mt-5">
-              <label className={label}>Amount (UGX)</label>
+              <label className={label}>Withdrawal amount (UGX)</label>
               <input className={field} type="number" required min={summary?.limits.min} max={Math.min(summary?.limits.max || 0, summary?.available || 0)}
                 value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="e.g. 50000" />
-              <p className={hint}>Between {money(summary?.limits.min)} and {money(Math.min(summary?.limits.max || 0, summary?.available || 0))}. A payout fee is deducted by the provider.</p>
+              <p className={hint}>Between {money(summary?.limits.min)} and {money(Math.min(summary?.limits.max || 0, summary?.available || 0))}.</p>
             </div>
             <div className="mt-4">
               <label className={label}>Mobile money number</label>
@@ -185,6 +202,14 @@ export default function WalletPage() {
                 placeholder="07XX XXX XXX" />
               <p className={hint}>MTN or Airtel number that will receive the payout.</p>
             </div>
+            {Number(amount) >= (summary?.limits.min ?? Infinity) && (
+              <dl className="mt-4 space-y-1.5 rounded-xl border border-[var(--border-soft)] bg-[var(--subtle)] px-4 py-3 text-xs">
+                <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Withdrawal amount</dt><dd className="font-semibold text-[var(--fg)]">{money(Number(amount))}</dd></div>
+                <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Estimated gateway fee</dt><dd className="text-[var(--fg-muted)]">-{money(estimateFee(Number(amount)))}</dd></div>
+                <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Deducted from wallet</dt><dd className="text-[var(--fg-muted)]">{money(Number(amount) + estimateFee(Number(amount)))}</dd></div>
+                <div className="flex justify-between border-t border-[var(--border-soft)] pt-1.5"><dt className="font-semibold text-[var(--fg)]">You will receive</dt><dd className="font-bold text-emerald-700">{money(Number(amount))}</dd></div>
+              </dl>
+            )}
             {summary?.limits.approvalRequired && (
               <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
                 Withdrawals are reviewed by the platform before funds are sent.

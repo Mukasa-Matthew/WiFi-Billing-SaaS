@@ -61,7 +61,7 @@ public class WalletController {
     }
 
     public record WithdrawalView(Long id, Long amount, Long fee, Long totalDeduction,
-                                 String phone, String status, String failureReason,
+                                 String phone, String status, String failureReason, String payoutRef,
                                  OffsetDateTime createdAt, OffsetDateTime completedAt) {}
 
     @GetMapping("/withdrawals")
@@ -88,6 +88,7 @@ public class WalletController {
 
     private static WithdrawalView toView(WithdrawalRequest w) {
         return new WithdrawalView(w.getId(), w.getAmount(), w.getFee(), w.getTotalDeduction(),
-                w.getPhone(), w.getStatus(), w.getFailureReason(), w.getCreatedAt(), w.getCompletedAt());
+                w.getPhone(), w.getStatus(), w.getFailureReason(), w.getPayoutRef(),
+                w.getCreatedAt(), w.getCompletedAt());
     }
 }
