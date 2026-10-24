@@ -160,4 +160,29 @@ public class AdminTenantController {
                 activeSessions
         );
     }
+
+    /** Platform-wide router inventory. Deliberately excludes provisioning tokens,
+     * RADIUS secrets and WireGuard public keys. */
+    @GetMapping("/routers")
+    public List<AdminTenantDto.RouterFleetResponse> listRouters() {
+        return routerRepository.findAll().stream()
+                .map(r -> new AdminTenantDto.RouterFleetResponse(
+                        r.getId(),
+                        r.getTenant().getId(),
+                        r.getTenant().getName(),
+                        r.getName(),
+                        r.getStatus(),
+                        r.getWgIp(),
+                        r.getCpuLoad(),
+                        r.getMemoryUsage(),
+                        r.getUptime(),
+                        r.getActiveUsers(),
+                        r.getHotspotReady(),
+                        r.getRadiusReady(),
+                        r.getPortalReady(),
+                        r.getLastSeen(),
+                        r.getCreatedAt()
+                ))
+                .toList();
+    }
 }

@@ -7,8 +7,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import ThemeToggle from "@/components/ThemeToggle";
 import {
-  ChartLine,
-  Users,
   CellTower as RouterIcon,
   HardDrives,
   SignOut,
@@ -16,6 +14,9 @@ import {
   ShieldCheck,
   List,
   Bank,
+  Building2,
+  CreditCard,
+  LayoutDashboard,
 } from "@/components/icons";
 
 
@@ -43,12 +44,12 @@ export default function AdminLayout({
   const ready = !loading && user?.role === "ROLE_SUPERADMIN";
 
   const navItems = [
-    { name: "Platform overview", href: "/admin", icon: ChartLine, group: "Platform" },
-    { name: "Tenants", href: "/admin/tenants", icon: Users, group: "Platform" },
-    { name: "Finance", href: "/admin/finance", icon: Bank, group: "Platform" },
-    { name: "Subscriptions", href: "/admin/subscriptions", icon: ShieldCheck, group: "Platform" },
-    { name: "Router fleet", href: "/admin/routers", icon: RouterIcon, group: "Devices" },
-    { name: "Network health", href: "/admin/health", icon: HardDrives, group: "Devices" },
+    { name: "Command center", href: "/admin", icon: LayoutDashboard, group: "Overview" },
+    { name: "Tenants", href: "/admin/tenants", icon: Building2, group: "Business management" },
+    { name: "Subscriptions", href: "/admin/subscriptions", icon: CreditCard, group: "Business management" },
+    { name: "Finance", href: "/admin/finance", icon: Bank, group: "Financial management" },
+    { name: "Router fleet", href: "/admin/routers", icon: RouterIcon, group: "Network operations" },
+    { name: "System health", href: "/admin/health", icon: HardDrives, group: "Network operations" },
   ];
 
   const activeItem = [...navItems].sort((a, b) => b.href.length - a.href.length).find(
