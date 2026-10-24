@@ -29,6 +29,9 @@ public class RouterDto {
             Integer memoryUsage,
             String uptime,
             Integer activeUsers,
+            Boolean hotspotReady,
+            Boolean radiusReady,
+            Boolean portalReady,
             OffsetDateTime lastSeen,
             OffsetDateTime createdAt) {
     }

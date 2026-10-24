@@ -70,6 +70,13 @@ public class Router {
     @Column(name = "last_seen")
     private OffsetDateTime lastSeen;
 
+    @Column(name = "hotspot_ready")
+    private Boolean hotspotReady;
+    @Column(name = "radius_ready")
+    private Boolean radiusReady;
+    @Column(name = "portal_ready")
+    private Boolean portalReady;
+
     @Column(length=64) private String bindingsHash;
     private OffsetDateTime bindingsSyncedAt;
     @Column(length=12000) private String hostsJson;

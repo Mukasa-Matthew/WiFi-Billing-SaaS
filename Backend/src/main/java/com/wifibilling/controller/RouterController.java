@@ -131,6 +131,9 @@ public class RouterController {
                 r.getMemoryUsage(),
                 r.getUptime(),
                 r.getActiveUsers(),
+                r.getHotspotReady(),
+                r.getRadiusReady(),
+                r.getPortalReady(),
                 r.getLastSeen(),
                 r.getCreatedAt()
         );
