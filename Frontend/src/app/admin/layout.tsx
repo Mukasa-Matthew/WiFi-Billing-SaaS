@@ -103,7 +103,11 @@ export default function AdminLayout({
                     }`}
                   >
                     {isActive && <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r bg-blue-400" />}
-                    <Icon className="h-4 w-4 shrink-0" />
+                    <Icon
+                      aria-hidden="true"
+                      weight="regular"
+                      className={`h-5 w-5 shrink-0 ${isActive ? "text-blue-300" : "text-[var(--sidebar-fg-dim)]"}`}
+                    />
                     <span className="flex-1">{item.name}</span><LinkPending />
                   </Link>
                 </React.Fragment>
