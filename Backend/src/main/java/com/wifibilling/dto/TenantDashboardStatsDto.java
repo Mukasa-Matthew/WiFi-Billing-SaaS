@@ -26,5 +26,11 @@ public record TenantDashboardStatsDto(
     List<Map<String, Object>> dailyActiveUsers,
     List<Map<String, Object>> registrations,
     List<Map<String, Object>> topDataUsers,
-    List<Map<String, Object>> packagePerformance
+    List<Map<String, Object>> packagePerformance,
+    Integer avgCpuLoad,
+    Integer avgMemoryUsage,
+    long dataMonthDownBytes,
+    long dataMonthUpBytes,
+    long totalCustomers,
+    long newCustomersThisWeek
 ) {}

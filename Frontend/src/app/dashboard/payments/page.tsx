@@ -92,7 +92,7 @@ export default function Page() {
           { label: "Method", render: p => <Badge tone="slate">{p.method}</Badge> },
           { label: "Amount", render: p => <span className="font-semibold">UGX {Number(p.amount).toLocaleString()}</span> },
           { label: "Status", render: p => <Badge tone={p.status === "SUCCESSFUL" ? "green" : p.status === "FAILED" ? "red" : "amber"}>{p.status}</Badge> },
-          { label: "CellTower", render: p => p.router },
+          { label: "Router", render: p => p.router },
           { label: "Recorded", render: p => <span className="text-slate-500">{date(p.createdAt)}</span> },
         ]}
       />

@@ -52,7 +52,7 @@ export default function AdminLayout({
   const navItems = [
     { name: "Platform overview", href: "/admin", icon: ChartLine, group: "Platform" },
     { name: "Tenants", href: "/admin/tenants", icon: Users, group: "Platform" },
-    { name: "CellTower fleet", href: "/admin/routers", icon: RouterIcon, group: "Devices" },
+    { name: "Router fleet", href: "/admin/routers", icon: RouterIcon, group: "Devices" },
     { name: "Network health", href: "/admin/health", icon: HardDrives, group: "Devices" },
   ];
 

@@ -106,7 +106,7 @@ export default function TenantSessionLogsPage() {
       "User / Voucher",
       "Framed IP",
       "Client MAC",
-      "CellTower NAS IP",
+      "Router NAS IP",
       "Start Time",
       "Stop Time",
       "Duration (Sec)",
@@ -201,7 +201,7 @@ export default function TenantSessionLogsPage() {
           <MagnifyingGlass className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
           <input
             type="text"
-            placeholder="MagnifyingGlass code, IP, MAC, cause..."
+            placeholder="Search code, IP, MAC, cause..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-9 pr-4 py-2 rounded-xl bg-[#F5F7FA] border border-slate-200 text-xs text-slate-900 placeholder-slate-500 focus:outline-none focus:border-indigo-500"

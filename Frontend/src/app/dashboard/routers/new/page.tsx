@@ -202,7 +202,7 @@ export default function AddRouterPage() {
                   <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition ${hasWireless ? "left-6" : "left-1"}`} />
                 </button>
                 <span>
-                  <span className="block text-sm font-semibold text-slate-900">CellTower has Wireless</span>
+                  <span className="block text-sm font-semibold text-slate-900">Router has Wireless</span>
                   <span className="mt-1 block text-xs text-slate-500">Enable this if your MikroTik router has Wi-Fi capabilities.</span>
                 </span>
               </label>
@@ -241,7 +241,7 @@ export default function AddRouterPage() {
                   {connected ? <CheckCircle className="h-6 w-6 text-emerald-700" /> : <CircleNotch className="h-6 w-6 animate-spin text-blue-700" />}
                   <div>
                     <p className={`font-mono text-sm font-semibold ${connected ? "text-emerald-700" : "text-slate-900"}`}>
-                      {connected ? "CellTower is verified and ready" : degraded ? "CellTower connected, but readiness checks failed" : "$ Paste the provisioning command in your MikroTik terminal to begin"}
+                      {connected ? "Router is verified and ready" : degraded ? "Router connected, but readiness checks failed" : "$ Paste the provisioning command in your MikroTik terminal to begin"}
                     </p>
                     <p className="mt-2 text-xs text-slate-500">
                       {connected
