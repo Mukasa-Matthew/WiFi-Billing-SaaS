@@ -5,6 +5,7 @@ import { LinkPending } from "@/components/LoadingUI";
 import React, { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import ThemeToggle from "@/components/ThemeToggle";
 import {
   ChartLine,
   Users,
@@ -17,7 +18,7 @@ import {
   Bank,
 } from "@phosphor-icons/react";
 
-const NAVY = "#0B1F36";
+
 
 export default function AdminLayout({
   children,
@@ -39,16 +40,7 @@ export default function AdminLayout({
     }
   }, [user, loading, router]);
 
-  if (loading || !user || user.role !== "ROLE_SUPERADMIN") {
-    return (
-      <div className="flex h-screen items-center justify-center bg-[#F5F7FA] text-slate-500">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-700 border-t-transparent" />
-          <p className="text-sm">Verifying platform access…</p>
-        </div>
-      </div>
-    );
-  }
+  const ready = !loading && user?.role === "ROLE_SUPERADMIN";
 
   const navItems = [
     { name: "Platform overview", href: "/admin", icon: ChartLine, group: "Platform" },
@@ -64,7 +56,7 @@ export default function AdminLayout({
   );
 
   return (
-    <div className="h-dvh overflow-hidden bg-[#F5F7FA] text-slate-900 flex">
+    <div className="h-dvh overflow-hidden bg-[var(--canvas)] text-[var(--fg)] flex">
       {menuOpen && (
         <button aria-label="Close navigation" onClick={() => setMenuOpen(false)}
           className="fixed inset-0 z-30 bg-slate-950/50 md:hidden" />
@@ -73,7 +65,7 @@ export default function AdminLayout({
       {/* Sidebar */}
       <aside
         className={`${menuOpen ? "flex" : "hidden"} fixed inset-y-0 left-0 z-40 w-64 flex-col justify-between shrink-0 md:static md:flex`}
-        style={{ backgroundColor: NAVY }}
+        style={{ backgroundColor: "var(--sidebar-admin)" }}
       >
         <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain">
           <div className="flex h-16 items-center gap-3 border-b border-white/10 px-5">
@@ -82,7 +74,7 @@ export default function AdminLayout({
             </div>
             <div>
               <span className="block text-sm font-bold tracking-tight text-white">AirPairy</span>
-              <span className="block text-[10px] font-semibold uppercase tracking-widest text-blue-100">
+              <span className="block text-[10px] font-semibold uppercase tracking-widest text-[var(--sidebar-fg-dim)]">
                 Platform admin
               </span>
             </div>
@@ -96,7 +88,7 @@ export default function AdminLayout({
               return (
                 <React.Fragment key={item.href}>
                   {(index === 0 || navItems[index - 1].group !== item.group) && (
-                    <p className={`px-3 pb-1.5 ${index === 0 ? "" : "pt-3"} text-[10px] font-bold uppercase tracking-widest text-blue-200`}>
+                    <p className={`px-3 pb-1.5 ${index === 0 ? "" : "pt-3"} text-[10px] font-bold uppercase tracking-widest text-[var(--sidebar-fg-faint)]`}>
                       {item.group}
                     </p>
                   )}
@@ -106,7 +98,7 @@ export default function AdminLayout({
                     href={item.href}
                     className={`relative flex items-center gap-3 rounded-lg px-3.5 py-2 text-[13px] font-medium transition ${
                       isActive
-                        ? "bg-white text-[#122B49] shadow-sm"
+                        ? "bg-[var(--sidebar-active)] text-[var(--sidebar-active-fg)] shadow-sm"
                         : "text-slate-200 hover:bg-white/10 hover:text-white"
                     }`}
                   >
@@ -126,13 +118,13 @@ export default function AdminLayout({
               <ShieldCheck className="h-4 w-4" />
             </div>
             <div className="min-w-0">
-              <p className="truncate text-xs font-semibold text-white">{user.name}</p>
-              <p className="truncate text-[11px] text-blue-100">{user.email}</p>
+              <p className="truncate text-xs font-semibold text-white">{user?.name}</p>
+              <p className="truncate text-[11px] text-[var(--sidebar-fg-dim)]">{user?.email}</p>
             </div>
           </div>
           <button
             onClick={logout}
-            className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 py-2 px-3 text-xs font-semibold text-blue-100 transition hover:bg-red-500/20 hover:text-white"
+            className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 py-2 px-3 text-xs font-semibold text-[var(--sidebar-fg-dim)] transition hover:bg-red-500/20 hover:text-white"
           >
             <SignOut className="h-3.5 w-3.5" />
             <span>Sign out</span>
@@ -142,19 +134,20 @@ export default function AdminLayout({
 
       {/* Main */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 md:px-8">
+        <header className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-[var(--border)] bg-[var(--surface)] px-4 md:px-8">
           <div className="flex min-w-0 items-center gap-3">
             <button aria-label="Open navigation" onClick={() => setMenuOpen(true)}
-              className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 md:hidden">
+              className="rounded-lg p-2 text-[var(--fg-muted)] hover:bg-[var(--fill)] md:hidden">
               <List className="h-5 w-5" />
             </button>
-            <span className="truncate text-sm font-semibold text-slate-900">
+            <span className="truncate text-sm font-semibold text-[var(--fg)]">
               {activeItem?.name || "Platform"}
             </span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <ThemeToggle />
             <Link href="/dashboard"
-              className="rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">
+              className="rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 py-2 text-xs font-semibold text-[var(--fg-body)] transition hover:bg-[var(--subtle)]">
               Tenant workspace →
             </Link>
           </div>
@@ -164,6 +157,20 @@ export default function AdminLayout({
           <div className="mx-auto w-full max-w-[1440px]">{children}</div>
         </main>
       </div>
+
+      {/* Covers the console instead of replacing it: the layout has to keep
+          rendering {children} so Next can validate the segments below it for
+          instant navigation. Platform data is fetched with the bearer token,
+          so a non-superadmin never receives it behind this. */}
+      {!ready && (
+        <div role="status" aria-live="polite"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--canvas)] text-[var(--fg-muted)]">
+          <div className="flex flex-col items-center gap-3">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-700 border-t-transparent" />
+            <p className="text-sm">Verifying platform access…</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

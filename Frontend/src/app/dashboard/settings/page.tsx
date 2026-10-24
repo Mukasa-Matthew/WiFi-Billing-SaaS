@@ -3,8 +3,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import api from "@/lib/api";
 import {
-  Warning, CheckCircle, CircleNotch, FloppyDisk, GearSix, Globe, FileText,
-  Bell, Ticket, CloudArrowDown, Trash, CreditCard,
+  CheckCircle, CircleNotch, FloppyDisk, GearSix, Globe, FileText,
+  Bell, Ticket, CloudArrowDown, Trash, CreditCard, ArrowSquareOut,
 } from "@phosphor-icons/react";
 import PaymentGatewaySettings from "@/components/PaymentGatewaySettings";
 
@@ -49,10 +49,10 @@ const TEMPLATES = [
 const FONTS = ["Poppins", "Work Sans", "Inter", "Roboto", "Open Sans", "Lato", "Montserrat", "Nunito", "Raleway"];
 const LANGUAGES = ["English", "Swahili", "Luganda", "French"];
 
-const field = "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500";
-const label = "mb-2 block text-sm font-semibold text-slate-900";
-const hint = "mt-2 text-xs text-slate-500";
-const card = "rounded-xl border border-slate-200 bg-white p-6";
+const field = "w-full rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--fg)] outline-none transition focus:border-blue-500";
+const label = "mb-2 block text-sm font-semibold text-[var(--fg)]";
+const hint = "mt-2 text-xs text-[var(--fg-muted)]";
+const card = "rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6";
 
 const TABS = [
   { key: "general", name: "General Settings", icon: GearSix },
@@ -69,11 +69,11 @@ function Toggle({ on, onChange, title, desc }: { on: boolean; onChange: (v: bool
     <div className="flex items-start gap-4">
       <button type="button" role="switch" aria-checked={on} onClick={() => onChange(!on)}
         className={`relative mt-0.5 h-6 w-11 shrink-0 rounded-full transition ${on ? "bg-blue-600" : "bg-slate-300"}`}>
-        <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition ${on ? "left-6" : "left-1"}`} />
+        <span className={`absolute top-1 h-4 w-4 rounded-full bg-[var(--surface)] transition ${on ? "left-6" : "left-1"}`} />
       </button>
       <span>
-        <span className="block text-sm font-semibold text-slate-900">{title}</span>
-        {desc && <span className="mt-1 block text-xs text-slate-500">{desc}</span>}
+        <span className="block text-sm font-semibold text-[var(--fg)]">{title}</span>
+        {desc && <span className="mt-1 block text-xs text-[var(--fg-muted)]">{desc}</span>}
       </span>
     </div>
   );
@@ -87,9 +87,9 @@ function AssetBox({ title, hintText, has, uploading, onPick, onRemove, inputRef 
     <div>
       <label className={label}>{title}</label>
       <button type="button" onClick={() => inputRef.current?.click()} disabled={uploading}
-        className="flex h-24 w-full flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 text-xs text-slate-500 transition hover:border-blue-400 hover:bg-blue-50/40">
-        {uploading ? <CircleNotch size={18} className="animate-spin text-blue-600" /> : <CloudArrowDown size={20} className="text-slate-400" />}
-        {has ? "Replace image" : <>Drag &amp; drop or <span className="font-semibold text-blue-700">Browse</span></>}
+        className="flex h-24 w-full flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-[var(--border-strong)] bg-[var(--subtle)] text-xs text-[var(--fg-muted)] transition hover:border-blue-400 hover:bg-blue-50/40">
+        {uploading ? <CircleNotch size={18} className="animate-spin text-blue-600" /> : <CloudArrowDown size={20} className="text-[var(--fg-faint)]" />}
+        {has ? "Replace image" : <>Drag &amp; drop or <span className="font-semibold text-[var(--accent-text)]">Browse</span></>}
       </button>
       <input ref={inputRef} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; if (f) onPick(f); e.target.value = ""; }} />
@@ -106,8 +106,8 @@ function AssetBox({ title, hintText, has, uploading, onPick, onRemove, inputRef 
 export default function TenantSettingsPage() {
   const [form, setForm] = useState<TenantSettings | null>(null);
   const [tab, setTab] = useState<TabKey>("general");
-  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
-  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewSrc, setPreviewSrc] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(true);
   const [previewKey, setPreviewKey] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -122,22 +122,30 @@ export default function TenantSettingsPage() {
       .catch(() => setError("Could not load settings"));
   }, []);
 
-  const isPortalHtml = (html: string) =>
-    typeof html === "string" &&
-    html.includes("portal-card") &&
-    !html.includes("/_next/") &&
-    !/<title[^>]*>\s*(WiFi-Billing|AirPairy)/i.test(html);
-
+  /* The preview is the real /portal route in an iframe, fed the unsaved form
+     state. Debounced so typing a business name doesn't reload it per keystroke. */
   useEffect(() => {
     if (!form) return;
-    setPreviewError(null);
-    api.get<string>(`/api/settings/portal-preview?template=${encodeURIComponent(form.portalTemplate)}`, { responseType: "text" })
-      .then((r) => {
-        if (isPortalHtml(r.data)) { setPreviewHtml(r.data); }
-        else { setPreviewHtml(null); setPreviewError("The preview response wasn't a captive-portal page."); }
-      })
-      .catch(() => { setPreviewHtml(null); setPreviewError("Could not load the portal preview."); });
-  }, [form?.portalTemplate, previewKey]);
+    const timer = window.setTimeout(() => {
+      const q = new URLSearchParams({
+        preview: "1",
+        theme: form.portalTemplate,
+        name: form.name,
+        showPackages: form.portalShowPackages ? "1" : "0",
+        allowPurchases: form.portalAllowPurchases ? "1" : "0",
+        deviceLimits: form.portalShowDeviceLimits ? "1" : "0",
+        packageTime: form.portalShowPackageTime ? "1" : "0",
+        deviceMac: form.portalShowDeviceMac ? "1" : "0",
+        buyForOther: form.portalBuyForOther ? "1" : "0",
+        feedback: form.portalShowFeedback ? "1" : "0",
+      });
+      if (form.portalFont) q.set("font", form.portalFont);
+      if (form.portalLanguage) q.set("lang", form.portalLanguage);
+      setPreviewLoading(true);
+      setPreviewSrc(`/portal?${q.toString()}`);
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [form, previewKey]);
 
   const set = <K extends keyof TenantSettings>(key: K, value: TenantSettings[K]) =>
     setForm((f) => (f ? { ...f, [key]: value } : f));
@@ -190,7 +198,7 @@ export default function TenantSettingsPage() {
 
   if (!form) {
     return (
-      <div className="mx-auto max-w-3xl p-8 text-sm text-slate-500">
+      <div className="mx-auto max-w-3xl p-8 text-sm text-[var(--fg-muted)]">
         {error ?? "Loading settings…"}
       </div>
     );
@@ -199,18 +207,18 @@ export default function TenantSettingsPage() {
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-slate-900">Settings</h1>
-        <p className="mt-1 text-sm text-slate-500">
+        <h1 className="text-xl font-bold tracking-tight text-[var(--fg)]">Settings</h1>
+        <p className="mt-1 text-sm text-[var(--fg-muted)]">
           Branding, portal behavior, voucher defaults, and notifications for your hotspot business.
         </p>
       </div>
 
       {/* Tab bar */}
-      <nav className="flex flex-wrap gap-1 border-b border-slate-200 pb-px" aria-label="Settings sections">
+      <nav className="flex flex-wrap gap-1 border-b border-[var(--border)] pb-px" aria-label="Settings sections">
         {TABS.map(({ key, name, icon: Icon }) => (
           <button key={key} type="button" onClick={() => setTab(key)}
             className={`flex items-center gap-2 rounded-t-lg border-b-2 px-4 py-2.5 text-sm font-medium transition ${
-              tab === key ? "border-blue-600 text-blue-700" : "border-transparent text-slate-500 hover:text-slate-800"
+              tab === key ? "border-blue-600 text-[var(--accent-text)]" : "border-transparent text-[var(--fg-muted)] hover:text-[var(--fg)]"
             }`}>
             <Icon size={16} />{name}
           </button>
@@ -223,8 +231,8 @@ export default function TenantSettingsPage() {
       <form onSubmit={save} className="space-y-6">
         {tab === "general" && (
           <section className={card}>
-            <h2 className="text-sm font-semibold text-slate-900">Your ISP Branding</h2>
-            <p className="mb-5 mt-1 text-xs text-slate-500">Configure your WiFi business branding and customer support details for {form.name}.</p>
+            <h2 className="text-sm font-semibold text-[var(--fg)]">Your ISP Branding</h2>
+            <p className="mb-5 mt-1 text-xs text-[var(--fg-muted)]">Configure your WiFi business branding and customer support details for {form.name}.</p>
             <div className="grid gap-5 sm:grid-cols-2">
               <AssetBox title="Your Logo" hintText="Upload a JPG, PNG, or SVG logo. Appears on the login page."
                 has={form.hasLogo} uploading={uploading === "logo"}
@@ -237,7 +245,7 @@ export default function TenantSettingsPage() {
               <div>
                 <label className={label}>Brand Color</label>
                 <div className="flex items-center gap-3">
-                  <input type="color" value={form.brandColor} onChange={(e) => set("brandColor", e.target.value)} className="h-11 w-14 cursor-pointer rounded-lg border border-slate-300 bg-[#F5F7FA]" />
+                  <input type="color" value={form.brandColor} onChange={(e) => set("brandColor", e.target.value)} className="h-11 w-14 cursor-pointer rounded-lg border border-[var(--border-strong)] bg-[var(--canvas)]" />
                   <input pattern="#[0-9A-Fa-f]{6}" value={form.brandColor} onChange={(e) => set("brandColor", e.target.value)} className={`${field} font-mono`} />
                 </div>
                 <p className={hint}>Your brand color for the dashboard.</p>
@@ -273,7 +281,7 @@ export default function TenantSettingsPage() {
 
         {tab === "hotspot" && (
           <section className={card}>
-            <h2 className="mb-5 text-sm font-semibold text-slate-900">Hotspot</h2>
+            <h2 className="mb-5 text-sm font-semibold text-[var(--fg)]">Hotspot</h2>
             <div className="grid gap-5 sm:grid-cols-2">
               <div>
                 <label className={label}>Redirect URL after login</label>
@@ -296,13 +304,13 @@ export default function TenantSettingsPage() {
         {tab === "portal" && (
           <>
             <section className={card}>
-              <h2 className="text-sm font-semibold text-slate-900">Portal Design</h2>
-              <p className="mb-5 mt-1 text-xs text-slate-500">Adjust the branding and appearance of your customer login page. Scroll down to choose a captive portal template.</p>
+              <h2 className="text-sm font-semibold text-[var(--fg)]">Portal Design</h2>
+              <p className="mb-5 mt-1 text-xs text-[var(--fg-muted)]">Adjust the branding and appearance of your customer login page. Scroll down to choose a captive portal template.</p>
               <div className="grid gap-5 sm:grid-cols-2">
                 <div>
                   <label className={label}>Primary colour override</label>
                   <div className="flex items-center gap-3">
-                    <input type="color" value={form.portalPrimaryColor || "#3B82F6"} onChange={(e) => set("portalPrimaryColor", e.target.value)} className="h-11 w-14 cursor-pointer rounded-lg border border-slate-300 bg-[#F5F7FA]" />
+                    <input type="color" value={form.portalPrimaryColor || "#3B82F6"} onChange={(e) => set("portalPrimaryColor", e.target.value)} className="h-11 w-14 cursor-pointer rounded-lg border border-[var(--border-strong)] bg-[var(--canvas)]" />
                     <input pattern="#[0-9A-Fa-f]{6}|" value={form.portalPrimaryColor ?? ""} onChange={(e) => set("portalPrimaryColor", e.target.value || null)} className={`${field} font-mono`} placeholder="Template default" />
                   </div>
                   <p className={hint}>Leave empty to use the selected template colour.</p>
@@ -310,7 +318,7 @@ export default function TenantSettingsPage() {
                 <div>
                   <label className={label}>Secondary colour override</label>
                   <div className="flex items-center gap-3">
-                    <input type="color" value={form.portalSecondaryColor || "#BFD9F2"} onChange={(e) => set("portalSecondaryColor", e.target.value)} className="h-11 w-14 cursor-pointer rounded-lg border border-slate-300 bg-[#F5F7FA]" />
+                    <input type="color" value={form.portalSecondaryColor || "#BFD9F2"} onChange={(e) => set("portalSecondaryColor", e.target.value)} className="h-11 w-14 cursor-pointer rounded-lg border border-[var(--border-strong)] bg-[var(--canvas)]" />
                     <input pattern="#[0-9A-Fa-f]{6}|" value={form.portalSecondaryColor ?? ""} onChange={(e) => set("portalSecondaryColor", e.target.value || null)} className={`${field} font-mono`} placeholder="Template default" />
                   </div>
                   <p className={hint}>Leave empty to use the selected template colour.</p>
@@ -319,7 +327,7 @@ export default function TenantSettingsPage() {
                   <label className={label}>Logo size</label>
                   <div className="relative">
                     <input type="number" min={40} max={120} value={form.portalLogoSize ?? ""} onChange={(e) => set("portalLogoSize", e.target.value ? Number(e.target.value) : null)} className={`${field} pr-10`} placeholder="Default" />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">px</span>
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[var(--fg-faint)]">px</span>
                   </div>
                   <p className={hint}>Leave empty to use the template default. Range 40–120px.</p>
                 </div>
@@ -345,8 +353,8 @@ export default function TenantSettingsPage() {
             </section>
 
             <section className={card}>
-              <h2 className="text-sm font-semibold text-slate-900">Customer Experience</h2>
-              <p className="mb-5 mt-1 text-xs text-slate-500">Control what customers can see and do on the captive portal.</p>
+              <h2 className="text-sm font-semibold text-[var(--fg)]">Customer Experience</h2>
+              <p className="mb-5 mt-1 text-xs text-[var(--fg-muted)]">Control what customers can see and do on the captive portal.</p>
               <div className="grid gap-5 sm:grid-cols-2">
                 <Toggle on={form.portalShowPackages} onChange={(v) => set("portalShowPackages", v)} title="Show packages" desc="When off, the portal only accepts voucher codes." />
                 <Toggle on={form.portalAllowPurchases} onChange={(v) => set("portalAllowPurchases", v)} title="Allow online purchases" desc="Show the buy options on packages." />
@@ -359,41 +367,55 @@ export default function TenantSettingsPage() {
             </section>
 
             <section className={card}>
-              <h2 className="mb-1 text-sm font-semibold text-slate-900">Portal template</h2>
-              <p className="mb-5 text-xs text-slate-500">Pick the design customers see on your captive portal. The preview shows your branding.</p>
+              <h2 className="mb-1 text-sm font-semibold text-[var(--fg)]">Portal template</h2>
+              <p className="mb-5 text-xs text-[var(--fg-muted)]">Pick the design customers see on your captive portal. The preview shows your branding.</p>
               <div className="grid gap-6 lg:grid-cols-2">
                 <div className="space-y-3">
                   {TEMPLATES.map((t) => (
                     <button key={t.key} type="button" onClick={() => set("portalTemplate", t.key)}
                       className={`flex w-full items-center justify-between rounded-xl border p-4 text-left transition ${
-                        form.portalTemplate === t.key ? "border-blue-500 bg-blue-50" : "border-slate-300 bg-[#F5F7FA]/50 hover:border-slate-500"
+                        form.portalTemplate === t.key ? "border-blue-500 bg-blue-50" : "border-[var(--border-strong)] bg-[var(--canvas)]/50 hover:border-slate-500"
                       }`}>
                       <span>
-                        <span className="block text-sm font-semibold text-slate-900">{t.name}</span>
-                        <span className="mt-0.5 block text-xs text-slate-500">{t.blurb}</span>
+                        <span className="block text-sm font-semibold text-[var(--fg)]">{t.name}</span>
+                        <span className="mt-0.5 block text-xs text-[var(--fg-muted)]">{t.blurb}</span>
                       </span>
-                      <span className={`flex h-5 w-5 items-center justify-center rounded-full border ${form.portalTemplate === t.key ? "border-blue-600 bg-blue-600" : "border-slate-300"}`}>
+                      <span className={`flex h-5 w-5 items-center justify-center rounded-full border ${form.portalTemplate === t.key ? "border-blue-600 bg-blue-600" : "border-[var(--border-strong)]"}`}>
                         {form.portalTemplate === t.key && <CheckCircle size={12} className="text-white" />}
                       </span>
                     </button>
                   ))}
                 </div>
                 <div>
-                  <div className="overflow-hidden rounded-xl border border-slate-300 bg-[#F5F7FA]">
-                    <div className="border-b border-slate-200 px-3 py-2 text-[10px] text-slate-500">Live preview — {form.portalTemplate}</div>
-                    {previewError ? (
-                      <div className="flex h-[420px] flex-col items-center justify-center gap-2 px-6 text-center">
-                        <Warning size={20} className="text-amber-600" />
-                        <p className="text-xs font-medium text-slate-700">{previewError}</p>
-                        <button type="button" onClick={() => setPreviewKey(k => k + 1)} className="mt-1 text-xs font-medium text-blue-700 hover:underline">Retry preview</button>
-                      </div>
-                    ) : previewHtml ? (
-                      <iframe key={form.portalTemplate} srcDoc={previewHtml} title="Captive portal preview" className="h-[420px] w-full bg-white" />
-                    ) : (
-                      <div className="flex h-[420px] items-center justify-center text-xs text-slate-500">
-                        <CircleNotch size={16} className="mr-2 animate-spin" />Rendering preview…
-                      </div>
-                    )}
+                  <div className="overflow-hidden rounded-xl border border-[var(--border-strong)] bg-[var(--canvas)]">
+                    <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] px-3 py-2">
+                      <span className="text-[10px] text-[var(--fg-muted)]">Live preview — {form.portalTemplate}</span>
+                      <a
+                        href={previewSrc ?? "/portal"}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 rounded text-[10px] font-semibold text-[var(--accent-text)] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+                      >
+                        Open in new tab
+                        <ArrowSquareOut size={12} weight="bold" aria-hidden />
+                      </a>
+                    </div>
+                    <div className="relative h-[420px]">
+                      {previewSrc && (
+                        <iframe
+                          key={previewKey}
+                          src={previewSrc}
+                          title="Captive portal preview"
+                          onLoad={() => setPreviewLoading(false)}
+                          className="h-full w-full bg-[var(--surface)]"
+                        />
+                      )}
+                      {previewLoading && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-[var(--canvas)] text-xs text-[var(--fg-muted)]">
+                          <CircleNotch size={16} className="mr-2 animate-spin" />Rendering preview…
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -403,7 +425,7 @@ export default function TenantSettingsPage() {
 
         {tab === "vouchers" && (
           <section className={card}>
-            <h2 className="mb-5 text-sm font-semibold text-slate-900">Voucher defaults</h2>
+            <h2 className="mb-5 text-sm font-semibold text-[var(--fg)]">Voucher defaults</h2>
             <div className="grid gap-5 sm:grid-cols-3">
               <div>
                 <label className={label}>Code prefix</label>
@@ -425,13 +447,13 @@ export default function TenantSettingsPage() {
                 </select>
               </div>
             </div>
-            <p className="mt-3 text-xs text-slate-500">These pre-fill the voucher generation form — you can still override per batch.</p>
+            <p className="mt-3 text-xs text-[var(--fg-muted)]">These pre-fill the voucher generation form — you can still override per batch.</p>
           </section>
         )}
 
         {tab === "notifications" && (
           <section className={card}>
-            <h2 className="mb-5 text-sm font-semibold text-slate-900">Notifications</h2>
+            <h2 className="mb-5 text-sm font-semibold text-[var(--fg)]">Notifications</h2>
             <div className="grid gap-5 sm:grid-cols-2">
               <div>
                 <label className={label}>Alert emails</label>

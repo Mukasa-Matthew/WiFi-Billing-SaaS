@@ -47,12 +47,12 @@ export default function AdminOverviewPage() {
       <StatCard label="Open sessions" value={metrics?.activeHotspotSessions ?? "—"} icon={<Radio className="h-5 w-5" />} hintText="Accounting sessions without a stop record" />
     </div>
     <section className={`${panel} flex flex-wrap items-center justify-between gap-4 p-5`}>
-      <div><h2 className="text-sm font-semibold text-slate-900">Network and infrastructure</h2><p className="mt-1 max-w-2xl text-sm text-slate-600">These business metrics do not verify WireGuard, RADIUS, or database service health. Live infrastructure probes are not connected to this page.</p></div>
-      <Link href="/admin/health" className="text-sm font-semibold text-blue-700">View service details →</Link>
+      <div><h2 className="text-sm font-semibold text-[var(--fg)]">Network and infrastructure</h2><p className="mt-1 max-w-2xl text-sm text-[var(--fg-muted)]">These business metrics do not verify WireGuard, RADIUS, or database service health. Live infrastructure probes are not connected to this page.</p></div>
+      <Link href="/admin/health" className="text-sm font-semibold text-[var(--accent-text)]">View service details →</Link>
     </section>
-    <div className="flex items-center justify-between"><h2 className="text-lg font-semibold text-slate-900">Recently added businesses</h2><Link href="/admin/tenants" className="text-sm font-semibold text-blue-700">View tenants →</Link></div>
+    <div className="flex items-center justify-between"><h2 className="text-lg font-semibold text-[var(--fg)]">Recently added businesses</h2><Link href="/admin/tenants" className="text-sm font-semibold text-[var(--accent-text)]">View tenants →</Link></div>
     <Table rows={tenants} columns={[
-      { label: "Business", render: t => <span className="font-medium text-slate-900">{t.name}</span> },
+      { label: "Business", render: t => <span className="font-medium text-[var(--fg)]">{t.name}</span> },
       { label: "Email", render: t => t.email }, { label: "Phone", render: t => t.phone },
       { label: "Routers", render: t => t.routerCount },
       { label: "Status", render: t => <Badge tone={t.status === "ACTIVE" ? "green" : "red"}>{t.status}</Badge> },

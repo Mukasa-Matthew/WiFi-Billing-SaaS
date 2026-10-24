@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { NetworkActivity } from "@/components/LoadingUI";
 import { AuthProvider } from "@/context/AuthContext";
+import { ThemeProvider, themeBootstrapScript } from "@/context/ThemeContext";
 import { ToastProvider } from "@/components/ui/Toast";
 
 export const metadata: Metadata = {
@@ -25,10 +26,17 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Browser extensions inject attributes onto <html> and <body> before React
+  // hydrates (jd-enabled, cz-shortcut-listen), which React reports as hydration
+  // mismatches. suppressHydrationWarning applies only to the element it is on —
+  // mismatches inside the app tree are still reported.
   return (
-    <html lang="en">
-      <body className="bg-[#F5F7FA] text-slate-900 antialiased min-h-screen">
-        <AuthProvider><ToastProvider>{children}<NetworkActivity /></ToastProvider></AuthProvider>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeBootstrapScript }} />
+      </head>
+      <body className="bg-[var(--canvas)] text-[var(--fg)] antialiased min-h-screen" suppressHydrationWarning>
+        <ThemeProvider><AuthProvider><ToastProvider>{children}<NetworkActivity /></ToastProvider></AuthProvider></ThemeProvider>
       </body>
     </html>
   );
