@@ -166,7 +166,7 @@ class PaymentServiceTest {
                 1L, "VOUCH999", "unused", 100L, "1 Hour",
                 new BigDecimal("1000.00"), null, null, null, OffsetDateTime.now(), null, null, null, null, "ONLINE", "MANUAL", false
         );
-        when(voucherService.generate(eq(1L), any(GenerateVouchersRequest.class), isNull())).thenReturn(List.of(vResp));
+        when(voucherService.generate(eq(1L), any(GenerateVouchersRequest.class), isNull(), isNull())).thenReturn(List.of(vResp));
 
         PaymentDto.WebhookRequest webhook = new PaymentDto.WebhookRequest("PAY-REF123456", "SUCCESSFUL", "MOMO-EXT-1", null);
         paymentService.processWebhook(webhook);
@@ -176,7 +176,7 @@ class PaymentServiceTest {
         assertEquals("MOMO-EXT-1", tx.getExternalReference());
         assertNotNull(tx.getCompletedAt());
 
-        verify(voucherService).generate(eq(1L), argThat(r -> r.packageId().equals(100L) && r.count().equals(1)), isNull());
+        verify(voucherService).generate(eq(1L), argThat(r -> r.packageId().equals(100L) && r.count().equals(1)), isNull(), isNull());
         verify(transactionRepository).save(tx);
     }
 
@@ -239,7 +239,14 @@ class PaymentServiceTest {
         when(platformProperties.getPublicBaseUrl()).thenReturn("https://pay.example.com");
         when(routerRepository.findByToken("tok_valid123456")).thenReturn(Optional.of(router));
         when(packagePlanRepository.findByIdAndTenantId(100L, 1L)).thenReturn(Optional.of(packagePlan));
-        when(transactionRepository.save(any(Transaction.class))).thenAnswer(i -> i.getArgument(0));
+        // Dispatch is claimed atomically then sent after commit.
+        final Transaction[] holder = new Transaction[1];
+        when(transactionRepository.save(any(Transaction.class))).thenAnswer(i -> {
+            holder[0] = i.getArgument(0);
+            return holder[0];
+        });
+        when(transactionRepository.findById(any())).thenAnswer(i -> Optional.ofNullable(holder[0]));
+        when(transactionRepository.claimDispatch(any())).thenReturn(1);
         when(marzPay.collectMoney(any(), anyLong(), anyString(), anyString(), anyString(), anyString(), anyString()))
                 .thenThrow(new RuntimeException("connect timed out"));
 
@@ -267,7 +274,7 @@ class PaymentServiceTest {
 
         paymentService.processWebhook(new PaymentDto.WebhookRequest("PAY-DUP", "SUCCESSFUL", "X", null));
 
-        verify(voucherService, never()).generate(any(), any(), any());
+        verify(voucherService, never()).generate(any(), any(), any(), any());
         verify(walletService, never()).creditCollection(any(), anyLong(), any(), any(), any());
     }
 

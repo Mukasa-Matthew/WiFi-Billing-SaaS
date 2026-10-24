@@ -14,11 +14,16 @@ import com.wifibilling.util.RouterTokens;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.security.MessageDigest;
 import java.time.OffsetDateTime;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
 
@@ -31,6 +36,16 @@ public class PaymentService {
     public static final String STATUS_SUCCESSFUL = "SUCCESSFUL";
     public static final String STATUS_FAILED = "FAILED";
 
+    /** Max payment initiations per phone per router per rolling window. */
+    private static final int INITIATE_RATE_LIMIT = 5;
+    private static final long INITIATE_RATE_WINDOW_SECONDS = 600;
+    /** Derived checkout keys dedupe identical checkouts within this bucket. */
+    private static final long AUTO_CHECKOUT_BUCKET_SECONDS = 600;
+    /** Don't recheck the provider more often than this per transaction. */
+    private static final long RECHECK_INTERVAL_SECONDS = 15;
+    /** Stop actively rechecking after this many attempts — flagged for review. */
+    private static final int MAX_RECHECKS = 40;
+
     private final TransactionRepository transactionRepository;
     private final RouterRepository routerRepository;
     private final PackagePlanRepository packagePlanRepository;
@@ -40,6 +55,15 @@ public class PaymentService {
     private final com.wifibilling.service.payment.MarzPayClient marzPay;
     private final WalletService walletService;
     private final com.wifibilling.config.PlatformProperties platformProperties;
+
+    // Lazy self-injection so internal calls still go through the tx proxy.
+    // Defaults to the raw instance so plain unit tests (no proxy) still work.
+    private PaymentService self = this;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setSelf(@org.springframework.context.annotation.Lazy PaymentService self) {
+        this.self = self;
+    }
 
     /**
      * Initiates a Mobile Money payment collection for a chosen package on a router.
@@ -52,6 +76,8 @@ public class PaymentService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Router not found");
         }
 
+        // A client-supplied checkout reference resolves first — resuming an
+        // existing checkout must not revalidate package availability.
         String checkoutRef = sanitizeCheckoutRef(req.checkoutRef());
         if (checkoutRef != null) {
             var existing = transactionRepository.findByCheckoutRefForUpdate(checkoutRef);
@@ -73,13 +99,45 @@ public class PaymentService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Package not found for router");
         }
 
-        String mode = gatewayConfig.modeFor(router.getTenant());
-        String reference = "PAY-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16).toUpperCase();
-
-        String network = detectNetwork(req.phone(), req.network());
         String phoneE164 = toE164(req.phone());
 
-        Transaction transaction = Transaction.builder()
+        // Keyless clients: derive a stable key from
+        // (router, phone, package, 10-min bucket) so they dedupe too.
+        boolean derivedRef = checkoutRef == null;
+        if (derivedRef) {
+            checkoutRef = "AUTO-" + sha256(router.getId() + "|" + phoneE164 + "|" + req.packageId()
+                        + "|" + (System.currentTimeMillis() / (AUTO_CHECKOUT_BUCKET_SECONDS * 1000))).substring(0, 40);
+            var existing = transactionRepository.findByCheckoutRefForUpdate(checkoutRef);
+            if (existing.isPresent()) {
+                Transaction tx = existing.get();
+                if (STATUS_PENDING.equals(tx.getStatus())) {
+                    return resumeCheckout(tx, req);
+                }
+                if (STATUS_FAILED.equals(tx.getStatus())) {
+                    // Legitimately new purchase after a failed attempt.
+                    checkoutRef = checkoutRef + "-" + UUID.randomUUID().toString().substring(0, 8);
+                } else {
+                    return new PaymentDto.InitiateResponse(tx.getReference(), tx.getStatus(), tx.getAmount(),
+                            "Payment already confirmed.");
+                }
+            }
+        }
+
+        // Rate limit raw initiations (USSD-prompt spam). Resumes return early above.
+        long recent = transactionRepository.countByRouterIdAndPhoneAndCreatedAtAfter(
+                router.getId(), phoneE164,
+                OffsetDateTime.now().minusSeconds(INITIATE_RATE_WINDOW_SECONDS));
+        if (recent >= INITIATE_RATE_LIMIT) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                    "Too many payment attempts. Please wait a few minutes.");
+        }
+
+        String mode = gatewayConfig.modeFor(router.getTenant());
+        String reference = "PAY-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16).toUpperCase();
+        String network = detectNetwork(req.phone(), req.network());
+        boolean mock = useMockGateway(mode);
+
+        Transaction.TransactionBuilder builder = Transaction.builder()
                 .tenant(router.getTenant())
                 .packagePlan(packagePlan)
                 .router(router)
@@ -91,24 +149,29 @@ public class PaymentService {
                 .network(network)
                 .status(STATUS_PENDING)
                 .gatewayMode(mode)
-                .createdAt(OffsetDateTime.now())
-                .build();
+                .createdAt(OffsetDateTime.now());
+        if (!mock) {
+            // MarzPay collection reference committed WITH the row — the provider
+            // request is only sent after this transaction is durable.
+            builder.externalReference(UUID.randomUUID().toString()); // MarzPay requires UUID v4
+        }
+        Transaction transaction = transactionRepository.save(builder.build());
 
-        transaction = transactionRepository.save(transaction);
-
-        // Dispatch the collection through the tenant's active gateway.
-        if (useMockGateway(mode)) {
+        if (mock) {
+            // Dev fallback gateway: no external HTTP, safe to run in-transaction.
             String extRef = gatewayClient.requestPayment(transaction);
             if (extRef != null) {
                 transaction.setExternalReference(extRef);
                 transactionRepository.save(transaction);
             }
         } else {
-            dispatchMarzPayCollection(transaction, router, mode);
+            // Dispatch after commit so the provider reference is durable first.
+            Long txId = transaction.getId();
+            registerAfterCommit(() -> self.dispatchCollection(txId));
         }
 
-        log.info("Initiated transaction ref: {} for amount: {} UGX via {} gateway={} (router: {})",
-                reference, packagePlan.getPrice(), network, mode, router.getId());
+        log.info("Initiated transaction ref: {} for amount: {} UGX via {} gateway={} (router: {}, checkout: {})",
+                reference, packagePlan.getPrice(), network, mode, router.getId(), checkoutRef);
 
         return new PaymentDto.InitiateResponse(
                 reference,
@@ -133,16 +196,21 @@ public class PaymentService {
                             ? "Payment already confirmed."
                             : "This checkout already failed. Start a new payment.");
         }
-        boolean sameCheckout = tx.getPackagePlan().getId().equals(req.packageId())
+        // The checkout is immutable: router, package, and phone must all match.
+        boolean sameCheckout = tx.getRouter() != null && tx.getRouter().getToken().equals(req.token())
+                && tx.getPackagePlan().getId().equals(req.packageId())
                 && tx.getPhone().equals(toE164(req.phone()));
         if (!sameCheckout) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Checkout already in progress with different details");
         }
-        recheckProvider(tx);
-        if (STATUS_PENDING.equals(tx.getStatus()) && tx.getExternalReference() == null
-                && !useMockGateway(tx.getGatewayMode())) {
-            dispatchMarzPayCollection(tx, tx.getRouter(), tx.getGatewayMode());
+        if (tx.getDispatchAt() == null) {
+            // Provably never sent — dispatch once after commit.
+            Long txId = tx.getId();
+            registerAfterCommit(() -> self.dispatchCollection(txId));
+        } else {
+            // Already dispatched — resolve by provider lookup only. NEVER re-send.
+            recheckProvider(tx);
         }
         return new PaymentDto.InitiateResponse(tx.getReference(), tx.getStatus(), tx.getAmount(),
                 "Payment already in progress — resuming.");
@@ -155,6 +223,15 @@ public class PaymentService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid checkout reference");
         }
         return clean;
+    }
+
+    private static String sha256(String s) {
+        try {
+            return HexFormat.of().formatHex(
+                    MessageDigest.getInstance("SHA-256").digest(s.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     private static String sanitizeMac(String mac) {
@@ -172,20 +249,31 @@ public class PaymentService {
      */
     private void recheckProvider(Transaction tx) {
         String extRef = tx.getExternalReference();
-        if (extRef == null || useMockGateway(tx.getGatewayMode())) return;
+        if (extRef == null || tx.getDispatchAt() == null || useMockGateway(tx.getGatewayMode())) return;
+        if (tx.getRecheckCount() != null && tx.getRecheckCount() >= MAX_RECHECKS) return;
+        OffsetDateTime now = OffsetDateTime.now();
+        if (tx.getLastRecheckAt() != null
+                && tx.getLastRecheckAt().isAfter(now.minusSeconds(RECHECK_INTERVAL_SECONDS))) {
+            return; // throttled
+        }
+        tx.setLastRecheckAt(now);
+        tx.setRecheckCount((tx.getRecheckCount() == null ? 0 : tx.getRecheckCount()) + 1);
+        transactionRepository.save(tx);
         try {
             var creds = gatewayConfig.credentialsFor(tx.getTenant(), tx.getGatewayMode());
-            var status = marzPay.getCollection(creds, extRef);
+            // /transactions/{id} is documented to accept our merchant reference.
+            var status = marzPay.getTransaction(creds, extRef);
             var payload = status.has("data") && status.get("data").isObject() ? status.get("data") : status;
             processMarzPayCollection(payload);
         } catch (com.wifibilling.service.payment.MarzPayClient.MarzPayException e) {
-            if (e.getStatus() == 404) {
-                // The provider has no record of this reference — the original
-                // dispatch provably never arrived, so one redispatch is safe.
-                log.info("Provider 404 for {} — original collection never arrived; redispatching", extRef);
-                tx.setExternalReference(null);
+            if (e.isNotFound()) {
+                // Provider has no record — outcome unresolved. Flag for manual
+                // review; NEVER auto-redispatch (visibility lag is possible).
+                tx.setNotes("Provider has no record of collection ref " + extRef
+                        + " — outcome unresolved, flagged for manual review");
                 transactionRepository.save(tx);
-                dispatchMarzPayCollection(tx, tx.getRouter(), tx.getGatewayMode());
+                log.warn("Provider shows no record for tx {} (ref {}) — unresolved, no redispatch",
+                        tx.getReference(), extRef);
             } else {
                 log.warn("Provider recheck for {} failed: {}", tx.getReference(), e.getMessage());
             }
@@ -210,16 +298,42 @@ public class PaymentService {
      * transaction PENDING (outcome uncertain) — never FAILED — and the
      * provider recheck in resume/status polling resolves it.
      */
-    private void dispatchMarzPayCollection(Transaction tx, Router router, String mode) {
-        var creds = gatewayConfig.credentialsFor(router.getTenant(), mode);
-        String collectRef = UUID.randomUUID().toString(); // MarzPay requires UUID v4
-        String callbackUrl = platformProperties.getPublicBaseUrl() + "/api/payments/marzpay/callback";
-        tx.setExternalReference(collectRef);
-        transactionRepository.save(tx);
+    /**
+     * Commits dispatch_at if and only if this transaction is still PENDING and
+     * was never dispatched. Atomic — exactly one caller wins the claim.
+     */
+    @Transactional
+    public boolean claimCollectionDispatch(Long txId) {
+        Transaction tx = transactionRepository.findById(txId).orElse(null);
+        if (tx == null || !STATUS_PENDING.equals(tx.getStatus())
+                || tx.getExternalReference() == null
+                || useMockGateway(tx.getGatewayMode())) {
+            return false;
+        }
+        return transactionRepository.claimDispatch(txId) == 1;
+    }
+
+    /**
+     * Performs the single MarzPay collection dispatch for a transaction. Runs
+     * OUTSIDE any transaction so dispatch_at commits before the HTTP call:
+     * claiming is atomic — whichever caller (afterCommit, resume, sweep) sets
+     * dispatch_at first wins and only that caller sends the request. A failure
+     * after claiming leaves the transaction PENDING and "uncertain": the
+     * provider may have received it, so we NEVER send again automatically.
+     */
+    public void dispatchCollection(Long txId) {
+        if (!self.claimCollectionDispatch(txId)) {
+            return; // not dispatchable, or another dispatcher claimed it
+        }
+        Transaction tx = transactionRepository.findById(txId).orElse(null);
+        if (tx == null || !STATUS_PENDING.equals(tx.getStatus())) return;
+        String collectRef = tx.getExternalReference();
         try {
+            var creds = gatewayConfig.credentialsFor(tx.getTenant(), tx.getGatewayMode());
+            String callbackUrl = platformProperties.getPublicBaseUrl() + "/api/payments/marzpay/callback";
             var res = marzPay.collectMoney(creds,
                     tx.getAmount().longValue(), tx.getPhone(), collectRef,
-                    gatewayConfig.countryFor(router.getTenant(), mode),
+                    gatewayConfig.countryFor(tx.getTenant(), tx.getGatewayMode()),
                     "WiFi " + tx.getPackagePlan().getName(), callbackUrl);
             var txn = res.path("data").path("transaction");
             if (!txn.path("uuid").isMissingNode() && !txn.path("uuid").isNull()) {
@@ -227,12 +341,57 @@ public class PaymentService {
             }
             transactionRepository.save(tx);
         } catch (Exception e) {
-            // Uncertain outcome — MarzPay may have received the collection. Keep
-            // the reference and stay PENDING; recheckProvider() resolves it.
+            // Response lost / provider error — outcome is uncertain. Stay PENDING;
+            // recheckProvider resolves it via GET /transactions/{reference}.
             tx.setNotes("Collection dispatch uncertain: " + e.getMessage());
             transactionRepository.save(tx);
             log.error("MarzPay collection dispatch uncertain for ref {} (provider ref {}): {}",
                     tx.getReference(), collectRef, e.getMessage());
+        }
+    }
+
+    /**
+     * Scheduled reconciliation for collections. Every 30s:
+     *  - PENDING with dispatch_at NULL   → never sent; dispatch once (safe).
+     *  - PENDING with dispatch_at SET    → verify with the provider; apply the
+     *    authoritative outcome. Provider "not found" is flagged, never retried.
+     * Handles: missed webhooks, lost responses, backend crashes, provider lag.
+     */
+    @Scheduled(fixedDelayString = "${payment.reconcile.interval-ms:30000}",
+               initialDelayString = "${payment.reconcile.initial-delay-ms:60000}")
+    public void reconcilePendingCollections() {
+        List<Transaction> pending = transactionRepository
+                .findTop50ByStatusAndCreatedAtBeforeOrderByCreatedAtAsc(
+                        STATUS_PENDING, OffsetDateTime.now().minusSeconds(15));
+        for (Transaction t : pending) {
+            try {
+                if (useMockGateway(t.getGatewayMode())) continue;
+                if (t.getDispatchAt() == null) {
+                    dispatchCollection(t.getId()); // provably never sent
+                } else {
+                    self.reconcileTransaction(t.getId());
+                }
+            } catch (Exception e) {
+                log.warn("Reconciliation step failed for tx {}: {}", t.getReference(), e.getMessage());
+            }
+        }
+    }
+
+    /** Transactional per-transaction reconcile used by the sweep. */
+    @Transactional
+    public void reconcileTransaction(Long txId) {
+        Transaction tx = transactionRepository.findByIdForUpdate(txId).orElse(null);
+        if (tx == null || !STATUS_PENDING.equals(tx.getStatus())) return;
+        recheckProvider(tx);
+    }
+
+    private void registerAfterCommit(Runnable r) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override public void afterCommit() { r.run(); }
+            });
+        } else {
+            r.run();
         }
     }
 
@@ -287,10 +446,11 @@ public class PaymentService {
 
         // Provision a single voucher for this tenant and package — exactly once.
         if (tx.getVoucherCode() == null) {
+            String nasIp = tx.getRouter() != null ? tx.getRouter().getWgIp() : null;
             List<VoucherResponse> vouchers = voucherService.generate(
                     tx.getTenant().getId(),
                     new GenerateVouchersRequest(tx.getPackagePlan().getId(), 1),
-                    tx.getClientMac()
+                    tx.getClientMac(), nasIp
             );
             if (!vouchers.isEmpty()) {
                 String voucherCode = vouchers.get(0).code();

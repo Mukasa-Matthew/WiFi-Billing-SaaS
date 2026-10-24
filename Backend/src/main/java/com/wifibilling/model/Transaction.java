@@ -88,6 +88,22 @@ public class Transaction {
     @Column(name = "client_mac", length = 24)
     private String clientMac;
 
+    /** When the MarzPay HTTP request was actually dispatched. NULL means the
+     *  collection provably never left this process — only then may the sweep
+     *  dispatch it. Once set, the collection is never re-dispatched: outcome
+     *  is resolved exclusively through provider rechecks. */
+    @Column(name = "dispatch_at")
+    private OffsetDateTime dispatchAt;
+
+    /** Last provider status recheck (throttles reconciliation polling). */
+    @Column(name = "last_recheck_at")
+    private OffsetDateTime lastRecheckAt;
+
+    /** Number of provider rechecks performed; caps polling for stuck payments. */
+    @Column(name = "recheck_count")
+    @Builder.Default
+    private Integer recheckCount = 0;
+
     @Column(length=1000) private String notes;
 
     @Column(name = "created_at")

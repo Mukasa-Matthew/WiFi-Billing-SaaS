@@ -88,9 +88,24 @@ public class MarzPayClient {
         return post("/collect-money", c, body);
     }
 
-    /** GET /collect-money/{uuid} — authoritative status check (callback-shaped body). */
+    /** GET /collect-money/{uuid} — status check by MarzPay's transaction UUID.
+     *  NOTE: {uuid} here is the provider-generated transaction uuid, NOT the
+     *  merchant reference we submitted. Prefer getTransaction() which is
+     *  documented to accept merchant references. */
     public JsonNode getCollection(Credentials c, String uuid) {
         return get("/collect-money/" + uuid, c);
+    }
+
+    /**
+     * GET /transactions/{id} — the documented lookup that accepts the merchant
+     * reference we submitted (as well as provider UUIDs and provider tx ids).
+     * This is the correct recheck path after an uncertain dispatch: a
+     * TRANSACTION_NOT_FOUND response means MarzPay has no record of our
+     * merchant reference. Even then we never auto-retry — temporary visibility
+     * lag on the provider side is possible.
+     */
+    public JsonNode getTransaction(Credentials c, String reference) {
+        return get("/transactions/" + reference, c);
     }
 
     /** POST /send-money — disbursement. reference is echoed back as transaction.provider_reference. */
@@ -134,5 +149,11 @@ public class MarzPayClient {
             this.status = status;
         }
         public int getStatus() { return status; }
+        /** True when MarzPay reports the transaction does not exist — either
+         *  HTTP 404 or the documented TRANSACTION_NOT_FOUND error code. */
+        public boolean isNotFound() {
+            return status == 404
+                    || (getMessage() != null && getMessage().contains("TRANSACTION_NOT_FOUND"));
+        }
     }
 }
