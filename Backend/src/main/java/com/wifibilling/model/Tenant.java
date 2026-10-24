@@ -80,6 +80,59 @@ public class Tenant {
     @Builder.Default
     private String tetheringProtection = "OFF"; // OFF, LOG, BLOCK
 
+    @Column(name = "support_phone2", length = 60)
+    private String supportPhone2;
+
+    @Column(name = "whatsapp_phone", length = 60)
+    private String whatsappPhone;
+
+    @Column(name = "portal_font", length = 60)
+    @Builder.Default
+    private String portalFont = "Poppins";
+
+    @Column(name = "portal_language", length = 30)
+    @Builder.Default
+    private String portalLanguage = "English";
+
+    @Column(name = "portal_primary_color", length = 7)
+    private String portalPrimaryColor;
+
+    @Column(name = "portal_secondary_color", length = 7)
+    private String portalSecondaryColor;
+
+    @Column(name = "portal_logo_size")
+    private Integer portalLogoSize;
+
+    @Column(name = "portal_logo_file", length = 120)
+    private String portalLogoFile;
+
+    @Column(name = "portal_background_file", length = 120)
+    private String portalBackgroundFile;
+
+    @Column(name = "portal_show_device_limits")
+    @Builder.Default
+    private Boolean portalShowDeviceLimits = true;
+
+    @Column(name = "portal_show_device_mac")
+    @Builder.Default
+    private Boolean portalShowDeviceMac = false;
+
+    @Column(name = "portal_show_package_time")
+    @Builder.Default
+    private Boolean portalShowPackageTime = true;
+
+    @Column(name = "portal_allow_purchases")
+    @Builder.Default
+    private Boolean portalAllowPurchases = true;
+
+    @Column(name = "portal_buy_for_other")
+    @Builder.Default
+    private Boolean portalBuyForOther = true;
+
+    @Column(name = "portal_show_feedback")
+    @Builder.Default
+    private Boolean portalShowFeedback = true;
+
     @Column(name = "created_at")
     @Builder.Default
     private OffsetDateTime createdAt = OffsetDateTime.now();

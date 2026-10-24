@@ -338,6 +338,50 @@ function renderSettings(settings) {
         document.getElementById('share-btn').style.display = 'none';
     }
     document.getElementById('dst-input').value = settings.redirectUrl || LINK_ORIG;
+
+    // Portal design overrides
+    if (settings.font) document.body.style.fontFamily = "'" + settings.font + "', -apple-system, 'Segoe UI', sans-serif";
+    if (settings.primaryColor) document.body.style.setProperty('--primary', settings.primaryColor);
+    if (settings.secondaryColor) document.body.style.setProperty('--bg-1', settings.secondaryColor);
+    var iconEl = document.querySelector('.brand-icon');
+    if (settings.logoUrl) {
+        iconEl.outerHTML = '<img class="brand-icon brand-logo" src="' + settings.logoUrl + '" alt="" style="height:' +
+            (settings.logoSize || 40) + 'px;width:auto;object-fit:contain" />';
+    } else if (settings.logoSize) {
+        iconEl.style.fontSize = (settings.logoSize * 0.6) + 'px';
+    }
+    if (settings.backgroundUrl) {
+        document.body.style.background =
+            'linear-gradient(rgba(10,15,25,0.45), rgba(10,15,25,0.45)), url("' + settings.backgroundUrl + '") center/cover no-repeat fixed';
+    }
+    // Second support line + dedicated WhatsApp number
+    var waDigits = (settings.whatsappPhone || phone).replace(/[^0-9]/g, '');
+    if (waDigits.length > 6) {
+        document.getElementById('support-wa-line').style.display = 'block';
+        document.getElementById('support-wa-link').textContent = settings.whatsappPhone || phone;
+        document.getElementById('support-wa-link').href = 'https://wa.me/' + waDigits;
+    }
+    var phone2 = (settings.supportPhone2 || '').trim();
+    if (phone2 && !document.getElementById('support-phone2-line')) {
+        var d = document.createElement('div');
+        d.id = 'support-phone2-line';
+        d.innerHTML = 'Or call: <a href="tel:' + phone2.replace(/[^0-9]/g, '') + '" style="color:var(--primary);font-weight:600"></a>';
+        d.querySelector('a').textContent = phone2;
+        document.getElementById('support-block').appendChild(d);
+        document.getElementById('support-block').style.display = '';
+    }
+    // Customer-experience toggles
+    if (settings.allowPurchases === false) {
+        document.getElementById('packages-section').style.display = 'none';
+        document.getElementById('plans-label').style.display = 'none';
+    }
+    if (settings.buyForOther === false) {
+        var ib = document.querySelector('.info-box'); if (ib) ib.style.display = 'none';
+    }
+    if (settings.showFeedback === false) {
+        document.getElementById('share-btn').style.display = 'none';
+    }
+    window.PORTAL_CFG = settings;
 }
 
 if (LINK_LOGIN && LINK_LOGIN.charAt(0) !== '$') {
@@ -401,7 +445,10 @@ function renderPackages(plans) {
         left.appendChild(name);
         if (p.featured) { var badge = document.createElement('span'); badge.className = 'pkg-featured'; badge.textContent = '★ POPULAR'; left.appendChild(badge); }
         var meta = document.createElement('span'); meta.className = 'pkg-meta';
-        meta.textContent = [p.sessionTimeout ? fmtDuration(p.sessionTimeout) : '', p.rateLimit ? 'Speed ' + p.rateLimit : '', '1 Device'].filter(Boolean).join(' · ');
+        var cfg = window.PORTAL_CFG || {};
+        meta.textContent = [cfg.showPackageTime !== false && p.sessionTimeout ? fmtDuration(p.sessionTimeout) : '',
+            p.rateLimit ? 'Speed ' + p.rateLimit : '',
+            cfg.showDeviceLimits !== false ? '1 Device' : ''].filter(Boolean).join(' · ');
         left.appendChild(meta);
         var right = document.createElement('span'); right.className = 'pkg-right';
         var price = document.createElement('span'); price.className = 'pkg-price'; price.textContent = fmtPrice(p.price);

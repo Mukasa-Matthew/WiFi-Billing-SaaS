@@ -54,6 +54,19 @@ public class TenantSettingsController {
         tenant.setNotifyPhones(req.notifyPhones());
         if (req.portalTemplate() != null) tenant.setPortalTemplate(req.portalTemplate());
         if (req.tetheringProtection() != null) tenant.setTetheringProtection(req.tetheringProtection());
+        tenant.setSupportPhone2(req.supportPhone2());
+        tenant.setWhatsappPhone(req.whatsappPhone());
+        if (req.portalFont() != null) tenant.setPortalFont(req.portalFont());
+        if (req.portalLanguage() != null) tenant.setPortalLanguage(req.portalLanguage());
+        tenant.setPortalPrimaryColor(req.portalPrimaryColor());
+        tenant.setPortalSecondaryColor(req.portalSecondaryColor());
+        tenant.setPortalLogoSize(req.portalLogoSize());
+        if (req.portalShowDeviceLimits() != null) tenant.setPortalShowDeviceLimits(req.portalShowDeviceLimits());
+        if (req.portalShowDeviceMac() != null) tenant.setPortalShowDeviceMac(req.portalShowDeviceMac());
+        if (req.portalShowPackageTime() != null) tenant.setPortalShowPackageTime(req.portalShowPackageTime());
+        if (req.portalAllowPurchases() != null) tenant.setPortalAllowPurchases(req.portalAllowPurchases());
+        if (req.portalBuyForOther() != null) tenant.setPortalBuyForOther(req.portalBuyForOther());
+        if (req.portalShowFeedback() != null) tenant.setPortalShowFeedback(req.portalShowFeedback());
         Tenant saved = tenantRepository.save(tenant);
 
         // Push changes that live on the router to already-provisioned devices.
@@ -110,6 +123,62 @@ public class TenantSettingsController {
                 Boolean.TRUE.equals(t.getPortalShowPackages()),
                 t.getNotifyEmails(), t.getNotifyPhones(),
                 t.getPortalTemplate() != null ? t.getPortalTemplate() : "midnight",
-                t.getTetheringProtection() != null ? t.getTetheringProtection() : "OFF");
+                t.getTetheringProtection() != null ? t.getTetheringProtection() : "OFF",
+                t.getSupportPhone2(), t.getWhatsappPhone(),
+                t.getPortalFont() != null ? t.getPortalFont() : "Poppins",
+                t.getPortalLanguage() != null ? t.getPortalLanguage() : "English",
+                t.getPortalPrimaryColor(), t.getPortalSecondaryColor(),
+                t.getPortalLogoSize(),
+                Boolean.TRUE.equals(t.getPortalShowDeviceLimits()),
+                Boolean.TRUE.equals(t.getPortalShowDeviceMac()),
+                !Boolean.FALSE.equals(t.getPortalShowPackageTime()),
+                !Boolean.FALSE.equals(t.getPortalAllowPurchases()),
+                !Boolean.FALSE.equals(t.getPortalBuyForOther()),
+                !Boolean.FALSE.equals(t.getPortalShowFeedback()),
+                t.getPortalLogoFile() != null,
+                t.getPortalBackgroundFile() != null);
+    }
+
+    /** Upload a tenant branding image (logo or portal background). */
+    @PostMapping(value = "/assets/{kind}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Transactional
+    public TenantSettingsDto uploadAsset(@AuthenticationPrincipal TenantPrincipal principal,
+            @PathVariable String kind,
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file) throws java.io.IOException {
+        if (!kind.equals("logo") && !kind.equals("background")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "kind must be logo or background");
+        }
+        String type = file.getContentType() != null ? file.getContentType() : "";
+        String ext = switch (type) {
+            case "image/png" -> ".png";
+            case "image/jpeg" -> ".jpg";
+            case "image/svg+xml" -> kind.equals("logo") ? ".svg" : null;
+            case "image/webp" -> ".webp";
+            default -> null;
+        };
+        if (ext == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only PNG, JPG" + (kind.equals("logo") ? ", SVG" : "") + " or WebP images are allowed");
+        long max = kind.equals("background") ? 500_000 : 1_000_000;
+        if (file.getSize() > max) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "File too large (max " + max / 1000 + " KB)");
+        Tenant tenant = load(principal.getTenantId());
+        java.nio.file.Path dir = java.nio.file.Path.of("uploads", "tenants", String.valueOf(tenant.getId()));
+        java.nio.file.Files.createDirectories(dir);
+        String filename = kind + ext;
+        java.nio.file.Files.copy(file.getInputStream(), dir.resolve(filename),
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        if (kind.equals("logo")) tenant.setPortalLogoFile(filename); else tenant.setPortalBackgroundFile(filename);
+        return toDto(tenantRepository.save(tenant));
+    }
+
+    @DeleteMapping("/assets/{kind}")
+    @Transactional
+    public TenantSettingsDto deleteAsset(@AuthenticationPrincipal TenantPrincipal principal,
+            @PathVariable String kind) {
+        Tenant tenant = load(principal.getTenantId());
+        String file = kind.equals("logo") ? tenant.getPortalLogoFile() : kind.equals("background") ? tenant.getPortalBackgroundFile() : null;
+        if (file == null) return toDto(tenant);
+        try { java.nio.file.Files.deleteIfExists(java.nio.file.Path.of("uploads", "tenants", String.valueOf(tenant.getId()), file)); }
+        catch (java.io.IOException ignored) {}
+        if (kind.equals("logo")) tenant.setPortalLogoFile(null); else tenant.setPortalBackgroundFile(null);
+        return toDto(tenantRepository.save(tenant));
     }
 }

@@ -56,11 +56,27 @@ public class PortalController {
         Router router = resolveRouter(token);
         var tenant = router.getTenant();
         var packages = portalPackages(router);
+        String base = props.getPublicBaseUrl();
+        String logoUrl = tenant.getPortalLogoFile() != null
+                ? base + "/api/portal/assets/" + token + "/logo" : null;
+        String bgUrl = tenant.getPortalBackgroundFile() != null
+                ? base + "/api/portal/assets/" + token + "/background" : null;
         var settings = new PortalConfigResponse.PortalSettings(
-                tenant.getName(), tenant.getSupportPhone(), tenant.getSupportEmail(),
+                tenant.getName(), tenant.getSupportPhone(), tenant.getSupportPhone2(),
+                tenant.getSupportEmail(), tenant.getWhatsappPhone(),
                 tenant.getBrandColor() == null ? "#3B82F6" : tenant.getBrandColor(),
                 tenant.getRedirectUrl(), tenant.getPortalTemplate() == null ? "midnight" : tenant.getPortalTemplate(),
-                Boolean.TRUE.equals(tenant.getPortalShowPackages()));
+                Boolean.TRUE.equals(tenant.getPortalShowPackages()),
+                tenant.getPortalFont() == null ? "Poppins" : tenant.getPortalFont(),
+                tenant.getPortalLanguage() == null ? "English" : tenant.getPortalLanguage(),
+                tenant.getPortalPrimaryColor(), tenant.getPortalSecondaryColor(),
+                tenant.getPortalLogoSize(), logoUrl, bgUrl,
+                Boolean.TRUE.equals(tenant.getPortalShowDeviceLimits()),
+                Boolean.TRUE.equals(tenant.getPortalShowDeviceMac()),
+                !Boolean.FALSE.equals(tenant.getPortalShowPackageTime()),
+                !Boolean.FALSE.equals(tenant.getPortalAllowPurchases()),
+                !Boolean.FALSE.equals(tenant.getPortalBuyForOther()),
+                !Boolean.FALSE.equals(tenant.getPortalShowFeedback()));
         String fingerprint = settings.toString() + "|" + packages.toString();
         String version;
         try {
