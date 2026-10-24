@@ -4,6 +4,7 @@ import com.wifibilling.model.WalletAccount;
 import com.wifibilling.model.WalletLedgerEntry;
 import com.wifibilling.model.WithdrawalRequest;
 import com.wifibilling.security.TenantPrincipal;
+import com.wifibilling.service.OtpService;
 import com.wifibilling.service.WalletService;
 import com.wifibilling.service.WithdrawalService;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,11 @@ public class WalletController {
 
     private final WalletService walletService;
     private final WithdrawalService withdrawalService;
+    private final OtpService otpService;
+    private final com.wifibilling.repository.TenantRepository tenantRepository;
+
+    @org.springframework.beans.factory.annotation.Value("${withdrawals.otp-required:true}")
+    private boolean otpRequired;
 
     public record WalletView(
             Long available, Long pending, Long reserved,
@@ -69,7 +75,21 @@ public class WalletController {
         return withdrawalService.list(p.getTenantId()).stream().map(WalletController::toView).toList();
     }
 
-    public record WithdrawalCreate(Long amount, String phone) {}
+    public record WithdrawalCreate(Long amount, String phone, String otp) {}
+
+    public record OtpResponse(boolean sent, String devCode) {}
+
+    /** Step 1 of withdrawal: email a verification code to the tenant's registered email. */
+    @PostMapping("/withdrawals/otp")
+    public OtpResponse requestWithdrawalOtp(@AuthenticationPrincipal TenantPrincipal p) {
+        var tenant = tenantRepository.findById(p.getTenantId())
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "Tenant not found"));
+        String devCode = otpService.issue(tenant.getEmail(), com.wifibilling.model.EmailOtp.PURPOSE_WITHDRAWAL,
+                tenant.getId(), tenant.getName(),
+                "You requested a wallet withdrawal. Enter this code to confirm it.");
+        return new OtpResponse(true, devCode);
+    }
 
     @PostMapping("/withdrawals")
     public WithdrawalView requestWithdrawal(@AuthenticationPrincipal TenantPrincipal p,
@@ -77,6 +97,9 @@ public class WalletController {
         if (req == null || req.amount() == null || req.amount() <= 0) {
             throw new org.springframework.web.server.ResponseStatusException(
                     org.springframework.http.HttpStatus.BAD_REQUEST, "A positive amount is required");
+        }
+        if (otpRequired) {
+            otpService.verify(p.getEmail(), com.wifibilling.model.EmailOtp.PURPOSE_WITHDRAWAL, req.otp());
         }
         return toView(withdrawalService.request(p.getTenantId(), req.amount(), req.phone()));
     }

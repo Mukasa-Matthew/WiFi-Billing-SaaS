@@ -49,6 +49,9 @@ export default function WalletPage() {
   const [phone, setPhone] = useState("");
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState("");
+  const [otp, setOtp] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpBusy, setOtpBusy] = useState(false);
 
   const loadSummary = async () => {
     try { setSummary((await api.get<WalletSummary>("/api/wallet")).data); } catch { /* keep stale */ }
@@ -56,12 +59,21 @@ export default function WalletPage() {
   useEffect(() => { void loadSummary(); const t = setInterval(loadSummary, 30000); return () => clearInterval(t); }, []);
   const refreshAll = () => { void loadSummary(); loadActivity(); loadWithdrawals(); };
 
+  const sendOtp = async () => {
+    setOtpBusy(true); setFormError("");
+    try {
+      await api.post("/api/wallet/withdrawals/otp");
+      setOtpSent(true);
+    } catch (err) { setFormError(message(err)); }
+    finally { setOtpBusy(false); }
+  };
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true); setFormError("");
     try {
-      await api.post("/api/wallet/withdrawals", { amount: Number(amount), phone });
-      setOpen(false); setAmount(""); setPhone("");
+      await api.post("/api/wallet/withdrawals", { amount: Number(amount), phone, otp });
+      setOpen(false); setAmount(""); setPhone(""); setOtp(""); setOtpSent(false);
       refreshAll();
     } catch (err) { setFormError(message(err)); }
     finally { setBusy(false); }
@@ -210,6 +222,24 @@ export default function WalletPage() {
                 <div className="flex justify-between border-t border-[var(--border-soft)] pt-1.5"><dt className="font-semibold text-[var(--fg)]">You will receive</dt><dd className="font-bold text-emerald-700">{money(Number(amount))}</dd></div>
               </dl>
             )}
+            {/* Email verification — a code must be issued before the request can be submitted. */}
+            <div className="mt-4">
+              <label className={label}>Verification code</label>
+              <div className="flex gap-2">
+                <input className={field} inputMode="numeric" maxLength={6} value={otp}
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                  placeholder={otpSent ? "6-digit code" : "Request a code first"} required />
+                <button type="button" className={buttonGhost} disabled={otpBusy}
+                  onClick={() => void sendOtp()}>
+                  {otpBusy ? "Sending…" : otpSent ? "Resend" : "Send code"}
+                </button>
+              </div>
+              <p className={hint}>
+                {otpSent
+                  ? "Code sent to your account email — valid for 10 minutes. Check spam if it doesn't arrive."
+                  : "For your security, we email a verification code to your account email before any withdrawal."}
+              </p>
+            </div>
             {summary?.limits.approvalRequired && (
               <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
                 Withdrawals are reviewed by the platform before funds are sent.
@@ -217,7 +247,7 @@ export default function WalletPage() {
             )}
             <div className="mt-6 flex justify-end gap-3">
               <button type="button" className={buttonGhost} onClick={() => setOpen(false)}>Cancel</button>
-              <button type="submit" className={button} disabled={busy}>
+              <button type="submit" className={button} disabled={busy || otp.length !== 6}>
                 {busy ? "Submitting…" : "Request withdrawal"}
               </button>
             </div>
