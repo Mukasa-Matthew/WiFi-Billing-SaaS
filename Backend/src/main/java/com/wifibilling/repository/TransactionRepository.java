@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.stereotype.Repository;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -33,6 +34,29 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
     boolean existsByReference(String reference);
 
     List<Transaction> findAllByTenantIdOrderByCreatedAtDesc(Long tenantId);
+
+    /** Initiation rate limiting — pending purchases per phone on a router. */
+    long countByRouterIdAndPhoneAndCreatedAtAfter(Long routerId, String phone, OffsetDateTime after);
+
+    /** Reconciliation sweep — stale pending transactions. */
+    List<Transaction> findTop50ByStatusAndCreatedAtBeforeOrderByCreatedAtAsc(
+            String status, OffsetDateTime before);
+
+    Optional<Transaction> findById(Long id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("select t from Transaction t where t.id = :id")
+    Optional<Transaction> findByIdForUpdate(Long id);
+
+    /**
+     * Atomic dispatch claim: sets dispatch_at only if the transaction is still
+     * PENDING and was never dispatched. Exactly one concurrent caller wins.
+     */
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query(
+            "update Transaction t set t.dispatchAt = :#{T(java.time.OffsetDateTime).now()} "
+            + "where t.id = :id and t.status = 'PENDING' and t.dispatchAt is null")
+    int claimDispatch(Long id);
 
     List<Transaction> findTop1000ByTenantIdOrderByCreatedAtDesc(Long tenantId);
 
