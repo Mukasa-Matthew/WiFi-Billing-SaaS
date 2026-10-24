@@ -359,7 +359,9 @@ public class RouterScriptGenerator {
                 + "/system/ntp/client/set enabled=yes\n"
                 + ":if ([:len [/system/ntp/client/servers find address=pool.ntp.org]] = 0) do={ /system/ntp/client/servers add address=pool.ntp.org }\n"
                 + "/system/script/add name=wb-management policy=read,write,test source={\n"
-                + ":do { /tool/fetch url=" + q(prefix + "/management.rsc") + " dst-path=wb-management.rsc; /import wb-management.rsc } on-error={ :log warning \"wifi-billing management failed\" }\n"
+                + ":for i from=1 to=3 do={\n"
+                + ":do { /tool/fetch url=" + q(prefix + "/management.rsc?wait=25") + " dst-path=wb-management.rsc; /import wb-management.rsc } on-error={ :delay 2s }\n"
+                + "}\n"
                 + ":do { :local hosts [/ip/dhcp-server/lease/print as-value where status=bound]; /tool/fetch url=" + q(prefix + "/hosts")
                 + " http-method=post http-header-field=\"Content-Type: application/json\" http-data=[:serialize to=json value=$hosts] output=none } on-error={ :log warning \"wifi-billing host report failed\" }\n}\n"
                 + "/system/scheduler/add name=wb-management interval=1m on-event=wb-management policy=read,write,test\n"
