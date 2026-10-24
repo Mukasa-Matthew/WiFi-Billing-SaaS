@@ -17,5 +17,20 @@ public record TenantSettingsDto(
         @Size(max = 500) String notifyEmails,
         @Size(max = 255) String notifyPhones,
         @Pattern(regexp = "[a-z0-9-]{1,40}") String portalTemplate,
-        @Pattern(regexp = "OFF|LOG|BLOCK") String tetheringProtection
+        @Pattern(regexp = "OFF|LOG|BLOCK") String tetheringProtection,
+        @Size(max = 60) String supportPhone2,
+        @Size(max = 60) String whatsappPhone,
+        @Size(max = 60) String portalFont,
+        @Size(max = 30) String portalLanguage,
+        @Pattern(regexp = "#[0-9A-Fa-f]{6}|^$") String portalPrimaryColor,
+        @Pattern(regexp = "#[0-9A-Fa-f]{6}|^$") String portalSecondaryColor,
+        @Min(40) @Max(120) Integer portalLogoSize,
+        Boolean portalShowDeviceLimits,
+        Boolean portalShowDeviceMac,
+        Boolean portalShowPackageTime,
+        Boolean portalAllowPurchases,
+        Boolean portalBuyForOther,
+        Boolean portalShowFeedback,
+        boolean hasLogo,
+        boolean hasBackground
 ) {}
