@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TENANT_NAME_PLACEHOLDER — Feedback</title>
+    <style>
+        body.theme-midnight {
+            --bg-1: #BFD9F2; --bg-2: #8FB8E8;
+            --card: #FFFFFF;
+            --header-bg: #0F172A; --header-text: #F8FAFC;
+            --text: #0F172A; --muted: #64748B; --border: #E2E8F0;
+            --input-bg: #F8FAFC; --buy-bg: #0F172A; --buy-text: #F8FAFC;
+        }
+        body.theme-daylight {
+            --bg-1: #E8F0FA; --bg-2: #C9DEF5;
+            --card: #FFFFFF;
+            --header-bg: #1E293B; --header-text: #F8FAFC;
+            --text: #0F172A; --muted: #64748B; --border: #E2E8F0;
+            --input-bg: #F8FAFC; --buy-bg: #0F172A; --buy-text: #F8FAFC;
+        }
+        body.theme-ember {
+            --bg-1: #2A1210; --bg-2: #1A0B0A;
+            --card: #231012;
+            --header-bg: #1A0B0A; --header-text: #F8FAFC;
+            --text: #F8FAFC; --muted: #B8A79A; --border: rgba(255,255,255,0.09);
+            --input-bg: rgba(255,255,255,0.05); --buy-bg: #F59E0B; --buy-text: #1A0A00;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: linear-gradient(160deg, var(--bg-1) 0%, var(--bg-2) 100%);
+            color: var(--text);
+            min-height: 100vh; display: flex; align-items: center; justify-content: center;
+            padding: 24px 16px; -webkit-font-smoothing: antialiased;
+        }
+        .portal-card {
+            width: 100%; max-width: 400px;
+            background: var(--card);
+            border-radius: 26px; overflow: hidden;
+            box-shadow: 0 30px 70px -15px rgba(15, 23, 42, 0.35);
+        }
+        .brand {
+            background: var(--header-bg); color: var(--header-text);
+            text-align: center; padding: 26px 24px 20px;
+        }
+        .brand-icon {
+            width: 46px; height: 46px; margin: 0 auto 10px;
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            background: rgba(255,255,255,0.08); font-size: 20px;
+        }
+        .brand h1 { font-size: 19px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
+        .brand p { margin-top: 4px; font-size: 12px; opacity: .7; }
+        .form-body { padding: 24px 24px 28px; }
+        .stars { display: flex; gap: 8px; justify-content: center; font-size: 34px; margin: 6px 0 18px; cursor: pointer; color: #F59E0B; }
+        .stars span { transition: transform .1s; }
+        .stars span:active { transform: scale(1.2); }
+        .input-wrap { position: relative; margin-bottom: 12px; }
+        .input-wrap .icon {
+            position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+            font-size: 14px; pointer-events: none; opacity: .6;
+        }
+        .form-input {
+            width: 100%; padding: 13px 14px 13px 40px;
+            background: var(--input-bg); border: 1.5px solid var(--border);
+            border-radius: 12px; font-size: 14px; color: var(--text);
+            font-family: inherit; outline: none;
+        }
+        textarea.form-input { padding: 13px 14px; resize: vertical; }
+        .form-input:focus { border-color: var(--buy-bg); }
+        .btn {
+            width: 100%; padding: 14px; border: none; border-radius: 12px;
+            background: var(--buy-bg); color: var(--buy-text);
+            font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit;
+        }
+        .btn:disabled { opacity: .55; cursor: default; }
+        .back-link {
+            display: block; text-align: center; margin-top: 14px;
+            font-size: 13px; color: var(--muted); text-decoration: none;
+        }
+        .back-link:hover { color: var(--text); }
+        .status-msg { padding: 11px 14px; border-radius: 10px; font-size: 13px; margin-top: 12px; text-align: center; }
+        .status-msg.error { background: #FEF2F2; border: 1px solid #FECACA; color: #DC2626; }
+        .status-msg.success { background: #F0FDF4; border: 1px solid #BBF7D0; color: #16A34A; }
+        .spinner {
+            width: 20px; height: 20px; margin: 12px auto 0;
+            border: 2.5px solid var(--border); border-top-color: var(--buy-bg);
+            border-radius: 50%; animation: spin .7s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="PORTAL_THEME_PLACEHOLDER">
+<div class="portal-card">
+    <div class="brand">
+        <div class="brand-icon">💬</div>
+        <h1>TENANT_NAME_PLACEHOLDER</h1>
+        <p>Share your feedback</p>
+    </div>
+    <div class="form-body">
+        <p style="text-align:center;font-size:13px;color:var(--muted);margin-bottom:4px">How was your experience with this WiFi service?</p>
+        <div class="stars" id="fb-stars">
+            <span data-r="1">☆</span><span data-r="2">☆</span><span data-r="3">☆</span><span data-r="4">☆</span><span data-r="5">☆</span>
+        </div>
+        <div class="input-wrap">
+            <span class="icon">👤</span>
+            <input class="form-input" id="fb-name" type="text" placeholder="Your name (optional)" maxlength="120">
+        </div>
+        <div class="input-wrap">
+            <span class="icon">📞</span>
+            <input class="form-input" id="fb-phone" type="tel" placeholder="Phone number (optional)" maxlength="32">
+        </div>
+        <div class="input-wrap">
+            <textarea class="form-input" id="fb-message" rows="4" maxlength="1000" placeholder="Tell us what you think…"></textarea>
+        </div>
+        <button type="button" class="btn" id="fb-send" onclick="sendFeedback()">Send Feedback</button>
+        <div id="fb-result"></div>
+        <a class="back-link" href="login.html">← Back to WiFi packages</a>
+    </div>
+</div>
+
+<script>
+var TOKEN = 'ROUTER_TOKEN_PLACEHOLDER';
+var BASE = 'SERVER_BASE_URL_PLACEHOLDER';
+var Q = new URLSearchParams(location.search);
+var fbRating = 0;
+
+Array.prototype.forEach.call(document.querySelectorAll('#fb-stars span'), function(star){
+    star.onclick = function(){
+        fbRating = parseInt(star.getAttribute('data-r'), 10);
+        Array.prototype.forEach.call(document.querySelectorAll('#fb-stars span'), function(s){
+            s.textContent = parseInt(s.getAttribute('data-r'), 10) <= fbRating ? '★' : '☆';
+        });
+    };
+});
+
+function sendFeedback(){
+    var msg = document.getElementById('fb-message').value.trim();
+    var out = document.getElementById('fb-result');
+    if (!msg) { out.innerHTML = '<div class="status-msg error">Please write your feedback first.</div>'; return; }
+    var btn = document.getElementById('fb-send');
+    btn.disabled = true; out.innerHTML = '<div class="spinner"></div>';
+    fetch(BASE + '/api/portal/feedback?token=' + encodeURIComponent(TOKEN), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            name: document.getElementById('fb-name').value.trim(),
+            phone: document.getElementById('fb-phone').value.trim(),
+            mac: Q.get('mac') || '', rating: fbRating || null, message: msg
+        })
+    }).then(function(r){
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        out.innerHTML = '<div class="status-msg success">Thank you! Your feedback has been sent.</div>';
+        setTimeout(function(){ location.href = 'login.html'; }, 1800);
+    }).catch(function(){
+        out.innerHTML = '<div class="status-msg error">Could not send right now. Please try again in a moment.</div>';
+        btn.disabled = false;
+    });
+}
+</script>
+</body>
+</html>

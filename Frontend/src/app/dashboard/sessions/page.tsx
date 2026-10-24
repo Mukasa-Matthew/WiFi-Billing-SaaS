@@ -38,7 +38,7 @@ export default function TenantActiveSessionsPage() {
   const [sessions, setSessions] = useState<ActiveSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [autoRefresh, setAutoRefresh] = useState(true);
+
   const [msg, setMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
   // Disconnect Confirmation Modal
@@ -61,12 +61,11 @@ export default function TenantActiveSessionsPage() {
   }, []);
 
   useEffect(() => {
-    if (!autoRefresh) return;
     const interval = setInterval(() => {
       fetchActiveSessions();
     }, 10000);
     return () => clearInterval(interval);
-  }, [autoRefresh]);
+  }, []);
 
   const handleDisconnect = async () => {
     if (!disconnectTarget) return;
@@ -148,26 +147,7 @@ export default function TenantActiveSessionsPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 text-xs font-medium text-slate-700 px-3 py-2 rounded-xl bg-white border border-slate-200 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={autoRefresh}
-              onChange={(e) => setAutoRefresh(e.target.checked)}
-              className="rounded bg-[#F5F7FA] border-slate-300 text-blue-700 focus:ring-0 cursor-pointer"
-            />
-            <span>Auto Refresh (10s)</span>
-          </label>
-
-          <button
-            onClick={() => {
-              setLoading(true);
-              fetchActiveSessions();
-            }}
-            className="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 border border-slate-300 transition cursor-pointer"
-            title="Refresh Sessions"
-          >
-            <ArrowClockwise className={`w-4 h-4 ${loading ? "animate-spin text-emerald-700" : ""}`} />
-          </button>
+          <span className="text-xs text-slate-500">Auto-refreshes every 10 seconds</span>
         </div>
       </div>
 

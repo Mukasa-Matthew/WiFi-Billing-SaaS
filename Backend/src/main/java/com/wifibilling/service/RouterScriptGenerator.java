@@ -38,6 +38,7 @@ public class RouterScriptGenerator {
 
     private static final List<String> PORTAL_TEMPLATES = List.of(
             "login.html",
+            "feedback.html",
             "status.html",
             "logout.html",
             "alogin.html",
@@ -287,16 +288,10 @@ public class RouterScriptGenerator {
         // 3. Captive Portal Template Download to flash/hotspot
         s.append("# --- 4. Captive Portal Assets Download ---\n");
         s.append(":do { /file add name=flash/hotspot/login.html contents=\"\" } on-error={}\n");
-        StringBuilder sync = new StringBuilder();
         for (String tmpl : PORTAL_TEMPLATES) {
-            String tmplUrl = c.publicBaseUrl() + "/api/portal/templates/" + tmpl + "?token=" + c.token();
-            String fetchLine = ":do { /tool fetch url=" + q(tmplUrl)
+            s.append(":do { /tool fetch url=" + q(c.publicBaseUrl() + "/api/portal/templates/" + tmpl + "?token=" + c.token())
                     + " dst-path=" + q("flash/hotspot/" + tmpl)
-                    + " } on-error={ :log warning \"wifi-billing: failed fetching " + tmpl + "\" }\n";
-            s.append(fetchLine);
-            if (!"packages.json".equals(tmpl)) {
-                sync.append(fetchLine);
-            }
+                    + " } on-error={ :log warning \"wifi-billing: failed fetching " + tmpl + "\" }\n");
         }
         // Two cadences: packages.json (tiny, changes often) refreshes every minute;
         // full template refresh every 30 minutes (branding changes are rare).
@@ -309,8 +304,12 @@ public class RouterScriptGenerator {
         s.append("/system/scheduler add name=wb-pkg-sync interval=1m on-event=")
                 .append(q("/system script run wb-pkg-sync"))
                 .append(" policy=").append(POLICY).append(" comment=").append(tag).append("\n");
+        // wb-portal-sync stays a tiny bootstrap: it pulls the server-generated
+        // portal-sync.rsc every run, so new portal files sync without ever
+        // rewriting this on-router script.
         s.append("/system/script add name=wb-portal-sync policy=").append(POLICY)
-                .append(" comment=").append(tag).append(" source={\n").append(sync).append("}\n");
+                .append(" comment=").append(tag).append(" source={\n")
+                .append(portalSyncBootstrap(c.publicBaseUrl(), c.token())).append("}\n");
         s.append("/system/scheduler add name=wb-portal-sync interval=30m on-event=")
                 .append(q("/system script run wb-portal-sync"))
                 .append(" policy=").append(POLICY).append(" comment=").append(tag).append("\n");
@@ -401,6 +400,24 @@ public class RouterScriptGenerator {
                 + " http-method=post http-header-field=\"Content-Type: application/json\" http-data=[:serialize to=json value=$hosts] output=none } on-error={ :log warning \"wifi-billing host report failed\" }\n}\n"
                 + "/system/scheduler/add name=wb-management interval=1m on-event=wb-management policy=read,write,test\n"
                 + ":do { /system/script/run wb-management } on-error={}\n";
+    }
+
+    /** RouterOS commands that fetch every portal template file to flash/hotspot. */
+    public static String portalSyncScript(String publicBaseUrl, String token) {
+        StringBuilder sb = new StringBuilder();
+        for (String tmpl : PORTAL_TEMPLATES) {
+            sb.append(":do { /tool fetch url=").append(q(publicBaseUrl + "/api/portal/templates/" + tmpl + "?token=" + token))
+                    .append(" dst-path=").append(q("flash/hotspot/" + tmpl))
+                    .append(" } on-error={}\n");
+        }
+        return sb.toString();
+    }
+
+    /** Bootstrap body for the on-router wb-portal-sync script: fetch + import portal-sync.rsc. */
+    public static String portalSyncBootstrap(String publicBaseUrl, String token) {
+        return ":do { /tool fetch url=" + q(publicBaseUrl + "/api/portal/templates/portal-sync.rsc?token=" + token)
+                + " dst-path=" + q("wb-portal-sync.rsc")
+                + "; /import wb-portal-sync.rsc } on-error={}\n";
     }
 
     /** Quotes a value as a RouterOS string literal. */

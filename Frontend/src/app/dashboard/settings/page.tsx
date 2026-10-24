@@ -4,8 +4,9 @@ import React, { useEffect, useRef, useState } from "react";
 import api from "@/lib/api";
 import {
   CheckCircle, CircleNotch, FloppyDisk, GearSix, Globe, FileText,
-  Bell, Ticket, CloudArrowDown, Trash, ArrowSquareOut,
+  Bell, Ticket, CloudArrowDown, Trash, CreditCard, ArrowSquareOut,
 } from "@phosphor-icons/react";
+import PaymentGatewaySettings from "@/components/PaymentGatewaySettings";
 
 interface TenantSettings {
   name: string;
@@ -59,6 +60,7 @@ const TABS = [
   { key: "portal", name: "Captive Portal", icon: FileText },
   { key: "vouchers", name: "Vouchers", icon: Ticket },
   { key: "notifications", name: "Notifications", icon: Bell },
+  { key: "payments", name: "Payment Gateway", icon: CreditCard },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
@@ -223,6 +225,9 @@ export default function TenantSettingsPage() {
         ))}
       </nav>
 
+      {tab === "payments" ? (
+        <PaymentGatewaySettings />
+      ) : (
       <form onSubmit={save} className="space-y-6">
         {tab === "general" && (
           <section className={card}>
@@ -474,6 +479,7 @@ export default function TenantSettingsPage() {
           {saved && <span className="flex items-center gap-1.5 text-sm text-emerald-700"><CheckCircle size={15} />Saved</span>}
         </div>
       </form>
+      )}
     </div>
   );
 }

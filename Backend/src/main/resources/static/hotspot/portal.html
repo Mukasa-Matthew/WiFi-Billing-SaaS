@@ -284,35 +284,14 @@
     </div>
 </div>
 
-<!-- Feedback modal -->
-<div id="feedback-modal" class="overlay">
-    <div class="modal-box">
-        <button class="modal-close" onclick="hideFeedback()">✕</button>
-        <h3>Share Feedback</h3>
-        <p>Tell us about your experience with this WiFi service.</p>
-        <div id="fb-stars" style="display:flex;gap:6px;justify-content:center;font-size:26px;margin-bottom:12px;cursor:pointer">
-            <span data-r="1">☆</span><span data-r="2">☆</span><span data-r="3">☆</span><span data-r="4">☆</span><span data-r="5">☆</span>
-        </div>
-        <div class="input-wrap">
-            <span class="icon">👤</span>
-            <input class="form-input" id="fb-name" type="text" placeholder="Your name (optional)" maxlength="120">
-        </div>
-        <div class="input-wrap">
-            <span class="icon">📞</span>
-            <input class="form-input" id="fb-phone" type="tel" placeholder="Phone number (optional)" maxlength="32">
-        </div>
-        <textarea class="form-input" id="fb-message" rows="3" maxlength="1000" placeholder="Your feedback…" style="padding:14px;margin-bottom:12px;resize:vertical"></textarea>
-        <button type="button" class="btn btn-dark" id="fb-send" onclick="sendFeedback()">Send Feedback</button>
-        <div id="fb-result" style="margin-top:10px"></div>
-    </div>
-</div>
-
 <script>
 var Q = new URLSearchParams(location.search);
 var TOKEN = Q.get('token') || '';
 var LINK_LOGIN = Q.get('link-login-only') || '';
 var LINK_ORIG = Q.get('link-orig') || '';
 var MT_ERROR = Q.get('error') || '';
+var MT_MAC = Q.get('mac') || '';
+var MT_IP = Q.get('ip') || '';
 var BASE = location.origin;
 var pollTimer = null;
 var configTimer = null;
@@ -359,7 +338,7 @@ function renderSettings(settings) {
     var sb = document.getElementById('share-btn');
     if (settings.showFeedback !== false) {
         sb.style.display = 'flex';
-        sb.onclick = showFeedback;
+        sb.onclick = function(){ location.href = 'feedback.html' + location.search; };
     } else {
         sb.style.display = 'none';
     }
@@ -426,44 +405,6 @@ function showFind(){ document.getElementById('find-modal').classList.add('show')
 function hideFind(){ document.getElementById('find-modal').classList.remove('show'); }
 function hidePay(){ document.getElementById('pay-modal').classList.remove('show'); }
 
-var fbRating = 0;
-function showFeedback(){ document.getElementById('feedback-modal').classList.add('show'); }
-function hideFeedback(){ document.getElementById('feedback-modal').classList.remove('show'); }
-Array.prototype.forEach.call(document.querySelectorAll('#fb-stars span'), function(star){
-    star.onclick = function(){
-        fbRating = parseInt(star.getAttribute('data-r'), 10);
-        Array.prototype.forEach.call(document.querySelectorAll('#fb-stars span'), function(s){
-            s.textContent = parseInt(s.getAttribute('data-r'), 10) <= fbRating ? '★' : '☆';
-        });
-    };
-});
-function sendFeedback(){
-    var msg = document.getElementById('fb-message').value.trim();
-    var out = document.getElementById('fb-result');
-    if (!msg) { out.innerHTML = '<div class="status-msg error">Please write your feedback first.</div>'; return; }
-    var btn = document.getElementById('fb-send');
-    btn.disabled = true; out.innerHTML = '<div class="spinner" style="margin:10px auto"></div>';
-    var mac = Q.get('mac') || '';
-    fetch(BASE + '/api/portal/feedback?token=' + encodeURIComponent(TOKEN), {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            name: document.getElementById('fb-name').value.trim(),
-            phone: document.getElementById('fb-phone').value.trim(),
-            mac: mac, rating: fbRating || null, message: msg
-        })
-    }).then(function(r){
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        out.innerHTML = '<div class="status-msg success">Thank you! Your feedback has been sent.</div>';
-        document.getElementById('fb-message').value = '';
-        document.getElementById('fb-name').value = '';
-        document.getElementById('fb-phone').value = '';
-        fbRating = 0;
-        Array.prototype.forEach.call(document.querySelectorAll('#fb-stars span'), function(s){ s.textContent = '☆'; });
-        setTimeout(hideFeedback, 1600);
-    }).catch(function(){
-        out.innerHTML = '<div class="status-msg error">Could not send right now. Please try again in a moment.</div>';
-    }).finally(function(){ btn.disabled = false; });
-}
 
 function findVoucher(){
     var phone = document.getElementById('find-phone').value.trim();
@@ -561,48 +502,136 @@ function refreshConfig() {
 refreshConfig();
 configTimer = setInterval(refreshConfig, 4000);
 
+/* ---------- checkout idempotency ----------
+   One stable checkout id per purchase intent, persisted in localStorage so a
+   closed captive browser, a refresh, or a dropped connection resumes the SAME
+   transaction instead of charging again. The backend enforces uniqueness on
+   checkout_ref — this client key is only for convenience/resume. */
+var CHECKOUT_KEY = 'wb_checkout_' + TOKEN;
+var payInFlight = false;
+
+function loadCheckout() {
+    try {
+        var raw = localStorage.getItem(CHECKOUT_KEY);
+        if (!raw) return null;
+        var c = JSON.parse(raw);
+        if (c && c.ref && c.paymentRef) return c;
+    } catch (e) {}
+    return null;
+}
+function saveCheckout(c) {
+    try { localStorage.setItem(CHECKOUT_KEY, JSON.stringify(c)); } catch (e) {}
+}
+function clearCheckout() {
+    try { localStorage.removeItem(CHECKOUT_KEY); } catch (e) {}
+}
+function newCheckoutRef() {
+    return 'chk-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
+}
+
 function handlePurchase() {
     var phone = document.getElementById('phone-number').value.trim();
-    if (!configReady || !selectedPkg || !phone) return;
+    if (!configReady || !selectedPkg || !phone || payInFlight) return;
+
+    // If this browser already has a live checkout, resume it — never start a
+    // second collection for what is logically the same purchase.
+    var existing = loadCheckout();
+    if (existing) {
+        hidePay();
+        if (!existing.paymentRef) { sendInitiate(existing); return; }
+        document.getElementById('payment-modal').classList.add('show');
+        document.getElementById('modal-status').textContent = 'Checking your existing payment…';
+        pollPayment(existing.paymentRef, 0);
+        return;
+    }
+
+    var checkout = { ref: newCheckoutRef(), pkgId: selectedPkg.id, phone: phone, paymentRef: null };
+    saveCheckout(checkout);
+    sendInitiate(checkout);
+}
+
+function sendInitiate(checkout) {
+    payInFlight = true;
+    document.getElementById('pay-btn').disabled = true;
     hidePay();
     document.getElementById('payment-modal').classList.add('show');
     document.getElementById('modal-status').textContent = 'Sending payment request…';
     fetch(BASE + '/api/payments/initiate', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ token: TOKEN, packageId: selectedPkg.id, phone: phone, network: '' })
+        body: JSON.stringify({
+            token: TOKEN, packageId: checkout.pkgId, phone: checkout.phone,
+            network: '', checkoutRef: checkout.ref, mac: (MT_MAC && MT_MAC.charAt(0) !== '$') ? MT_MAC : ''
+        })
     })
     .then(function(r){ return r.json(); })
     .then(function(res){
-        if (!res.reference) { cancelPaymentPolling(); showMsg(res.message || 'Payment could not be started.', true); return; }
-        document.getElementById('modal-status').textContent = 'Waiting for confirmation…';
+        payInFlight = false;
+        document.getElementById('pay-btn').disabled = false;
+        if (!res.reference) { cancelPaymentPolling(); clearCheckout(); showMsg(res.message || 'Payment could not be started.', true); return; }
+        checkout.paymentRef = res.reference;
+        saveCheckout(checkout);
+        if (res.status === 'SUCCESSFUL') { finishSuccess(res.reference); return; }
+        if (res.status === 'FAILED') { cancelPaymentPolling(); clearCheckout(); showMsg('This payment failed. You have not been charged — try again.', true); return; }
+        document.getElementById('modal-status').textContent = 'Please approve the payment request on your phone.';
         pollPayment(res.reference, 0);
     })
-    .catch(function(){ cancelPaymentPolling(); showMsg('Network error starting payment.', true); });
+    .catch(function(){
+        payInFlight = false;
+        document.getElementById('pay-btn').disabled = false;
+        // Network error — the request may still have reached the backend. Keep
+        // the checkout and probe the initiate endpoint once more rather than
+        // starting a new payment.
+        document.getElementById('modal-status').textContent = 'Connection lost — rechecking your payment…';
+        setTimeout(function(){ retryInitiate(checkout, 0); }, 3000);
+    });
+}
+
+/* After a failed initiate response, re-POST the same checkoutRef — the backend
+   resumes the same transaction if it exists, never a duplicate charge. */
+function retryInitiate(checkout, attempt) {
+    if (attempt > 4) { cancelPaymentPolling(); showMsg('Could not reach the payment server. Your checkout is saved — reopen this page to continue.', true); return; }
+    fetch(BASE + '/api/payments/initiate', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            token: TOKEN, packageId: checkout.pkgId, phone: checkout.phone,
+            network: '', checkoutRef: checkout.ref, mac: (MT_MAC && MT_MAC.charAt(0) !== '$') ? MT_MAC : ''
+        })
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+        if (!res.reference) { retryInitiate(checkout, attempt + 1); return; }
+        checkout.paymentRef = res.reference;
+        saveCheckout(checkout);
+        if (res.status === 'SUCCESSFUL') { finishSuccess(res.reference); return; }
+        if (res.status === 'FAILED') { cancelPaymentPolling(); clearCheckout(); showMsg('This payment failed. You have not been charged — try again.', true); return; }
+        document.getElementById('modal-status').textContent = 'Please approve the payment request on your phone.';
+        pollPayment(res.reference, 0);
+    })
+    .catch(function(){ setTimeout(function(){ retryInitiate(checkout, attempt + 1); }, 4000); });
 }
 
 function pollPayment(reference, attempt) {
-    if (attempt > 30) { cancelPaymentPolling(); showMsg('Payment timed out. Try again or use a voucher.', true); return; }
+    if (attempt > 60) {
+        // Long-unresolved: do NOT offer a fresh payment. Keep the checkout and
+        // let the customer reopen/resume — a second charge is worse than a wait.
+        document.getElementById('modal-status').textContent = 'Still waiting for the network. Keep this page open or reopen it later — do not pay again.';
+        pollTimer = setTimeout(function(){ pollPayment(reference, attempt + 1); }, 10000);
+        return;
+    }
     pollTimer = setTimeout(function(){
         fetch(BASE + '/api/payments/status/' + encodeURIComponent(reference))
             .then(function(r){ return r.json(); })
             .then(function(res){
                 if (res.status === 'SUCCESSFUL') {
-                    cancelPaymentPolling();
-                    purchasedCode = res.voucherCode || '';
-                    if (purchasedCode) {
-                        document.getElementById('voucher-code-display').textContent = purchasedCode;
-                        document.getElementById('voucher-result').classList.add('show');
-                        document.getElementById('username-input').value = purchasedCode;
-                        showMsg('Payment received! Press "Connect with this code" to go online.', false);
-                        window.scrollTo(0, 0);
-                    } else {
-                        showMsg('Payment received! You are being connected…', false);
-                    }
+                    finishSuccess(reference, res.voucherCode);
                 } else if (res.status === 'FAILED') {
                     cancelPaymentPolling();
-                    showMsg('Payment failed or was cancelled. Try again.', true);
+                    clearCheckout();
+                    showMsg('Payment was not completed. You have not been charged by a confirmed transaction — you can try again.', true);
                 } else {
+                    document.getElementById('modal-status').textContent = 'Verifying your payment. Please wait…';
                     pollPayment(reference, attempt + 1);
                 }
             })
@@ -610,10 +639,69 @@ function pollPayment(reference, attempt) {
     }, 3000);
 }
 
+function finishSuccess(reference, codeFromPoll) {
+    if (codeFromPoll) { applySuccess(codeFromPoll); return; }
+    fetch(BASE + '/api/payments/status/' + encodeURIComponent(reference))
+        .then(function(r){ return r.json(); })
+        .then(function(res){ applySuccess(res.voucherCode || ''); })
+        .catch(function(){ applySuccess(''); });
+}
+
+function applySuccess(code) {
+    cancelPaymentPolling();
+    clearCheckout();
+    purchasedCode = code;
+    if (code) {
+        document.getElementById('voucher-code-display').textContent = code;
+        document.getElementById('voucher-result').classList.add('show');
+        document.getElementById('username-input').value = code;
+    }
+    autoConnect(code);
+}
+
+/* ---------- automatic MikroTik login ----------
+   Submits the router's own login form ($(link-login-only), http-pap enabled in
+   the hotspot profile) with the just-purchased credential — no manual voucher
+   entry, no challenge to expire. On failure MikroTik re-renders this page with
+   $(error); the stored purchase is gone but "Connect with this code" still works. */
+function autoConnect(code) {
+    if (!code || !LINK_LOGIN || LINK_LOGIN.charAt(0) === '$') {
+        showMsg(code ? 'Payment confirmed! Press "Connect with this code" to go online.'
+                     : 'Payment confirmed! Reopen this page to finish connecting.', false);
+        window.scrollTo(0, 0);
+        return;
+    }
+    showMsg('Payment confirmed. Connecting you to the internet…', false);
+    window.scrollTo(0, 0);
+    setTimeout(function(){
+        document.getElementById('username-input').value = code;
+        document.getElementById('password-input').value = code;
+        document.getElementById('login-form').submit();
+    }, 900);
+}
+
 function cancelPaymentPolling() {
     if (pollTimer) clearTimeout(pollTimer);
     document.getElementById('payment-modal').classList.remove('show');
 }
+
+/* Resume an interrupted checkout on page load (browser closed mid-payment,
+   WiFi flap, captive-browser restart). */
+(function resumeCheckoutOnLoad() {
+    var c = loadCheckout();
+    if (!c) return;
+    if (!c.paymentRef) { sendInitiate(c); return; }
+    document.getElementById('payment-modal').classList.add('show');
+    document.getElementById('modal-status').textContent = 'Checking your earlier payment…';
+    fetch(BASE + '/api/payments/status/' + encodeURIComponent(c.paymentRef))
+        .then(function(r){ return r.json(); })
+        .then(function(res){
+            if (res.status === 'SUCCESSFUL') finishSuccess(c.paymentRef, res.voucherCode);
+            else if (res.status === 'FAILED') { cancelPaymentPolling(); clearCheckout(); showMsg('Your earlier payment did not complete. You have not been charged — start a new payment.', true); }
+            else pollPayment(c.paymentRef, 0);
+        })
+        .catch(function(){ pollPayment(c.paymentRef, 0); });
+})();
 
 function useVoucher() {
     document.getElementById('username-input').value = purchasedCode;

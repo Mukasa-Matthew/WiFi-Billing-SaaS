@@ -11,7 +11,12 @@ public class PaymentDto {
             @NotBlank String token,
             @NotNull Long packageId,
             @NotBlank String phone,
-            String network) {
+            String network,
+            /** Client-generated checkout idempotency key (UUID). Repeated submits
+             *  of the same checkout resume the existing transaction. */
+            String checkoutRef,
+            /** MikroTik hotspot client MAC, echoed by the portal from $(mac). */
+            String mac) {
     }
 
     public record InitiateResponse(
