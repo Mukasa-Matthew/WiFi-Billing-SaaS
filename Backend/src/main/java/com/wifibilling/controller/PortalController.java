@@ -113,10 +113,17 @@ public class PortalController {
     @GetMapping(value = "/page", produces = "text/html;charset=UTF-8")
     public ResponseEntity<String> portalPage(@RequestParam("token") String token) {
         Router router = resolveRouter(token);
+        // Server-rendered previews run in iframes where location.origin is "null"
+        // and there are no query params — bake in the token and public base URL.
+        String html = renderPortal(router.getTenant(), null)
+                .replace("var TOKEN = Q.get('token') || '';",
+                        "var TOKEN = '" + router.getToken() + "';")
+                .replace("var BASE = location.origin;",
+                        "var BASE = '" + props.getPublicBaseUrl() + "';");
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .contentType(MediaType.TEXT_HTML)
-                .body(renderPortal(router.getTenant(), null));
+                .body(html);
     }
 
     static String renderPortal(com.wifibilling.model.Tenant tenant, String themeOverride) {
