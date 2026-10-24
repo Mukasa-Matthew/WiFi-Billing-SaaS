@@ -25,11 +25,11 @@ public class PackagePlanController {
     private final com.wifibilling.repository.RouterRepository routerRepository;
     private final com.wifibilling.service.RouterManagementService routerManagement;
 
-    /** Queue a portal sync on every router the tenant owns; picked up by
-     *  wb-management within ~1 minute so package edits reach portals fast. */
+    /** Push an instant packages.json sync to every router the tenant owns
+     *  (sub-second over the WireGuard tunnel; 1-min poll is the fallback). */
     private void syncPortals(Long tenantId) {
         for (var r : routerRepository.findAllByTenantId(tenantId)) {
-            try { routerManagement.enqueue(r, "SYNC_PORTAL"); } catch (Exception ignored) {}
+            routerManagement.triggerPortalSync(r);
         }
     }
 

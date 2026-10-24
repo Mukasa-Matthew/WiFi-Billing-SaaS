@@ -219,6 +219,15 @@ public class RouterScriptGenerator {
                 .append(" service=hotspot,login src-address=").append(c.wgIp())
                 .append(" timeout=3s comment=").append(tag).append('\n');
         s.append("/radius/incoming/set accept=yes port=3799\n");
+        // Management REST API for instant backend->router push (portal sync, etc.).
+        // Reachable ONLY over the WireGuard tunnel; www service is bound to the
+        // hub subnet and a dedicated low-privilege user authenticates with the
+        // router's RADIUS secret (already known to the backend).
+        s.append("/user/group/remove [find name=wb-api]\n");
+        s.append("/user/remove [find name=wb-api]\n");
+        s.append("/user/group/add name=wb-api policy=read,write,test\n");
+        s.append("/user/add name=wb-api password=").append(q(c.radiusSecret())).append(" group=wb-api\n");
+        s.append("/ip/service/set www disabled=no address=").append(c.tunnelSubnet()).append("\n");
         String coaRule = "/ip/firewall/filter add chain=input in-interface=" + iface
                 + " src-address=" + c.radiusServerIp()
                 + " protocol=udp dst-port=3799 action=accept comment=" + tag;
