@@ -2,8 +2,8 @@
 
 import React, { useState } from "react";
 import api from "@/lib/api";
-import { ChatCircleText, Star, Trash, ArrowClockwise } from "@phosphor-icons/react";
-import { useResource, Notice, ErrorNotice, message, date, PageContainer, PageHeader, buttonGhost } from "@/components/BillingUI";
+import { ChatCircleText, Star, Trash } from "@phosphor-icons/react";
+import { useResource, Notice, ErrorNotice, message, date, PageContainer, PageHeader } from "@/components/BillingUI";
 import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
 
@@ -55,7 +55,7 @@ export default function FeedbackPage() {
       <PageHeader
         title="Customer feedback"
         description="Feedback customers leave from the captive portal."
-        action={<button onClick={() => load()} disabled={loading} className={buttonGhost}><ArrowClockwise size={14} className={loading ? "animate-spin" : ""} />Refresh</button>}
+        action={undefined}
       />
       <ErrorNotice text={error} />
       <Notice text={note} />
