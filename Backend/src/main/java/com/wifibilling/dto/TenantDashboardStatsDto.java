@@ -10,6 +10,7 @@ import java.util.Map;
 public record TenantDashboardStatsDto(
     BigDecimal revenueToday,
     BigDecimal revenueMonth,
+    BigDecimal revenueAllTime,
     long activeUsers,
     long totalDataConsumedBytes,
     long totalRouters,
