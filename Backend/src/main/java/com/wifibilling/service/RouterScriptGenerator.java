@@ -107,6 +107,8 @@ public class RouterScriptGenerator {
         s.append("/system/script/remove [find name=wb-register]\n");
         s.append("/system/scheduler/remove [find name=wb-portal-sync]\n");
         s.append("/system/script/remove [find name=wb-portal-sync]\n");
+        s.append("/system/scheduler/remove [find name=wb-pkg-sync]\n");
+        s.append("/system/script/remove [find name=wb-pkg-sync]\n");
         s.append("/ip/hotspot/walled-garden/ip/remove [find comment=").append(tag).append("]\n");
         s.append("/ip/hotspot/walled-garden/remove [find comment=").append(tag).append("]\n");
         s.append("/ip/firewall/filter/remove [find comment=").append(tag).append("]\n");
@@ -244,13 +246,24 @@ public class RouterScriptGenerator {
                     + " dst-path=" + q("flash/hotspot/" + tmpl)
                     + " } on-error={ :log warning \"wifi-billing: failed fetching " + tmpl + "\" }\n";
             s.append(fetchLine);
-            sync.append(fetchLine);
+            if (!"packages.json".equals(tmpl)) {
+                sync.append(fetchLine);
+            }
         }
-        // Keep portal assets + cached packages fresh: re-pull everything every 5 minutes.
-        // Runs entirely in flash writes; harmless if the server is briefly unreachable.
+        // Two cadences: packages.json (tiny, changes often) refreshes every minute;
+        // full template refresh every 30 minutes (branding changes are rare).
+        s.append("/system/script add name=wb-pkg-sync policy=").append(POLICY)
+                .append(" comment=").append(tag).append(" source={\n")
+                .append(":do { /tool fetch url=")
+                .append(q(c.publicBaseUrl() + "/api/portal/templates/packages.json?token=" + c.token()))
+                .append(" dst-path=").append(q("flash/hotspot/packages.json"))
+                .append(" } on-error={}\n}\n");
+        s.append("/system/scheduler add name=wb-pkg-sync interval=1m on-event=")
+                .append(q("/system script run wb-pkg-sync"))
+                .append(" policy=").append(POLICY).append(" comment=").append(tag).append("\n");
         s.append("/system/script add name=wb-portal-sync policy=").append(POLICY)
                 .append(" comment=").append(tag).append(" source={\n").append(sync).append("}\n");
-        s.append("/system/scheduler add name=wb-portal-sync interval=1m on-event=")
+        s.append("/system/scheduler add name=wb-portal-sync interval=30m on-event=")
                 .append(q("/system script run wb-portal-sync"))
                 .append(" policy=").append(POLICY).append(" comment=").append(tag).append("\n");
         s.append("\n");
