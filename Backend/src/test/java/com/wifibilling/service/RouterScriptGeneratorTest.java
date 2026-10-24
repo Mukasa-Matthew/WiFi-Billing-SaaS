@@ -48,6 +48,12 @@ class RouterScriptGeneratorTest {
         // tethering BLOCK mode emits drop rules
         assertTrue(s.contains("/ip/firewall/filter/add chain=forward ttl=equal:62 action=drop"));
         assertTrue(s.contains("/ip/firewall/filter/add chain=forward ttl=equal:126 action=drop"));
+        assertTrue(s.contains("# Provisioning-Version: " + RouterScriptGenerator.PROVISIONING_VERSION));
+        assertTrue(s.contains("find name=wb-provisioned comment=$wbMarker"));
+        assertTrue(s.contains("Existing wb-hotspot-bridge is not managed by WiFi-Billing"));
+        assertTrue(s.contains("\\\"hotspotReady\\\":"));
+        assertTrue(s.contains("/system/script/add name=wb-provisioned"));
+        assertTrue(s.indexOf("Existing wb-hotspot-bridge") < s.indexOf("Remove previous provisioning"));
     }
 
     @Test
