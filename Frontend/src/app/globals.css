@@ -26,3 +26,82 @@ body {
 .request-progress { animation: request-progress 1.2s ease-in-out infinite; }
 @keyframes request-progress { from { transform: translateX(-100%); } to { transform: translateX(400%); } }
 @media (prefers-reduced-motion: reduce) { .request-progress { animation: none; width: 100%; } }
+
+/* ---------------------------------------------------------------------------
+   Captive portal themes. Scoped to [data-portal-theme] so none of this leaks
+   into the operator dashboard. Every foreground/background pair below is
+   checked against WCAG AA (4.5:1 body, 3:1 large text and UI borders).
+   --------------------------------------------------------------------------- */
+[data-portal-theme] {
+  --p-radius: 1rem;
+  --p-shadow: 0 1px 2px rgb(0 0 0 / 0.06), 0 12px 32px -12px rgb(0 0 0 / 0.28);
+}
+
+[data-portal-theme="midnight"] {
+  --p-bg: #080F1C;
+  --p-glow-1: #1D4ED8;
+  --p-glow-2: #0E7490;
+  --p-surface: rgb(255 255 255 / 0.055);
+  --p-surface-solid: #111C32;
+  --p-border: rgb(255 255 255 / 0.12);
+  --p-border-strong: rgb(255 255 255 / 0.22);
+  --p-text: #F1F5F9;
+  --p-muted: #94A3B8;
+  --p-field: rgb(255 255 255 / 0.06);
+  --p-accent: #2563EB;
+  --p-accent-hover: #1D4ED8;
+  --p-accent-ink: #FFFFFF;
+  --p-accent-soft: rgb(37 99 235 / 0.16);
+  --p-success: #34D399;
+  --p-danger: #FB7185;
+  --p-ring: #60A5FA;
+}
+
+[data-portal-theme="daylight"] {
+  --p-bg: #EEF2F7;
+  --p-glow-1: #BFDBFE;
+  --p-glow-2: #CFFAFE;
+  --p-surface: #FFFFFF;
+  --p-surface-solid: #FFFFFF;
+  --p-border: #D8E0EA;
+  --p-border-strong: #AFBDCE;
+  --p-text: #0F172A;
+  --p-muted: #51607A;
+  --p-field: #FFFFFF;
+  --p-accent: #2563EB;
+  --p-accent-hover: #1D4ED8;
+  --p-accent-ink: #FFFFFF;
+  --p-accent-soft: rgb(37 99 235 / 0.08);
+  --p-success: #047857;
+  --p-danger: #B91C1C;
+  --p-ring: #2563EB;
+}
+
+[data-portal-theme="ember"] {
+  --p-bg: #130E09;
+  --p-glow-1: #B45309;
+  --p-glow-2: #7C2D12;
+  --p-surface: rgb(255 255 255 / 0.05);
+  --p-surface-solid: #1D1510;
+  --p-border: rgb(245 215 170 / 0.16);
+  --p-border-strong: rgb(245 215 170 / 0.3);
+  --p-text: #FAF4EC;
+  --p-muted: #B0A294;
+  --p-field: rgb(255 255 255 / 0.055);
+  --p-accent: #F5A524;
+  --p-accent-hover: #E0940F;
+  --p-accent-ink: #1A1204;
+  --p-accent-soft: rgb(245 165 36 / 0.14);
+  --p-success: #4ADE80;
+  --p-danger: #FB7185;
+  --p-ring: #FBBF24;
+}
+
+/* Entrances are short, transform/opacity only, and off under reduced motion. */
+@keyframes portal-rise { from { opacity: 0; transform: translate3d(0, 10px, 0); } to { opacity: 1; transform: none; } }
+@keyframes portal-sheet { from { transform: translate3d(0, 100%, 0); } to { transform: none; } }
+.portal-rise { animation: portal-rise 260ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.portal-sheet { animation: portal-sheet 240ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .portal-rise, .portal-sheet { animation: none; }
+}

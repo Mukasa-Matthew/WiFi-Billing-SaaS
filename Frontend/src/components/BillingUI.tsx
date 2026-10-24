@@ -2,7 +2,8 @@
 import React, { useCallback, useEffect, useState, useRef } from "react";
 import api from "@/lib/api";
 import { LoadingIndicator } from "@/components/LoadingUI";
-import { CaretLeft, CaretRight, MagnifyingGlass, Tray } from "@phosphor-icons/react";
+import Link from "next/link";
+import { ArrowLeft, CaretLeft, CaretRight, MagnifyingGlass, Tray } from "@phosphor-icons/react";
 
 /* ---------- design tokens ---------- */
 export const field = "mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-500 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15";
@@ -182,6 +183,98 @@ export function date(value: string | null) { return value ? new Date(value).toLo
 export function bytes(value: number) { return value < 1048576 ? `${(value / 1024).toFixed(1)} KB` : value < 1073741824 ? `${(value / 1048576).toFixed(2)} MB` : `${(value / 1073741824).toFixed(2)} GB`; }
 export function remaining(value: number | null) { if (value === null) return "Not started"; if (value === 0) return "Expired"; return `${Math.floor(value / 86400)}d ${Math.floor(value % 86400 / 3600)}h ${Math.floor(value % 3600 / 60)}m`; }
 export function ugx(v: number | string | null | undefined) { return `UGX ${Number(v || 0).toLocaleString()}`; }
+
+/* ---------- create / edit form scaffolding ----------
+   Shared so every "new" page reads the same: back link, titled sections with
+   an icon, and one action row. */
+
+export function BackLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <Link href={href} className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 transition hover:text-slate-900">
+      <ArrowLeft size={13} weight="bold" aria-hidden />{children}
+    </Link>
+  );
+}
+
+export function FormHeader({ title, description, backHref, backLabel }: {
+  title: string; description?: string; backHref: string; backLabel: string;
+}) {
+  return (
+    <div>
+      <BackLink href={backHref}>{backLabel}</BackLink>
+      <h1 className="mt-3 text-2xl font-bold tracking-tight text-slate-900">{title}</h1>
+      {description && <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-500">{description}</p>}
+    </div>
+  );
+}
+
+export function FormSection({ icon, title, hint, children }: {
+  icon?: React.ReactNode; title: string; hint?: string; children: React.ReactNode;
+}) {
+  return (
+    <section className={panel}>
+      <div className="flex items-start gap-3 border-b border-slate-200 px-5 py-4">
+        {icon && (
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-blue-100 bg-blue-50 text-blue-700">
+            {icon}
+          </span>
+        )}
+        <div className="min-w-0">
+          <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
+          {hint && <p className="mt-0.5 text-xs leading-relaxed text-slate-500">{hint}</p>}
+        </div>
+      </div>
+      <div className="space-y-5 p-5">{children}</div>
+    </section>
+  );
+}
+
+/* Stacks full-width on phones with the primary action on top (thumb reach),
+   and sits right-aligned on a single row from sm up. */
+export function FormActions({ busy, busyLabel, submitLabel, cancelHref }: {
+  busy?: boolean; busyLabel: string; submitLabel: string; cancelHref: string;
+}) {
+  return (
+    <div className="flex flex-col-reverse gap-3 pb-2 sm:flex-row sm:items-center sm:justify-end">
+      <Link href={cancelHref} className={`${buttonGhost} min-h-[44px] justify-center py-3 sm:min-h-0 sm:py-2.5`}>Cancel</Link>
+      <button type="submit" disabled={busy} className={`${button} min-h-[44px] justify-center py-3 sm:min-h-0 sm:py-2.5`}>
+        {busy ? busyLabel : submitLabel}
+      </button>
+    </div>
+  );
+}
+
+/* Two-column shell: the form keeps a readable measure while the aside carries
+   a live summary, instead of the form stretching the full page width. */
+export function FormLayout({ children, aside }: { children: React.ReactNode; aside?: React.ReactNode }) {
+  return (
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_19rem] lg:items-start lg:gap-8">
+      <div className="min-w-0 space-y-5">{children}</div>
+      {aside && <div className="space-y-4 lg:sticky lg:top-2">{aside}</div>}
+    </div>
+  );
+}
+
+export function SummaryCard({ title, rows, footer }: {
+  title: string;
+  rows: { label: string; value: React.ReactNode }[];
+  footer?: React.ReactNode;
+}) {
+  return (
+    <section className={panel}>
+      <h2 className="border-b border-slate-200 px-5 py-3.5 text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</h2>
+      <dl className="divide-y divide-slate-100">
+        {rows.map((r) => (
+          <div key={r.label} className="flex items-baseline justify-between gap-3 px-5 py-3">
+            <dt className="text-xs text-slate-500">{r.label}</dt>
+            <dd className="min-w-0 truncate text-right text-sm font-semibold text-slate-900">{r.value}</dd>
+          </div>
+        ))}
+      </dl>
+      {footer && <div className="border-t border-slate-200 px-5 py-3.5 text-xs leading-relaxed text-slate-500">{footer}</div>}
+    </section>
+  );
+}
 
 export function PageContainer({ children, width = "default" }: { children: React.ReactNode; width?: "narrow" | "default" | "wide" }) {
   const w = width === "narrow" ? "max-w-3xl" : width === "wide" ? "max-w-[1440px]" : "max-w-6xl";

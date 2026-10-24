@@ -3,8 +3,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import api from "@/lib/api";
 import {
-  Warning, CheckCircle, CircleNotch, FloppyDisk, GearSix, Globe, FileText,
-  Bell, Ticket, CloudArrowDown, Trash,
+  CheckCircle, CircleNotch, FloppyDisk, GearSix, Globe, FileText,
+  Bell, Ticket, CloudArrowDown, Trash, ArrowSquareOut,
 } from "@phosphor-icons/react";
 
 interface TenantSettings {
@@ -104,8 +104,8 @@ function AssetBox({ title, hintText, has, uploading, onPick, onRemove, inputRef 
 export default function TenantSettingsPage() {
   const [form, setForm] = useState<TenantSettings | null>(null);
   const [tab, setTab] = useState<TabKey>("general");
-  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
-  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewSrc, setPreviewSrc] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(true);
   const [previewKey, setPreviewKey] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -120,22 +120,30 @@ export default function TenantSettingsPage() {
       .catch(() => setError("Could not load settings"));
   }, []);
 
-  const isPortalHtml = (html: string) =>
-    typeof html === "string" &&
-    html.includes("portal-card") &&
-    !html.includes("/_next/") &&
-    !/<title[^>]*>\s*WiFi-Billing/i.test(html);
-
+  /* The preview is the real /portal route in an iframe, fed the unsaved form
+     state. Debounced so typing a business name doesn't reload it per keystroke. */
   useEffect(() => {
     if (!form) return;
-    setPreviewError(null);
-    api.get<string>(`/api/settings/portal-preview?template=${encodeURIComponent(form.portalTemplate)}`, { responseType: "text" })
-      .then((r) => {
-        if (isPortalHtml(r.data)) { setPreviewHtml(r.data); }
-        else { setPreviewHtml(null); setPreviewError("The preview response wasn't a captive-portal page."); }
-      })
-      .catch(() => { setPreviewHtml(null); setPreviewError("Could not load the portal preview."); });
-  }, [form?.portalTemplate, previewKey]);
+    const timer = window.setTimeout(() => {
+      const q = new URLSearchParams({
+        preview: "1",
+        theme: form.portalTemplate,
+        name: form.name,
+        showPackages: form.portalShowPackages ? "1" : "0",
+        allowPurchases: form.portalAllowPurchases ? "1" : "0",
+        deviceLimits: form.portalShowDeviceLimits ? "1" : "0",
+        packageTime: form.portalShowPackageTime ? "1" : "0",
+        deviceMac: form.portalShowDeviceMac ? "1" : "0",
+        buyForOther: form.portalBuyForOther ? "1" : "0",
+        feedback: form.portalShowFeedback ? "1" : "0",
+      });
+      if (form.portalFont) q.set("font", form.portalFont);
+      if (form.portalLanguage) q.set("lang", form.portalLanguage);
+      setPreviewLoading(true);
+      setPreviewSrc(`/portal?${q.toString()}`);
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [form, previewKey]);
 
   const set = <K extends keyof TenantSettings>(key: K, value: TenantSettings[K]) =>
     setForm((f) => (f ? { ...f, [key]: value } : f));
@@ -375,20 +383,34 @@ export default function TenantSettingsPage() {
                 </div>
                 <div>
                   <div className="overflow-hidden rounded-xl border border-slate-300 bg-[#F5F7FA]">
-                    <div className="border-b border-slate-200 px-3 py-2 text-[10px] text-slate-500">Live preview — {form.portalTemplate}</div>
-                    {previewError ? (
-                      <div className="flex h-[420px] flex-col items-center justify-center gap-2 px-6 text-center">
-                        <Warning size={20} className="text-amber-600" />
-                        <p className="text-xs font-medium text-slate-700">{previewError}</p>
-                        <button type="button" onClick={() => setPreviewKey(k => k + 1)} className="mt-1 text-xs font-medium text-blue-700 hover:underline">Retry preview</button>
-                      </div>
-                    ) : previewHtml ? (
-                      <iframe key={form.portalTemplate} srcDoc={previewHtml} title="Captive portal preview" className="h-[420px] w-full bg-white" />
-                    ) : (
-                      <div className="flex h-[420px] items-center justify-center text-xs text-slate-500">
-                        <CircleNotch size={16} className="mr-2 animate-spin" />Rendering preview…
-                      </div>
-                    )}
+                    <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-3 py-2">
+                      <span className="text-[10px] text-slate-500">Live preview — {form.portalTemplate}</span>
+                      <a
+                        href={previewSrc ?? "/portal"}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 rounded text-[10px] font-semibold text-blue-700 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+                      >
+                        Open in new tab
+                        <ArrowSquareOut size={12} weight="bold" aria-hidden />
+                      </a>
+                    </div>
+                    <div className="relative h-[420px]">
+                      {previewSrc && (
+                        <iframe
+                          key={previewKey}
+                          src={previewSrc}
+                          title="Captive portal preview"
+                          onLoad={() => setPreviewLoading(false)}
+                          className="h-full w-full bg-white"
+                        />
+                      )}
+                      {previewLoading && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-[#F5F7FA] text-xs text-slate-500">
+                          <CircleNotch size={16} className="mr-2 animate-spin" />Rendering preview…
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

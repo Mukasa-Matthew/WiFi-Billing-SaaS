@@ -38,16 +38,7 @@ export default function AdminLayout({
     }
   }, [user, loading, router]);
 
-  if (loading || !user || user.role !== "ROLE_SUPERADMIN") {
-    return (
-      <div className="flex h-screen items-center justify-center bg-[#F5F7FA] text-slate-500">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-700 border-t-transparent" />
-          <p className="text-sm">Verifying platform access…</p>
-        </div>
-      </div>
-    );
-  }
+  const ready = !loading && user?.role === "ROLE_SUPERADMIN";
 
   const navItems = [
     { name: "Platform overview", href: "/admin", icon: ChartLine, group: "Platform" },
@@ -123,8 +114,8 @@ export default function AdminLayout({
               <ShieldCheck className="h-4 w-4" />
             </div>
             <div className="min-w-0">
-              <p className="truncate text-xs font-semibold text-white">{user.name}</p>
-              <p className="truncate text-[11px] text-blue-100">{user.email}</p>
+              <p className="truncate text-xs font-semibold text-white">{user?.name}</p>
+              <p className="truncate text-[11px] text-blue-100">{user?.email}</p>
             </div>
           </div>
           <button
@@ -161,6 +152,20 @@ export default function AdminLayout({
           <div className="mx-auto w-full max-w-[1440px]">{children}</div>
         </main>
       </div>
+
+      {/* Covers the console instead of replacing it: the layout has to keep
+          rendering {children} so Next can validate the segments below it for
+          instant navigation. Platform data is fetched with the bearer token,
+          so a non-superadmin never receives it behind this. */}
+      {!ready && (
+        <div role="status" aria-live="polite"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#F5F7FA] text-slate-500">
+          <div className="flex flex-col items-center gap-3">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-700 border-t-transparent" />
+            <p className="text-sm">Verifying platform access…</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
