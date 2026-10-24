@@ -30,7 +30,14 @@ public class PaymentController {
     @PostMapping(value = "/initiate", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(HttpStatus.ACCEPTED)
     public PaymentDto.InitiateResponse initiate(@Valid @RequestBody PaymentDto.InitiateRequest body) {
-        return paymentService.initiatePayment(body);
+        try {
+            return paymentService.initiatePayment(body);
+        } catch (org.springframework.dao.DataIntegrityViolationException race) {
+            // Two requests for the same checkout raced on the unique checkout_ref.
+            // The original rolled back; retrying in a fresh transaction resumes
+            // the winner — still exactly one transaction and one collection.
+            return paymentService.initiatePayment(body);
+        }
     }
 
     @PostMapping(value = "/webhook", consumes = MediaType.APPLICATION_JSON_VALUE)

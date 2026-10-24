@@ -1,7 +1,9 @@
 package com.wifibilling.repository;
 
 import com.wifibilling.model.Transaction;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -12,6 +14,21 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
 
     Optional<Transaction> findByReference(String reference);
     Optional<Transaction> findByExternalReference(String externalReference);
+    Optional<Transaction> findByCheckoutRef(String checkoutRef);
+
+    /** Serialized lookups for status transitions — concurrent webhooks/status
+     *  rechecks must not both observe PENDING and double-fulfill. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("select t from Transaction t where t.reference = :ref")
+    Optional<Transaction> findByReferenceForUpdate(String ref);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("select t from Transaction t where t.externalReference = :ref")
+    Optional<Transaction> findByExternalReferenceForUpdate(String ref);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("select t from Transaction t where t.checkoutRef = :ref")
+    Optional<Transaction> findByCheckoutRefForUpdate(String ref);
 
     boolean existsByReference(String reference);
 

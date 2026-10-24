@@ -30,7 +30,7 @@ class PaymentControllerTest {
 
     @Test
     void initiate_DelegatesToService() {
-        PaymentDto.InitiateRequest req = new PaymentDto.InitiateRequest("tok_12345678", 1L, "0771234567", "MTN");
+        PaymentDto.InitiateRequest req = new PaymentDto.InitiateRequest("tok_12345678", 1L, "0771234567", "MTN", null, null);
         PaymentDto.InitiateResponse expected = new PaymentDto.InitiateResponse("PAY-123", "PENDING", new BigDecimal("1000"), "Prompt sent");
 
         when(paymentService.initiatePayment(req)).thenReturn(expected);
