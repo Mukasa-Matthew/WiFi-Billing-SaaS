@@ -5,7 +5,7 @@ import { useResource, Table, Badge, ErrorNotice, date, field, button, buttonGhos
 import { Dialog } from "@/components/ui/Dialog";
 import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
-import { Wallet, Bank, ArrowDown, ShieldCheck } from "@phosphor-icons/react";
+import { Wallet, Bank, ArrowDown, ShieldCheck } from "@/components/icons";
 
 interface WalletSummary {
   available: number; pending: number; reserved: number;
@@ -101,7 +101,7 @@ export default function WalletPage() {
       <PageHeader title="Wallet" description="Earnings collected through the platform payment gateway. Payments made through your own payment gateway account settle directly to your wallet there." action={
         <button className={`${button} w-full sm:w-auto`} onClick={() => setOpen(true)}
           disabled={!summary || summary.available <= 0}>
-          <ArrowDown size={15} weight="bold" /> Withdraw
+          <ArrowDown size={15} /> Withdraw
         </button>
       } />
 

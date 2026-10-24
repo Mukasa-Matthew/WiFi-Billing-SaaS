@@ -18,7 +18,7 @@ import {
   WifiHigh, Ticket, ShieldCheck, Lightning, Devices, ArrowRight,
   CheckCircle, WarningCircle, Phone, WhatsappLogo, ChatCircleText, X,
   SpinnerGap, CaretRight, Globe,
-} from "@phosphor-icons/react";
+} from "@/components/icons";
 
 /* ---------------------------------------------------------------- types --- */
 
@@ -306,7 +306,7 @@ function Brand({ config, t }: { config: PortalConfig | null; t: Strings }) {
         className="mb-4 flex shrink-0 items-center justify-center rounded-2xl border border-[var(--p-border)] bg-[var(--p-accent-soft)] lg:mb-6"
         style={{ width: size, height: size }}
       >
-        <WifiHigh size={Math.round(size * 0.46)} weight="duotone" className="text-[var(--p-accent)]" aria-hidden />
+        <WifiHigh size={Math.round(size * 0.46)} className="text-[var(--p-accent)]" aria-hidden />
       </div>
       <h1 className="text-[1.6rem] font-bold leading-tight tracking-tight text-balance sm:text-[1.8rem] lg:text-[2.6rem] lg:leading-[1.08]">
         {config?.tenantName || "Hotspot"}
@@ -334,7 +334,7 @@ function VoucherCard({ t, code, setCode, error, busy, onSubmit, inputRef, length
   return (
     <section className={`${surface} portal-rise p-5`} style={{ animationDelay: "40ms" }}>
       <div className="mb-4 flex items-center gap-2.5">
-        <Ticket size={20} weight="duotone" className="text-[var(--p-accent)]" aria-hidden />
+        <Ticket size={20} className="text-[var(--p-accent)]" aria-hidden />
         <h2 className="text-base font-semibold">{t.haveCode}</h2>
       </div>
 
@@ -364,7 +364,7 @@ function VoucherCard({ t, code, setCode, error, busy, onSubmit, inputRef, length
           ? (
             <p id="voucher-error" role="alert" aria-live="assertive"
               className="mt-3 flex items-start gap-2 text-sm leading-snug text-[var(--p-danger)]">
-              <WarningCircle size={17} weight="fill" className="mt-0.5 shrink-0" aria-hidden />
+              <WarningCircle size={17} className="mt-0.5 shrink-0" aria-hidden />
               <span>{error}</span>
             </p>
           )
@@ -373,7 +373,7 @@ function VoucherCard({ t, code, setCode, error, busy, onSubmit, inputRef, length
         <div className="mt-4">
           <PrimaryButton type="submit" busy={busy} busyLabel={t.connecting} disabled={code.trim().length < 4}>
             {t.connect}
-            <ArrowRight size={19} weight="bold" aria-hidden />
+            <ArrowRight size={19} aria-hidden />
           </PrimaryButton>
         </div>
       </form>
@@ -414,7 +414,7 @@ function PackageList({ t, config, onBuy }: {
               </span>
               <span className="flex shrink-0 items-center gap-1.5">
                 <span className="text-right text-[1.02rem] font-bold tabular-nums">{ugx(p.price)}</span>
-                {onBuy && <CaretRight size={16} weight="bold" className="text-[var(--p-muted)]" aria-hidden />}
+                {onBuy && <CaretRight size={16} className="text-[var(--p-muted)]" aria-hidden />}
               </span>
             </>
           );
@@ -457,7 +457,7 @@ function ConnectedPanel({ session, config, t }: {
   return (
     <section className={`${surface} portal-rise overflow-hidden lg:col-start-2 lg:row-start-1 lg:row-span-2 lg:self-start`}>
       <div className="flex flex-col items-center border-b border-[var(--p-border)] px-5 py-7 text-center">
-        <CheckCircle size={46} weight="fill" className="text-[var(--p-success)]" aria-hidden />
+        <CheckCircle size={46} className="text-[var(--p-success)]" aria-hidden />
         <h2 className="mt-3 text-xl font-bold">{t.connected}</h2>
 
         <p className="mt-5 text-xs font-semibold uppercase tracking-wider text-[var(--p-muted)]">
@@ -474,7 +474,7 @@ function ConnectedPanel({ session, config, t }: {
         {rows.map(({ icon: Icon, label, value }) => (
           <div key={label} className="flex items-center justify-between gap-3 px-5 py-3.5">
             <dt className="flex items-center gap-2.5 text-sm text-[var(--p-muted)]">
-              <Icon size={17} weight="duotone" aria-hidden />{label}
+              <Icon size={17} aria-hidden />{label}
             </dt>
             <dd className="truncate text-sm font-semibold tabular-nums">{value}</dd>
           </div>
@@ -487,7 +487,7 @@ function ConnectedPanel({ session, config, t }: {
             href={session.redirectUrl}
             className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-[var(--p-accent)] px-5 text-base font-semibold text-[var(--p-accent-ink)] transition-colors hover:bg-[var(--p-accent-hover)] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--p-ring)]"
           >
-            {t.browse}<ArrowRight size={19} weight="bold" aria-hidden />
+            {t.browse}<ArrowRight size={19} aria-hidden />
           </a>
         </div>
       )}
@@ -511,20 +511,20 @@ function SupportFooter({ t, config, onFeedback }: {
         <>
           <p className="mb-2.5 text-center text-sm text-[var(--p-muted)] lg:text-left">{t.support}</p>
           <div className="flex flex-wrap gap-2.5 lg:max-w-md">
-            {tel && <a href={`tel:${tel}`} className={link}><Phone size={17} weight="duotone" aria-hidden />{t.call}</a>}
+            {tel && <a href={`tel:${tel}`} className={link}><Phone size={17} aria-hidden />{t.call}</a>}
             {wa && <a href={`https://wa.me/${wa}`} target="_blank" rel="noopener noreferrer" className={link}>
-              <WhatsappLogo size={17} weight="duotone" aria-hidden />{t.whatsapp}
+              <WhatsappLogo size={17} aria-hidden />{t.whatsapp}
             </a>}
             {config?.showFeedback && (
               <button type="button" onClick={onFeedback} className={link} style={{ touchAction: "manipulation" }}>
-                <ChatCircleText size={17} weight="duotone" aria-hidden />{t.feedback}
+                <ChatCircleText size={17} aria-hidden />{t.feedback}
               </button>
             )}
           </div>
         </>
       )}
       <p className="mt-5 flex items-center justify-center gap-1.5 text-xs text-[var(--p-muted)] lg:mt-6 lg:justify-start">
-        <ShieldCheck size={14} weight="duotone" aria-hidden />{t.secured}
+        <ShieldCheck size={14} aria-hidden />{t.secured}
       </p>
     </footer>
   );
@@ -567,7 +567,7 @@ function Sheet({ title, onClose, children }: {
             style={{ touchAction: "manipulation" }}
             className="-mr-1.5 -mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[var(--p-muted)] transition-colors hover:bg-[var(--p-field)] hover:text-[var(--p-text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-ring)]"
           >
-            <X size={19} weight="bold" aria-hidden />
+            <X size={19} aria-hidden />
           </button>
         </div>
         {children}
@@ -607,7 +607,7 @@ function PurchaseSheet({ t, plan, config, onClose }: {
     <Sheet title={`${t.payTitle} ${plan.name}`} onClose={onClose}>
       {done ? (
         <div className="py-2 text-center">
-          <CheckCircle size={44} weight="fill" className="mx-auto text-[var(--p-success)]" aria-hidden />
+          <CheckCircle size={44} className="mx-auto text-[var(--p-success)]" aria-hidden />
           <p className="mt-3 text-base font-semibold">{done}</p>
           <div className="mt-5">
             <PrimaryButton type="button" onClick={onClose}>{t.cancel === "Cancel" ? "Done" : t.cancel}</PrimaryButton>
@@ -633,7 +633,7 @@ function PurchaseSheet({ t, plan, config, onClose }: {
           />
           {error
             ? <p id="pay-error" role="alert" className="mt-2 flex items-start gap-1.5 text-sm text-[var(--p-danger)]">
-                <WarningCircle size={16} weight="fill" className="mt-0.5 shrink-0" aria-hidden />{error}
+                <WarningCircle size={16} className="mt-0.5 shrink-0" aria-hidden />{error}
               </p>
             : <p id="pay-hint" className="mt-2 text-sm text-[var(--p-muted)]">{t.payHint}</p>}
 
@@ -679,7 +679,7 @@ function FeedbackSheet({ t, onClose }: { t: Strings; onClose: () => void }) {
     <Sheet title={t.feedbackTitle} onClose={onClose}>
       {done ? (
         <div className="py-2 text-center">
-          <CheckCircle size={44} weight="fill" className="mx-auto text-[var(--p-success)]" aria-hidden />
+          <CheckCircle size={44} className="mx-auto text-[var(--p-success)]" aria-hidden />
           <p className="mt-3 text-base font-semibold">{t.feedbackHint}</p>
           <div className="mt-5"><PrimaryButton type="button" onClick={onClose}>Done</PrimaryButton></div>
         </div>

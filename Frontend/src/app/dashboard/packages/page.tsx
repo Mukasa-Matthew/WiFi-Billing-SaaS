@@ -2,7 +2,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import api from "@/lib/api";
-import { Plus, MagnifyingGlass, Lightning, BookOpen, Trash } from "@phosphor-icons/react";
+import { Plus, MagnifyingGlass, Lightning, BookOpen, Trash } from "@/components/icons";
 interface Plan { id: number; name: string; price: number; rateLimit: string; sessionTimeout: number; sharedUsers: number; availability: string; featured: boolean; routerName?: string | null }
 const statuses = ["ALL", "ACTIVE", "HIDDEN", "DISABLED"];
 function duration(seconds: number) { const unit = seconds % 86400 === 0 ? [86400, "days"] : seconds % 3600 === 0 ? [3600, "hours"] : [60, "minutes"]; return `${seconds / Number(unit[0])} ${unit[1]}`; }

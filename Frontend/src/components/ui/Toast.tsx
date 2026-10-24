@@ -1,6 +1,6 @@
 "use client";
 import React, { createContext, useCallback, useContext, useRef, useState } from "react";
-import { CheckCircle, Warning, XCircle, X } from "@phosphor-icons/react";
+import { CheckCircle, Warning, XCircle, X } from "@/components/icons";
 
 type ToastKind = "success" | "error" | "info";
 interface Toast { id: number; kind: ToastKind; text: string }

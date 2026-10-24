@@ -7,7 +7,7 @@ import {
   field, label, hint, panel, ErrorNotice, ugx,
   FormHeader, FormSection, FormActions, FormLayout,
 } from "@/components/BillingUI";
-import { Stack, Lightning, Money, Eye, CellTower } from "@phosphor-icons/react";
+import { Stack, Lightning, Money, Eye, CellTower } from "@/components/icons";
 
 const presets: Record<string, { name: string; duration: string; unit: string; price: string }> = {
   hourly: { name: "Hourly Internet", duration: "1", unit: "3600", price: "500" },
@@ -103,7 +103,7 @@ export default function CreatePackagePage() {
             </section>
           }
         >
-          <FormSection icon={<Stack size={18} weight="duotone" aria-hidden />}
+          <FormSection icon={<Stack size={18} aria-hidden />}
             title="Basic configuration" hint="Name the plan and set how long access lasts.">
             <div>
               <label htmlFor="p-name" className={label}>Package name *</label>
@@ -133,7 +133,7 @@ export default function CreatePackagePage() {
             </div>
           </FormSection>
 
-          <FormSection icon={<Lightning size={18} weight="duotone" aria-hidden />}
+          <FormSection icon={<Lightning size={18} aria-hidden />}
             title="Speed and performance" hint="Maximum speeds applied per connected user.">
             <div className="grid gap-5 sm:grid-cols-2">
               <div>
@@ -150,7 +150,7 @@ export default function CreatePackagePage() {
             <p className={hint}>Data volume is unlimited. The duration above controls the session allowance.</p>
           </FormSection>
 
-          <FormSection icon={<Money size={18} weight="duotone" aria-hidden />}
+          <FormSection icon={<Money size={18} aria-hidden />}
             title="Pricing and devices" hint="What customers pay, and how many devices one voucher covers.">
             <div className="grid gap-5 sm:grid-cols-2">
               <div>
@@ -167,7 +167,7 @@ export default function CreatePackagePage() {
             </div>
           </FormSection>
 
-          <FormSection icon={<Eye size={18} weight="duotone" aria-hidden />}
+          <FormSection icon={<Eye size={18} aria-hidden />}
             title="Availability and visibility" hint="Choose how customers can reach this package.">
             <fieldset>
               <legend className={label}>Package availability *</legend>

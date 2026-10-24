@@ -7,7 +7,7 @@ import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Dialog } from "@/components/ui/Dialog";
 import { useToast } from "@/components/ui/Toast";
 import { useResource, Table, Badge, ErrorNotice, button, buttonGhost, field, date, message, FilterTabs, PageHeader, label } from "@/components/BillingUI";
-import { Plus, DownloadSimple } from "@phosphor-icons/react";
+import { Plus, DownloadSimple } from "@/components/icons";
 
 interface Voucher { id: number; code: string; status: string; packageName: string; price: number; customerId: number | null; customerName: string | null; customerPhone: string | null; batchReference: string | null; saleType: string; delivery: string; archived: boolean; createdAt: string; firstLogin: string | null; expiresAt: string | null }
 interface Customer { id: number; name: string }

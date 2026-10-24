@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { HardDrives, ChartLine, CheckCircle, ShieldCheck, Database, Radio } from "@phosphor-icons/react";
+import { HardDrives, ChartLine, CheckCircle, ShieldCheck, Database, Radio } from "@/components/icons";
 
 export default function AdminHealthPage() {
   const components = [

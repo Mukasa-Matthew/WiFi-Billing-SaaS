@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import { Users, WifiHigh, WifiSlash, Archive, Plugs, Eye, X, ClockCountdown, Prohibit, CalendarX, Package, DeviceMobile, Globe, User as UserIcon } from "@phosphor-icons/react";
+import { Users, WifiHigh, WifiSlash, Archive, Plugs, Eye, X, ClockCountdown, Prohibit, CalendarX, Package, DeviceMobile, Globe, User as UserIcon } from "@/components/icons";
 import api from "@/lib/api";
 import { useResource, Table, Badge, Notice, ErrorNotice, date, bytes, remaining, message, StatCard, FilterTabs, PageContainer, PageHeader } from "./BillingUI";
 import { useConfirmDialog } from "@/components/ui/ConfirmDialog";

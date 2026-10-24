@@ -13,7 +13,7 @@ import {
   Clock,
   UserMinus,
   ShieldWarning,
-} from "@phosphor-icons/react";
+} from "@/components/icons";
 
 interface ActiveSession {
   radAcctId: number;

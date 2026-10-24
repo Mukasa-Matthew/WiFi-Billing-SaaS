@@ -5,7 +5,7 @@ import api from "@/lib/api";
 import {useResource,Table,Badge,Notice,FilterTabs,button,date,message,PageContainer,PageHeader} from "@/components/BillingUI";
 import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
-import { LinkSimple } from "@phosphor-icons/react";
+import { LinkSimple } from "@/components/icons";
 
 interface Binding{id:number;name:string;address:string;mac:string;router:string;packageName:string;status:string;synced:boolean;expiresAt:string}
 

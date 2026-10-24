@@ -5,7 +5,7 @@ import { Table, Badge, ErrorNotice, date, panel, button, buttonGhost, field, lab
 import { Dialog } from "@/components/ui/Dialog";
 import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
-import { ArrowDown, WarningCircle, ArrowsClockwise } from "@phosphor-icons/react";
+import { ArrowDown, WarningCircle, ArrowsClockwise } from "@/components/icons";
 
 interface Overview {
   walletCount: number; tenantLiabilities: number; reservedFunds: number;
@@ -207,7 +207,7 @@ export default function AdminFinancePage() {
                 )}
                 <button className={`${button} mt-3 w-full`} disabled={!plat.payoutsEnabled || plat.safeWithdrawable <= 0 || plat.reconcileStatus === "DISCREPANCY"}
                   onClick={() => setWdOpen(true)}>
-                  <ArrowDown size={15} weight="bold" /> Withdraw earnings
+                  <ArrowDown size={15} /> Withdraw earnings
                 </button>
                 <p className="mt-2 text-[11px] text-[var(--fg-faint)]">Requires your admin password. Max {money(plat.safeWithdrawable)} minus payout fee.</p>
               </div>

@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import api from "@/lib/api";
-import { Wallet, Users, CellTower, Radio, ArrowClockwise } from "@phosphor-icons/react";
+import { Wallet, Users, CellTower, Radio, ArrowClockwise } from "@/components/icons";
 import { Badge, ErrorNotice, PageHeader, StatCard, Table, buttonGhost, panel, ugx, date } from "@/components/BillingUI";
 import { DashboardLoading, LoadingIndicator } from "@/components/LoadingUI";
 

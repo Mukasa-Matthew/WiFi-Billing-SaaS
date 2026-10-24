@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import api from "@/lib/api";
-import { EnvelopeSimple, Lock, Radio, WarningCircle, CheckCircle, ArrowLeft, ArrowRight, Key } from "@phosphor-icons/react";
+import { EnvelopeSimple, Lock, Radio, WarningCircle, CheckCircle, ArrowLeft, ArrowRight, Key } from "@/components/icons";
 import axios from "axios";
 
 const errText = (e: unknown) =>

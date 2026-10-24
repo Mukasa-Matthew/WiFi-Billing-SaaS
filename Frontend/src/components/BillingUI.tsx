@@ -2,7 +2,7 @@
 import React, { useCallback, useEffect, useState, useRef } from "react";
 import api from "@/lib/api";
 import Link from "next/link";
-import { ArrowLeft, CaretLeft, CaretRight, MagnifyingGlass, Tray } from "@phosphor-icons/react";
+import { ArrowLeft, CaretLeft, CaretRight, MagnifyingGlass, Tray } from "@/components/icons";
 
 /* ---------- design tokens ---------- */
 export const field = "mt-1.5 min-h-11 w-full rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm text-[var(--fg)] placeholder:text-[var(--fg-muted)] outline-none transition-[border-color,box-shadow] focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15 disabled:cursor-not-allowed disabled:opacity-60";
@@ -195,7 +195,7 @@ export function ugx(v: number | string | null | undefined) { return `UGX ${Numbe
 export function BackLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
     <Link href={href} className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--fg-muted)] transition hover:text-[var(--fg)]">
-      <ArrowLeft size={13} weight="bold" aria-hidden />{children}
+      <ArrowLeft size={13} aria-hidden />{children}
     </Link>
   );
 }

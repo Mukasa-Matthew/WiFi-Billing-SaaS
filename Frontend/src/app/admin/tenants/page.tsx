@@ -12,7 +12,7 @@ import {
   Ticket,
   X,
   WarningCircle
-} from "@phosphor-icons/react";
+} from "@/components/icons";
 
 interface TenantSummary {
   id: number;

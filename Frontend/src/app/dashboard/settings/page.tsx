@@ -5,7 +5,7 @@ import api from "@/lib/api";
 import {
   CheckCircle, CircleNotch, FloppyDisk, GearSix, Globe, FileText,
   Bell, Ticket, CloudArrowDown, Trash, CreditCard, ArrowSquareOut,
-} from "@phosphor-icons/react";
+} from "@/components/icons";
 import PaymentGatewaySettings from "@/components/PaymentGatewaySettings";
 
 interface TenantSettings {
@@ -495,7 +495,7 @@ export default function TenantSettingsPage() {
                         className="inline-flex items-center gap-1 rounded text-[10px] font-semibold text-[var(--accent-text)] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
                       >
                         Open in new tab
-                        <ArrowSquareOut size={12} weight="bold" aria-hidden />
+                        <ArrowSquareOut size={12} aria-hidden />
                       </a>
                     </div>
                     <div className="relative h-[420px]">

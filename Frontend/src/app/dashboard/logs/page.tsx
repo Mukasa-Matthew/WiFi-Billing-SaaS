@@ -7,7 +7,7 @@ import {
   MagnifyingGlass,
   Download,
   Clock,
-} from "@phosphor-icons/react";
+} from "@/components/icons";
 
 interface SessionHistory {
   radAcctId: number;
