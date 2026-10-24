@@ -54,6 +54,7 @@ export default function AdminLayout({
     { name: "Platform overview", href: "/admin", icon: ChartLine, group: "Platform" },
     { name: "Tenants", href: "/admin/tenants", icon: Users, group: "Platform" },
     { name: "Finance", href: "/admin/finance", icon: Bank, group: "Platform" },
+    { name: "Subscriptions", href: "/admin/subscriptions", icon: ShieldCheck, group: "Platform" },
     { name: "Router fleet", href: "/admin/routers", icon: RouterIcon, group: "Devices" },
     { name: "Network health", href: "/admin/health", icon: HardDrives, group: "Devices" },
   ];
