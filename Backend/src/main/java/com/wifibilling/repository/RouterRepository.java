@@ -39,6 +39,6 @@ public interface RouterRepository extends JpaRepository<Router, Long> {
 
     /** Bulk-flags routers whose telemetry has gone silent. */
     @Modifying
-    @Query("update Router r set r.status = 'offline' where r.status = 'online' and r.lastSeen < :cutoff")
+    @Query("update Router r set r.status = 'offline' where r.status in ('online', 'degraded') and r.lastSeen < :cutoff")
     int markOfflineSeenBefore(@Param("cutoff") OffsetDateTime cutoff);
 }
