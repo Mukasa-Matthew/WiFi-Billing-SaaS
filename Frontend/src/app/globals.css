@@ -50,21 +50,21 @@ body {
 
 [data-theme="dark"] {
   /* Neutral graphite ramp (Calton-style): true grays, no blue tint. */
-  --canvas: #0E0F11;
-  --surface: #1A1D21;
-  --subtle: #20242A;
-  --fill: #282D34;
-  --border: #2D323A;
-  --border-strong: #414852;
-  --border-soft: #23272D;
+  --canvas: #121316;
+  --surface: #17191D;
+  --subtle: #1B1E23;
+  --fill: #21252B;
+  --border: #24282E;
+  --border-strong: #343A43;
+  --border-soft: #1F2227;
   --fg: #F2F4F7;
   --fg-body: #C9CED6;
-  --fg-muted: #9BA2AC;
-  --fg-faint: #7D848F;
+  --fg-muted: #98A0AA;
+  --fg-faint: #78808B;
   --accent-text: #8AB4FF;
-  --sidebar: #131518;
-  --sidebar-admin: #0F1113;
-  --sidebar-active: #2B3037;
+  --sidebar: #14161A;
+  --sidebar-admin: #101215;
+  --sidebar-active: #262A30;
   --sidebar-active-fg: #F2F4F7;
   --sidebar-fg-dim: #B8BDC6;
   --sidebar-fg-faint: #8B929C;
