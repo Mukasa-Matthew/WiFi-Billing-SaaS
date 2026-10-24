@@ -38,6 +38,12 @@ public class ProvisioningController {
                 .body(script);
     }
 
+    @PostMapping(value = "/{token}/complete")
+    public ResponseEntity<Void> complete(@PathVariable String token) {
+        provisioningService.markComplete(token);
+        return ResponseEntity.ok().build();
+    }
+
     @PostMapping(value = "/{token}/register",
             consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
