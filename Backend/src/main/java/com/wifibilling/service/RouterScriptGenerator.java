@@ -285,22 +285,35 @@ public class RouterScriptGenerator {
         s.append(managementInstaller(c.publicBaseUrl(), c.token()));
         s.append('\n');
 
+        // 3a. Router-side DNS: the router itself must resolve the billing host
+        // for /tool fetch (client DNS is already intercepted by the hotspot).
+        s.append("# --- 4a. Router DNS resolution ---\n");
+        s.append(":if ([:len [/ip dns get servers]] = 0) do={ /ip dns set servers=1.1.1.1,8.8.8.8 }\n\n");
+
+        // 3b. TLS trust: the public base URL is HTTPS (Let's Encrypt) and
+        // RouterOS 7 verifies certificates. Import the Mozilla CA bundle once;
+        // every fetch below retries with check-certificate=no as a fallback so
+        // provisioning never hard-fails on routers with an empty/old CA store.
+        s.append("# --- 4b. CA trust store for HTTPS fetches ---\n");
+        s.append(":do { /tool fetch url=\"https://curl.se/ca/cacert.pem\" dst-path=\"cacert.pem\" check-certificate=no } on-error={}\n");
+        s.append(":do { /certificate import file-name=\"cacert.pem\" } on-error={}\n");
+        s.append(":do { /file remove [find name=\"cacert.pem\"] } on-error={}\n\n");
+
         // 3. Captive Portal Template Download to flash/hotspot
         s.append("# --- 4. Captive Portal Assets Download ---\n");
         s.append(":do { /file add name=flash/hotspot/login.html contents=\"\" } on-error={}\n");
         for (String tmpl : PORTAL_TEMPLATES) {
-            s.append(":do { /tool fetch url=" + q(c.publicBaseUrl() + "/api/portal/templates/" + tmpl + "?token=" + c.token())
-                    + " dst-path=" + q("flash/hotspot/" + tmpl)
-                    + " } on-error={ :log warning \"wifi-billing: failed fetching " + tmpl + "\" }\n");
+            String url = c.publicBaseUrl() + "/api/portal/templates/" + tmpl + "?token=" + c.token();
+            String dst = " dst-path=" + q("flash/hotspot/" + tmpl);
+            s.append(tlsFetch(url, dst, ":log warning \"wifi-billing: failed fetching " + tmpl + "\"")).append('\n');
         }
         // Two cadences: packages.json (tiny, changes often) refreshes every minute;
         // full template refresh every 30 minutes (branding changes are rare).
         s.append("/system/script add name=wb-pkg-sync policy=").append(POLICY)
                 .append(" comment=").append(tag).append(" source={\n")
-                .append(":do { /tool fetch url=")
-                .append(q(c.publicBaseUrl() + "/api/portal/templates/packages.json?token=" + c.token()))
-                .append(" dst-path=").append(q("flash/hotspot/packages.json"))
-                .append(" } on-error={}\n}\n");
+                .append(tlsFetch(c.publicBaseUrl() + "/api/portal/templates/packages.json?token=" + c.token(),
+                        " dst-path=" + q("flash/hotspot/packages.json"), ""))
+                .append("\n}\n");
         s.append("/system/scheduler add name=wb-pkg-sync interval=1m on-event=")
                 .append(q("/system script run wb-pkg-sync"))
                 .append(" policy=").append(POLICY).append(" comment=").append(tag).append("\n");
@@ -349,9 +362,9 @@ public class RouterScriptGenerator {
                 .append(" . \"\\\",\\\"activeUsers\\\":\" . $users")
                 .append(" . \",\\\"hotspotReady\\\":\" . $hotspotReady . \",\\\"radiusReady\\\":\" . $radiusReady")
                 .append(" . \",\\\"portalReady\\\":\" . $portalReady . \"}\")\n");
-        s.append(":do { /tool fetch url=").append(q(telemetryUrl))
-                .append(" http-method=post http-header-field=\"Content-Type: application/json\"")
-                .append(" http-data=$body output=none } on-error={ :log warning \"wifi-billing: telemetry push failed\" }\n");
+        s.append(tlsFetch(telemetryUrl,
+                " http-method=post http-header-field=\"Content-Type: application/json\" http-data=$body output=none",
+                ":log warning \"wifi-billing: telemetry push failed\"")).append('\n');
         s.append("}\n");
         s.append("/system/scheduler add name=").append(q(TELEMETRY_NAME))
                 .append(" interval=2m on-event=").append(q("/system script run " + TELEMETRY_NAME))
@@ -363,13 +376,21 @@ public class RouterScriptGenerator {
         s.append(":delay 2s\n");
         s.append("/system/script/add name=wb-register policy=read,write,test source={\n");
         s.append("    :local wbPub [/interface/wireguard get [find name=").append(iface).append("] public-key]\n");
+        s.append("    :local wbOk false\n");
         s.append("    :do { /tool fetch url=").append(q(registerUrl))
                 .append(" http-method=post http-header-field=\"Content-Type: application/json\"")
                 .append(" http-data=(\"{\\\"publicKey\\\":\\\"\" . $wbPub . \"\\\"}\") output=none;\n");
+        s.append("        :set wbOk true\n");
+        s.append("    } on-error={ :do { /tool fetch url=").append(q(registerUrl))
+                .append(" http-method=post http-header-field=\"Content-Type: application/json\"")
+                .append(" http-data=(\"{\\\"publicKey\\\":\\\"\" . $wbPub . \"\\\"}\") output=none check-certificate=no;\n");
+        s.append("        :set wbOk true\n");
+        s.append("    } on-error={ :log warning \"wifi-billing: key registration failed - will retry\" } }\n");
+        s.append("    :if ($wbOk) do={\n");
         s.append("        /system/scheduler/remove [find name=wb-register];\n");
         s.append("        /system/script/remove [find name=wb-register];\n");
         s.append("        :log info \"wifi-billing: WireGuard public key registered\"\n");
-        s.append("    } on-error={ :log warning \"wifi-billing: key registration failed - will retry\" }\n");
+        s.append("    }\n");
         s.append("}\n");
         s.append("/system/scheduler/add name=wb-register interval=30s on-event=wb-register policy=read,write,test comment=").append(tag).append("\n");
         s.append(":do { /system script run wb-register } on-error={}\n\n");
@@ -380,8 +401,8 @@ public class RouterScriptGenerator {
         s.append(":log info \"wifi-billing: provisioning complete\"\n");
         // Signal the backend that the full script ran end-to-end — the dashboard
         // can then show "provisioned" instead of guessing from telemetry.
-        s.append(":do { /tool fetch url=").append(q(c.publicBaseUrl() + "/api/router/provision/" + c.token() + "/complete"))
-                .append(" http-method=post output=none } on-error={}\n");
+        s.append(tlsFetch(c.publicBaseUrl() + "/api/router/provision/" + c.token() + "/complete",
+                " http-method=post output=none", "")).append('\n');
         return s.toString();
     }
 
@@ -394,10 +415,14 @@ public class RouterScriptGenerator {
                 + ":if ([:len [/system/ntp/client/servers find address=pool.ntp.org]] = 0) do={ /system/ntp/client/servers add address=pool.ntp.org }\n"
                 + "/system/script/add name=wb-management policy=read,write,test source={\n"
                 + ":for i from=1 to=3 do={\n"
-                + ":do { /tool/fetch url=" + q(prefix + "/management.rsc?wait=25") + " dst-path=wb-management.rsc; /import wb-management.rsc } on-error={ :delay 2s }\n"
+                + tlsFetch(prefix + "/management.rsc?wait=25", " dst-path=wb-management.rsc", ":delay 2s")
+                + ":do { /import wb-management.rsc } on-error={}\n"
                 + "}\n"
-                + ":do { :local hosts [/ip/dhcp-server/lease/print as-value where status=bound]; /tool/fetch url=" + q(prefix + "/hosts")
-                + " http-method=post http-header-field=\"Content-Type: application/json\" http-data=[:serialize to=json value=$hosts] output=none } on-error={ :log warning \"wifi-billing host report failed\" }\n}\n"
+                + ":do { :local hosts [/ip/dhcp-server/lease/print as-value where status=bound]; "
+                + tlsFetch(prefix + "/hosts",
+                        " http-method=post http-header-field=\"Content-Type: application/json\" http-data=[:serialize to=json value=$hosts] output=none",
+                        ":log warning \"wifi-billing host report failed\"")
+                + " } on-error={}\n}\n"
                 + "/system/scheduler/add name=wb-management interval=1m on-event=wb-management policy=read,write,test\n"
                 + ":do { /system/script/run wb-management } on-error={}\n";
     }
@@ -406,18 +431,30 @@ public class RouterScriptGenerator {
     public static String portalSyncScript(String publicBaseUrl, String token) {
         StringBuilder sb = new StringBuilder();
         for (String tmpl : PORTAL_TEMPLATES) {
-            sb.append(":do { /tool fetch url=").append(q(publicBaseUrl + "/api/portal/templates/" + tmpl + "?token=" + token))
-                    .append(" dst-path=").append(q("flash/hotspot/" + tmpl))
-                    .append(" } on-error={}\n");
+            sb.append(tlsFetch(publicBaseUrl + "/api/portal/templates/" + tmpl + "?token=" + token,
+                    " dst-path=" + q("flash/hotspot/" + tmpl), "")).append('\n');
         }
         return sb.toString();
     }
 
     /** Bootstrap body for the on-router wb-portal-sync script: fetch + import portal-sync.rsc. */
     public static String portalSyncBootstrap(String publicBaseUrl, String token) {
-        return ":do { /tool fetch url=" + q(publicBaseUrl + "/api/portal/templates/portal-sync.rsc?token=" + token)
-                + " dst-path=" + q("wb-portal-sync.rsc")
-                + "; /import wb-portal-sync.rsc } on-error={}\n";
+        return tlsFetch(publicBaseUrl + "/api/portal/templates/portal-sync.rsc?token=" + token,
+                " dst-path=" + q("wb-portal-sync.rsc"), "")
+                + ":do { /import wb-portal-sync.rsc } on-error={}\n";
+    }
+
+    /**
+     * /tool fetch with a TLS-verified first attempt and a check-certificate=no
+     * retry. RouterOS 7 verifies certs by default and ships without the Let's
+     * Encrypt chain on many devices; the CA bundle import above handles fresh
+     * installs, and this fallback keeps provisioning working when the import
+     * failed (offline at that moment, ancient RouterOS, custom cert store).
+     */
+    private static String tlsFetch(String url, String args, String onErrorBody) {
+        return ":do { /tool fetch url=" + q(url) + args + " } on-error={"
+                + " :do { /tool fetch url=" + q(url) + args + " check-certificate=no } on-error={"
+                + onErrorBody + " } }";
     }
 
     /** Quotes a value as a RouterOS string literal. */
