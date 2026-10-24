@@ -49,24 +49,23 @@ body {
 }
 
 [data-theme="dark"] {
-  /* Neutral graphite ramp (Calton-style): true grays, no blue tint.
-     Soft low-contrast palette — panels sit just above the canvas. */
-  --canvas: #1E2126;
-  --surface: #26292F;
-  --subtle: #2B2F36;
-  --fill: #31363E;
-  --border: #34393F;
-  --border-strong: #464C56;
-  --border-soft: #2C3037;
-  --fg: #F4F5F7;
-  --fg-body: #C7CBD2;
-  --fg-muted: #9CA1A9;
-  --fg-faint: #7E848D;
+  /* Neutral graphite ramp (Calton-style): true grays, no blue tint. */
+  --canvas: #0E0F11;
+  --surface: #1A1D21;
+  --subtle: #20242A;
+  --fill: #282D34;
+  --border: #2D323A;
+  --border-strong: #414852;
+  --border-soft: #23272D;
+  --fg: #F2F4F7;
+  --fg-body: #C9CED6;
+  --fg-muted: #9BA2AC;
+  --fg-faint: #7D848F;
   --accent-text: #8AB4FF;
-  --sidebar: #202329;
-  --sidebar-admin: #1C1F24;
-  --sidebar-active: #33383F;
-  --sidebar-active-fg: #F4F5F7;
+  --sidebar: #131518;
+  --sidebar-admin: #0F1113;
+  --sidebar-active: #2B3037;
+  --sidebar-active-fg: #F2F4F7;
   --sidebar-fg-dim: #B8BDC6;
   --sidebar-fg-faint: #8B929C;
   --sidebar-warn: #FCD34D;
