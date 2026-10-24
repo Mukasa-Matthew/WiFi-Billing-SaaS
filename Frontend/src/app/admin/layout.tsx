@@ -126,6 +126,9 @@ export default function AdminLayout({
               <p className="truncate text-[11px] text-[var(--sidebar-fg-dim)]">{user?.email}</p>
             </div>
           </div>
+          <div className="mb-3 flex justify-center">
+            <ThemeToggle compact />
+          </div>
           <button
             onClick={logout}
             className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 py-2 px-3 text-xs font-semibold text-[var(--sidebar-fg-dim)] transition hover:bg-red-500/20 hover:text-white"
@@ -149,7 +152,6 @@ export default function AdminLayout({
             </span>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
-            <ThemeToggle />
             <Link href="/dashboard"
               className="rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 py-2 text-xs font-semibold text-[var(--fg-body)] transition hover:bg-[var(--subtle)]">
               Tenant workspace →

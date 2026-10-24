@@ -313,13 +313,16 @@ export default function TenantSettingsPage() {
       </div>
 
       {/* Tab bar */}
-      <nav className="flex flex-wrap gap-1 border-b border-[var(--border)] pb-px" aria-label="Settings sections">
+      <nav className="flex border-b border-[var(--border)]" aria-label="Settings sections">
         {TABS.map(({ key, name, icon: Icon }) => (
           <button key={key} type="button" onClick={() => setTab(key)}
-            className={`flex items-center gap-2 rounded-t-lg border-b-2 px-4 py-2.5 text-sm font-medium transition ${
-              tab === key ? "border-blue-600 text-[var(--accent-text)]" : "border-transparent text-[var(--fg-muted)] hover:text-[var(--fg)]"
+            className={`flex flex-1 min-w-0 items-center justify-center gap-2 whitespace-nowrap border-b-2 px-3 py-3.5 text-sm font-medium transition ${
+              tab === key
+                ? "border-blue-600 text-[var(--accent-text)]"
+                : "border-transparent text-[var(--fg-muted)] hover:bg-[var(--subtle)] hover:text-[var(--fg)]"
             }`}>
-            <Icon size={16} />{name}
+            <Icon size={17} className="shrink-0" />
+            <span className="hidden sm:inline">{name}</span>
           </button>
         ))}
       </nav>

@@ -15,7 +15,7 @@ const OPTIONS: { value: ThemePreference; label: string; Icon: React.ElementType 
  * always visible, and "System" stays reachable instead of being a hidden state.
  * Selection is carried by icon + aria-checked, never by colour alone.
  */
-export default function ThemeToggle() {
+export default function ThemeToggle({ compact = false }: { compact?: boolean }) {
   const { preference, setPreference } = useTheme();
 
   return (
@@ -36,13 +36,13 @@ export default function ThemeToggle() {
             title={label}
             onClick={() => setPreference(value)}
             style={{ touchAction: "manipulation" }}
-            className={`flex h-11 w-11 items-center justify-center rounded-lg transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${
+            className={`flex ${compact ? "h-7 w-7" : "h-11 w-11"} items-center justify-center rounded-lg transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${
               active
                 ? "bg-[var(--surface)] text-[var(--fg)] shadow-sm"
                 : "text-[var(--fg-muted)] hover:text-[var(--fg)]"
             }`}
           >
-            <Icon size={17} weight={active ? "fill" : "regular"} aria-hidden />
+            <Icon size={compact ? 14 : 17} weight={active ? "fill" : "regular"} aria-hidden />
           </button>
         );
       })}
