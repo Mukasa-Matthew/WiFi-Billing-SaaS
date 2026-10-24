@@ -119,7 +119,10 @@ public class RouterScriptGenerator {
         s.append("/ip/hotspot/profile/remove [find name=").append(q(HOTSPOT_PROFILE)).append("]\n");
         s.append("/ip/dhcp-server/remove [find name=").append(q(DHCP_NAME)).append("]\n");
         s.append("/ip/dhcp-server/network/remove [find comment=").append(tag).append("]\n");
-        s.append("/ip/pool/remove [find name=").append(q(POOL_NAME)).append("]\n");
+        // Active leases hold references to the pool — clear them first or the pool
+        // removal throws and aborts the whole import mid-teardown.
+        s.append(":do { /ip/dhcp-server/lease/remove [find dynamic] } on-error={}\n");
+        s.append(":do { /ip/pool/remove [find name=").append(q(POOL_NAME)).append("] } on-error={}\n");
         s.append("/ip/address/remove [find comment=").append(tag).append("]\n");
         s.append("/interface/list/member/remove [find comment=").append(tag).append("]\n");
         s.append("/interface/bridge/port/remove [find comment=").append(tag).append("]\n");
