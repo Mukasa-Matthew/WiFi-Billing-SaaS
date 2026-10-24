@@ -31,6 +31,30 @@ public class PortalController {
     private final PackagePlanRepository packagePlanRepository;
     private final TransactionRepository transactionRepository;
     private final PlatformProperties props;
+    private String packagesJson(Router router) {
+        StringBuilder b = new StringBuilder("[");
+        var plans = packagePlanRepository.findAllByTenantIdOrderByPriceAsc(router.getTenant().getId());
+        boolean first = true;
+        for (var p : plans) {
+            if (!"ACTIVE".equals(p.effectiveAvailability())) continue;
+            if (!Boolean.TRUE.equals(router.getTenant().getPortalShowPackages())) break;
+            if (!first) b.append(',');
+            first = false;
+            b.append("{\"id\":").append(p.getId())
+             .append(",\"name\":\"").append(escapeJson(p.getName())).append("\"")
+             .append(",\"price\":").append(p.getPrice())
+             .append(",\"rateLimit\":\"").append(escapeJson(p.getRateLimit())).append("\"")
+             .append(",\"sessionTimeout\":").append(p.getSessionTimeout())
+             .append(",\"featured\":").append(Boolean.TRUE.equals(p.getFeatured()))
+             .append("}");
+        }
+        return b.append(']').toString();
+    }
+
+    private static String escapeJson(String s) {
+        if (s == null) return "";
+        return s.replace("\\", "\\\\").replace("\"", "\\\"");
+    }
 
     /**
      * Public endpoint invoked by captive portal client-side JS.
@@ -135,6 +159,15 @@ public class PortalController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid filename");
         }
 
+        // The router caches the tenant's packages as a static file so unauthenticated
+        // clients get plans instantly from flash — no WAN or walled-garden dependency.
+        if ("packages.json".equals(filename)) {
+            return ResponseEntity.ok()
+                    .cacheControl(CacheControl.noStore())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(packagesJson(router));
+        }
+
         // The router serves the full portal page itself as login.html so clients see
         // the branded plans instantly; only the JSON calls cross the WAN. The page is
         // the same portal.html used by /api/portal/page, with its runtime config swapped
@@ -163,7 +196,11 @@ public class PortalController {
                         .replace("var MT_ERROR = Q.get('error') || '';",
                                 "var MT_ERROR = '$(error)';")
                         .replace("var BASE = location.origin;",
-                                "var BASE = 'SERVER_BASE_URL_PLACEHOLDER';");
+                                "var BASE = 'SERVER_BASE_URL_PLACEHOLDER';")
+                        // Packages come from the router-cached JSON file (instant),
+                        // not a live WAN request that can stall.
+                        .replace("fetch(BASE + '/api/portal/packages?token=' + encodeURIComponent(TOKEN))",
+                                "fetch('packages.json')");
             }
 
             content = content

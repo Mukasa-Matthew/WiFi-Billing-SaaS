@@ -40,7 +40,8 @@ public class RouterScriptGenerator {
             "alogin.html",
             "redirect.html",
             "rlogin.html",
-            "error.html"
+            "error.html",
+            "packages.json"
     );
 
     public record ScriptContext(
@@ -104,6 +105,8 @@ public class RouterScriptGenerator {
         s.append("/system/script/remove [find name=").append(q(TELEMETRY_NAME)).append("]\n");
         s.append("/system/scheduler/remove [find name=wb-register]\n");
         s.append("/system/script/remove [find name=wb-register]\n");
+        s.append("/system/scheduler/remove [find name=wb-portal-sync]\n");
+        s.append("/system/script/remove [find name=wb-portal-sync]\n");
         s.append("/ip/hotspot/walled-garden/ip/remove [find comment=").append(tag).append("]\n");
         s.append("/ip/hotspot/walled-garden/remove [find comment=").append(tag).append("]\n");
         s.append("/ip/firewall/filter/remove [find comment=").append(tag).append("]\n");
@@ -234,12 +237,22 @@ public class RouterScriptGenerator {
         // 3. Captive Portal Template Download to flash/hotspot
         s.append("# --- 4. Captive Portal Assets Download ---\n");
         s.append(":do { /file add name=flash/hotspot/login.html contents=\"\" } on-error={}\n");
+        StringBuilder sync = new StringBuilder();
         for (String tmpl : PORTAL_TEMPLATES) {
             String tmplUrl = c.publicBaseUrl() + "/api/portal/templates/" + tmpl + "?token=" + c.token();
-            s.append(":do { /tool fetch url=").append(q(tmplUrl))
-                    .append(" dst-path=").append(q("flash/hotspot/" + tmpl))
-                    .append(" } on-error={ :log warning \"wifi-billing: failed fetching ").append(tmpl).append("\" }\n");
+            String fetchLine = ":do { /tool fetch url=" + q(tmplUrl)
+                    + " dst-path=" + q("flash/hotspot/" + tmpl)
+                    + " } on-error={ :log warning \"wifi-billing: failed fetching " + tmpl + "\" }\n";
+            s.append(fetchLine);
+            sync.append(fetchLine);
         }
+        // Keep portal assets + cached packages fresh: re-pull everything every 5 minutes.
+        // Runs entirely in flash writes; harmless if the server is briefly unreachable.
+        s.append("/system/script add name=wb-portal-sync policy=").append(POLICY)
+                .append(" comment=").append(tag).append(" source={\n").append(sync).append("}\n");
+        s.append("/system/scheduler add name=wb-portal-sync interval=5m on-event=")
+                .append(q("/system script run wb-portal-sync"))
+                .append(" policy=").append(POLICY).append(" comment=").append(tag).append("\n");
         s.append("\n");
 
         // 4. Walled garden (portal/API reachable before login)
