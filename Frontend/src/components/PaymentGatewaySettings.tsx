@@ -130,14 +130,17 @@ export default function PaymentGatewaySettings() {
         </div>
       </div>
 
-      {/* Credential form */}
+      {/* Credential form — only relevant for the tenant's OWN gateway.
+          Platform mode uses keys from the server environment; tenants never see or fill them. */}
       <div className={card}>
         <div className="flex items-center gap-2">
           <ShieldCheck size={18} className="text-[var(--fg-muted)]" />
-          <h3 className="text-sm font-bold text-[var(--fg)]">MarzPay credentials</h3>
+          <h3 className="text-sm font-bold text-[var(--fg)]">Your own MarzPay credentials</h3>
         </div>
         <p className="mt-1.5 text-xs text-[var(--fg-muted)]">
-          From your MarzPay dashboard → API Keys. Credentials are encrypted at rest and never shown after saving.
+          Only needed if you choose <b>“Use My Own Payment Gateway”</b>. The platform gateway needs
+          nothing from you — it runs on our keys. From your MarzPay dashboard → API Keys.
+          Credentials are encrypted at rest and never shown after saving.
         </p>
         <form onSubmit={saveCreds} className="mt-5 grid gap-4 md:grid-cols-2">
           <div>
@@ -184,7 +187,8 @@ export default function PaymentGatewaySettings() {
         </form>
       </div>
 
-      {/* Webhook setup */}
+      {/* Webhook setup — only relevant once a tenant has their own gateway */}
+      {(gw.mode === "OWN" || gw.hasSecret) && (
       <div className={card}>
         <h3 className="text-sm font-bold text-[var(--fg)]">Webhook / callback setup</h3>
         <p className="mt-1.5 text-xs text-[var(--fg-muted)]">
@@ -202,6 +206,7 @@ export default function PaymentGatewaySettings() {
           registering one adds reliable re-delivery and HMAC signature verification.
         </p>
       </div>
+      )}
     </div>
   );
 }
