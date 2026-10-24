@@ -1,7 +1,8 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import api from "@/lib/api";
 import { Badge, Notice, field, button, buttonGhost, label, hint, message } from "@/components/BillingUI";
+import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { CheckCircle, Copy, CreditCard, Plugs, ShieldCheck, SpinnerGap, Wallet } from "@phosphor-icons/react";
 
 interface GatewayView {
@@ -32,17 +33,18 @@ export default function PaymentGatewaySettings() {
   const [environment, setEnvironment] = useState("live");
   const [copied, setCopied] = useState(false);
   const [showOwn, setShowOwn] = useState(false);
+  const { confirm, dialog } = useConfirmDialog();
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try { setGw((await api.get<GatewayView>("/api/settings/gateway")).data); }
     catch (e) { setErr(message(e)); }
-  };
-  useEffect(() => { void load(); }, []);
+  }, []);
+  useEffect(() => { const initial = window.setTimeout(load, 0); return () => window.clearTimeout(initial); }, [load]);
 
   const act = async (key: string, fn: () => Promise<unknown>, done: string) => {
     setBusy(key); setErr(""); setOk("");
-    try { await fn(); setOk(done); await load(); }
-    catch (e) { setErr(message(e)); }
+    try { await fn(); setOk(done); await load(); return true; }
+    catch (e) { setErr(message(e)); return false; }
     finally { setBusy(""); }
   };
 
@@ -50,16 +52,15 @@ export default function PaymentGatewaySettings() {
     const msg = mode === "OWN"
       ? "Switch to your own payment gateway? New payments will settle to YOUR provider account. Existing wallet balance and history are preserved."
       : "Switch back to the platform gateway? New payments will be collected into your platform wallet. Your own gateway credentials remain saved.";
-    if (!window.confirm(msg)) return;
-    void act("mode", () => api.post("/api/settings/gateway/mode", { mode, confirm: true }), "Gateway mode updated.");
+    confirm({ title: mode === "OWN" ? "Switch to your own gateway?" : "Switch to the platform gateway?", body: msg, confirmLabel: "Switch gateway", onConfirm: async () => { await act("mode", () => api.post("/api/settings/gateway/mode", { mode, confirm: true }), "Gateway mode updated."); } });
   };
 
-  const saveCreds = (e: React.FormEvent) => {
+  const saveCreds = async (e: React.FormEvent) => {
     e.preventDefault();
-    void act("save", () => api.post("/api/settings/gateway/credentials", {
+    const saved = await act("save", () => api.post("/api/settings/gateway/credentials", {
       apiKey, apiSecret, webhookSecret: webhookSecret || undefined, environment,
     }), "Credentials saved — verify the connection below.");
-    setApiKey(""); setApiSecret(""); setWebhookSecret("");
+    if (saved) { setApiKey(""); setApiSecret(""); setWebhookSecret(""); }
   };
 
   const copy = async () => {
@@ -70,6 +71,7 @@ export default function PaymentGatewaySettings() {
 
   return (
     <div className="space-y-5">
+      {dialog}
       <Notice text={err} />
       {ok && <p className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs font-medium text-emerald-800">{ok}</p>}
 
@@ -142,7 +144,7 @@ export default function PaymentGatewaySettings() {
         </div>
         <p className="mt-1.5 text-xs text-[var(--fg-muted)]">
           Only needed for <b>“Use My Own Payment Gateway”</b> — the platform gateway needs nothing
-          from you. Find these in your payment provider's dashboard → API Keys.
+          from you. Find these in your payment provider&apos;s dashboard → API Keys.
           Credentials are encrypted at rest and never shown after saving.
         </p>
         <form onSubmit={saveCreds} className="mt-5 grid gap-4 md:grid-cols-2">
@@ -180,8 +182,8 @@ export default function PaymentGatewaySettings() {
                   onClick={() => act("test", () => api.post("/api/settings/gateway/test"), busy === "test" ? "" : "Connection check finished.")}>
                   <Plugs size={14} /> {busy === "test" ? "Testing…" : "Test connection"}
                 </button>
-                <button type="button" className="text-xs font-semibold text-red-600 hover:underline" disabled={busy === "disconnect"}
-                  onClick={() => { if (window.confirm("Disconnect your gateway and return to the platform gateway? Your credentials will be deleted.")) void act("disconnect", () => api.post("/api/settings/gateway/disconnect"), "Gateway disconnected."); }}>
+                <button type="button" className="min-h-10 rounded-lg px-2 text-xs font-semibold text-red-600 transition hover:bg-red-50" disabled={busy === "disconnect"}
+                  onClick={() => confirm({ title: "Disconnect payment gateway?", body: "Your saved gateway credentials will be deleted and new payments will return to the platform gateway after server confirmation.", confirmLabel: "Disconnect gateway", onConfirm: async () => { await act("disconnect", () => api.post("/api/settings/gateway/disconnect"), "Gateway disconnected."); } })}>
                   {busy === "disconnect" ? "Disconnecting…" : "Disconnect gateway"}
                 </button>
               </>

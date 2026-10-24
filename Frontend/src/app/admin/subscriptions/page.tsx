@@ -1,8 +1,11 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import api from "@/lib/api";
-import { Table, Badge, Notice, panel, button, buttonGhost, field, label, hint, message } from "@/components/BillingUI";
-import { X, Plus, CheckCircle } from "@phosphor-icons/react";
+import { Table, Badge, Notice, panel, button, buttonGhost, field, label, hint, message, PageHeader } from "@/components/BillingUI";
+import { Dialog } from "@/components/ui/Dialog";
+import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { LoadingIndicator } from "@/components/LoadingUI";
+import { Plus, CheckCircle } from "@phosphor-icons/react";
 
 interface Overview {
   totalTenants: number; subscribed: number; active: number; dueSoon: number;
@@ -48,8 +51,9 @@ export default function AdminSubscriptionsPage() {
   const [fRef, setFRef] = useState("");
   const [fNote, setFNote] = useState("");
   const [fChannel, setFChannel] = useState("EXTERNAL");
+  const { confirm, dialog: confirmationDialog } = useConfirmDialog();
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const [o, r, t] = await Promise.all([
         api.get<Overview>("/api/admin/subscriptions/overview"),
@@ -58,8 +62,8 @@ export default function AdminSubscriptionsPage() {
       ]);
       setOv(o.data); setRows(r.data); setTenants(t.data);
     } catch (e) { setErr(message(e)); }
-  };
-  useEffect(() => { void load(); }, []);
+  }, []);
+  useEffect(() => { const initial = window.setTimeout(load, 0); return () => window.clearTimeout(initial); }, [load]);
 
   const act = async (fn: () => Promise<unknown>, done: string) => {
     setBusy(true); setErr(""); setOk("");
@@ -84,14 +88,9 @@ export default function AdminSubscriptionsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-[var(--fg)]">Subscriptions</h1>
-          <p className="mt-1 text-sm text-[var(--fg-muted)]">
-            SaaS fees tenants pay to use this platform — separate from their customer WiFi revenue.
-          </p>
-        </div>
-        <div className="flex gap-2">
+      {confirmationDialog}
+      <PageHeader title="Subscriptions" description="SaaS fees tenants pay to use this platform—separate from their customer WiFi revenue." action={
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
           <button className={buttonGhost} onClick={() => { setFFee(String(ov?.defaultFee ?? 25000)); setDialog("defaultFee"); }}>
             Default fee
           </button>
@@ -99,12 +98,12 @@ export default function AdminSubscriptionsPage() {
             <Plus size={15} weight="bold" /> New subscription
           </button>
         </div>
-      </div>
+      } />
 
       <Notice text={err} />
       {ok && <p className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs font-medium text-emerald-800">{ok}</p>}
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {statCards.map((c) => (
           <div key={c.label} className={`${panel} p-5`}>
             <div className="text-xs font-semibold text-[var(--fg-muted)]">{c.label}</div>
@@ -160,7 +159,7 @@ export default function AdminSubscriptionsPage() {
                       Reactivate
                     </button>
                   : <button className="font-semibold text-red-600 hover:underline"
-                      onClick={() => { if (window.confirm(`Suspend ${r.businessName}'s subscription?`)) void act(() => api.post(`/api/admin/subscriptions/${r.id}/suspend`), "Subscription suspended."); }}>
+                      onClick={() => confirm({ title: "Suspend subscription?", body: `Suspend ${r.businessName}'s subscription? Access changes only after the server confirms this action.`, confirmLabel: "Suspend subscription", onConfirm: () => act(() => api.post(`/api/admin/subscriptions/${r.id}/suspend`), "Subscription suspended.") })}>
                       Suspend
                     </button>}
               </span>
@@ -171,20 +170,14 @@ export default function AdminSubscriptionsPage() {
 
       {/* ---- dialogs ---- */}
       {dialog && dialog !== "billing" && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={() => setDialog(null)}>
-          <div className="w-full max-w-md rounded-2xl bg-[var(--surface)] p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-[var(--fg)]">
-                {dialog === "create" && "New subscription"}
-                {dialog === "fee" && `Edit monthly fee — ${sel?.businessName}`}
-                {dialog === "pay" && `Record payment — ${sel?.businessName}`}
-                {dialog === "defaultFee" && "Default monthly fee"}
-              </h3>
-              <button onClick={() => setDialog(null)} className="text-[var(--fg-faint)] hover:text-[var(--fg-muted)]"><X size={18} /></button>
-            </div>
+        <Dialog
+          title={dialog === "create" ? "New subscription" : dialog === "fee" ? `Edit monthly fee — ${sel?.businessName}` : dialog === "pay" ? `Record payment — ${sel?.businessName}` : "Default monthly fee"}
+          description={dialog === "pay" ? "Record only a payment already confirmed outside this screen." : undefined}
+          onClose={() => { if (!busy) setDialog(null); }}
+        >
 
             {dialog === "create" && (
-              <form className="mt-5 space-y-4" onSubmit={(e) => { e.preventDefault(); void act(() => api.post("/api/admin/subscriptions", {
+              <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); void act(() => api.post("/api/admin/subscriptions", {
                 tenantId: Number(fTenant), monthlyFee: fFee ? Number(fFee) : undefined, startDate: fStart || undefined,
               }), "Subscription created."); }}>
                 <div>
@@ -205,43 +198,43 @@ export default function AdminSubscriptionsPage() {
                   <label className={label}>Start date</label>
                   <input className={field} type="date" value={fStart} onChange={(e) => setFStart(e.target.value)} />
                 </div>
-                <div className="flex justify-end gap-3">
-                  <button type="button" className={buttonGhost} onClick={() => setDialog(null)}>Cancel</button>
+                <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                  <button type="button" className={buttonGhost} disabled={busy} onClick={() => setDialog(null)}>Cancel</button>
                   <button type="submit" className={button} disabled={busy || !fTenant}>Create &amp; activate</button>
                 </div>
               </form>
             )}
 
             {dialog === "fee" && (
-              <form className="mt-5 space-y-4" onSubmit={(e) => { e.preventDefault(); void act(() => api.put(`/api/admin/subscriptions/${sel!.id}/fee`, { monthlyFee: Number(fFee) }), "Fee updated — applies from the next billing cycle."); }}>
+              <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); void act(() => api.put(`/api/admin/subscriptions/${sel!.id}/fee`, { monthlyFee: Number(fFee) }), "Fee updated — applies from the next billing cycle."); }}>
                 <div>
                   <label className={label}>Monthly fee (UGX)</label>
                   <input className={field} type="number" min="1" required value={fFee} onChange={(e) => setFFee(e.target.value)} />
                   <p className={hint}>Already-issued invoices keep their original amounts.</p>
                 </div>
-                <div className="flex justify-end gap-3">
-                  <button type="button" className={buttonGhost} onClick={() => setDialog(null)}>Cancel</button>
+                <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                  <button type="button" className={buttonGhost} disabled={busy} onClick={() => setDialog(null)}>Cancel</button>
                   <button type="submit" className={button} disabled={busy}>Save</button>
                 </div>
               </form>
             )}
 
             {dialog === "defaultFee" && (
-              <form className="mt-5 space-y-4" onSubmit={(e) => { e.preventDefault(); void act(() => api.put("/api/admin/subscriptions/default-fee", { fee: Number(fFee) }), "Default fee updated."); }}>
+              <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); void act(() => api.put("/api/admin/subscriptions/default-fee", { fee: Number(fFee) }), "Default fee updated."); }}>
                 <div>
                   <label className={label}>Default fee (UGX)</label>
                   <input className={field} type="number" min="1" required value={fFee} onChange={(e) => setFFee(e.target.value)} />
                   <p className={hint}>Used when a new subscription is created without a custom amount.</p>
                 </div>
-                <div className="flex justify-end gap-3">
-                  <button type="button" className={buttonGhost} onClick={() => setDialog(null)}>Cancel</button>
+                <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                  <button type="button" className={buttonGhost} disabled={busy} onClick={() => setDialog(null)}>Cancel</button>
                   <button type="submit" className={button} disabled={busy}>Save</button>
                 </div>
               </form>
             )}
 
             {dialog === "pay" && (
-              <form className="mt-5 space-y-4" onSubmit={(e) => { e.preventDefault(); void act(() => api.post(`/api/admin/subscriptions/${sel!.id}/payments`, {
+              <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); void act(() => api.post(`/api/admin/subscriptions/${sel!.id}/payments`, {
                 amount: Number(fAmount), method: fMethod, externalRef: fRef || undefined, note: fNote || undefined,
                 settlementChannel: fChannel,
               }), "Payment recorded."); }}>
@@ -279,31 +272,25 @@ export default function AdminSubscriptionsPage() {
                   <label className={label}>Note <span className="font-normal text-[var(--fg-faint)]">(optional)</span></label>
                   <input className={field} value={fNote} onChange={(e) => setFNote(e.target.value)} />
                 </div>
-                <div className="flex justify-end gap-3">
-                  <button type="button" className={buttonGhost} onClick={() => setDialog(null)}>Cancel</button>
+                <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                  <button type="button" className={buttonGhost} disabled={busy} onClick={() => setDialog(null)}>Cancel</button>
                   <button type="submit" className={button} disabled={busy}>
                     <CheckCircle size={14} /> {busy ? "Saving…" : "Record payment"}
                   </button>
                 </div>
               </form>
             )}
-          </div>
-        </div>
+        </Dialog>
       )}
 
       {/* billing history */}
       {dialog === "billing" && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={() => { setDialog(null); setBilling(null); }}>
-          <div className="w-full max-w-2xl rounded-2xl bg-[var(--surface)] p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-[var(--fg)]">Billing history — {sel?.businessName}</h3>
-              <button onClick={() => { setDialog(null); setBilling(null); }} className="text-[var(--fg-faint)] hover:text-[var(--fg-muted)]"><X size={18} /></button>
-            </div>
-            {!billing ? <p className="mt-6 text-sm text-[var(--fg-faint)]">Loading…</p> : (
-              <div className="mt-5 space-y-6">
+        <Dialog title={`Billing history — ${sel?.businessName}`} description="Invoices and administrator-confirmed payments for this subscription." wide onClose={() => { setDialog(null); setBilling(null); }}>
+            {!billing ? <LoadingIndicator label="Loading billing history…" className="py-8" /> : (
+              <div className="space-y-6">
                 <div>
                   <h4 className="text-xs font-bold uppercase tracking-wide text-[var(--fg-muted)]">Billing periods</h4>
-                  <table className="mt-2 w-full text-sm">
+                  <div className="mt-2 overflow-x-auto"><table className="min-w-[34rem] w-full text-sm">
                     <thead><tr className="text-left text-xs text-[var(--fg-faint)]">
                       <th className="py-1.5">Period</th><th>Due</th><th>Status</th><th>Paid</th>
                     </tr></thead>
@@ -317,11 +304,11 @@ export default function AdminSubscriptionsPage() {
                         </tr>
                       ))}
                     </tbody>
-                  </table>
+                  </table></div>
                 </div>
                 <div>
                   <h4 className="text-xs font-bold uppercase tracking-wide text-[var(--fg-muted)]">Payments</h4>
-                  <table className="mt-2 w-full text-sm">
+                  <div className="mt-2 overflow-x-auto"><table className="min-w-[34rem] w-full text-sm">
                     <thead><tr className="text-left text-xs text-[var(--fg-faint)]">
                       <th className="py-1.5">Date</th><th>Amount</th><th>Method</th><th>Reference</th>
                     </tr></thead>
@@ -336,12 +323,11 @@ export default function AdminSubscriptionsPage() {
                         </tr>
                       ))}
                     </tbody>
-                  </table>
+                  </table></div>
                 </div>
               </div>
             )}
-          </div>
-        </div>
+        </Dialog>
       )}
     </div>
   );

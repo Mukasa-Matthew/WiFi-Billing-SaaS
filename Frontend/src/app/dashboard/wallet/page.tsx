@@ -1,8 +1,11 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import api from "@/lib/api";
-import { useResource, Table, Badge, Notice, date, field, button, buttonGhost, panel, label, hint, message } from "@/components/BillingUI";
-import { Wallet, Bank, ArrowDown, X, ShieldCheck } from "@phosphor-icons/react";
+import { useResource, Table, Badge, ErrorNotice, date, field, button, buttonGhost, panel, label, hint, message, PageHeader } from "@/components/BillingUI";
+import { Dialog } from "@/components/ui/Dialog";
+import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { useToast } from "@/components/ui/Toast";
+import { Wallet, Bank, ArrowDown, ShieldCheck } from "@phosphor-icons/react";
 
 interface WalletSummary {
   available: number; pending: number; reserved: number;
@@ -52,11 +55,13 @@ export default function WalletPage() {
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [otpBusy, setOtpBusy] = useState(false);
+  const toast = useToast();
+  const { confirm, dialog } = useConfirmDialog();
 
-  const loadSummary = async () => {
+  const loadSummary = useCallback(async () => {
     try { setSummary((await api.get<WalletSummary>("/api/wallet")).data); } catch { /* keep stale */ }
-  };
-  useEffect(() => { void loadSummary(); const t = setInterval(loadSummary, 30000); return () => clearInterval(t); }, []);
+  }, []);
+  useEffect(() => { const initial = window.setTimeout(loadSummary, 0); const timer = window.setInterval(loadSummary, 30000); return () => { window.clearTimeout(initial); window.clearInterval(timer); }; }, [loadSummary]);
   const refreshAll = () => { void loadSummary(); loadActivity(); loadWithdrawals(); };
 
   const sendOtp = async () => {
@@ -74,34 +79,35 @@ export default function WalletPage() {
     try {
       await api.post("/api/wallet/withdrawals", { amount: Number(amount), phone, otp });
       setOpen(false); setAmount(""); setPhone(""); setOtp(""); setOtpSent(false);
+      toast("success", "Withdrawal request submitted for processing.");
       refreshAll();
     } catch (err) { setFormError(message(err)); }
     finally { setBusy(false); }
   };
 
-  const cancel = async (id: number) => {
-    try { await api.post(`/api/wallet/withdrawals/${id}/cancel`); refreshAll(); }
-    catch (err) { setFormError(message(err)); }
-  };
+  const cancel = (id: number) => confirm({
+    title: "Cancel withdrawal request?",
+    body: "The reserved funds will be released back to your available wallet balance after the server confirms cancellation.",
+    confirmLabel: "Cancel withdrawal",
+    onConfirm: async () => {
+      try { await api.post(`/api/wallet/withdrawals/${id}/cancel`); toast("success", "Withdrawal request cancelled."); refreshAll(); }
+      catch (err) { toast("error", message(err)); }
+    },
+  });
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-[var(--fg)]">Wallet</h1>
-          <p className="mt-1 text-sm text-[var(--fg-muted)]">
-            Earnings collected through the platform payment gateway. Payments made through your own payment gateway account settle directly to your wallet there.
-          </p>
-        </div>
-        <button className={button} onClick={() => setOpen(true)}
+      {dialog}
+      <PageHeader title="Wallet" description="Earnings collected through the platform payment gateway. Payments made through your own payment gateway account settle directly to your wallet there." action={
+        <button className={`${button} w-full sm:w-auto`} onClick={() => setOpen(true)}
           disabled={!summary || summary.available <= 0}>
           <ArrowDown size={15} weight="bold" /> Withdraw
         </button>
-      </div>
+      } />
 
-      <Notice text={formError || actErr} />
+      <ErrorNotice text={formError || actErr} />
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <div className={`${panel} p-5`}>
           <div className="flex items-center gap-2 text-xs font-semibold text-[var(--fg-muted)]"><Wallet size={15} /> Available balance</div>
           <div className="mt-2 text-2xl font-bold text-[var(--fg)]">{money(summary?.available)}</div>
@@ -122,7 +128,7 @@ export default function WalletPage() {
         <div className={`${panel} p-5`}>
           <div className="flex items-center gap-2 text-xs font-semibold text-[var(--fg-muted)]"><Bank size={15} /> Lifetime earnings</div>
           <div className="mt-2 text-2xl font-bold text-[var(--fg)]">{money(summary?.totalCollected)}</div>
-          <p className="mt-1 text-xs text-[var(--fg-faint)]">All you've ever collected, net of gateway fees</p>
+          <p className="mt-1 text-xs text-[var(--fg-faint)]">All lifetime collections, net of gateway fees</p>
         </div>
         <div className={`${panel} p-5`}>
           <div className="flex items-center gap-2 text-xs font-semibold text-[var(--fg-muted)]"><ArrowDown size={15} /> Total withdrawn</div>
@@ -159,7 +165,7 @@ export default function WalletPage() {
             )},
             { label: "", render: (w: Withdrawal) => (
               (w.status === "PENDING_APPROVAL" || w.status === "REQUESTED") &&
-                <button onClick={() => cancel(w.id)} className="text-xs font-semibold text-red-600 hover:underline">Cancel</button>
+                <button onClick={() => cancel(w.id)} className="min-h-10 rounded-lg px-2 text-xs font-semibold text-red-600 transition hover:bg-red-50">Cancel</button>
             )},
           ]}
         />
@@ -190,13 +196,8 @@ export default function WalletPage() {
       </div>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={() => setOpen(false)}>
-          <form onSubmit={submit} onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md rounded-2xl bg-[var(--surface)] p-6 shadow-xl">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-[var(--fg)]">Withdraw earnings</h3>
-              <button type="button" onClick={() => setOpen(false)} className="text-[var(--fg-faint)] hover:text-[var(--fg-muted)]"><X size={18} /></button>
-            </div>
+        <Dialog title="Withdraw earnings" description="Verify the amount and recipient before submitting this request." onClose={() => { if (!busy) setOpen(false); }}>
+          <form onSubmit={submit}>
             <div className="mt-4 rounded-xl bg-[var(--subtle)] px-4 py-3 text-center">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--fg-faint)]">Available balance</p>
               <p className="mt-0.5 text-xl font-bold text-[var(--fg)]">{money(summary?.available)}</p>
@@ -225,11 +226,11 @@ export default function WalletPage() {
             {/* Email verification — a code must be issued before the request can be submitted. */}
             <div className="mt-4">
               <label className={label}>Verification code</label>
-              <div className="flex gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row">
                 <input className={field} inputMode="numeric" maxLength={6} value={otp}
                   onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
                   placeholder={otpSent ? "6-digit code" : "Request a code first"} required />
-                <button type="button" className={buttonGhost} disabled={otpBusy}
+                <button type="button" className={`${buttonGhost} shrink-0`} disabled={otpBusy || busy}
                   onClick={() => void sendOtp()}>
                   {otpBusy ? "Sending…" : otpSent ? "Resend" : "Send code"}
                 </button>
@@ -245,14 +246,14 @@ export default function WalletPage() {
                 Withdrawals are reviewed by the platform before funds are sent.
               </p>
             )}
-            <div className="mt-6 flex justify-end gap-3">
-              <button type="button" className={buttonGhost} onClick={() => setOpen(false)}>Cancel</button>
-              <button type="submit" className={button} disabled={busy || otp.length !== 6}>
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button type="button" className={buttonGhost} disabled={busy} onClick={() => setOpen(false)}>Cancel</button>
+              <button type="submit" className={button} disabled={busy || otpBusy || otp.length !== 6}>
                 {busy ? "Submitting…" : "Request withdrawal"}
               </button>
             </div>
           </form>
-        </div>
+        </Dialog>
       )}
     </div>
   );
