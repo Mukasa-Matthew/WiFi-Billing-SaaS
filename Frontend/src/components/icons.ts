@@ -46,6 +46,7 @@ export {
   Inbox as Tray,
   Key,
   Layers3 as Stack,
+  LayoutDashboard,
   LayoutDashboard as SquaresFour,
   Link as LinkSimple,
   LoaderCircle as CircleNotch,

@@ -40,4 +40,22 @@ public class AdminTenantDto {
             java.math.BigDecimal totalRevenueUgx,
             long activeHotspotSessions) {
     }
+
+    public record RouterFleetResponse(
+            Long id,
+            Long tenantId,
+            String tenantName,
+            String name,
+            String status,
+            String managementIp,
+            Integer cpuLoad,
+            Integer memoryUsage,
+            String uptime,
+            Integer activeUsers,
+            Boolean hotspotReady,
+            Boolean radiusReady,
+            Boolean portalReady,
+            OffsetDateTime lastSeen,
+            OffsetDateTime createdAt) {
+    }
 }
