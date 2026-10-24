@@ -10,5 +10,8 @@ public record TelemetryRequest(
         @PositiveOrZero Long freeMemory,
         @PositiveOrZero Long totalMemory,
         String uptime,
-        @PositiveOrZero Integer activeUsers) {
+        @PositiveOrZero Integer activeUsers,
+        Boolean hotspotReady,
+        Boolean radiusReady,
+        Boolean portalReady) {
 }

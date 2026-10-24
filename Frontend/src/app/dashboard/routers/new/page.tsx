@@ -54,7 +54,10 @@ export default function AddRouterPage() {
     return `:do { /tool fetch url="${url}" dst-path=wifi-billing.rsc; /import wifi-billing.rsc } on-error={ :put "Provisioning failed. Check internet access and try again." }`;
   }, [router]);
 
-  const connected = router?.status === "registered" || router?.status === "online";
+  // A public-key registration alone is not readiness. The backend only marks
+  // the router online after telemetry confirms hotspot, RADIUS and portal assets.
+  const connected = router?.status === "online";
+  const degraded = router?.status === "degraded";
 
   useEffect(() => {
     if (step !== 2 || !router || connected || attempt >= MAX_ATTEMPTS) return;
@@ -238,10 +241,14 @@ export default function AddRouterPage() {
                   {connected ? <CheckCircle2 className="h-6 w-6 text-emerald-700" /> : <LoaderCircle className="h-6 w-6 animate-spin text-blue-700" />}
                   <div>
                     <p className={`font-mono text-sm font-semibold ${connected ? "text-emerald-700" : "text-slate-900"}`}>
-                      {connected ? "Router registration received" : "$ Paste the provisioning command in your MikroTik terminal to begin"}
+                      {connected ? "Router is verified and ready" : degraded ? "Router connected, but readiness checks failed" : "$ Paste the provisioning command in your MikroTik terminal to begin"}
                     </p>
                     <p className="mt-2 text-xs text-slate-500">
-                      {connected ? `Tunnel ${router.wgIp} is registered with the cloud core.` : "The system waits for the router to register its WireGuard public key."}
+                      {connected
+                        ? `Tunnel ${router.wgIp}, hotspot, RADIUS configuration and portal assets are reporting ready.`
+                        : degraded
+                          ? "Review the router log and provisioning troubleshooting guide; the dashboard will keep checking."
+                          : "The system waits for configuration completion and a successful readiness report."}
                     </p>
                     {!connected && <p className="mt-3 text-xs text-slate-500">Attempt {Math.min(attempt + 1, MAX_ATTEMPTS)} of {MAX_ATTEMPTS}</p>}
                   </div>
@@ -259,8 +266,8 @@ export default function AddRouterPage() {
             <div className="space-y-6">
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 text-center">
                 <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-700" />
-                <h2 className="mt-3 text-xl font-bold text-slate-900">Router configuration submitted</h2>
-                <p className="mt-2 text-sm text-slate-500">{router.name} has registered with the billing core. Tunnel connectivity and customer authentication will be verified during router testing.</p>
+                <h2 className="mt-3 text-xl font-bold text-slate-900">Router verified and ready</h2>
+                <p className="mt-2 text-sm text-slate-500">{router.name} is reporting its managed hotspot, RADIUS configuration and captive portal assets as ready.</p>
               </div>
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="rounded-xl border border-slate-200 bg-[#F5F7FA]/50 p-4"><p className="text-xs text-slate-500">WAN interface</p><p className="mt-1 font-mono text-sm text-slate-900">{router.wanInterface}</p></div>

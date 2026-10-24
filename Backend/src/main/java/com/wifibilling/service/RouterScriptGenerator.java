@@ -23,6 +23,9 @@ import java.util.Set;
 @Component
 public class RouterScriptGenerator {
 
+    /** Bump only for a deliberate, reviewed RouterOS infrastructure migration. */
+    public static final String PROVISIONING_VERSION = "2026.10.1";
+
     private static final String IFACE_NAME = "wg-billing";
     private static final String TELEMETRY_NAME = "wb-telemetry";
     private static final String BRIDGE_NAME = "wb-hotspot-bridge";
@@ -93,11 +96,25 @@ public class RouterScriptGenerator {
         StringBuilder s = new StringBuilder(8192);
         s.append("# ==========================================================\n");
         s.append("# WiFi-Billing auto-provisioning script (RouterOS v7+)\n");
+        s.append("# Provisioning-Version: ").append(PROVISIONING_VERSION).append('\n');
         s.append("# Router    : ").append(comment(c.routerName())).append('\n');
         s.append("# Tunnel IP : ").append(c.wgIp()).append('/').append(c.prefixLength()).append('\n');
         s.append("# Generated : ").append(OffsetDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)).append('\n');
         s.append("# Requires RouterOS v7+ (WireGuard support)\n");
         s.append("# ==========================================================\n");
+        s.append(":local wbMarker ").append(q("wifi-billing:" + PROVISIONING_VERSION)).append('\n');
+        s.append(":if ([:len [/system/script find name=wb-provisioned comment=$wbMarker]] > 0) do={ ")
+                .append(":log info \"wifi-billing: provisioning already current; no changes made\"; ")
+                .append(":put \"WiFi-Billing is already provisioned at the requested version.\"; :return }\n");
+        s.append(":if ([:tonum [:pick [/system/resource get version] 0 1]] < 7) do={ :error \"RouterOS v7 or newer is required\" }\n");
+        s.append(":if ([:len [/interface find name=").append(q(c.wanInterface()))
+                .append("]] = 0) do={ :error \"WAN interface not found; no changes made\" }\n");
+        s.append(":local wbBridge [/interface/bridge find name=").append(q(BRIDGE_NAME)).append("]\n");
+        s.append(":if ([:len $wbBridge] > 0 && [/interface/bridge get [:pick $wbBridge 0] comment] != ")
+                .append(tag).append(") do={ :error \"Existing wb-hotspot-bridge is not managed by WiFi-Billing; no changes made\" }\n");
+        s.append(":local wbAddress [/ip/address find address=\"10.10.0.1/24\"]\n");
+        s.append(":if ([:len $wbAddress] > 0 && [/ip/address get [:pick $wbAddress 0] comment] != ")
+                .append(tag).append(") do={ :error \"10.10.0.1/24 is already used by an unmanaged configuration; no changes made\" }\n");
         s.append(":log info \"wifi-billing: provisioning started\"\n\n");
         s.append(":do { /export file=before-wifi-billing } on-error={}\n\n");
 
@@ -111,6 +128,7 @@ public class RouterScriptGenerator {
         s.append("/system/script/remove [find name=wb-portal-sync]\n");
         s.append("/system/scheduler/remove [find name=wb-pkg-sync]\n");
         s.append("/system/script/remove [find name=wb-pkg-sync]\n");
+        s.append("/system/script/remove [find name=wb-provisioned]\n");
         s.append("/ip/hotspot/walled-garden/ip/remove [find comment=").append(tag).append("]\n");
         s.append("/ip/hotspot/walled-garden/remove [find comment=").append(tag).append("]\n");
         s.append("/ip/firewall/filter/remove [find comment=").append(tag).append("]\n");
@@ -313,10 +331,15 @@ public class RouterScriptGenerator {
         s.append(":local totalMem [/system resource get total-memory]\n");
         s.append(":local up [/system resource get uptime]\n");
         s.append(":local users [/ip hotspot active print count-only]\n");
+        s.append(":local hotspotReady ([:len [/ip hotspot find name=").append(q(HOTSPOT_SERVER)).append(" disabled=no]] > 0)\n");
+        s.append(":local radiusReady ([:len [/radius find comment=").append(tag).append("]] > 0)\n");
+        s.append(":local portalReady ([:len [/file find name=flash/hotspot/login.html]] > 0)\n");
         s.append(":local body (\"{\\\"token\\\":\\\"").append(c.token())
                 .append("\\\",\\\"cpuLoad\\\":\" . $cpu . \",\\\"freeMemory\\\":\" . $freeMem")
                 .append(" . \",\\\"totalMemory\\\":\" . $totalMem . \",\\\"uptime\\\":\\\"\" . $up")
-                .append(" . \"\\\",\\\"activeUsers\\\":\" . $users . \"}\")\n");
+                .append(" . \"\\\",\\\"activeUsers\\\":\" . $users")
+                .append(" . \",\\\"hotspotReady\\\":\" . $hotspotReady . \",\\\"radiusReady\\\":\" . $radiusReady")
+                .append(" . \",\\\"portalReady\\\":\" . $portalReady . \"}\")\n");
         s.append(":do { /tool fetch url=").append(q(telemetryUrl))
                 .append(" http-method=post http-header-field=\"Content-Type: application/json\"")
                 .append(" http-data=$body output=none } on-error={ :log warning \"wifi-billing: telemetry push failed\" }\n");
@@ -342,6 +365,8 @@ public class RouterScriptGenerator {
         s.append("/system/scheduler/add name=wb-register interval=30s on-event=wb-register policy=read,write,test comment=").append(tag).append("\n");
         s.append(":do { /system script run wb-register } on-error={}\n\n");
 
+        s.append("/system/script/add name=wb-provisioned policy=read comment=")
+                .append(q("wifi-billing:" + PROVISIONING_VERSION)).append(" source={}\n");
         s.append(":do { /system script run ").append(TELEMETRY_NAME).append(" } on-error={}\n");
         s.append(":log info \"wifi-billing: provisioning complete\"\n");
         // Signal the backend that the full script ran end-to-end — the dashboard
