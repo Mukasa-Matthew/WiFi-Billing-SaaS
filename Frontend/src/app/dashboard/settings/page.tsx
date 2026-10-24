@@ -103,6 +103,105 @@ function AssetBox({ title, hintText, has, uploading, onPick, onRemove, inputRef 
   );
 }
 
+/** Inline account-email change: code is sent to the CURRENT email to authorise. */
+function EmailChange({ currentEmail, onChanged }: { currentEmail: string; onChanged: (e: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [newEmail, setNewEmail] = useState("");
+  const [otp, setOtp] = useState("");
+  const [sent, setSent] = useState(false);
+  const [devCode, setDevCode] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+
+  const sendCode = async () => {
+    setBusy(true); setMsg(null);
+    try {
+      const r = await api.post<{ devCode?: string }>("/api/settings/email/otp", { newEmail });
+      setSent(true);
+      setDevCode(r.data.devCode ?? null);
+      setMsg({ kind: "ok", text: `Code sent to ${currentEmail} — enter it below to confirm.` });
+    } catch (e: any) {
+      setMsg({ kind: "err", text: e?.response?.data?.message || e?.response?.data || "Could not send code" });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirm = async () => {
+    setBusy(true); setMsg(null);
+    try {
+      const r = await api.post<{ email: string }>("/api/settings/email", { newEmail, otp });
+      onChanged(r.data.email);
+      setOpen(false); setNewEmail(""); setOtp(""); setSent(false); setDevCode(null);
+      setMsg({ kind: "ok", text: "Account email updated. Use it to sign in from now on." });
+    } catch (e: any) {
+      setMsg({ kind: "err", text: e?.response?.data?.message || e?.response?.data || "Email change failed" });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="sm:col-span-2">
+      <label className={label}>Account email</label>
+      <div className="flex items-center gap-3">
+        <input value={currentEmail} disabled className={`${field} opacity-60 max-w-sm`} />
+        {!open && (
+          <button type="button" onClick={() => { setOpen(true); setMsg(null); }}
+            className="shrink-0 rounded-lg border border-[var(--border-strong)] px-3 py-2 text-xs font-semibold text-[var(--fg-body)] hover:text-[var(--fg)] hover:bg-[var(--fill)] transition">
+            Change
+          </button>
+        )}
+      </div>
+      <p className={hint}>Sign-in email — also where withdrawal and password-reset codes are sent.</p>
+
+      {msg && !open && <p className={`mt-2 text-xs font-medium ${msg.kind === "ok" ? "text-emerald-600" : "text-red-500"}`}>{msg.text}</p>}
+
+      {open && (
+        <div className="mt-3 max-w-md space-y-3 rounded-xl border border-[var(--border)] bg-[var(--subtle)] p-4">
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-[var(--fg)]">New email address</label>
+            <input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)}
+              placeholder="new@email.com" className={field} />
+          </div>
+          {sent && (
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-[var(--fg)]">Verification code</label>
+              <input inputMode="numeric" maxLength={6} value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                placeholder="6-digit code" className={`${field} font-mono tracking-widest`} />
+              {devCode && <p className="mt-1 text-xs text-amber-500">Dev mode — code: {devCode}</p>}
+            </div>
+          )}
+          {msg && <p className={`text-xs font-medium ${msg.kind === "ok" ? "text-emerald-600" : "text-red-500"}`}>{msg.text}</p>}
+          <div className="flex items-center gap-2">
+            {!sent ? (
+              <button type="button" disabled={busy || !newEmail} onClick={sendCode}
+                className="rounded-lg bg-blue-700 px-3.5 py-2 text-xs font-semibold text-white hover:bg-blue-600 disabled:opacity-50">
+                {busy ? "Sending…" : `Send code to ${currentEmail}`}
+              </button>
+            ) : (
+              <>
+                <button type="button" disabled={busy || otp.length !== 6} onClick={confirm}
+                  className="rounded-lg bg-blue-700 px-3.5 py-2 text-xs font-semibold text-white hover:bg-blue-600 disabled:opacity-50">
+                  {busy ? "Confirming…" : "Confirm change"}
+                </button>
+                <button type="button" disabled={busy} onClick={sendCode}
+                  className="rounded-lg px-3 py-2 text-xs font-semibold text-[var(--accent-text)] hover:underline disabled:opacity-50">
+                  Resend
+                </button>
+              </>
+            )}
+            <button type="button" disabled={busy} onClick={() => { setOpen(false); setSent(false); setOtp(""); setMsg(null); }}
+              className="rounded-lg px-3 py-2 text-xs font-semibold text-[var(--fg-muted)] hover:text-[var(--fg)]">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function TenantSettingsPage() {
   const [form, setForm] = useState<TenantSettings | null>(null);
   const [tab, setTab] = useState<TabKey>("general");
@@ -270,11 +369,7 @@ export default function TenantSettingsPage() {
                 <input type="email" maxLength={120} value={form.supportEmail ?? ""} onChange={(e) => set("supportEmail", e.target.value || null)} className={field} placeholder="support@yourbusiness.com" />
                 <p className={hint}>Your customers can email this address for support.</p>
               </div>
-              <div>
-                <label className={label}>Account email</label>
-                <input value={form.email} disabled className={`${field} opacity-50`} />
-                <p className={hint}>Login email — contact support to change.</p>
-              </div>
+              <EmailChange currentEmail={form.email} onChanged={(e) => set("email", e)} />
             </div>
           </section>
         )}
