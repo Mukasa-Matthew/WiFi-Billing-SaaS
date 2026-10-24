@@ -2,9 +2,9 @@
 
 import React, { useEffect, useState } from "react";
 import api from "@/lib/api";
-import { AlertTriangle, CheckCircle2, LoaderCircle, Save } from "lucide-react";
+import { Warning, CheckCircle, CircleNotch, FloppyDisk } from "@phosphor-icons/react";
 
-interface Settings {
+interface GearSix {
   name: string;
   email: string;
   supportPhone: string | null;
@@ -33,7 +33,7 @@ const hint = "mt-2 text-xs text-slate-500";
 const card = "rounded-xl border border-slate-200 bg-white p-6";
 
 export default function TenantSettingsPage() {
-  const [form, setForm] = useState<Settings | null>(null);
+  const [form, setForm] = useState<GearSix | null>(null);
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [previewKey, setPreviewKey] = useState(0);
@@ -42,7 +42,7 @@ export default function TenantSettingsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    api.get<Settings>("/api/settings")
+    api.get<GearSix>("/api/settings")
       .then((r) => setForm(r.data))
       .catch(() => setError("Could not load settings"));
   }, []);
@@ -69,7 +69,7 @@ export default function TenantSettingsPage() {
       .catch(() => { setPreviewHtml(null); setPreviewError("Could not load the portal preview."); });
   }, [form?.portalTemplate, previewKey]);
 
-  const set = <K extends keyof Settings>(key: K, value: Settings[K]) =>
+  const set = <K extends keyof GearSix>(key: K, value: GearSix[K]) =>
     setForm((f) => (f ? { ...f, [key]: value } : f));
 
   const save = async (e: React.FormEvent) => {
@@ -79,7 +79,7 @@ export default function TenantSettingsPage() {
     setError(null);
     setSaved(false);
     try {
-      const r = await api.put<Settings>("/api/settings", form);
+      const r = await api.put<GearSix>("/api/settings", form);
       setForm(r.data);
       setPreviewKey((k) => k + 1);
       setSaved(true);
@@ -102,7 +102,7 @@ export default function TenantSettingsPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-slate-900">Settings</h1>
+        <h1 className="text-xl font-bold tracking-tight text-slate-900">GearSix</h1>
         <p className="mt-1 text-sm text-slate-500">
           Branding, portal behavior, voucher defaults, and notifications for your hotspot business.
         </p>
@@ -192,7 +192,7 @@ export default function TenantSettingsPage() {
                     <span className="mt-0.5 block text-xs text-slate-500">{t.blurb}</span>
                   </span>
                   <span className={`flex h-5 w-5 items-center justify-center rounded-full border ${form.portalTemplate === t.key ? "border-blue-600 bg-blue-600" : "border-slate-300"}`}>
-                    {form.portalTemplate === t.key && <CheckCircle2 size={12} className="text-white" />}
+                    {form.portalTemplate === t.key && <CheckCircle size={12} className="text-white" />}
                   </span>
                 </button>
               ))}
@@ -202,7 +202,7 @@ export default function TenantSettingsPage() {
                 <div className="border-b border-slate-200 px-3 py-2 text-[10px] text-slate-500">Live preview — {form.portalTemplate}</div>
                 {previewError ? (
                   <div className="flex h-[420px] flex-col items-center justify-center gap-2 px-6 text-center">
-                    <AlertTriangle size={20} className="text-amber-600" />
+                    <Warning size={20} className="text-amber-600" />
                     <p className="text-xs font-medium text-slate-700">{previewError}</p>
                     <button onClick={() => setPreviewKey(k => k + 1)} className="mt-1 text-xs font-medium text-blue-700 hover:underline">Retry preview</button>
                   </div>
@@ -215,7 +215,7 @@ export default function TenantSettingsPage() {
                   />
                 ) : (
                   <div className="flex h-[420px] items-center justify-center text-xs text-slate-500">
-                    <LoaderCircle size={16} className="mr-2 animate-spin" />Rendering preview…
+                    <CircleNotch size={16} className="mr-2 animate-spin" />Rendering preview…
                   </div>
                 )}
               </div>
@@ -287,10 +287,10 @@ export default function TenantSettingsPage() {
 
         <div className="flex items-center gap-4">
           <button disabled={saving} className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50">
-            {saving ? <LoaderCircle size={16} className="animate-spin" /> : <Save size={16} />}
-            {saving ? "Saving…" : "Save settings"}
+            {saving ? <CircleNotch size={16} className="animate-spin" /> : <FloppyDisk size={16} />}
+            {saving ? "Saving…" : "FloppyDisk settings"}
           </button>
-          {saved && <span className="flex items-center gap-1.5 text-sm text-emerald-700"><CheckCircle2 size={15} />Saved</span>}
+          {saved && <span className="flex items-center gap-1.5 text-sm text-emerald-700"><CheckCircle size={15} />Saved</span>}
         </div>
       </form>
     </div>

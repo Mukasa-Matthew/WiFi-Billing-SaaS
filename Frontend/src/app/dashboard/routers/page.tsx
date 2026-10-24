@@ -5,9 +5,9 @@ import api from "@/lib/api";
 import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
 import { useResource, Table, Badge, Notice, FilterTabs, button, date, message, panel } from "@/components/BillingUI";
-import { MoreVertical, Eye, RefreshCw, FileDown, Clock, Terminal, Trash2 } from "lucide-react";
+import { DotsThreeVertical, Eye, ArrowClockwise, FileArrowDown, Clock, Terminal, Trash } from "@phosphor-icons/react";
 
-interface Router { id: number; name: string; token: string; wgIp: string; wgPublicKey: string | null; cpuLoad: number; memoryUsage: number; status: string; lastSeen: string | null; uptime: string | null; hotspotReady: boolean | null; radiusReady: boolean | null; portalReady: boolean | null }
+interface CellTower { id: number; name: string; token: string; wgIp: string; wgPublicKey: string | null; cpuLoad: number; memoryUsage: number; status: string; lastSeen: string | null; uptime: string | null; hotspotReady: boolean | null; radiusReady: boolean | null; portalReady: boolean | null }
 interface Task { id: number; action: string; status: string; createdAt: string }
 
 function Kebab({ children }: { children: React.ReactNode }) {
@@ -35,9 +35,9 @@ function Kebab({ children }: { children: React.ReactNode }) {
   };
   return (
     <div ref={ref}>
-      <button ref={btnRef} aria-label="Router actions" aria-expanded={open} onClick={toggle}
+      <button ref={btnRef} aria-label="CellTower actions" aria-expanded={open} onClick={toggle}
         className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900">
-        <MoreVertical size={16} />
+        <DotsThreeVertical size={16} />
       </button>
       {open && (
         <div className="fixed z-50 w-52 rounded-xl border border-slate-200 bg-white py-1.5 shadow-lg"
@@ -59,19 +59,19 @@ function MenuItem({ icon, label, danger, onClick }: { icon: React.ReactNode; lab
 }
 
 export default function Page() {
-  const { data, loading, error, load } = useResource<Router>("/api/routers", true);
+  const { data, loading, error, load } = useResource<CellTower>("/api/routers", true);
   const [tab, setTab] = useState("ALL");
-  const [selected, setSelected] = useState<Router | null>(null);
+  const [selected, setSelected] = useState<CellTower | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [note, setNote] = useState("");
   const [command, setCommand] = useState("");
 
-  const open = async (r: Router) => {
+  const open = async (r: CellTower) => {
     setSelected(r); setCommand("");
     try { setTasks((await api.get<Task[]>(`/api/routers/${r.id}/tasks`)).data); }
     catch (e) { setNote(message(e)); }
   };
-  const action = async (r: Router, action: string) => {
+  const action = async (r: CellTower, action: string) => {
     try {
       await api.post(`/api/routers/${r.id}/tasks`, { action });
       setNote("Action queued. Applied status requires a successful router acknowledgement.");
@@ -80,7 +80,7 @@ export default function Page() {
   };
   const toast = useToast();
   const { confirm, dialog } = useConfirmDialog();
-  const remove = (r: Router) => confirm({
+  const remove = (r: CellTower) => confirm({
     title: "Delete router",
     body: `Delete ${r.name}? Payment history may prevent deletion.`,
     confirmLabel: "Delete",
@@ -89,7 +89,7 @@ export default function Page() {
       catch (e) { toast("error", message(e)); }
     },
   });
-  const showCommand = (r: Router, install = false) => {
+  const showCommand = (r: CellTower, install = false) => {
     const url = `${window.location.origin}/api/router/provision/${r.token}${install ? "/install-management.rsc" : ""}`;
     setCommand(`:do { /tool fetch url="${url}" dst-path=wb-setup.rsc; /import wb-setup.rsc } on-error={ :put "Setup failed. Check router logs." }`);
     if (!selected || selected.id !== r.id) void open(r);
@@ -138,10 +138,10 @@ export default function Page() {
               <Kebab>
                 <MenuItem icon={<Eye size={14} />} label="View / manage" onClick={() => open(r)} />
                 <MenuItem icon={<Terminal size={14} />} label="Reprovision command" onClick={() => showCommand(r)} />
-                <MenuItem icon={<FileDown size={14} />} label="Sync hotspot files" onClick={() => action(r, "SYNC_PORTAL")} />
+                <MenuItem icon={<FileArrowDown size={14} />} label="Sync hotspot files" onClick={() => action(r, "SYNC_PORTAL")} />
                 <MenuItem icon={<Clock size={14} />} label="Sync router time" onClick={() => action(r, "SYNC_TIME")} />
-                <MenuItem icon={<RefreshCw size={14} />} label="Install mgmt agent" onClick={() => showCommand(r, true)} />
-                <MenuItem icon={<Trash2 size={14} />} label="Delete" danger onClick={() => remove(r)} />
+                <MenuItem icon={<ArrowClockwise size={14} />} label="Install mgmt agent" onClick={() => showCommand(r, true)} />
+                <MenuItem icon={<Trash size={14} />} label="Delete" danger onClick={() => remove(r)} />
               </Kebab>
             )
           },
@@ -159,7 +159,7 @@ export default function Page() {
           {command && (
             <div>
               <p className="mb-2 text-xs font-medium text-amber-700">Run this in the router terminal. Full reprovisioning moves customer interfaces; management-agent installation only enables sync and UTC/NTP time.</p>
-              <textarea aria-label="Router setup command" readOnly value={command} onFocus={e => e.target.select()}
+              <textarea aria-label="CellTower setup command" readOnly value={command} onFocus={e => e.target.select()}
                 className="h-24 w-full rounded-lg border border-slate-300 bg-[#0B1F36] p-3 font-mono text-xs text-slate-200" />
               <p className="mt-1 text-xs text-slate-500">Select the command and copy it. Keep this token private.</p>
             </div>

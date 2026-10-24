@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Router as RouterIcon, Signal, CheckCircle2, ShieldCheck, Terminal } from "lucide-react";
+import { CellTower as RouterIcon, CellSignalFull, CheckCircle, ShieldCheck, Terminal } from "@phosphor-icons/react";
 
 export default function AdminRoutersPage() {
   return (
@@ -21,7 +21,7 @@ export default function AdminRoutersPage() {
       <div className="p-6 rounded-2xl bg-white/70 border border-slate-200">
         <div className="flex items-center gap-3 mb-4">
           <div className="p-2 rounded-xl bg-blue-50 text-blue-700">
-            <Signal className="w-5 h-5" />
+            <CellSignalFull className="w-5 h-5" />
           </div>
           <div>
             <h2 className="text-sm font-semibold text-slate-900">WireGuard Mesh Status</h2>

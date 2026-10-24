@@ -2,7 +2,7 @@
 import React, { useCallback, useEffect, useState, useRef } from "react";
 import api from "@/lib/api";
 import { LoadingIndicator } from "@/components/LoadingUI";
-import { ChevronLeft, ChevronRight, Search, Inbox } from "lucide-react";
+import { CaretLeft, CaretRight, MagnifyingGlass, Tray } from "@phosphor-icons/react";
 
 /* ---------- design tokens ---------- */
 export const field = "mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-500 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15";
@@ -100,7 +100,7 @@ export function StatCard({ label, value, icon, hintText, tone }: {
 export function EmptyState({ title, description, action, icon }: { title: string; description?: string; action?: React.ReactNode; icon?: React.ReactNode }) {
   return (
     <div className="flex flex-col items-center justify-center gap-2 py-14 text-center">
-      {icon || <Inbox className="h-8 w-8 text-slate-300" />}
+      {icon || <Tray className="h-8 w-8 text-slate-300" />}
       <p className="text-sm font-semibold text-slate-700">{title}</p>
       {description && <p className="max-w-sm text-xs text-slate-500">{description}</p>}
       {action}
@@ -138,8 +138,8 @@ export function Table<T>({ rows, columns, loading = false, emptyTitle = "No reco
     <section className={`${panel} overflow-hidden`} aria-busy={loading}>
       <div className="flex justify-end border-b border-slate-200 px-4 py-3">
         <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
-          <input aria-label="Search records" placeholder="Search…" value={search}
+          <MagnifyingGlass className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
+          <input aria-label="MagnifyingGlass records" placeholder="MagnifyingGlass…" value={search}
             onChange={e => { setSearch(e.target.value); setPage(1); }}
             className="w-full sm:w-56 rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-xs text-slate-900 outline-none focus:border-blue-600" />
         </div>
@@ -168,9 +168,9 @@ export function Table<T>({ rows, columns, loading = false, emptyTitle = "No reco
             className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs">
             {[10, 25, 50].map(n => <option key={n} value={n}>{n} per page</option>)}
           </select>
-          <button disabled={current === 1} onClick={() => setPage(current - 1)} aria-label="Previous page" className="rounded-md border border-slate-300 p-1.5 disabled:opacity-30"><ChevronLeft className="h-3.5 w-3.5" /></button>
+          <button disabled={current === 1} onClick={() => setPage(current - 1)} aria-label="Previous page" className="rounded-md border border-slate-300 p-1.5 disabled:opacity-30"><CaretLeft className="h-3.5 w-3.5" /></button>
           <span className="tabular-nums">{current}/{pages}</span>
-          <button disabled={current === pages} onClick={() => setPage(current + 1)} aria-label="Next page" className="rounded-md border border-slate-300 p-1.5 disabled:opacity-30"><ChevronRight className="h-3.5 w-3.5" /></button>
+          <button disabled={current === pages} onClick={() => setPage(current + 1)} aria-label="Next page" className="rounded-md border border-slate-300 p-1.5 disabled:opacity-30"><CaretRight className="h-3.5 w-3.5" /></button>
         </div>
       </div>
     </section>

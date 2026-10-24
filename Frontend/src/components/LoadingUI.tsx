@@ -1,13 +1,13 @@
 "use client";
 
-import { LoaderCircle } from "lucide-react";
+import { CircleNotch } from "@phosphor-icons/react";
 import { useLinkStatus } from "next/link";
 import { useSyncExternalStore } from "react";
 import { getPendingRequests, subscribeRequests } from "@/lib/api";
 
 export function LoadingIndicator({ label = "Loading…", className = "" }: { label?: string; className?: string }) {
   return <span role="status" className={`inline-flex items-center justify-center gap-2 text-sm font-medium text-slate-600 ${className}`}>
-    <LoaderCircle aria-hidden="true" className="h-4 w-4 shrink-0 animate-spin motion-reduce:animate-none" />
+    <CircleNotch aria-hidden="true" className="h-4 w-4 shrink-0 animate-spin motion-reduce:animate-none" />
     {label}
   </span>;
 }
@@ -15,7 +15,7 @@ export function LoadingIndicator({ label = "Loading…", className = "" }: { lab
 export function LinkPending() {
   const { pending } = useLinkStatus();
   return <span className="inline-flex w-4 shrink-0 items-center" aria-live="polite">
-    {pending && <><LoaderCircle aria-hidden="true" className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" /><span className="sr-only">Opening page…</span></>}
+    {pending && <><CircleNotch aria-hidden="true" className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" /><span className="sr-only">Opening page…</span></>}
   </span>;
 }
 

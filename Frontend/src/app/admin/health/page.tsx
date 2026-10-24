@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Server, Activity, CheckCircle2, ShieldCheck, Database, Radio } from "lucide-react";
+import { HardDrives, ChartLine, CheckCircle, ShieldCheck, Database, Radio } from "@phosphor-icons/react";
 
 export default function AdminHealthPage() {
   const components = [
@@ -16,7 +16,7 @@ export default function AdminHealthPage() {
       name: "FreeRADIUS core",
       description: "SQL-backed authorization via radcheck/radreply and RFC 5176 CoA/PoD on port 3799",
       status: "NOT VERIFIED",
-      icon: Activity,
+      icon: ChartLine,
       badge: "RADIUS 1812/3799",
     },
     {
@@ -30,7 +30,7 @@ export default function AdminHealthPage() {
       name: "Voucher Expiration & Disconnect Worker",
       description: "30-second scheduled background task detecting newly logged-in vouchers and kicking expired sessions",
       status: "NOT VERIFIED",
-      icon: Server,
+      icon: HardDrives,
       badge: "WORKER",
     },
   ];
@@ -39,7 +39,7 @@ export default function AdminHealthPage() {
     <div className="space-y-6 max-w-7xl mx-auto">
       <div>
         <h1 className="text-xl font-bold tracking-tight text-slate-900 flex items-center gap-2.5">
-          <Server className="w-6 h-6 text-amber-700" />
+          <HardDrives className="w-6 h-6 text-amber-700" />
           <span>System &amp; VPN Health</span>
         </h1>
         <p className="text-xs text-slate-500 mt-1">
@@ -67,7 +67,7 @@ export default function AdminHealthPage() {
                 </div>
                 <p className="text-xs text-slate-500 mb-3">{c.description}</p>
                 <div className="flex items-center gap-1.5 text-xs text-amber-700 font-medium">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <CheckCircle className="w-3.5 h-3.5" />
                   <span>{c.status}</span>
                 </div>
               </div>

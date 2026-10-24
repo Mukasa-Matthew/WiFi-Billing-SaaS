@@ -4,19 +4,19 @@ import React, { useEffect, useState, useMemo } from "react";
 import api from "@/lib/api";
 import {
   Users,
-  RefreshCw,
-  Search,
-  Wifi,
+  ArrowClockwise,
+  MagnifyingGlass,
+  WifiHigh,
   Radio,
-  ArrowDownCircle,
-  ArrowUpCircle,
+  ArrowCircleDown,
+  ArrowCircleUp,
   Clock,
-  UserX,
-  AlertTriangle,
-  CheckCircle2,
-  ShieldAlert,
+  UserMinus,
+  Warning,
+  CheckCircle,
+  ShieldWarning,
   HardDrive
-} from "lucide-react";
+} from "@phosphor-icons/react";
 
 interface ActiveSession {
   radAcctId: number;
@@ -166,7 +166,7 @@ export default function TenantActiveSessionsPage() {
             className="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 border border-slate-300 transition cursor-pointer"
             title="Refresh Sessions"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-emerald-700" : ""}`} />
+            <ArrowClockwise className={`w-4 h-4 ${loading ? "animate-spin text-emerald-700" : ""}`} />
           </button>
         </div>
       </div>
@@ -212,7 +212,7 @@ export default function TenantActiveSessionsPage() {
             </div>
           </div>
           <div className="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-blue-700">
-            <ArrowDownCircle className="w-5 h-5" />
+            <ArrowCircleDown className="w-5 h-5" />
           </div>
         </div>
 
@@ -224,14 +224,14 @@ export default function TenantActiveSessionsPage() {
             </div>
           </div>
           <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-amber-700">
-            <ArrowUpCircle className="w-5 h-5" />
+            <ArrowCircleUp className="w-5 h-5" />
           </div>
         </div>
       </div>
 
-      {/* Search Bar */}
+      {/* MagnifyingGlass Bar */}
       <div className="relative w-full sm:w-80">
-        <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+        <MagnifyingGlass className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
         <input
           type="text"
           placeholder="Filter by voucher, IP, or MAC..."
@@ -250,7 +250,7 @@ export default function TenantActiveSessionsPage() {
                 <th className="py-3 px-4">User / Voucher</th>
                 <th className="py-3 px-4">Assigned IP</th>
                 <th className="py-3 px-4">Device MAC</th>
-                <th className="py-3 px-4">NAS Router</th>
+                <th className="py-3 px-4">NAS CellTower</th>
                 <th className="py-3 px-4">Session Uptime</th>
                 <th className="py-3 px-4">Data Usage (Down / Up)</th>
                 <th className="py-3 px-4">Started At</th>
@@ -261,7 +261,7 @@ export default function TenantActiveSessionsPage() {
               {loading && sessions.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-12 text-center text-slate-500">
-                    <RefreshCw className="w-5 h-5 mx-auto animate-spin text-emerald-700 mb-2" />
+                    <ArrowClockwise className="w-5 h-5 mx-auto animate-spin text-emerald-700 mb-2" />
                     <span>Streaming active sessions from FreeRADIUS...</span>
                   </td>
                 </tr>
@@ -310,7 +310,7 @@ export default function TenantActiveSessionsPage() {
                         onClick={() => setDisconnectTarget(session)}
                         className="px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-500/20 text-red-600 border border-red-200 text-[11px] font-semibold transition cursor-pointer flex items-center gap-1.5 ml-auto"
                       >
-                        <UserX className="w-3 h-3" />
+                        <UserMinus className="w-3 h-3" />
                         <span>Disconnect</span>
                       </button>
                     </td>
@@ -334,7 +334,7 @@ export default function TenantActiveSessionsPage() {
           <div className="w-full max-w-md bg-white border border-slate-200 rounded-xl p-6 space-y-6 shadow-sm">
             <div className="flex items-center gap-3 text-red-600">
               <div className="p-3 rounded-2xl bg-red-50 border border-red-200">
-                <ShieldAlert className="w-6 h-6" />
+                <ShieldWarning className="w-6 h-6" />
               </div>
               <div>
                 <h3 className="text-base font-bold text-slate-900">Revoke User Session</h3>

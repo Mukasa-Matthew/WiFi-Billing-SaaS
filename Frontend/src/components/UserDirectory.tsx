@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import { Users, Wifi, WifiOff, RefreshCw, Archive, Unplug, UserX, Eye, X } from "lucide-react";
+import { Users, WifiHigh, WifiSlash, ArrowClockwise, Archive, Plugs, UserMinus, Eye, X } from "@phosphor-icons/react";
 import api from "@/lib/api";
 import { useResource, Table, Badge, Notice, ErrorNotice, date, bytes, remaining, message, StatCard, FilterTabs, buttonGhost, PageContainer, PageHeader } from "./BillingUI";
 import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -42,13 +42,13 @@ export default function UserDirectory({expired=false}:{expired?:boolean}) {
  });
  const actionColumn={label:"Actions",render:(u:User)=><span className="inline-flex items-center gap-3">
   <button aria-label={`View ${u.voucher}`} onClick={()=>setView(u)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700"><Eye size={14}/>View</button>
-  <button disabled={pending!==null||(!expired&&!u.online)} onClick={()=>action(u)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-700 disabled:opacity-40">{expired?<Archive size={14}/>:<Unplug size={14}/ >}{pending===u.id?"Processing…":expired?"Archive":"Disconnect"}</button>
+  <button disabled={pending!==null||(!expired&&!u.online)} onClick={()=>action(u)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-700 disabled:opacity-40">{expired?<Archive size={14}/>:<Plugs size={14}/ >}{pending===u.id?"Processing…":expired?"Archive":"Disconnect"}</button>
  </span>};
  return <PageContainer>
   {dialog}
-  <PageHeader title={expired?"Expired users":"Active users"} description={expired?"Review expired access and revoked vouchers. Latest expiry appears first.":"Monitor voucher validity, connected devices, and customer usage."} action={<button onClick={()=>load()} disabled={refreshing} className={buttonGhost}><RefreshCw size={14} className={refreshing?"animate-spin":""}/>Refresh</button>}/>
+  <PageHeader title={expired?"Expired users":"Active users"} description={expired?"Review expired access and revoked vouchers. Latest expiry appears first.":"Monitor voucher validity, connected devices, and customer usage."} action={<button onClick={()=>load()} disabled={refreshing} className={buttonGhost}><ArrowClockwise size={14} className={refreshing?"animate-spin":""}/>Refresh</button>}/>
   <ErrorNotice text={error||actionError}/><Notice text={note}/>
-  {!expired&&<><div className="grid gap-4 sm:grid-cols-3"><StatCard label="All active" value={loading?"—":active.length} icon={<Users size={20}/>} hintText="Vouchers within their validity period"/><StatCard label="Online now" value={loading?"—":online.length} icon={<Wifi size={20}/>} tone="green" hintText="Recent accounting received within 6 minutes"/><StatCard label="Offline" value={loading?"—":offline.length} icon={<WifiOff size={20}/>} hintText="Valid access with no recent connection"/></div><div className="flex sm:justify-end"><FilterTabs value={tab} onChange={setTab} options={[{key:"ONLINE",label:"Online now",count:online.length},{key:"OFFLINE",label:"Offline",count:offline.length},{key:"ALL",label:"All active",count:active.length}]}/></div></>}
+  {!expired&&<><div className="grid gap-4 sm:grid-cols-3"><StatCard label="All active" value={loading?"—":active.length} icon={<Users size={20}/>} hintText="Vouchers within their validity period"/><StatCard label="Online now" value={loading?"—":online.length} icon={<WifiHigh size={20}/>} tone="green" hintText="Recent accounting received within 6 minutes"/><StatCard label="Offline" value={loading?"—":offline.length} icon={<WifiSlash size={20}/>} hintText="Valid access with no recent connection"/></div><div className="flex sm:justify-end"><FilterTabs value={tab} onChange={setTab} options={[{key:"ONLINE",label:"Online now",count:online.length},{key:"OFFLINE",label:"Offline",count:offline.length},{key:"ALL",label:"All active",count:active.length}]}/></div></>}
   <Table key={expired?"expired":tab} rows={rows} loading={loading} emptyTitle={expired?"No expired users":tab==="ONLINE"?"No users online":tab==="OFFLINE"?"No offline users":"No active users"} emptyDescription={expired?"Expired and revoked vouchers will appear here.":tab==="ONLINE"?"Connected users appear when recent router accounting is received.":"Users appear here after activating a voucher."} columns={expired?[
    {label:"Username",render:u=><span className="font-mono text-xs font-semibold">{u.customerId?`C${u.customerId}`:u.voucher}</span>},
    {label:"Full name",render:u=><span className="font-medium">{u.customerName||"Walk-in customer"}</span>},{label:"Phone",render:u=>u.phone||"—"},
@@ -63,7 +63,7 @@ export default function UserDirectory({expired=false}:{expired?:boolean}) {
    {label:"IP",render:u=>u.ip?<span className="font-mono text-xs">{u.ip}</span>:"—"},
    {label:"MAC",render:u=>u.mac?<span className="font-mono text-xs">{u.mac}</span>:"—"},
    {label:"Devices",render:u=><span className="tabular-nums">{u.devices}/{u.deviceLimit}</span>},
-   {label:"Router",render:u=>u.router||"—"},{label:"First activation",render:u=><span className="text-slate-500">{date(u.firstLogin)}</span>},{label:"Access expires",render:u=><span className="text-slate-500">{date(u.expiresAt)}</span>},
+   {label:"CellTower",render:u=>u.router||"—"},{label:"First activation",render:u=><span className="text-slate-500">{date(u.firstLogin)}</span>},{label:"Access expires",render:u=><span className="text-slate-500">{date(u.expiresAt)}</span>},
    {label:"Data usage",render:u=>bytes(u.dataBytes)},{label:"Time left",render:u=><Badge tone={(u.timeLeftSeconds??0)<3600?"amber":"green"}>{remaining(u.timeLeftSeconds)}</Badge>},actionColumn
   ]}/>
  {view&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" onClick={()=>setView(null)}>
@@ -76,7 +76,7 @@ export default function UserDirectory({expired=false}:{expired?:boolean}) {
     {([
       ["Voucher",view.voucher],["Customer",view.customerName||"Walk-in customer"],["Phone",view.phone||"—"],
       ["Package",view.packageName],["Status",view.status],["Connection",view.online?"Online now":"Offline"],
-      ["IP address",view.ip||"—"],["MAC address",view.mac||"—"],["Router",view.router||"—"],
+      ["IP address",view.ip||"—"],["MAC address",view.mac||"—"],["CellTower",view.router||"—"],
       ["Devices",`${view.devices}/${view.deviceLimit}`],["First login",date(view.firstLogin)],
       ["Expires",date(view.expiresAt)],["Data used",bytes(view.dataBytes)],["Time left",remaining(view.timeLeftSeconds)],
     ] as [string,string][]).map(([k,v])=><div key={k}><dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{k}</dt><dd className="mt-0.5 font-medium text-slate-800">{v}</dd></div>)}

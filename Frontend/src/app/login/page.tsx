@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
-import { Lock, Mail, Radio, AlertCircle, ArrowRight, ShieldCheck, Eye, EyeOff } from "lucide-react";
+import { Lock, EnvelopeSimple, Radio, WarningCircle, ArrowRight, ShieldCheck, Eye, EyeSlash } from "@phosphor-icons/react";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -71,7 +71,7 @@ export default function LoginPage() {
 
           {error && (
             <div className="mb-6 p-3.5 rounded-xl bg-red-50 border border-red-200 flex items-start gap-3 text-red-600 text-sm">
-              <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+              <WarningCircle className="w-5 h-5 shrink-0 mt-0.5" />
               <span>{error}</span>
             </div>
           )}
@@ -82,7 +82,7 @@ export default function LoginPage() {
                 Email Address
               </label>
               <div className="relative">
-                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <EnvelopeSimple className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                 <input
                   type="email"
                   required
@@ -114,7 +114,7 @@ export default function LoginPage() {
                   aria-label={showPassword ? "Hide password" : "Show password"}
                   className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md text-slate-500 hover:text-slate-700 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/40 cursor-pointer"
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPassword ? <EyeSlash className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
             </div>
