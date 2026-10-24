@@ -110,7 +110,11 @@ public class RouterManagementService {
    String mode=r.getTenant().getTetheringProtection();
    script=RouterScriptGenerator.tetheringRules(mode==null?"OFF":mode);
   }else throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Unknown router action");
-  if(tasks.findFirstByRouterIdAndStatusOrderByIdAsc(r.getId(),"PENDING").isPresent())throw new ResponseStatusException(HttpStatus.CONFLICT,"A router action is already pending");
+  // Idempotent: a pending task for the same action already covers this change —
+  // reuse it rather than failing the caller's transaction.
+  var existing=tasks.findAllByRouterIdOrderByCreatedAtDesc(r.getId()).stream()
+      .filter(t->"PENDING".equals(t.getStatus())&&action.equals(t.getAction())).findFirst();
+  if(existing.isPresent())return existing.get();
   return tasks.save(RouterTask.builder().router(r).action(action).script(script).build());
  }
 }
