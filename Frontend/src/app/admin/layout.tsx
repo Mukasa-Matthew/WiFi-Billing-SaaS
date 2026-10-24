@@ -81,7 +81,7 @@ export default function AdminLayout({
               <Radio className="h-4.5 w-4.5" />
             </div>
             <div>
-              <span className="block text-sm font-bold tracking-tight text-white">WiFi-Billing</span>
+              <span className="block text-sm font-bold tracking-tight text-white">AirPairy</span>
               <span className="block text-[10px] font-semibold uppercase tracking-widest text-blue-100">
                 Platform admin
               </span>
