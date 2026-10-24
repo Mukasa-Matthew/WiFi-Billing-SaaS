@@ -15,7 +15,7 @@ interface SeriesPoint { date: string; label: string; revenue?: number; transacti
 interface TopDataUser { username: string; customer: string | null; phone: string | null; package: string | null; octets: number }
 interface PackagePerf { id: number; name: string; price: number; activeUsers: number; monthlyRevenue: number; totalSold: number; arpu: number }
 interface DashboardStats {
-  revenueToday: number; revenueMonth: number; activeUsers: number; totalDataConsumedBytes: number;
+  revenueToday: number; revenueMonth: number; revenueAllTime: number; activeUsers: number; totalDataConsumedBytes: number;
   totalRouters: number; onlineRouters: number; totalVouchers: number; activeVouchers: number;
   usedVouchers: number; expiredVouchers: number; weeklySales: WeeklySale[]; routerRevenue: RouterRevenue[]; topConsumers: Consumer[];
   range: string; revenueSeries: SeriesPoint[]; dailyActiveUsers: SeriesPoint[]; registrations: SeriesPoint[];
@@ -75,6 +75,7 @@ export default function TenantDashboardOverview() {
     { label: "Today's revenue", value: money(stats?.revenueToday || 0), detail: "Successful payments today", icon: Wallet, color: "text-emerald-700" },
     { label: "Last 7 days revenue", value: money(weeklyRevenue), detail: `${number(transactions)} successful payments`, icon: Wallet, color: "text-amber-700" },
     { label: "Monthly revenue", value: money(stats?.revenueMonth || 0), detail: "Successful payments this month", icon: Wallet, color: "text-[var(--accent-text)]" },
+    { label: "All-time revenue", value: money(stats?.revenueAllTime || 0), detail: "Total earned through the platform", icon: Wallet, color: "text-[var(--accent-text)]" },
     { label: "Active users", value: number(stats?.activeUsers || 0), detail: "Current hotspot sessions", icon: Users, color: "text-[var(--accent-text)]" },
     { label: "Data Usage (This Month)", value: bytes((stats?.dataMonthDownBytes || 0) + (stats?.dataMonthUpBytes || 0)), detail: `↓ ${bytes(stats?.dataMonthDownBytes || 0)} · ↑ ${bytes(stats?.dataMonthUpBytes || 0)}`, icon: ChartLine, color: "text-emerald-700" },
     { label: "Total Customers", value: number(stats?.totalCustomers || 0), detail: `+${number(stats?.newCustomersThisWeek || 0)} this week`, icon: Users, color: "text-emerald-700" },
