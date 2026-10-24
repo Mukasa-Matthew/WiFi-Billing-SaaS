@@ -292,6 +292,9 @@ var LINK_ORIG = Q.get('link-orig') || '';
 var MT_ERROR = Q.get('error') || '';
 var BASE = location.origin;
 var pollTimer = null;
+var configTimer = null;
+var configReady = false;
+var everConfigured = false;
 var purchasedCode = '';
 var selectedPkg = null;
 
@@ -301,27 +304,41 @@ function showMsg(text, isError) {
 }
 if (MT_ERROR && MT_ERROR.charAt(0) !== '$') showMsg(MT_ERROR, true);
 
-// support block wiring
-(function(){
-    var phone = 'TENANT_SUPPORT_PHONE_PLACEHOLDER';
-    var email = 'TENANT_SUPPORT_EMAIL_PLACEHOLDER';
+function renderSettings(settings) {
+    var phone = settings.supportPhone || '';
+    var email = settings.supportEmail || '';
+    document.title = settings.businessName || 'WiFi Portal';
+    document.querySelector('.brand h1').textContent = settings.businessName || 'WiFi Portal';
+    document.body.style.setProperty('--primary', settings.brandColor || '#3B82F6');
+    document.body.className = 'theme-' + (/^[a-z0-9-]{1,40}$/.test(settings.template || '') ? settings.template : 'midnight');
     var digits = phone.replace(/[^0-9]/g, '');
-    if (!phone.trim() && !email.trim()) { document.getElementById('support-block').style.display = 'none'; }
+    document.getElementById('support-block').style.display = (!phone.trim() && !email.trim()) ? 'none' : '';
     if (phone.trim()) {
+        document.getElementById('support-phone-line').style.display = '';
+        document.getElementById('support-phone-link').textContent = phone;
         document.getElementById('support-phone-link').href = 'tel:' + digits;
         if (digits.length > 6) {
             document.getElementById('support-wa-line').style.display = 'block';
+            document.getElementById('support-wa-link').textContent = phone;
             document.getElementById('support-wa-link').href = 'https://wa.me/' + digits;
         }
-    } else { document.getElementById('support-phone-line').style.display = 'none'; }
+    } else {
+        document.getElementById('support-phone-line').style.display = 'none';
+        document.getElementById('support-wa-line').style.display = 'none';
+    }
     if (email.trim()) {
         document.getElementById('support-email-line').style.display = 'block';
+        document.getElementById('support-email-link').textContent = email;
         document.getElementById('support-email-link').href = 'mailto:' + email;
         var sb = document.getElementById('share-btn');
         sb.style.display = 'flex';
         sb.onclick = function(){ location.href = 'mailto:' + email + '?subject=WiFi%20Feedback'; };
+    } else {
+        document.getElementById('support-email-line').style.display = 'none';
+        document.getElementById('share-btn').style.display = 'none';
     }
-})();
+    document.getElementById('dst-input').value = settings.redirectUrl || LINK_ORIG;
+}
 
 if (LINK_LOGIN && LINK_LOGIN.charAt(0) !== '$') {
     document.getElementById('login-form').action = LINK_LOGIN;
@@ -368,42 +385,73 @@ function fmtDuration(seconds) {
 }
 function fmtPrice(p){ return 'USh ' + Number(p).toLocaleString(); }
 
-fetch(BASE + '/api/portal/packages?token=' + encodeURIComponent(TOKEN))
-    .then(function(r){ return r.json(); })
-    .then(function(plans){
-        var list = document.getElementById('packages-list');
-        list.innerHTML = '';
-        if (!plans.length) {
-            document.getElementById('plans-label').textContent = 'no packages available';
-            document.getElementById('packages-list').innerHTML =
-                '<div class="empty-state">No packages available yet — check back soon, or use a voucher above.</div>';
-            return;
-        }
-        plans.forEach(function(p){
-            var row = document.createElement('div');
-            row.className = 'pkg-row';
-            row.innerHTML = '<span><span class="pkg-name">' + p.name + '</span>' +
-                (p.featured ? '<span class="pkg-featured">★ POPULAR</span>' : '') +
-                '<span class="pkg-meta">' + [p.sessionTimeout ? fmtDuration(p.sessionTimeout) : '', p.rateLimit ? 'Speed ' + p.rateLimit : '', '1 Device'].filter(Boolean).join(' · ') + '</span></span>' +
-                '<span class="pkg-right"><span class="pkg-price">' + fmtPrice(p.price) + '</span>' +
-                '<button type="button" class="pkg-buy">BUY</button></span>';
-            row.querySelector('.pkg-buy').onclick = function(){
-                selectedPkg = p;
-                document.getElementById('pay-title').textContent = 'Pay ' + fmtPrice(p.price) + ' — ' + p.name;
-                document.getElementById('pay-btn').textContent = 'Pay ' + fmtPrice(p.price);
-                document.getElementById('pay-modal').classList.add('show');
-                document.getElementById('phone-number').focus();
-            };
-            list.appendChild(row);
-        });
-    })
-    .catch(function(){
-        document.getElementById('packages-list').innerHTML = '<div class="empty-state">Could not load plans. Pull down to retry.</div>';
+function renderPackages(plans) {
+    var list = document.getElementById('packages-list');
+    list.innerHTML = '';
+    if (!plans.length) {
+        document.getElementById('plans-label').textContent = 'no packages available';
+        list.innerHTML = '<div class="empty-state">No packages available yet — check back soon, or use a voucher above.</div>';
+        return;
+    }
+    document.getElementById('plans-label').textContent = 'or purchase a package';
+    plans.forEach(function(p){
+        var row = document.createElement('div'); row.className = 'pkg-row';
+        var left = document.createElement('span');
+        var name = document.createElement('span'); name.className = 'pkg-name'; name.textContent = p.name;
+        left.appendChild(name);
+        if (p.featured) { var badge = document.createElement('span'); badge.className = 'pkg-featured'; badge.textContent = '★ POPULAR'; left.appendChild(badge); }
+        var meta = document.createElement('span'); meta.className = 'pkg-meta';
+        meta.textContent = [p.sessionTimeout ? fmtDuration(p.sessionTimeout) : '', p.rateLimit ? 'Speed ' + p.rateLimit : '', '1 Device'].filter(Boolean).join(' · ');
+        left.appendChild(meta);
+        var right = document.createElement('span'); right.className = 'pkg-right';
+        var price = document.createElement('span'); price.className = 'pkg-price'; price.textContent = fmtPrice(p.price);
+        var buy = document.createElement('button'); buy.type = 'button'; buy.className = 'pkg-buy'; buy.textContent = 'BUY';
+        buy.onclick = function(){ selectedPkg = p; document.getElementById('pay-title').textContent = 'Pay ' + fmtPrice(p.price) + ' — ' + p.name; document.getElementById('pay-btn').textContent = 'Pay ' + fmtPrice(p.price); document.getElementById('pay-modal').classList.add('show'); document.getElementById('phone-number').focus(); };
+        right.appendChild(price); right.appendChild(buy); row.appendChild(left); row.appendChild(right); list.appendChild(row);
     });
+}
+
+function refreshConfig() {
+    var controller = window.AbortController ? new AbortController() : null;
+    var timeout = setTimeout(function(){ if (controller) controller.abort(); }, 3500);
+    fetch(BASE + '/api/portal/config?token=' + encodeURIComponent(TOKEN), {
+        cache: 'no-cache', signal: controller ? controller.signal : undefined
+    }).then(function(r){
+        clearTimeout(timeout);
+        if (r.status === 304) return null;
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+    }).then(function(config){
+        if (!config) return;
+        var recovered = everConfigured && !configReady;
+        configReady = true;
+        everConfigured = true;
+        renderSettings(config.settings);
+        renderPackages(config.packages || []);
+        if (recovered) showMsg('Package information is back online.', false);
+        if (selectedPkg) {
+            var current = (config.packages || []).filter(function(p){ return p.id === selectedPkg.id; })[0];
+            if (!current || Number(current.price) !== Number(selectedPkg.price)) {
+                selectedPkg = null; hidePay();
+                showMsg(current ? 'This package price changed. Please select it again.' : 'That package is no longer available.', true);
+            }
+        }
+    }).catch(function(){
+        clearTimeout(timeout);
+        configReady = false;
+        selectedPkg = null;
+        hidePay();
+        Array.prototype.forEach.call(document.querySelectorAll('.pkg-buy'), function(button){ button.disabled = true; });
+        if (!everConfigured) document.getElementById('packages-list').innerHTML = '<div class="empty-state">Plans are temporarily unavailable. Reconnecting automatically…</div>';
+        else showMsg('Package updates are temporarily offline. Purchases are paused while reconnecting…', true);
+    });
+}
+refreshConfig();
+configTimer = setInterval(refreshConfig, 4000);
 
 function handlePurchase() {
     var phone = document.getElementById('phone-number').value.trim();
-    if (!selectedPkg || !phone) return;
+    if (!configReady || !selectedPkg || !phone) return;
     hidePay();
     document.getElementById('payment-modal').classList.add('show');
     document.getElementById('modal-status').textContent = 'Sending payment request…';

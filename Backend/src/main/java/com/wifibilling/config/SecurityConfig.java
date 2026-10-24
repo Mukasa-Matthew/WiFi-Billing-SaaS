@@ -13,6 +13,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.http.HttpHeaders;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -55,6 +56,7 @@ public class SecurityConfig {
         open.setAllowedOriginPatterns(List.of("*"));
         open.setAllowedMethods(List.of("GET", "POST", "OPTIONS"));
         open.setAllowedHeaders(List.of("*"));
+        open.setExposedHeaders(List.of(HttpHeaders.ETAG));
         open.setAllowCredentials(false);
         open.setMaxAge(3600L);
 

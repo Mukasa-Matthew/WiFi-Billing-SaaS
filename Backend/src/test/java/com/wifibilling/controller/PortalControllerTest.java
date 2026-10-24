@@ -103,9 +103,31 @@ class PortalControllerTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
 
-        assertTrue(response.getBody().contains("token=tok_A1234567"));
-        assertTrue(response.getBody().contains("http://cloudserv.example.com:8080/api/portal/page"));
+        assertTrue(response.getBody().contains("var TOKEN = 'tok_A1234567'"));
+        assertTrue(response.getBody().contains("var BASE = 'http://cloudserv.example.com:8080'"));
+        assertTrue(response.getBody().contains("/api/portal/config?token="));
         assertFalse(response.getBody().contains("ROUTER_TOKEN_PLACEHOLDER"));
         assertFalse(response.getBody().contains("SERVER_BASE_URL_PLACEHOLDER"));
+    }
+
+    @Test
+    void configIncludesDynamicSettingsAndSupportsConditionalRequests() {
+        Tenant tenant = Tenant.builder().id(10L).name("Fresh Cafe").supportPhone("+256700000000")
+                .supportEmail("help@example.com").brandColor("#112233").portalShowPackages(true).build();
+        Router router = Router.builder().id(100L).token("tok_A1234567").tenant(tenant).build();
+        PackagePlan plan = PackagePlan.builder().id(1L).tenant(tenant).name("1 Hour")
+                .price(new BigDecimal("1500")).rateLimit("10M/10M").sessionTimeout(3600).build();
+        when(routerRepository.findByToken("tok_A1234567")).thenReturn(Optional.of(router));
+        when(packagePlanRepository.findAllByTenantIdOrderByPriceAsc(10L)).thenReturn(List.of(plan));
+
+        var first = controller.getConfig("tok_A1234567", null);
+        assertEquals(HttpStatus.OK, first.getStatusCode());
+        assertEquals("Fresh Cafe", first.getBody().settings().businessName());
+        assertEquals(new BigDecimal("1500"), first.getBody().packages().getFirst().price());
+        assertNotNull(first.getHeaders().getETag());
+
+        var unchanged = controller.getConfig("tok_A1234567", first.getHeaders().getETag());
+        assertEquals(HttpStatus.NOT_MODIFIED, unchanged.getStatusCode());
+        assertNull(unchanged.getBody());
     }
 }

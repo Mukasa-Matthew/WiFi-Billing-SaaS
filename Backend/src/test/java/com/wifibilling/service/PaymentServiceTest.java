@@ -117,6 +117,19 @@ class PaymentServiceTest {
     }
 
     @Test
+    void initiatePaymentRejectsPackageRestrictedToAnotherRouter() {
+        Router otherRouter = Router.builder().id(11L).tenant(tenant).build();
+        packagePlan.setRouter(otherRouter);
+        when(routerRepository.findByToken("tok_valid123456")).thenReturn(Optional.of(router));
+        when(packagePlanRepository.findByIdAndTenantId(100L, 1L)).thenReturn(Optional.of(packagePlan));
+
+        var req = new PaymentDto.InitiateRequest("tok_valid123456", 100L, "256771234567", null);
+        assertEquals(HttpStatus.NOT_FOUND,
+                assertThrows(ResponseStatusException.class, () -> paymentService.initiatePayment(req)).getStatusCode());
+        verifyNoInteractions(transactionRepository, gatewayClient);
+    }
+
+    @Test
     void processWebhook_SuccessfulPaymentGeneratesVoucher() {
         Transaction tx = Transaction.builder()
                 .id(50L)
