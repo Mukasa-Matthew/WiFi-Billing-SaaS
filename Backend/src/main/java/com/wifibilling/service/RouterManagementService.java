@@ -51,8 +51,17 @@ public class RouterManagementService {
  @Transactional public String installer(String token){var r=resolve(token);r.setBindingsHash(null);routers.save(r);return RouterScriptGenerator.managementInstaller(props.getPublicBaseUrl(),token);}
  @Transactional public void acknowledgeBindings(String token,String hash){var r=resolve(token);if(hash(r).equals(hash)){r.setBindingsHash(hash);r.setBindingsSyncedAt(OffsetDateTime.now());routers.save(r);}}
  @Transactional public void acknowledgeTask(String token,Long id,boolean success){var r=resolve(token);var t=tasks.findByIdAndRouterId(id,r.getId()).orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND));if("PENDING".equals(t.getStatus())){t.setStatus(success?"APPLIED":"FAILED");t.setAppliedAt(OffsetDateTime.now());tasks.save(t);}}
- @Transactional(readOnly=true) public String script(String token){
-  Router r=resolve(token);StringBuilder s=new StringBuilder("# WiFi Billing management sync\n");
+ @Transactional(readOnly=true) public String script(String token){return script(token,0);}
+ // Long-poll: when wait>0 the request is held until a task appears (checked
+ // every 300ms) so router actions apply in near-real time. Postgres READ
+ // COMMITTED gives each check a fresh snapshot.
+ @Transactional(readOnly=true) public String script(String token,int waitSeconds){
+  Router r=resolve(token);
+  long deadline=System.currentTimeMillis()+Math.min(waitSeconds,30)*1000L;
+  while(System.currentTimeMillis()<deadline&&tasks.findFirstByRouterIdAndStatusOrderByIdAsc(r.getId(),"PENDING").isEmpty()){
+   try{Thread.sleep(300);}catch(InterruptedException e){Thread.currentThread().interrupt();break;}
+  }
+  StringBuilder s=new StringBuilder("# WiFi Billing management sync\n");
   if(!bindingsSynced(r)){
    String hash=hash(r);s.append(":do {\n/ip/hotspot/ip-binding/remove [find where comment~\"^wb-binding:\"]\n/queue/simple/remove [find where name~\"^wb-binding:\"]\n/system/scheduler/remove [find where name~\"^wb-bind-exp-\"]\n");
    for(var v:bindings.findAllByRouterId(r.getId())){
