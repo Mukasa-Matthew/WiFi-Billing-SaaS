@@ -4,6 +4,10 @@ const nextConfig: NextConfig = {
   output: "standalone",
   cacheComponents: true,
   async headers() {
+    // Production only. In dev, Turbopack reuses asset filenames across rebuilds,
+    // so an immutable year-long cache pins the browser to stale CSS/JS until a
+    // manual hard reload. Next warns about this at boot for the same reason.
+    if (process.env.NODE_ENV !== "production") return [];
     return [
       {
         source: "/_next/static/:path*",

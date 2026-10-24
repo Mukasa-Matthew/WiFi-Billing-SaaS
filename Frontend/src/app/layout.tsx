@@ -14,9 +14,13 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Browser extensions inject attributes onto <html> and <body> before React
+  // hydrates (jd-enabled, cz-shortcut-listen), which React reports as hydration
+  // mismatches. suppressHydrationWarning applies only to the element it is on —
+  // mismatches inside the app tree are still reported.
   return (
-    <html lang="en">
-      <body className="bg-[#F5F7FA] text-slate-900 antialiased min-h-screen">
+    <html lang="en" suppressHydrationWarning>
+      <body className="bg-[#F5F7FA] text-slate-900 antialiased min-h-screen" suppressHydrationWarning>
         <AuthProvider><ToastProvider>{children}<NetworkActivity /></ToastProvider></AuthProvider>
       </body>
     </html>

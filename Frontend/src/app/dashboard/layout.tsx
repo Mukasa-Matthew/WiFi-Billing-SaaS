@@ -62,16 +62,7 @@ export default function TenantDashboardLayout({
     }
   }, [user, loading, router]);
 
-  if (loading || !user) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-[#F5F7FA] text-slate-500">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-700 border-t-transparent" />
-          <p className="text-sm">Loading workspace…</p>
-        </div>
-      </div>
-    );
-  }
+  const ready = !loading && !!user;
 
   const counts: Record<string, number | undefined> = {
     "Active users": stats?.activeUsers,
@@ -119,7 +110,7 @@ export default function TenantDashboardLayout({
             </div>
             <div className="min-w-0">
               <span className="block truncate text-sm font-bold tracking-tight text-white">
-                {user.name || "Hotspot Operator"}
+                {user?.name || "Hotspot Operator"}
               </span>
               <span className="block text-[10px] font-semibold uppercase tracking-widest text-blue-100">
                 Hotspot Manager
@@ -128,7 +119,7 @@ export default function TenantDashboardLayout({
           </div>
 
           {/* Superadmin viewing banner */}
-          {user.role === "ROLE_SUPERADMIN" && (
+          {user?.role === "ROLE_SUPERADMIN" && (
             <div className="mx-4 mt-3 flex items-center justify-between rounded-lg border border-amber-400/30 bg-amber-400/10 p-2.5 text-amber-200">
               <div className="flex min-w-0 items-center gap-1.5">
                 <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
@@ -198,11 +189,11 @@ export default function TenantDashboardLayout({
         <div className="border-t border-white/10 p-4">
           <div className="mb-3 flex items-center gap-3 px-1">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-xs font-bold uppercase text-white">
-              {user.name ? user.name.substring(0, 2) : "HO"}
+              {user?.name ? user.name.substring(0, 2) : "HO"}
             </div>
             <div className="min-w-0">
-              <p className="truncate text-xs font-semibold text-white">{user.name}</p>
-              <p className="truncate text-[11px] text-blue-100">{user.email}</p>
+              <p className="truncate text-xs font-semibold text-white">{user?.name}</p>
+              <p className="truncate text-[11px] text-blue-100">{user?.email}</p>
             </div>
           </div>
           <button
@@ -235,8 +226,8 @@ export default function TenantDashboardLayout({
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#122B49] text-xs font-bold text-white" title={user.email}>
-              {user.name.substring(0, 2).toUpperCase()}
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#122B49] text-xs font-bold text-white" title={user?.email}>
+              {(user?.name ?? "").substring(0, 2).toUpperCase()}
             </div>
           </div>
         </header>
@@ -245,6 +236,20 @@ export default function TenantDashboardLayout({
           <div className="mx-auto w-full max-w-[1440px]">{children}</div>
         </main>
       </div>
+
+      {/* Covers the workspace instead of replacing it: the layout has to keep
+          rendering {children} so Next can validate the segments below it for
+          instant navigation. No tenant data is server-rendered — every panel
+          fetches with the bearer token — so nothing is exposed behind this. */}
+      {!ready && (
+        <div role="status" aria-live="polite"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#F5F7FA] text-slate-500">
+          <div className="flex flex-col items-center gap-3">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-700 border-t-transparent" />
+            <p className="text-sm">Loading workspace…</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
