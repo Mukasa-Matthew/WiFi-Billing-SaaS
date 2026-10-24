@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import { Users, WifiHigh, WifiSlash, ArrowClockwise, Archive, Plugs, UserMinus, Eye, X } from "@phosphor-icons/react";
+import { Users, WifiHigh, WifiSlash, ArrowClockwise, Archive, Plugs, Eye, X, ClockCountdown, Prohibit, CalendarX, Package, DeviceMobile, Globe, User as UserIcon } from "@phosphor-icons/react";
 import api from "@/lib/api";
 import { useResource, Table, Badge, Notice, ErrorNotice, date, bytes, remaining, message, StatCard, FilterTabs, buttonGhost, PageContainer, PageHeader } from "./BillingUI";
 import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -12,6 +12,10 @@ function expiredAgo(value:string|null) {
  if (!value) return "—";
  const minutes=Math.max(0,Math.floor((Date.now()-new Date(value).getTime())/60000));
  return minutes<1?"Just now":minutes<60?`${minutes}m ago`:minutes<1440?`${Math.floor(minutes/60)}h ${minutes%60}m ago`:`${Math.floor(minutes/1440)}d ago`;
+}
+
+function Detail({label,value,mono}:{label:string;value:string;mono?:boolean}) {
+ return <div><dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</dt><dd className={`mt-0.5 text-xs font-medium text-slate-800 ${mono?"font-mono":""}`}>{value}</dd></div>;
 }
 
 function OnlineDot({online}:{online:boolean}) {
@@ -29,7 +33,12 @@ export default function UserDirectory({expired=false}:{expired?:boolean}) {
  const toast=useToast();
  const {confirm,dialog}=useConfirmDialog();
  const active=data.filter(u=>u.status==="active"), online=active.filter(u=>u.online), offline=active.filter(u=>!u.online);
- const rows=expired?data.filter(u=>["expired","revoked"].includes(u.status)).sort((a,b)=>(Date.parse(b.expiresAt||"")||0)-(Date.parse(a.expiresAt||"")||0)):tab==="ONLINE"?online:tab==="OFFLINE"?offline:active;
+ const expiredRows=data.filter(u=>["expired","revoked"].includes(u.status)).sort((a,b)=>(Date.parse(b.expiresAt||"")||0)-(Date.parse(a.expiresAt||"")||0));
+ const now=Date.now(), day=86400000;
+ const expToday=expiredRows.filter(u=>u.expiresAt&&now-Date.parse(u.expiresAt)<day).length;
+ const expWeek=expiredRows.filter(u=>u.expiresAt&&now-Date.parse(u.expiresAt)<7*day).length;
+ const revoked=expiredRows.filter(u=>u.status==="revoked").length;
+ const rows=expired?expiredRows:tab==="ONLINE"?online:tab==="OFFLINE"?offline:active;
  const action=(u:User)=>confirm({
   title:expired?"Archive record":`Disconnect ${u.voucher}`,
   body:expired?"Archive this expired record? Payment and accounting history will be retained.":"Send a disconnect request? The session ends only when the router confirms it.",
@@ -48,7 +57,15 @@ export default function UserDirectory({expired=false}:{expired?:boolean}) {
   {dialog}
   <PageHeader title={expired?"Expired users":"Active users"} description={expired?"Review expired access and revoked vouchers. Latest expiry appears first.":"Monitor voucher validity, connected devices, and customer usage."} action={<button onClick={()=>load()} disabled={refreshing} className={buttonGhost}><ArrowClockwise size={14} className={refreshing?"animate-spin":""}/>Refresh</button>}/>
   <ErrorNotice text={error||actionError}/><Notice text={note}/>
-  {!expired&&<><div className="grid gap-4 sm:grid-cols-3"><StatCard label="All active" value={loading?"—":active.length} icon={<Users size={20}/>} hintText="Vouchers within their validity period"/><StatCard label="Online now" value={loading?"—":online.length} icon={<WifiHigh size={20}/>} tone="green" hintText="Recent accounting received within 6 minutes"/><StatCard label="Offline" value={loading?"—":offline.length} icon={<WifiSlash size={20}/>} hintText="Valid access with no recent connection"/></div><div className="flex sm:justify-end"><FilterTabs value={tab} onChange={setTab} options={[{key:"ONLINE",label:"Online now",count:online.length},{key:"OFFLINE",label:"Offline",count:offline.length},{key:"ALL",label:"All active",count:active.length}]}/></div></>}
+  {expired?<div className="grid gap-4 sm:grid-cols-4">
+   <StatCard label="Expired today" value={loading?"—":expToday} icon={<ClockCountdown size={20}/>} tone="amber" hintText="Access ended in the last 24h"/>
+   <StatCard label="Expired this week" value={loading?"—":expWeek} icon={<CalendarX size={20}/>} hintText="Ended within the last 7 days"/>
+   <StatCard label="Revoked" value={loading?"—":revoked} icon={<Prohibit size={20}/>} tone="red" hintText="Manually blocked vouchers"/>
+   <StatCard label="Total inactive" value={loading?"—":expiredRows.length} icon={<Users size={20}/>} hintText="All expired and revoked records"/>
+  </div>:<>
+   <div className="grid gap-4 sm:grid-cols-3"><StatCard label="All active" value={loading?"—":active.length} icon={<Users size={20}/>} hintText="Vouchers within their validity period"/><StatCard label="Online now" value={loading?"—":online.length} icon={<WifiHigh size={20}/>} tone="green" hintText="Recent accounting received within 6 minutes"/><StatCard label="Offline" value={loading?"—":offline.length} icon={<WifiSlash size={20}/>} hintText="Valid access with no recent connection"/></div>
+   <div className="flex sm:justify-end"><FilterTabs value={tab} onChange={setTab} options={[{key:"ONLINE",label:"Online now",count:online.length},{key:"OFFLINE",label:"Offline",count:offline.length},{key:"ALL",label:"All active",count:active.length}]}/></div>
+  </>}
   <Table key={expired?"expired":tab} rows={rows} loading={loading} emptyTitle={expired?"No expired users":tab==="ONLINE"?"No users online":tab==="OFFLINE"?"No offline users":"No active users"} emptyDescription={expired?"Expired and revoked vouchers will appear here.":tab==="ONLINE"?"Connected users appear when recent router accounting is received.":"Users appear here after activating a voucher."} columns={expired?[
    {label:"Username",render:u=><span className="font-mono text-xs font-semibold">{u.customerId?`C${u.customerId}`:u.voucher}</span>},
    {label:"Full name",render:u=><span className="font-medium">{u.customerName||"Walk-in customer"}</span>},{label:"Phone",render:u=>u.phone||"—"},
@@ -67,20 +84,49 @@ export default function UserDirectory({expired=false}:{expired?:boolean}) {
    {label:"Data usage",render:u=>bytes(u.dataBytes)},{label:"Time left",render:u=><Badge tone={(u.timeLeftSeconds??0)<3600?"amber":"green"}>{remaining(u.timeLeftSeconds)}</Badge>},actionColumn
   ]}/>
  {view&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" onClick={()=>setView(null)}>
-  <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl" onClick={e=>e.stopPropagation()}>
-   <div className="mb-4 flex items-start justify-between">
-    <div><h2 className="text-sm font-bold text-slate-900">Customer details</h2><p className="text-xs text-slate-500">Voucher and session information</p></div>
+  <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-xl" onClick={e=>e.stopPropagation()}>
+   <div className="flex items-start justify-between border-b border-slate-100 bg-slate-50 px-6 py-4">
+    <div className="flex items-center gap-3">
+     <div className={`flex h-11 w-11 items-center justify-center rounded-full border ${view.status==="active"?"border-emerald-200 bg-emerald-50 text-emerald-700":"border-red-200 bg-red-50 text-red-600"}`}><UserIcon size={20}/></div>
+     <div>
+      <h2 className="text-sm font-bold text-slate-900">{view.customerName||"Walk-in customer"}</h2>
+      <div className="mt-0.5 flex items-center gap-2">
+       <span className="font-mono text-xs font-semibold text-slate-600">{view.voucher}</span>
+       <Badge tone={view.status==="active"?"green":"red"}>{view.status}</Badge>
+       <OnlineDot online={view.online}/>
+      </div>
+     </div>
+    </div>
     <button aria-label="Close" onClick={()=>setView(null)} className="text-slate-400 hover:text-slate-700"><X size={18}/></button>
    </div>
-   <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-xs">
-    {([
-      ["Voucher",view.voucher],["Customer",view.customerName||"Walk-in customer"],["Phone",view.phone||"—"],
-      ["Package",view.packageName],["Status",view.status],["Connection",view.online?"Online now":"Offline"],
-      ["IP address",view.ip||"—"],["MAC address",view.mac||"—"],["Router",view.router||"—"],
-      ["Devices",`${view.devices}/${view.deviceLimit}`],["First login",date(view.firstLogin)],
-      ["Expires",date(view.expiresAt)],["Data used",bytes(view.dataBytes)],["Time left",remaining(view.timeLeftSeconds)],
-    ] as [string,string][]).map(([k,v])=><div key={k}><dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{k}</dt><dd className="mt-0.5 font-medium text-slate-800">{v}</dd></div>)}
-   </dl>
+   <div className="space-y-5 px-6 py-5">
+    <section>
+     <h3 className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400"><Package size={12}/>Package & access</h3>
+     <div className="grid grid-cols-3 gap-3 rounded-xl border border-slate-100 bg-slate-50/60 p-3">
+      <Detail label="Package" value={view.packageName}/>
+      <Detail label="Time left" value={remaining(view.timeLeftSeconds)}/>
+      <Detail label="Data used" value={bytes(view.dataBytes)}/>
+      <Detail label="First login" value={date(view.firstLogin)}/>
+      <Detail label="Expires" value={date(view.expiresAt)}/>
+      <Detail label="Devices" value={`${view.devices}/${view.deviceLimit}`}/>
+     </div>
+    </section>
+    <section>
+     <h3 className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400"><Globe size={12}/>Connection</h3>
+     <div className="grid grid-cols-3 gap-3 rounded-xl border border-slate-100 bg-slate-50/60 p-3">
+      <Detail label="Router" value={view.router||"—"}/>
+      <Detail label="IP address" value={view.ip||"—"} mono/>
+      <Detail label="MAC address" value={view.mac||"—"} mono/>
+     </div>
+    </section>
+    <section>
+     <h3 className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400"><DeviceMobile size={12}/>Customer</h3>
+     <div className="grid grid-cols-2 gap-3 rounded-xl border border-slate-100 bg-slate-50/60 p-3">
+      <Detail label="Name" value={view.customerName||"Walk-in customer"}/>
+      <Detail label="Phone" value={view.phone||"—"}/>
+     </div>
+    </section>
+   </div>
   </div>
  </div>}
  </PageContainer>;
