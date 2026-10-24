@@ -1,5 +1,6 @@
 package com.wifibilling.controller;
 
+import com.wifibilling.config.PlatformProperties;
 import com.wifibilling.dto.TenantSettingsDto;
 import com.wifibilling.model.Router;
 import com.wifibilling.model.Tenant;
@@ -26,6 +27,7 @@ public class TenantSettingsController {
     private final TenantRepository tenantRepository;
     private final RouterRepository routerRepository;
     private final RouterManagementService managementService;
+    private final PlatformProperties props;
 
     @GetMapping
     @Transactional(readOnly = true)
@@ -83,10 +85,13 @@ public class TenantSettingsController {
         String tpl = template != null && template.matches("[a-z0-9-]{1,40}") ? template : null;
         String html = PortalController.renderPortal(tenant, tpl);
         // Give the page a real router token when available so package listing works.
+        // srcdoc iframes have no query string and location.origin is "null", so
+        // bake both values in instead of a replaceState hack that throws.
         String token = routerRepository.findAllByTenantId(tenant.getId()).stream()
                 .findFirst().map(Router::getToken).orElse("preview");
-        html = html.replace("</body>",
-                "<script>var Q2=new URLSearchParams(location.search);if(!Q2.get('token')){history.replaceState(null,'',location.pathname+'?token=" + token + "');}</script></body>");
+        html = html
+                .replace("var TOKEN = Q.get('token') || '';", "var TOKEN = '" + token + "';")
+                .replace("var BASE = location.origin;", "var BASE = '" + props.getPublicBaseUrl() + "';");
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(html);
     }
 
