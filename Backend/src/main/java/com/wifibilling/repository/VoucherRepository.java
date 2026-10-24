@@ -26,8 +26,25 @@ public interface VoucherRepository extends JpaRepository<Voucher, Long> {
 
     List<Voucher> findAllByStatus(String status);
 
+    long countByTenantId(Long tenantId);
+
     long countByTenantIdAndStatus(Long tenantId, String status);
 
     /** Vouchers still marked with the given status whose validity window has passed. */
     List<Voucher> findAllByStatusAndExpiresAtBefore(String status, OffsetDateTime cutoff);
+
+    /** Look up a small set of vouchers by code (dashboard joins, active sessions). */
+    List<Voucher> findAllByCodeIn(java.util.Collection<String> codes);
+
+    /** Voucher registrations bucketed per period for the dashboard charts. */
+    @org.springframework.data.jpa.repository.Query(value = """
+            SELECT date_trunc(:grain, created_at) AS d, COUNT(*)
+            FROM vouchers
+            WHERE tenant_id = :tenantId AND created_at >= :fromTs AND created_at < :toTs
+            GROUP BY 1
+            """, nativeQuery = true)
+    java.util.List<Object[]> registrationBuckets(@org.springframework.data.repository.query.Param("tenantId") Long tenantId,
+                                                 @org.springframework.data.repository.query.Param("grain") String grain,
+                                                 @org.springframework.data.repository.query.Param("fromTs") OffsetDateTime fromTs,
+                                                 @org.springframework.data.repository.query.Param("toTs") OffsetDateTime toTs);
 }
