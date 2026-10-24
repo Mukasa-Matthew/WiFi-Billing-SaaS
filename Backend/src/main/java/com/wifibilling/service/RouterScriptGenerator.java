@@ -38,6 +38,7 @@ public class RouterScriptGenerator {
 
     private static final List<String> PORTAL_TEMPLATES = List.of(
             "login.html",
+            "feedback.html",
             "status.html",
             "logout.html",
             "alogin.html",
