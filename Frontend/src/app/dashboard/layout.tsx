@@ -20,6 +20,7 @@ import {
   List,
   GearSix,
   Users,
+  ChatCircleText,
   Money,
   LinkSimple,
   FileText,
@@ -89,6 +90,7 @@ export default function TenantDashboardLayout({
     { name: "Payments", href: "/dashboard/payments", icon: Money, group: "Finance" },
     { name: "MikroTik routers", href: "/dashboard/routers", icon: RouterIcon, group: "Devices" },
     { name: "Sessions", href: "/dashboard/sessions", icon: Radio, group: "Accounting" },
+    { name: "Feedback", href: "/dashboard/feedback", icon: ChatCircleText, group: "Users" },
     { name: "Accounting logs", href: "/dashboard/logs", icon: FileText, group: "Accounting" },
     { name: "Settings", href: "/dashboard/settings", icon: GearSix, group: "Settings" },
   ];
