@@ -296,4 +296,11 @@ public class TenantDashboardService {
                 .topConsumers(topConsumers)
                 .build();
     }
+
+    private static LocalDate toLocalDate(Object v) {
+        if (v instanceof java.sql.Timestamp ts) return ts.toLocalDateTime().toLocalDate();
+        if (v instanceof OffsetDateTime odt) return odt.toLocalDate();
+        if (v instanceof java.sql.Date d) return d.toLocalDate();
+        return LocalDate.parse(String.valueOf(v).substring(0, 10));
+    }
 }

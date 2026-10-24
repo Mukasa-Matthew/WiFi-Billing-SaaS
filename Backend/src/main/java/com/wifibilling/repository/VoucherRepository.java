@@ -33,6 +33,10 @@ public interface VoucherRepository extends JpaRepository<Voucher, Long> {
     /** Vouchers still marked with the given status whose validity window has passed. */
     List<Voucher> findAllByStatusAndExpiresAtBefore(String status, OffsetDateTime cutoff);
 
+    /** Just the voucher codes for a tenant — cheap scoping query for radacct filters. */
+    @org.springframework.data.jpa.repository.Query("SELECT v.code FROM Voucher v WHERE v.tenant.id = :tenantId")
+    java.util.Set<String> codesByTenant(@org.springframework.data.repository.query.Param("tenantId") Long tenantId);
+
     /** Look up a small set of vouchers by code (dashboard joins, active sessions). */
     List<Voucher> findAllByCodeIn(java.util.Collection<String> codes);
 

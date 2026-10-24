@@ -41,10 +41,8 @@ class SessionServiceTest {
 
     @Test
     void activeSessions_QueriesOnlyAuthenticatedTenantVoucherCodes() {
-        Tenant tenant = Tenant.builder().id(11L).build();
-        Voucher voucher = Voucher.builder().code("TENANT11").tenant(tenant).build();
         RadAcct session = RadAcct.builder().radAcctId(7L).username("TENANT11").build();
-        when(voucherRepository.findAllByTenantIdOrderByCreatedAtDesc(11L)).thenReturn(List.of(voucher));
+        when(voucherRepository.codesByTenant(11L)).thenReturn(java.util.Set.of("TENANT11"));
         when(radAcctRepository.findAllByUsernameInAndAcctStopTimeIsNullOrderByAcctStartTimeDesc(
                 argThat(codes -> codes.size() == 1 && codes.contains("TENANT11"))))
                 .thenReturn(List.of(session));

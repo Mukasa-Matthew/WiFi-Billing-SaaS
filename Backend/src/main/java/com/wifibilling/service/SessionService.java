@@ -70,9 +70,7 @@ public class SessionService {
     }
 
     private Set<String> getTenantVoucherCodes(Long tenantId) {
-        return voucherRepository.findAllByTenantIdOrderByCreatedAtDesc(tenantId).stream()
-                .map(Voucher::getCode)
-                .collect(Collectors.toSet());
+        return voucherRepository.codesByTenant(tenantId);
     }
 
     private ActiveSessionDto toDto(RadAcct a) {
