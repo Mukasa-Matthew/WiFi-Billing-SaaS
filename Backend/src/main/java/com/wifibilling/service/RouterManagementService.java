@@ -25,24 +25,27 @@ public class RouterManagementService {
  public boolean bindingsSynced(Router r){return hash(r).equals(r.getBindingsHash());}
  public Router resolve(String token){if(!RouterTokens.isValid(token))throw new ResponseStatusException(HttpStatus.NOT_FOUND);return routers.findByToken(token).orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND));}
 
- // Push model: backend calls the router's REST API over the WireGuard tunnel and
- // runs wb-pkg-sync immediately — package changes reach the portal in seconds.
- // Falls back silently to the 1-minute poll if the tunnel is down.
- private static final java.net.http.HttpClient HTTP = java.net.http.HttpClient.newBuilder()
-     .connectTimeout(java.time.Duration.ofSeconds(3)).build();
+ // Push model: the backend SSHes to the WireGuard hub (same channel used for
+ // peer management) and curls the router's REST API over the tunnel, running
+ // wb-pkg-sync immediately — package changes reach the portal in seconds.
+ // Falls back silently to the 1-minute router poll if the push fails.
  public void triggerPortalSync(Router r) {
   try {
    String ip = com.wifibilling.util.Ipv4Subnet.stripPrefix(r.getWgIp());
-   if (ip == null || ip.isBlank()) return;
-   String creds = Base64.getEncoder().encodeToString(("wb-api:" + r.getRadiusSecret()).getBytes(StandardCharsets.UTF_8));
-   var req = java.net.http.HttpRequest.newBuilder(java.net.URI.create("http://" + ip + "/rest/system/script/run"))
-       .timeout(java.time.Duration.ofSeconds(5))
-       .header("Authorization", "Basic " + creds)
-       .header("Content-Type", "application/json")
-       .POST(java.net.http.HttpRequest.BodyPublishers.ofString("{\"numbers\":\"wb-pkg-sync\"}"))
-       .build();
-   HTTP.send(req, java.net.http.HttpResponse.BodyHandlers.discarding());
+   String sshTarget = props.getPeerManagementSshTarget();
+   if (ip == null || ip.isBlank() || sshTarget == null || sshTarget.isBlank()) return;
+   String remote = "curl -sS --max-time 4 -u " + shellQuote("wb-api:" + r.getRadiusSecret())
+       + " -X POST http://" + ip + "/rest/system/script/run"
+       + " -H 'Content-Type: application/json'"
+       + " -d '{\"numbers\":\"wb-pkg-sync\"}'";
+   List<String> cmd = List.of("ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5",
+       "-o", "StrictHostKeyChecking=accept-new", sshTarget, remote);
+   Process p = new ProcessBuilder(cmd).redirectErrorStream(true).start();
+   if (!p.waitFor(10, java.util.concurrent.TimeUnit.SECONDS)) p.destroyForcibly();
   } catch (Exception ignored) {}
+ }
+ private static String shellQuote(String s) {
+  return "'" + s.replace("'", "'\\''") + "'";
  }
  private String base(Router r){return props.getPublicBaseUrl()+"/api/router/provision/"+r.getToken();}
  @Transactional public String installer(String token){var r=resolve(token);r.setBindingsHash(null);routers.save(r);return RouterScriptGenerator.managementInstaller(props.getPublicBaseUrl(),token);}
