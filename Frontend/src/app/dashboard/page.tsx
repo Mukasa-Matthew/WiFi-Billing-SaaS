@@ -6,7 +6,7 @@ import { DashboardLoading, LoadingIndicator } from "@/components/LoadingUI";
 import { EmptyState } from "@/components/BillingUI";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
-import { ArrowUpRight, Eye, EyeSlash, CellTower, Ticket, Users, Wallet, ChartLine, WarningCircle } from "@phosphor-icons/react";
+import { ArrowUpRight, Eye, EyeSlash, CellTower, Ticket, Users, Wallet, ChartLine, WarningCircle } from "@/components/icons";
 
 interface WeeklySale { date: string; day: string; revenue: number; transactions: number }
 interface Consumer { radAcctId: number; username: string; framedIpAddress: string; totalOctets: number; acctSessionTime: number }

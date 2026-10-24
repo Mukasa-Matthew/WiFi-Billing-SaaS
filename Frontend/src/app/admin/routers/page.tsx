@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { CellTower as RouterIcon, CellSignalFull, CheckCircle, ShieldCheck, Terminal } from "@phosphor-icons/react";
+import { CellTower as RouterIcon, CellSignalFull, CheckCircle, ShieldCheck, Terminal } from "@/components/icons";
 
 export default function AdminRoutersPage() {
   return (

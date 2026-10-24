@@ -5,7 +5,7 @@ import { Table, Badge, Notice, panel, button, buttonGhost, field, label, hint, m
 import { Dialog } from "@/components/ui/Dialog";
 import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { LoadingIndicator } from "@/components/LoadingUI";
-import { Plus, CheckCircle } from "@phosphor-icons/react";
+import { Plus, CheckCircle } from "@/components/icons";
 
 interface Overview {
   totalTenants: number; subscribed: number; active: number; dueSoon: number;
@@ -95,7 +95,7 @@ export default function AdminSubscriptionsPage() {
             Default fee
           </button>
           <button className={button} onClick={() => { setFTenant(""); setFFee(""); setFStart(new Date().toISOString().slice(0, 10)); setDialog("create"); }}>
-            <Plus size={15} weight="bold" /> New subscription
+            <Plus size={15} /> New subscription
           </button>
         </div>
       } />

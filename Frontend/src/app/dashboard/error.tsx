@@ -1,6 +1,6 @@
 "use client";
 
-import { WarningCircle, ArrowClockwise } from "@phosphor-icons/react";
+import { WarningCircle, ArrowClockwise } from "@/components/icons";
 import { button } from "@/components/BillingUI";
 
 export default function DashboardError({ reset }: { error: Error & { digest?: string }; reset: () => void }) {

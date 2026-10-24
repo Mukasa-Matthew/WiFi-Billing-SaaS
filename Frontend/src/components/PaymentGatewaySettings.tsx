@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import api from "@/lib/api";
 import { Badge, Notice, field, button, buttonGhost, label, hint, message } from "@/components/BillingUI";
 import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { CheckCircle, Copy, CreditCard, Plugs, ShieldCheck, SpinnerGap, Wallet } from "@phosphor-icons/react";
+import { CheckCircle, Copy, CreditCard, Plugs, ShieldCheck, SpinnerGap, Wallet } from "@/components/icons";
 
 interface GatewayView {
   mode: "PLATFORM" | "OWN";

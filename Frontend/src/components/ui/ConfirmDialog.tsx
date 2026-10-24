@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
-import { Warning } from "@phosphor-icons/react";
+import { Warning } from "@/components/icons";
 import { buttonGhost } from "@/components/BillingUI";
 
 export interface ConfirmRequest {

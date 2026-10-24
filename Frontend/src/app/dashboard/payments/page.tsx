@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import { useResource, Table, Badge, Notice, FilterTabs, date } from "@/components/BillingUI";
-import { Wallet, Money, CalendarBlank, Eye, EyeSlash } from "@phosphor-icons/react";
+import { Wallet, Money, CalendarBlank, Eye, EyeSlash } from "@/components/icons";
 
 interface Payment {
   reference: string; method: string; amount: number; status: string;

@@ -4,7 +4,7 @@ import api from "@/lib/api";
 import { useResource, Table, Notice, field, button, buttonGhost, message, PageContainer,PageHeader, EmptyState, label } from "@/components/BillingUI";
 import { Dialog } from "@/components/ui/Dialog";
 import { useToast } from "@/components/ui/Toast";
-import { Users, UserPlus } from "@phosphor-icons/react";
+import { Users, UserPlus } from "@/components/icons";
 
 interface Customer { id: number; name: string; phone: string; notes: string }
 

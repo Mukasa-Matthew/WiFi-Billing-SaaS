@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
-import { Lock, EnvelopeSimple, Radio, WarningCircle, ArrowRight, Eye, EyeSlash } from "@phosphor-icons/react";
+import { Lock, EnvelopeSimple, Radio, WarningCircle, ArrowRight, Eye, EyeSlash } from "@/components/icons";
 
 export default function LoginPage() {
   const { login } = useAuth();

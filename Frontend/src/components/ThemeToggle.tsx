@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Sun, Moon, Desktop } from "@phosphor-icons/react";
+import { Sun, Moon, Desktop } from "@/components/icons";
 import { useTheme, type ThemePreference } from "@/context/ThemeContext";
 
 const OPTIONS: { value: ThemePreference; label: string; Icon: React.ElementType }[] = [
@@ -42,7 +42,7 @@ export default function ThemeToggle({ compact = false }: { compact?: boolean }) 
                 : "text-[var(--fg-muted)] hover:text-[var(--fg)]"
             }`}
           >
-            <Icon size={compact ? 14 : 17} weight={active ? "fill" : "regular"} aria-hidden />
+            <Icon size={compact ? 14 : 17} aria-hidden />
           </button>
         );
       })}
