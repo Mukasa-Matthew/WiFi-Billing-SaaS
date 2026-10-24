@@ -5,7 +5,7 @@ import lombok.*;
 import java.time.OffsetDateTime;
 
 @Entity
-@Table(name = "vouchers")
+@Table(name = "vouchers", indexes = { @Index(columnList = "tenant_id,created_at"), @Index(columnList = "tenant_id,status"), @Index(columnList = "code") })
 @Getter
 @Setter
 @NoArgsConstructor
