@@ -137,17 +137,17 @@ export default function TenantActiveSessionsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-900 flex items-center gap-2.5">
+          <h1 className="text-xl font-bold tracking-tight text-[var(--fg)] flex items-center gap-2.5">
             <Radio className="w-6 h-6 text-emerald-700 animate-pulse" />
             <span>Live Active Sessions</span>
           </h1>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-xs text-[var(--fg-muted)] mt-1">
             Real-time accounting telemetry streamed from MikroTik NAS devices via FreeRADIUS radacct.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
-          <span className="text-xs text-slate-500">Auto-refreshes every 10 seconds</span>
+          <span className="text-xs text-[var(--fg-muted)]">Auto-refreshes every 10 seconds</span>
         </div>
       </div>
 
@@ -160,7 +160,7 @@ export default function TenantActiveSessionsPage() {
           }`}
         >
           <span>{msg.text}</span>
-          <button onClick={() => setMsg(null)} className="text-slate-500 hover:text-slate-900">
+          <button onClick={() => setMsg(null)} className="text-[var(--fg-muted)] hover:text-[var(--fg)]">
             ✕
           </button>
         </div>
@@ -168,10 +168,10 @@ export default function TenantActiveSessionsPage() {
 
       {/* Real-time Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-        <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-between">
+        <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-sm flex items-center justify-between">
           <div className="space-y-1">
-            <span className="text-xs font-medium text-slate-500">Connected Users</span>
-            <div className="text-2xl font-bold tabular-nums text-slate-900 flex items-center gap-2">
+            <span className="text-xs font-medium text-[var(--fg-muted)]">Connected Users</span>
+            <div className="text-2xl font-bold tabular-nums text-[var(--fg)] flex items-center gap-2">
               <span>{sessions.length}</span>
               <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
@@ -184,21 +184,21 @@ export default function TenantActiveSessionsPage() {
           </div>
         </div>
 
-        <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-between">
+        <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-sm flex items-center justify-between">
           <div className="space-y-1">
-            <span className="text-xs font-medium text-slate-500">Total Live Download</span>
-            <div className="text-2xl font-bold tabular-nums text-blue-700">
+            <span className="text-xs font-medium text-[var(--fg-muted)]">Total Live Download</span>
+            <div className="text-2xl font-bold tabular-nums text-[var(--accent-text)]">
               {formatBytes(totalDownloadBytes)}
             </div>
           </div>
-          <div className="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-blue-700">
+          <div className="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-[var(--accent-text)]">
             <ArrowCircleDown className="w-5 h-5" />
           </div>
         </div>
 
-        <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-between">
+        <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-sm flex items-center justify-between">
           <div className="space-y-1">
-            <span className="text-xs font-medium text-slate-500">Total Live Upload</span>
+            <span className="text-xs font-medium text-[var(--fg-muted)]">Total Live Upload</span>
             <div className="text-2xl font-bold tabular-nums text-amber-700">
               {formatBytes(totalUploadBytes)}
             </div>
@@ -211,22 +211,22 @@ export default function TenantActiveSessionsPage() {
 
       {/* Search Bar */}
       <div className="relative w-full sm:w-80">
-        <MagnifyingGlass className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+        <MagnifyingGlass className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--fg-muted)]" />
         <input
           type="text"
           placeholder="Filter by voucher, IP, or MAC..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-9 pr-4 py-2 rounded-xl bg-[#F5F7FA] border border-slate-200 text-xs text-slate-900 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+          className="w-full pl-9 pr-4 py-2 rounded-xl bg-[var(--canvas)] border border-[var(--border)] text-xs text-[var(--fg)] placeholder-[var(--fg-muted)] focus:outline-none focus:border-indigo-500"
         />
       </div>
 
       {/* Active Sessions Table */}
-      <div className="rounded-2xl border border-slate-200 overflow-hidden bg-white/30">
+      <div className="rounded-2xl border border-[var(--border)] overflow-hidden bg-white/30">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="border-b border-slate-200 bg-white/80 text-slate-500 font-medium">
+              <tr className="border-b border-[var(--border)] bg-white/80 text-[var(--fg-muted)] font-medium">
                 <th className="py-3 px-4">User / Voucher</th>
                 <th className="py-3 px-4">Assigned IP</th>
                 <th className="py-3 px-4">Device MAC</th>
@@ -240,49 +240,49 @@ export default function TenantActiveSessionsPage() {
             <tbody className="divide-y divide-slate-100/60">
               {loading && sessions.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-500">
+                  <td colSpan={8} className="py-12 text-center text-[var(--fg-muted)]">
                     <ArrowClockwise className="w-5 h-5 mx-auto animate-spin text-emerald-700 mb-2" />
                     <span>Streaming active sessions from FreeRADIUS...</span>
                   </td>
                 </tr>
               ) : filteredSessions.length > 0 ? (
                 filteredSessions.map((session) => (
-                  <tr key={session.radAcctId || session.username} className="hover:bg-slate-50 transition">
+                  <tr key={session.radAcctId || session.username} className="hover:bg-[var(--subtle)] transition">
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-                        <span className="font-mono text-xs font-bold text-slate-900 tracking-wide">
+                        <span className="font-mono text-xs font-bold text-[var(--fg)] tracking-wide">
                           {session.username}
                         </span>
                       </div>
                     </td>
                     <td className="py-3 px-4 font-mono text-cyan-300">
-                      {session.framedIpAddress || <span className="text-slate-600">Pending</span>}
+                      {session.framedIpAddress || <span className="text-[var(--fg-muted)]">Pending</span>}
                     </td>
-                    <td className="py-3 px-4 font-mono text-slate-500">
-                      {session.callingStationId || <span className="text-slate-600">—</span>}
+                    <td className="py-3 px-4 font-mono text-[var(--fg-muted)]">
+                      {session.callingStationId || <span className="text-[var(--fg-muted)]">—</span>}
                     </td>
-                    <td className="py-3 px-4 font-mono text-slate-500">
-                      {session.nasIpAddress || <span className="text-slate-600">—</span>}
+                    <td className="py-3 px-4 font-mono text-[var(--fg-muted)]">
+                      {session.nasIpAddress || <span className="text-[var(--fg-muted)]">—</span>}
                     </td>
                     <td className="py-3 px-4">
-                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-mono text-[11px]">
-                        <Clock className="w-3 h-3 text-slate-500" />
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[var(--fill)] text-[var(--fg-body)] font-mono text-[11px]">
+                        <Clock className="w-3 h-3 text-[var(--fg-muted)]" />
                         {formatDuration(session.acctSessionTime)}
                       </span>
                     </td>
-                    <td className="py-3 px-4 font-mono text-slate-700">
+                    <td className="py-3 px-4 font-mono text-[var(--fg-body)]">
                       <div className="flex items-center gap-2">
-                        <span className="text-blue-700 flex items-center gap-0.5">
+                        <span className="text-[var(--accent-text)] flex items-center gap-0.5">
                           ↓ {formatBytes(session.acctOutputOctets)}
                         </span>
-                        <span className="text-slate-600">/</span>
+                        <span className="text-[var(--fg-muted)]">/</span>
                         <span className="text-amber-700 flex items-center gap-0.5">
                           ↑ {formatBytes(session.acctInputOctets)}
                         </span>
                       </div>
                     </td>
-                    <td className="py-3 px-4 text-slate-500">
+                    <td className="py-3 px-4 text-[var(--fg-muted)]">
                       {formatTime(session.acctStartTime)}
                     </td>
                     <td className="py-3 px-4 text-right">
@@ -298,7 +298,7 @@ export default function TenantActiveSessionsPage() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-500">
+                  <td colSpan={8} className="py-12 text-center text-[var(--fg-muted)]">
                     No active sessions found. Once clients authenticate on the captive portal, their sessions will appear here in real time.
                   </td>
                 </tr>
@@ -310,39 +310,39 @@ export default function TenantActiveSessionsPage() {
 
       {/* Disconnect Modal */}
       {disconnectTarget && (
-        <div className="fixed inset-0 bg-[#F5F7FA]/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-white border border-slate-200 rounded-xl p-6 space-y-6 shadow-sm">
+        <div className="fixed inset-0 bg-[var(--canvas)]/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-[var(--surface)] border border-[var(--border)] rounded-xl p-6 space-y-6 shadow-sm">
             <div className="flex items-center gap-3 text-red-600">
               <div className="p-3 rounded-2xl bg-red-50 border border-red-200">
                 <ShieldWarning className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-slate-900">Revoke User Session</h3>
-                <p className="text-xs text-slate-500">RFC 5176 Disconnect-Request (PoD)</p>
+                <h3 className="text-base font-bold text-[var(--fg)]">Revoke User Session</h3>
+                <p className="text-xs text-[var(--fg-muted)]">RFC 5176 Disconnect-Request (PoD)</p>
               </div>
             </div>
 
-            <p className="text-xs text-slate-700 leading-relaxed">
+            <p className="text-xs text-[var(--fg-body)] leading-relaxed">
               Are you sure you want to terminate connection for voucher{" "}
-              <span className="font-mono font-bold text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded">
+              <span className="font-mono font-bold text-[var(--fg)] bg-[var(--fill)] px-1.5 py-0.5 rounded">
                 {disconnectTarget.username}
               </span>
               ? A UDP 3799 CoA packet will be immediately transmitted to MikroTik router{" "}
               <span className="font-mono text-cyan-300">{disconnectTarget.nasIpAddress || "10.9.0.x"}</span> to terminate this hotspot session.
             </p>
 
-            <div className="p-3 rounded-xl bg-[#F5F7FA] border border-slate-200 space-y-1.5 text-[11px] font-mono">
-              <div className="flex justify-between text-slate-500">
+            <div className="p-3 rounded-xl bg-[var(--canvas)] border border-[var(--border)] space-y-1.5 text-[11px] font-mono">
+              <div className="flex justify-between text-[var(--fg-muted)]">
                 <span>Client IP:</span>
-                <span className="text-slate-900">{disconnectTarget.framedIpAddress || "N/A"}</span>
+                <span className="text-[var(--fg)]">{disconnectTarget.framedIpAddress || "N/A"}</span>
               </div>
-              <div className="flex justify-between text-slate-500">
+              <div className="flex justify-between text-[var(--fg-muted)]">
                 <span>Client MAC:</span>
-                <span className="text-slate-900">{disconnectTarget.callingStationId || "N/A"}</span>
+                <span className="text-[var(--fg)]">{disconnectTarget.callingStationId || "N/A"}</span>
               </div>
-              <div className="flex justify-between text-slate-500">
+              <div className="flex justify-between text-[var(--fg-muted)]">
                 <span>Session Duration:</span>
-                <span className="text-slate-900">{formatDuration(disconnectTarget.acctSessionTime)}</span>
+                <span className="text-[var(--fg)]">{formatDuration(disconnectTarget.acctSessionTime)}</span>
               </div>
             </div>
 
@@ -350,7 +350,7 @@ export default function TenantActiveSessionsPage() {
               <button
                 type="button"
                 onClick={() => setDisconnectTarget(null)}
-                className="px-4 py-2.5 rounded-xl bg-slate-100 text-xs font-medium text-slate-700 hover:text-slate-900 transition"
+                className="px-4 py-2.5 rounded-xl bg-[var(--fill)] text-xs font-medium text-[var(--fg-body)] hover:text-[var(--fg)] transition"
               >
                 Cancel
               </button>

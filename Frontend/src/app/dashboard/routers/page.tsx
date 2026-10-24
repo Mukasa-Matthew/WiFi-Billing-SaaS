@@ -36,11 +36,11 @@ function Kebab({ children }: { children: React.ReactNode }) {
   return (
     <div ref={ref}>
       <button ref={btnRef} aria-label="Router actions" aria-expanded={open} onClick={toggle}
-        className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900">
+        className="rounded-lg p-1.5 text-[var(--fg-muted)] hover:bg-[var(--fill)] hover:text-[var(--fg)]">
         <DotsThreeVertical size={16} />
       </button>
       {open && (
-        <div className="fixed z-50 w-52 rounded-xl border border-slate-200 bg-white py-1.5 shadow-lg"
+        <div className="fixed z-50 w-52 rounded-xl border border-[var(--border)] bg-[var(--surface)] py-1.5 shadow-lg"
           style={{ top: pos.top, left: pos.left }} onClick={() => setOpen(false)}>
           {children}
         </div>
@@ -52,7 +52,7 @@ function Kebab({ children }: { children: React.ReactNode }) {
 function MenuItem({ icon, label, danger, onClick }: { icon: React.ReactNode; label: string; danger?: boolean; onClick: () => void }) {
   return (
     <button onClick={onClick}
-      className={`flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-xs font-medium transition ${danger ? "text-red-600 hover:bg-red-50" : "text-slate-700 hover:bg-slate-50"}`}>
+      className={`flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-xs font-medium transition ${danger ? "text-red-600 hover:bg-red-50" : "text-[var(--fg-body)] hover:bg-[var(--subtle)]"}`}>
       {icon}{label}
     </button>
   );
@@ -105,8 +105,8 @@ export default function Page() {
     <div className="space-y-6">{dialog}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-900">MikroTik routers</h1>
-          <p className="mt-1 text-sm text-slate-500">To get started, add a MikroTik router by clicking 'Link a MikroTik'.</p>
+          <h1 className="text-xl font-bold tracking-tight text-[var(--fg)]">MikroTik routers</h1>
+          <p className="mt-1 text-sm text-[var(--fg-muted)]">To get started, add a MikroTik router by clicking 'Link a MikroTik'.</p>
         </div>
         <Link href="/dashboard/routers/new" className={button}>Link a MikroTik</Link>
       </div>
@@ -116,7 +116,7 @@ export default function Page() {
         rows={data.filter(r => tab === "ALL" || (tab === "ONLINE" ? r.status === "online" : r.status !== "online"))}
         loading={loading}
         columns={[
-          { label: "Name", render: r => <button onClick={() => open(r)} className="font-medium text-blue-700 hover:underline">{r.name}</button> },
+          { label: "Name", render: r => <button onClick={() => open(r)} className="font-medium text-[var(--accent-text)] hover:underline">{r.name}</button> },
           { label: "Provisioning", render: r => <Badge tone={r.status === "online" ? "green" : r.status === "degraded" ? "red" : "amber"}>{r.status === "online" ? "Verified" : r.status === "degraded" ? "Needs attention" : r.status === "provisioned" ? "Awaiting checks" : r.wgPublicKey ? "Registered" : "Awaiting router"}</Badge> },
           { label: "CPU", render: r => r.lastSeen ? `${r.cpuLoad || 0}%` : "—" },
           { label: "Memory", render: r => r.lastSeen ? `${r.memoryUsage || 0}%` : "—" },
@@ -130,9 +130,9 @@ export default function Page() {
           }},
           { label: "Remote access", render: r => r.wgIp ? <Badge tone="green">Enabled</Badge> : <Badge tone="slate">Off</Badge> },
           { label: "WinBox address", render: r => r.wgIp
-            ? <button title="Copy WinBox address" onClick={() => { void navigator.clipboard?.writeText(`${r.wgIp}`); toast("success", "WinBox address copied — connect via the WireGuard tunnel."); }} className="font-mono text-xs text-blue-700 hover:underline">{r.wgIp}</button>
+            ? <button title="Copy WinBox address" onClick={() => { void navigator.clipboard?.writeText(`${r.wgIp}`); toast("success", "WinBox address copied — connect via the WireGuard tunnel."); }} className="font-mono text-xs text-[var(--accent-text)] hover:underline">{r.wgIp}</button>
             : "—" },
-          { label: "Last telemetry", render: r => <span className="text-slate-500">{date(r.lastSeen)}</span> },
+          { label: "Last telemetry", render: r => <span className="text-[var(--fg-muted)]">{date(r.lastSeen)}</span> },
           {
             label: "", render: r => (
               <Kebab>
@@ -150,18 +150,18 @@ export default function Page() {
       {selected && (
         <section className={`${panel} space-y-5 p-5`}>
           <div className="flex justify-between">
-            <h2 className="text-lg font-semibold text-slate-900">{selected.name}</h2>
-            <button onClick={() => setSelected(null)} className="text-xs font-medium text-slate-500 hover:text-slate-900">Close</button>
+            <h2 className="text-lg font-semibold text-[var(--fg)]">{selected.name}</h2>
+            <button onClick={() => setSelected(null)} className="text-xs font-medium text-[var(--fg-muted)] hover:text-[var(--fg)]">Close</button>
           </div>
-          <p className="text-xs leading-6 text-slate-500">
-            WinBox over your routed WireGuard connection: <code className="text-blue-700">{selected.wgIp || "No tunnel IP"}:8291</code>. This is a private tunnel address, not a public remote-access endpoint.
+          <p className="text-xs leading-6 text-[var(--fg-muted)]">
+            WinBox over your routed WireGuard connection: <code className="text-[var(--accent-text)]">{selected.wgIp || "No tunnel IP"}:8291</code>. This is a private tunnel address, not a public remote-access endpoint.
           </p>
           {command && (
             <div>
               <p className="mb-2 text-xs font-medium text-amber-700">Run this in the router terminal. Full reprovisioning moves customer interfaces; management-agent installation only enables sync and UTC/NTP time.</p>
               <textarea aria-label="Router setup command" readOnly value={command} onFocus={e => e.target.select()}
-                className="h-24 w-full rounded-lg border border-slate-300 bg-[#0B1F36] p-3 font-mono text-xs text-slate-200" />
-              <p className="mt-1 text-xs text-slate-500">Select the command and copy it. Keep this token private.</p>
+                className="h-24 w-full rounded-lg border border-[var(--border-strong)] bg-[#0B1F36] p-3 font-mono text-xs text-slate-200" />
+              <p className="mt-1 text-xs text-[var(--fg-muted)]">Select the command and copy it. Keep this token private.</p>
             </div>
           )}
           <Table rows={tasks} columns={[

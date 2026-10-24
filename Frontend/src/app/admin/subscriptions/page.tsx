@@ -86,8 +86,8 @@ export default function AdminSubscriptionsPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-900">Subscriptions</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <h1 className="text-xl font-bold tracking-tight text-[var(--fg)]">Subscriptions</h1>
+          <p className="mt-1 text-sm text-[var(--fg-muted)]">
             SaaS fees tenants pay to use this platform — separate from their customer WiFi revenue.
           </p>
         </div>
@@ -107,22 +107,22 @@ export default function AdminSubscriptionsPage() {
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
         {statCards.map((c) => (
           <div key={c.label} className={`${panel} p-5`}>
-            <div className="text-xs font-semibold text-slate-500">{c.label}</div>
-            <div className="mt-2 text-2xl font-bold text-slate-900">{c.value ?? "—"}</div>
+            <div className="text-xs font-semibold text-[var(--fg-muted)]">{c.label}</div>
+            <div className="mt-2 text-2xl font-bold text-[var(--fg)]">{c.value ?? "—"}</div>
           </div>
         ))}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <div className={`${panel} p-5`}>
-          <div className="text-xs font-semibold text-slate-500">Subscription revenue this month</div>
+          <div className="text-xs font-semibold text-[var(--fg-muted)]">Subscription revenue this month</div>
           <div className="mt-2 text-2xl font-bold text-emerald-700">{money(ov?.monthRevenue)}</div>
-          <p className="mt-1 text-xs text-slate-400">Verified payments recorded by administrators</p>
+          <p className="mt-1 text-xs text-[var(--fg-faint)]">Verified payments recorded by administrators</p>
         </div>
         <div className={`${panel} p-5`}>
-          <div className="text-xs font-semibold text-slate-500">Outstanding balances</div>
+          <div className="text-xs font-semibold text-[var(--fg-muted)]">Outstanding balances</div>
           <div className="mt-2 text-2xl font-bold text-red-600">{money(ov?.outstanding)}</div>
-          <p className="mt-1 text-xs text-slate-400">Unpaid amounts across all billing periods</p>
+          <p className="mt-1 text-xs text-[var(--fg-faint)]">Unpaid amounts across all billing periods</p>
         </div>
       </div>
 
@@ -133,8 +133,8 @@ export default function AdminSubscriptionsPage() {
           columns={[
             { label: "Tenant", render: (r: Row) => <span className="font-medium">{r.businessName}</span> },
             { label: "Monthly fee", render: (r: Row) => <span className="font-semibold">{money(r.monthlyFee)}</span> },
-            { label: "Started", render: (r: Row) => <span className="text-slate-600">{d(r.startDate)}</span> },
-            { label: "Next renewal", render: (r: Row) => <span className="text-slate-600">{d(r.nextRenewalDate)}</span> },
+            { label: "Started", render: (r: Row) => <span className="text-[var(--fg-muted)]">{d(r.startDate)}</span> },
+            { label: "Next renewal", render: (r: Row) => <span className="text-[var(--fg-muted)]">{d(r.nextRenewalDate)}</span> },
             { label: "Status", render: (r: Row) => (
               <span>
                 <Badge tone={TONE[r.displayStatus] || "slate"}>{STATUS_NAME[r.displayStatus] || r.displayStatus}</Badge>
@@ -143,14 +143,14 @@ export default function AdminSubscriptionsPage() {
             )},
             { label: "Actions", render: (r: Row) => (
               <span className="flex flex-wrap gap-1.5 text-xs">
-                <button className="font-semibold text-blue-700 hover:underline" onClick={() => openBilling(r)}>Billing</button>
+                <button className="font-semibold text-[var(--accent-text)] hover:underline" onClick={() => openBilling(r)}>Billing</button>
                 {(r.displayStatus === "PAYMENT_DUE" || r.displayStatus === "PAST_DUE" || r.outstanding > 0) && (
                   <button className="font-semibold text-emerald-700 hover:underline"
                     onClick={() => { setSel(r); setFAmount(""); setFMethod("CASH"); setFRef(""); setFNote(""); setDialog("pay"); }}>
                     Record payment
                   </button>
                 )}
-                <button className="font-semibold text-slate-600 hover:underline"
+                <button className="font-semibold text-[var(--fg-muted)] hover:underline"
                   onClick={() => { setSel(r); setFFee(String(r.monthlyFee)); setDialog("fee"); }}>
                   Edit fee
                 </button>
@@ -172,15 +172,15 @@ export default function AdminSubscriptionsPage() {
       {/* ---- dialogs ---- */}
       {dialog && dialog !== "billing" && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={() => setDialog(null)}>
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-md rounded-2xl bg-[var(--surface)] p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-slate-900">
+              <h3 className="text-base font-bold text-[var(--fg)]">
                 {dialog === "create" && "New subscription"}
                 {dialog === "fee" && `Edit monthly fee — ${sel?.businessName}`}
                 {dialog === "pay" && `Record payment — ${sel?.businessName}`}
                 {dialog === "defaultFee" && "Default monthly fee"}
               </h3>
-              <button onClick={() => setDialog(null)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+              <button onClick={() => setDialog(null)} className="text-[var(--fg-faint)] hover:text-[var(--fg-muted)]"><X size={18} /></button>
             </div>
 
             {dialog === "create" && (
@@ -272,11 +272,11 @@ export default function AdminSubscriptionsPage() {
                   <p className={hint}>Only MarzPay-settled funds become withdrawable earnings — choose honestly, it affects reconciliation.</p>
                 </div>
                 <div>
-                  <label className={label}>External reference <span className="font-normal text-slate-400">(optional)</span></label>
+                  <label className={label}>External reference <span className="font-normal text-[var(--fg-faint)]">(optional)</span></label>
                   <input className={field} value={fRef} onChange={(e) => setFRef(e.target.value)} placeholder="e.g. MoMo transaction id" />
                 </div>
                 <div>
-                  <label className={label}>Note <span className="font-normal text-slate-400">(optional)</span></label>
+                  <label className={label}>Note <span className="font-normal text-[var(--fg-faint)]">(optional)</span></label>
                   <input className={field} value={fNote} onChange={(e) => setFNote(e.target.value)} />
                 </div>
                 <div className="flex justify-end gap-3">
@@ -294,45 +294,45 @@ export default function AdminSubscriptionsPage() {
       {/* billing history */}
       {dialog === "billing" && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={() => { setDialog(null); setBilling(null); }}>
-          <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-2xl rounded-2xl bg-[var(--surface)] p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-slate-900">Billing history — {sel?.businessName}</h3>
-              <button onClick={() => { setDialog(null); setBilling(null); }} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+              <h3 className="text-base font-bold text-[var(--fg)]">Billing history — {sel?.businessName}</h3>
+              <button onClick={() => { setDialog(null); setBilling(null); }} className="text-[var(--fg-faint)] hover:text-[var(--fg-muted)]"><X size={18} /></button>
             </div>
-            {!billing ? <p className="mt-6 text-sm text-slate-400">Loading…</p> : (
+            {!billing ? <p className="mt-6 text-sm text-[var(--fg-faint)]">Loading…</p> : (
               <div className="mt-5 space-y-6">
                 <div>
-                  <h4 className="text-xs font-bold uppercase tracking-wide text-slate-500">Billing periods</h4>
+                  <h4 className="text-xs font-bold uppercase tracking-wide text-[var(--fg-muted)]">Billing periods</h4>
                   <table className="mt-2 w-full text-sm">
-                    <thead><tr className="text-left text-xs text-slate-400">
+                    <thead><tr className="text-left text-xs text-[var(--fg-faint)]">
                       <th className="py-1.5">Period</th><th>Due</th><th>Status</th><th>Paid</th>
                     </tr></thead>
                     <tbody>
                       {billing.invoices.map((i) => (
-                        <tr key={i.id} className="border-t border-slate-100">
-                          <td className="py-2 text-slate-700">{d(i.periodStart)} → {d(i.periodEnd)}</td>
+                        <tr key={i.id} className="border-t border-[var(--border-soft)]">
+                          <td className="py-2 text-[var(--fg-body)]">{d(i.periodStart)} → {d(i.periodEnd)}</td>
                           <td className="font-semibold">{money(i.amountDue)}</td>
                           <td><Badge tone={TONE[i.status] || "slate"}>{i.status}</Badge></td>
-                          <td className="text-slate-600">{d(i.paidAt)}</td>
+                          <td className="text-[var(--fg-muted)]">{d(i.paidAt)}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
                 <div>
-                  <h4 className="text-xs font-bold uppercase tracking-wide text-slate-500">Payments</h4>
+                  <h4 className="text-xs font-bold uppercase tracking-wide text-[var(--fg-muted)]">Payments</h4>
                   <table className="mt-2 w-full text-sm">
-                    <thead><tr className="text-left text-xs text-slate-400">
+                    <thead><tr className="text-left text-xs text-[var(--fg-faint)]">
                       <th className="py-1.5">Date</th><th>Amount</th><th>Method</th><th>Reference</th>
                     </tr></thead>
                     <tbody>
-                      {billing.payments.length === 0 && <tr><td colSpan={4} className="py-3 text-slate-400">No payments recorded.</td></tr>}
+                      {billing.payments.length === 0 && <tr><td colSpan={4} className="py-3 text-[var(--fg-faint)]">No payments recorded.</td></tr>}
                       {billing.payments.map((p) => (
-                        <tr key={p.id} className="border-t border-slate-100">
-                          <td className="py-2 text-slate-700">{d(p.paidAt)}</td>
+                        <tr key={p.id} className="border-t border-[var(--border-soft)]">
+                          <td className="py-2 text-[var(--fg-body)]">{d(p.paidAt)}</td>
                           <td className="font-semibold">{money(p.amount)}</td>
-                          <td className="text-slate-600">{p.method}</td>
-                          <td className="font-mono text-[11px] text-slate-400">{p.externalRef || "—"}</td>
+                          <td className="text-[var(--fg-muted)]">{p.method}</td>
+                          <td className="font-mono text-[11px] text-[var(--fg-faint)]">{p.externalRef || "—"}</td>
                         </tr>
                       ))}
                     </tbody>

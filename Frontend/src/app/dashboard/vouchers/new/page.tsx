@@ -79,7 +79,7 @@ export default function CreateVouchersPage() {
             <SummaryCard
               title="Batch summary"
               rows={[
-                { label: "Package", value: selected ? selected.name : <span className="font-normal text-slate-500">Not selected</span> },
+                { label: "Package", value: selected ? selected.name : <span className="font-normal text-[var(--fg-muted)]">Not selected</span> },
                 { label: "Vouchers", value: Number(count) || 0 },
                 { label: "Code length", value: `${length} characters` },
                 { label: "Example code", value: <span className="font-mono tracking-wider">{sample || "—"}</span> },
@@ -152,12 +152,12 @@ export default function CreateVouchersPage() {
             title="Revenue"
             hint="Mark complimentary batches so they stay out of your sales figures."
           >
-            <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 p-4 transition hover:bg-slate-50">
+            <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-[var(--border)] p-4 transition hover:bg-[var(--subtle)]">
               <input type="checkbox" checked={giveaway} onChange={(e) => setGiveaway(e.target.checked)}
                 className="mt-0.5 h-4 w-4 shrink-0 accent-blue-700" />
               <span>
-                <span className="block text-sm font-medium text-slate-900">Giveaway batch</span>
-                <span className="mt-0.5 block text-xs text-slate-500">No revenue is recorded when these codes are used.</span>
+                <span className="block text-sm font-medium text-[var(--fg)]">Giveaway batch</span>
+                <span className="mt-0.5 block text-xs text-[var(--fg-muted)]">No revenue is recorded when these codes are used.</span>
               </span>
             </label>
           </FormSection>

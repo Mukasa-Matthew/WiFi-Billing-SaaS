@@ -21,7 +21,7 @@ export default function HomePage() {
   }, [user, loading, router]);
 
   return (
-    <div className="flex h-screen items-center justify-center bg-[#F5F7FA] text-slate-500">
+    <div className="flex h-screen items-center justify-center bg-[var(--canvas)] text-[var(--fg-muted)]">
       <div className="flex flex-col items-center gap-3">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-700 border-t-transparent" />
         <p className="text-sm">Loading WiFi-Billing Platform...</p>

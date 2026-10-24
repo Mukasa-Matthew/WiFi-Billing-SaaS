@@ -35,35 +35,35 @@ export default function Page() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-900">Payments</h1>
-          <p className="mt-1 text-sm text-slate-500">Online payments and manually recorded walk-in or binding sales.</p>
+          <h1 className="text-xl font-bold tracking-tight text-[var(--fg)]">Payments</h1>
+          <p className="mt-1 text-sm text-[var(--fg-muted)]">Online payments and manually recorded walk-in or binding sales.</p>
         </div>
         <button onClick={() => setHidden(!hidden)} aria-label={hidden ? "Show revenue" : "Hide revenue"}
-          className="rounded-lg border border-slate-300 p-2.5 text-slate-500 hover:text-slate-900">
+          className="rounded-lg border border-[var(--border-strong)] p-2.5 text-[var(--fg-muted)] hover:text-[var(--fg)]">
           {hidden ? <EyeSlash size={16} /> : <Eye size={16} />}
         </button>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Today's revenue (online)</p>
-          <p className="mt-2 text-2xl font-bold tabular-nums text-slate-900">{money(todayOnline)}</p>
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--fg-muted)]">Today's revenue (online)</p>
+          <p className="mt-2 text-2xl font-bold tabular-nums text-[var(--fg)]">{money(todayOnline)}</p>
           <p className="mt-1 flex items-center gap-1.5 text-xs text-emerald-700"><Money size={12} />Paid via mobile money</p>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Today's revenue (walk-in)</p>
-          <p className="mt-2 text-2xl font-bold tabular-nums text-slate-900">{money(todayWalkin)}</p>
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--fg-muted)]">Today's revenue (walk-in)</p>
+          <p className="mt-2 text-2xl font-bold tabular-nums text-[var(--fg)]">{money(todayWalkin)}</p>
           <p className="mt-1 flex items-center gap-1.5 text-xs text-amber-700"><Ticket2 />Cash / manual sales</p>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Weekly revenue</p>
-          <p className="mt-2 text-2xl font-bold tabular-nums text-slate-900">{money(weekTotal)}</p>
-          <p className="mt-1 flex items-center gap-1.5 text-xs text-blue-700"><CalendarBlank size={12} />Last 7 days</p>
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--fg-muted)]">Weekly revenue</p>
+          <p className="mt-2 text-2xl font-bold tabular-nums text-[var(--fg)]">{money(weekTotal)}</p>
+          <p className="mt-1 flex items-center gap-1.5 text-xs text-[var(--accent-text)]"><CalendarBlank size={12} />Last 7 days</p>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Monthly revenue</p>
-          <p className="mt-2 text-2xl font-bold tabular-nums text-slate-900">{money(monthTotal)}</p>
-          <p className="mt-1 flex items-center gap-1.5 text-xs text-blue-700"><CalendarBlank size={12} />This month</p>
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--fg-muted)]">Monthly revenue</p>
+          <p className="mt-2 text-2xl font-bold tabular-nums text-[var(--fg)]">{money(monthTotal)}</p>
+          <p className="mt-1 flex items-center gap-1.5 text-xs text-[var(--accent-text)]"><CalendarBlank size={12} />This month</p>
         </div>
       </div>
 
@@ -93,7 +93,7 @@ export default function Page() {
           { label: "Amount", render: p => <span className="font-semibold">UGX {Number(p.amount).toLocaleString()}</span> },
           { label: "Status", render: p => <Badge tone={p.status === "SUCCESSFUL" ? "green" : p.status === "FAILED" ? "red" : "amber"}>{p.status}</Badge> },
           { label: "Router", render: p => p.router },
-          { label: "Recorded", render: p => <span className="text-slate-500">{date(p.createdAt)}</span> },
+          { label: "Recorded", render: p => <span className="text-[var(--fg-muted)]">{date(p.createdAt)}</span> },
         ]}
       />
     </div>

@@ -5,6 +5,7 @@ import { LinkPending } from "@/components/LoadingUI";
 import React, { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import ThemeToggle from "@/components/ThemeToggle";
 import api from "@/lib/api";
 import {
   SquaresFour,
@@ -29,7 +30,7 @@ import {
   CaretDown,
 } from "@phosphor-icons/react";
 
-const NAVY = "#122B49";
+
 
 interface SidebarStats {
   activeUsers?: number;
@@ -95,7 +96,7 @@ export default function TenantDashboardLayout({
   );
 
   return (
-    <div className="h-dvh overflow-hidden bg-[#F5F7FA] text-slate-900 flex">
+    <div className="h-dvh overflow-hidden bg-[var(--canvas)] text-[var(--fg)] flex">
       {menuOpen && (
         <button aria-label="Close navigation" onClick={() => setMenuOpen(false)}
           className="fixed inset-0 z-30 bg-slate-950/50 md:hidden" />
@@ -104,7 +105,7 @@ export default function TenantDashboardLayout({
       {/* Sidebar */}
       <aside
         className={`${menuOpen ? "flex" : "hidden"} fixed inset-y-0 left-0 z-40 w-64 flex-col justify-between shrink-0 md:static md:flex`}
-        style={{ backgroundColor: NAVY }}
+        style={{ backgroundColor: "var(--sidebar)" }}
       >
         <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain">
           {/* Brand */}
@@ -168,7 +169,7 @@ export default function TenantDashboardLayout({
                       href={item.href}
                       className={`relative flex items-center gap-3 rounded-lg px-3.5 py-2 text-[13px] font-medium transition ${
                         isActive
-                          ? "bg-white text-[#122B49] shadow-sm"
+                          ? "bg-[var(--sidebar-active)] text-[var(--sidebar-active-fg)] shadow-sm"
                           : "text-slate-200 hover:bg-white/10 hover:text-white"
                       }`}
                     >
@@ -176,7 +177,7 @@ export default function TenantDashboardLayout({
                       <Icon className="h-4 w-4 shrink-0" />
                       <span className="flex-1">{item.name}</span>
                       {count !== undefined && count > 0 && (
-                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${isActive ? "bg-blue-100 text-[#122B49]" : "bg-white/15 text-white"}`}>
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${isActive ? "bg-[var(--sidebar-active-fg)]/12 text-[var(--sidebar-active-fg)]" : "bg-white/15 text-white"}`}>
                           {count > 999 ? `${(count / 1000).toFixed(1)}k` : count}
                         </span>
                       )}
@@ -212,24 +213,25 @@ export default function TenantDashboardLayout({
 
       {/* Main */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 md:px-8">
+        <header className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-[var(--border)] bg-[var(--surface)] px-4 md:px-8">
           <div className="flex min-w-0 items-center gap-3">
             <button aria-label="Open navigation" onClick={() => setMenuOpen(true)}
-              className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 md:hidden">
+              className="rounded-lg p-2 text-[var(--fg-muted)] hover:bg-[var(--fill)] md:hidden">
               <List className="h-5 w-5" />
             </button>
             <div className="min-w-0">
-              <span className="block truncate text-sm font-semibold text-slate-900">
+              <span className="block truncate text-sm font-semibold text-[var(--fg)]">
                 {activeItem?.name || "Dashboard"}
               </span>
               {pathname !== "/dashboard" && (
-                <span className="block text-[11px] text-slate-500">
+                <span className="block text-[11px] text-[var(--fg-muted)]">
                   Dashboard / {activeItem?.name || ""}
                 </span>
               )}
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <ThemeToggle />
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#122B49] text-xs font-bold text-white" title={user?.email}>
               {(user?.name ?? "").substring(0, 2).toUpperCase()}
             </div>
@@ -247,7 +249,7 @@ export default function TenantDashboardLayout({
           fetches with the bearer token — so nothing is exposed behind this. */}
       {!ready && (
         <div role="status" aria-live="polite"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-[#F5F7FA] text-slate-500">
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--canvas)] text-[var(--fg-muted)]">
           <div className="flex flex-col items-center gap-3">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-700 border-t-transparent" />
             <p className="text-sm">Loading workspace…</p>

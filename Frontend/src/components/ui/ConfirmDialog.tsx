@@ -42,15 +42,15 @@ function ConfirmDialog({ req, onClose }: { req: ConfirmRequest; onClose: () => v
         aria-modal="true"
         aria-labelledby="confirm-title"
         aria-describedby="confirm-body"
-        className="relative w-full max-w-sm rounded-xl border border-slate-200 bg-white p-6 shadow-lg"
+        className="relative w-full max-w-sm rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-lg"
       >
         <div className="flex items-start gap-3">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600">
             <Warning className="h-4.5 w-4.5" />
           </div>
           <div>
-            <h2 id="confirm-title" className="text-sm font-semibold text-slate-900">{req.title}</h2>
-            <p id="confirm-body" className="mt-1 text-xs leading-5 text-slate-500">{req.body}</p>
+            <h2 id="confirm-title" className="text-sm font-semibold text-[var(--fg)]">{req.title}</h2>
+            <p id="confirm-body" className="mt-1 text-xs leading-5 text-[var(--fg-muted)]">{req.body}</p>
           </div>
         </div>
         <div className="mt-5 flex justify-end gap-2">

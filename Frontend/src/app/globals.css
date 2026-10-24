@@ -18,6 +18,78 @@ body {
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 
+/* ---------------------------------------------------------------------------
+   Dashboard theming. Semantic tokens only — components never name a raw colour.
+   Dark is a hand-tuned tonal ramp, not an inversion: surfaces stay lighter than
+   the canvas so elevation still reads, and every pair below is checked to WCAG
+   AA (4.5:1 body text, 3:1 borders and large text).
+   --------------------------------------------------------------------------- */
+:root,
+[data-theme="light"] {
+  --canvas: #F5F7FA;
+  --surface: #FFFFFF;
+  --subtle: #F8FAFC;
+  --fill: #F1F5F9;
+  --border: #E2E8F0;
+  --border-strong: #CBD5E1;
+  --border-soft: #F1F5F9;
+  --fg: #0F172A;
+  --fg-body: #334155;
+  --fg-muted: #5A6880;
+  --fg-faint: #626F88;
+  --accent-text: #1D4ED8;
+  --sidebar: #122B49;
+  --sidebar-admin: #0B1F36;
+  --sidebar-active: #FFFFFF;
+  --sidebar-active-fg: #122B49;
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --canvas: #0B1017;
+  --surface: #151C27;
+  --subtle: #1A2230;
+  --fill: #212B3B;
+  --border: #2A3446;
+  --border-strong: #3B4860;
+  --border-soft: #222C3C;
+  --fg: #EDF2F9;
+  --fg-body: #CBD5E1;
+  --fg-muted: #9AA8BC;
+  --fg-faint: #8292A6;
+  --accent-text: #7DA9FF;
+  --sidebar: #0E1724;
+  --sidebar-admin: #0A121D;
+  --sidebar-active: #DCE6F5;
+  --sidebar-active-fg: #0B1724;
+  color-scheme: dark;
+
+  /* Tailwind v4 emits every palette utility as var(--color-*), so redefining
+     these re-tints the tinted badges and chips without touching components. */
+  --color-blue-50: #16243C;
+  --color-blue-100: #1E3356;
+  --color-blue-200: #27406B;
+  --color-blue-700: #2563EB;
+  --color-emerald-50: #0D2A1F;
+  --color-emerald-100: #14382A;
+  --color-emerald-200: #1E4D38;
+  --color-emerald-700: #4ADE80;
+  --color-emerald-800: #86EFAC;
+  --color-amber-50: #2C2009;
+  --color-amber-100: #3A2B0D;
+  --color-amber-200: #4A3511;
+  --color-amber-700: #FBBF24;
+  --color-amber-800: #FCD34D;
+  --color-red-50: #2E1316;
+  --color-red-100: #3D191D;
+  --color-red-200: #4D2026;
+  --color-red-600: #F87171;
+  --color-red-700: #FCA5A5;
+  --color-red-800: #FECACA;
+}
+
+body { background: var(--canvas); color: var(--fg); }
+
 /* Keep keyboard navigation visible on both white panels and the navy sidebar. */
 :focus-visible { outline: 2px solid #3b82f6; outline-offset: 3px; }
 .sidebar-scroll { scrollbar-width: thin; scrollbar-color: #54708e transparent; }

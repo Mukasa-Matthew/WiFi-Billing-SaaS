@@ -38,11 +38,11 @@ export default function AdminHealthPage() {
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-slate-900 flex items-center gap-2.5">
+        <h1 className="text-xl font-bold tracking-tight text-[var(--fg)] flex items-center gap-2.5">
           <HardDrives className="w-6 h-6 text-amber-700" />
           <span>System &amp; VPN Health</span>
         </h1>
-        <p className="text-xs text-slate-500 mt-1">
+        <p className="text-xs text-[var(--fg-muted)] mt-1">
           Configured services. Live probes are not connected; these cards do not report current health.
         </p>
       </div>
@@ -53,19 +53,19 @@ export default function AdminHealthPage() {
           return (
             <div
               key={c.name}
-              className="p-5 rounded-2xl bg-white/70 border border-slate-200 flex items-start gap-4"
+              className="p-5 rounded-2xl bg-white/70 border border-[var(--border)] flex items-start gap-4"
             >
-              <div className="p-3 rounded-xl bg-[#F5F7FA] border border-slate-200 text-blue-700 shrink-0">
+              <div className="p-3 rounded-xl bg-[var(--canvas)] border border-[var(--border)] text-[var(--accent-text)] shrink-0">
                 <Icon className="w-5 h-5" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-1">
-                  <h3 className="text-sm font-semibold text-slate-900 truncate">{c.name}</h3>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                  <h3 className="text-sm font-semibold text-[var(--fg)] truncate">{c.name}</h3>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-[var(--accent-text)] border border-blue-200">
                     {c.badge}
                   </span>
                 </div>
-                <p className="text-xs text-slate-500 mb-3">{c.description}</p>
+                <p className="text-xs text-[var(--fg-muted)] mb-3">{c.description}</p>
                 <div className="flex items-center gap-1.5 text-xs text-amber-700 font-medium">
                   <CheckCircle className="w-3.5 h-3.5" />
                   <span>{c.status}</span>
