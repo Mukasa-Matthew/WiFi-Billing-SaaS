@@ -79,6 +79,15 @@ public class Transaction {
     @Column(name = "provider_transaction_id", length = 128)
     private String providerTransactionId;
 
+    /** Client-generated checkout idempotency key. Unique so a repeated/reopened
+     *  checkout always resolves to this same transaction — never a second charge. */
+    @Column(name = "checkout_ref", unique = true, length = 64)
+    private String checkoutRef;
+
+    /** Hotspot client MAC ($(mac)) captured at checkout; binds the auto-login. */
+    @Column(name = "client_mac", length = 24)
+    private String clientMac;
+
     @Column(length=1000) private String notes;
 
     @Column(name = "created_at")

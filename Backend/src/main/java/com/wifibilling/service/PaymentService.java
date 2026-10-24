@@ -52,6 +52,14 @@ public class PaymentService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Router not found");
         }
 
+        String checkoutRef = sanitizeCheckoutRef(req.checkoutRef());
+        if (checkoutRef != null) {
+            var existing = transactionRepository.findByCheckoutRefForUpdate(checkoutRef);
+            if (existing.isPresent()) {
+                return resumeCheckout(existing.get(), req);
+            }
+        }
+
         Router router = routerRepository.findByToken(req.token())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Router not found"));
 
@@ -76,6 +84,8 @@ public class PaymentService {
                 .packagePlan(packagePlan)
                 .router(router)
                 .reference(reference)
+                .checkoutRef(checkoutRef)
+                .clientMac(sanitizeMac(req.mac()))
                 .phone(phoneE164)
                 .amount(packagePlan.getPrice())
                 .network(network)
@@ -108,6 +118,82 @@ public class PaymentService {
         );
     }
 
+    /**
+     * Re-entry point for a checkout the client already started. Never creates a
+     * second transaction or provider collection for the same checkout:
+     *   - SUCCESSFUL → report it so the portal can auto-connect immediately
+     *   - FAILED     → report it; the portal discards the checkout and starts fresh
+     *   - PENDING    → recheck the provider; if the collection provably never
+     *                  arrived (404), redispatch once for the same checkout.
+     */
+    private PaymentDto.InitiateResponse resumeCheckout(Transaction tx, PaymentDto.InitiateRequest req) {
+        if (!STATUS_PENDING.equals(tx.getStatus())) {
+            return new PaymentDto.InitiateResponse(tx.getReference(), tx.getStatus(), tx.getAmount(),
+                    STATUS_SUCCESSFUL.equals(tx.getStatus())
+                            ? "Payment already confirmed."
+                            : "This checkout already failed. Start a new payment.");
+        }
+        boolean sameCheckout = tx.getPackagePlan().getId().equals(req.packageId())
+                && tx.getPhone().equals(toE164(req.phone()));
+        if (!sameCheckout) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Checkout already in progress with different details");
+        }
+        recheckProvider(tx);
+        if (STATUS_PENDING.equals(tx.getStatus()) && tx.getExternalReference() == null
+                && !useMockGateway(tx.getGatewayMode())) {
+            dispatchMarzPayCollection(tx, tx.getRouter(), tx.getGatewayMode());
+        }
+        return new PaymentDto.InitiateResponse(tx.getReference(), tx.getStatus(), tx.getAmount(),
+                "Payment already in progress — resuming.");
+    }
+
+    private static String sanitizeCheckoutRef(String ref) {
+        if (ref == null) return null;
+        String clean = ref.trim();
+        if (clean.isEmpty() || clean.length() > 64 || !clean.matches("[A-Za-z0-9_-]+")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid checkout reference");
+        }
+        return clean;
+    }
+
+    private static String sanitizeMac(String mac) {
+        if (mac == null || mac.isBlank()) return null;
+        String clean = mac.trim().toUpperCase().replace('-', ':');
+        if (!clean.matches("^([0-9A-F]{2}:){5}[0-9A-F]{2}$")) return null;
+        return clean;
+    }
+
+    /**
+     * Server-side provider recheck for a pending transaction whose provider
+     * reference we hold. Feeds the authoritative GET /collect-money/{uuid}
+     * response through the same confirmation path as callbacks. Best-effort:
+     * any failure leaves the transaction PENDING for the next poll/webhook.
+     */
+    private void recheckProvider(Transaction tx) {
+        String extRef = tx.getExternalReference();
+        if (extRef == null || useMockGateway(tx.getGatewayMode())) return;
+        try {
+            var creds = gatewayConfig.credentialsFor(tx.getTenant(), tx.getGatewayMode());
+            var status = marzPay.getCollection(creds, extRef);
+            var payload = status.has("data") && status.get("data").isObject() ? status.get("data") : status;
+            processMarzPayCollection(payload);
+        } catch (com.wifibilling.service.payment.MarzPayClient.MarzPayException e) {
+            if (e.getStatus() == 404) {
+                // The provider has no record of this reference — the original
+                // dispatch provably never arrived, so one redispatch is safe.
+                log.info("Provider 404 for {} — original collection never arrived; redispatching", extRef);
+                tx.setExternalReference(null);
+                transactionRepository.save(tx);
+                dispatchMarzPayCollection(tx, tx.getRouter(), tx.getGatewayMode());
+            } else {
+                log.warn("Provider recheck for {} failed: {}", tx.getReference(), e.getMessage());
+            }
+        } catch (Exception e) {
+            log.warn("Provider recheck for {} failed: {}", tx.getReference(), e.getMessage());
+        }
+    }
+
     /** Dev fallback: the platform gateway has no credentials configured (sandbox/dev),
      *  so the existing mock gateway simulates the provider. Own-gateway mode always
      *  uses real MarzPay credentials. */
@@ -116,29 +202,37 @@ public class PaymentService {
                 && !gatewayConfig.platformConfigured();
     }
 
+    /**
+     * Dispatches one MarzPay collection for a transaction. The UUID reference is
+     * persisted BEFORE the HTTP call so that a lost response can never trigger a
+     * second collection: every later recheck verifies /collect-money/{uuid} with
+     * the same reference instead of charging again. Any dispatch error leaves the
+     * transaction PENDING (outcome uncertain) — never FAILED — and the
+     * provider recheck in resume/status polling resolves it.
+     */
     private void dispatchMarzPayCollection(Transaction tx, Router router, String mode) {
         var creds = gatewayConfig.credentialsFor(router.getTenant(), mode);
         String collectRef = UUID.randomUUID().toString(); // MarzPay requires UUID v4
         String callbackUrl = platformProperties.getPublicBaseUrl() + "/api/payments/marzpay/callback";
+        tx.setExternalReference(collectRef);
+        transactionRepository.save(tx);
         try {
             var res = marzPay.collectMoney(creds,
                     tx.getAmount().longValue(), tx.getPhone(), collectRef,
                     gatewayConfig.countryFor(router.getTenant(), mode),
                     "WiFi " + tx.getPackagePlan().getName(), callbackUrl);
-            tx.setExternalReference(collectRef);
             var txn = res.path("data").path("transaction");
             if (!txn.path("uuid").isMissingNode() && !txn.path("uuid").isNull()) {
                 tx.setProviderUuid(txn.path("uuid").asText());
             }
             transactionRepository.save(tx);
         } catch (Exception e) {
-            tx.setStatus(STATUS_FAILED);
-            tx.setCompletedAt(OffsetDateTime.now());
-            tx.setNotes("Collection initiation failed: " + e.getMessage());
+            // Uncertain outcome — MarzPay may have received the collection. Keep
+            // the reference and stay PENDING; recheckProvider() resolves it.
+            tx.setNotes("Collection dispatch uncertain: " + e.getMessage());
             transactionRepository.save(tx);
-            log.error("MarzPay collection failed for ref {}: {}", tx.getReference(), e.getMessage());
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
-                    "Payment could not be initiated. Please try again.");
+            log.error("MarzPay collection dispatch uncertain for ref {} (provider ref {}): {}",
+                    tx.getReference(), collectRef, e.getMessage());
         }
     }
 
@@ -157,7 +251,7 @@ public class PaymentService {
      */
     @Transactional
     public void processWebhook(PaymentDto.WebhookRequest webhook) {
-        Transaction tx = transactionRepository.findByReference(webhook.reference())
+        Transaction tx = transactionRepository.findByReferenceForUpdate(webhook.reference())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Transaction not found: " + webhook.reference()));
 
         if (!STATUS_PENDING.equalsIgnoreCase(tx.getStatus())) {
@@ -195,7 +289,8 @@ public class PaymentService {
         if (tx.getVoucherCode() == null) {
             List<VoucherResponse> vouchers = voucherService.generate(
                     tx.getTenant().getId(),
-                    new GenerateVouchersRequest(tx.getPackagePlan().getId(), 1)
+                    new GenerateVouchersRequest(tx.getPackagePlan().getId(), 1),
+                    tx.getClientMac()
             );
             if (!vouchers.isEmpty()) {
                 String voucherCode = vouchers.get(0).code();
@@ -238,8 +333,8 @@ public class PaymentService {
             log.warn("MarzPay collection callback without reference — ignored");
             return;
         }
-        Transaction tx = transactionRepository.findByExternalReference(ref)
-                .or(() -> transactionRepository.findByReference(ref))
+        Transaction tx = transactionRepository.findByExternalReferenceForUpdate(ref)
+                .or(() -> transactionRepository.findByReferenceForUpdate(ref))
                 .orElse(null);
         if (tx == null) {
             log.warn("MarzPay callback for unknown reference {} — ignored", ref);
@@ -269,10 +364,21 @@ public class PaymentService {
     /**
      * Polling endpoint used by the captive portal front-end to detect payment completion.
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public PaymentDto.StatusResponse getStatus(String reference) {
-        Transaction tx = transactionRepository.findByReference(reference)
+        Transaction tx = transactionRepository.findByReferenceForUpdate(reference)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Transaction not found"));
+
+        // If a callback was missed or delayed, actively verify with the provider
+        // once the transaction is old enough to reasonably have resolved. This
+        // also resolves dispatch-uncertain transactions without a new charge.
+        if (STATUS_PENDING.equals(tx.getStatus())
+                && tx.getCreatedAt() != null
+                && tx.getCreatedAt().isBefore(OffsetDateTime.now().minusSeconds(10))) {
+            recheckProvider(tx);
+            tx = transactionRepository.findByReferenceForUpdate(reference)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Transaction not found"));
+        }
 
         return new PaymentDto.StatusResponse(
                 tx.getReference(),

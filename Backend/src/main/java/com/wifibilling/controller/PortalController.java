@@ -247,6 +247,10 @@ public class PortalController {
                                 "var LINK_ORIG = '$(link-orig)';")
                         .replace("var MT_ERROR = Q.get('error') || '';",
                                 "var MT_ERROR = '$(error)';")
+                        .replace("var MT_MAC = Q.get('mac') || '';",
+                                "var MT_MAC = '$(mac)';")
+                        .replace("var MT_IP = Q.get('ip') || '';",
+                                "var MT_IP = '$(ip)';")
                         .replace("var BASE = location.origin;",
                                 "var BASE = 'SERVER_BASE_URL_PLACEHOLDER';");
             }
