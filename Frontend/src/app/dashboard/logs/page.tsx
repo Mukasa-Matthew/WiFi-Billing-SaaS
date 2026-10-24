@@ -4,17 +4,17 @@ import React, { useEffect, useState, useMemo } from "react";
 import api from "@/lib/api";
 import {
   FileText,
-  RefreshCw,
-  Search,
+  ArrowClockwise,
+  MagnifyingGlass,
   Download,
   Calendar,
   Clock,
   HardDrive,
-  ArrowDownCircle,
-  ArrowUpCircle,
-  CheckCircle2,
-  AlertCircle
-} from "lucide-react";
+  ArrowCircleDown,
+  ArrowCircleUp,
+  CheckCircle,
+  WarningCircle
+} from "@phosphor-icons/react";
 
 interface SessionHistory {
   radAcctId: number;
@@ -106,7 +106,7 @@ export default function TenantSessionLogsPage() {
       "User / Voucher",
       "Framed IP",
       "Client MAC",
-      "Router NAS IP",
+      "CellTower NAS IP",
       "Start Time",
       "Stop Time",
       "Duration (Sec)",
@@ -148,7 +148,7 @@ export default function TenantSessionLogsPage() {
         <div>
           <h1 className="text-xl font-bold tracking-tight text-slate-900 flex items-center gap-2.5">
             <FileText className="w-6 h-6 text-blue-700" />
-            <span>Accounting Logs & History</span>
+            <span>Accounting Logs & ClockCounterClockwise</span>
           </h1>
           <p className="text-xs text-slate-500 mt-1">
             Historical radius accounting records (radacct) storing session durations, disconnect causes, and byte transfers.
@@ -161,7 +161,7 @@ export default function TenantSessionLogsPage() {
             className="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 border border-slate-300 transition cursor-pointer"
             title="Refresh Logs"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-blue-700" : ""}`} />
+            <ArrowClockwise className={`w-4 h-4 ${loading ? "animate-spin text-blue-700" : ""}`} />
           </button>
 
           <button
@@ -198,10 +198,10 @@ export default function TenantSessionLogsPage() {
       {/* Filters Bar */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-200">
         <div className="relative w-full sm:w-80">
-          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+          <MagnifyingGlass className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
           <input
             type="text"
-            placeholder="Search code, IP, MAC, cause..."
+            placeholder="MagnifyingGlass code, IP, MAC, cause..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-9 pr-4 py-2 rounded-xl bg-[#F5F7FA] border border-slate-200 text-xs text-slate-900 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
@@ -245,7 +245,7 @@ export default function TenantSessionLogsPage() {
               {loading ? (
                 <tr>
                   <td colSpan={8} className="py-12 text-center text-slate-500">
-                    <RefreshCw className="w-5 h-5 mx-auto animate-spin text-blue-700 mb-2" />
+                    <ArrowClockwise className="w-5 h-5 mx-auto animate-spin text-blue-700 mb-2" />
                     <span>Loading accounting logs...</span>
                   </td>
                 </tr>

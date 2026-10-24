@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import api from "@/lib/api";
-import { Wallet, Users, Router, Radio, RefreshCw } from "lucide-react";
+import { Wallet, Users, CellTower, Radio, ArrowClockwise } from "@phosphor-icons/react";
 import { Badge, ErrorNotice, PageHeader, StatCard, Table, buttonGhost, panel, ugx, date } from "@/components/BillingUI";
 import { DashboardLoading, LoadingIndicator } from "@/components/LoadingUI";
 
@@ -38,12 +38,12 @@ export default function AdminOverviewPage() {
 
   return <div className="mx-auto max-w-7xl space-y-6">
     <PageHeader title="Platform overview" description="Business activity and router telemetry across your platform."
-      action={<button disabled={loading} onClick={load} className={buttonGhost}><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />{loading ? "Refreshing…" : "Refresh data"}</button>} />
+      action={<button disabled={loading} onClick={load} className={buttonGhost}><ArrowClockwise className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />{loading ? "Refreshing…" : "Refresh data"}</button>} />
     <ErrorNotice text={error} />
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <StatCard label="Recorded revenue" value={metrics ? ugx(metrics.totalRevenueUgx) : "—"} icon={<Wallet className="h-5 w-5" />} hintText="Successful recorded payments" tone="green" />
       <StatCard label="Hotspot businesses" value={metrics?.totalTenants ?? "—"} icon={<Users className="h-5 w-5" />} hintText="Registered business accounts" />
-      <StatCard label="Online routers" value={metrics ? `${metrics.onlineRouters} / ${metrics.totalRouters}` : "—"} icon={<Router className="h-5 w-5" />} hintText="Based on reported router telemetry" />
+      <StatCard label="Online routers" value={metrics ? `${metrics.onlineRouters} / ${metrics.totalRouters}` : "—"} icon={<CellTower className="h-5 w-5" />} hintText="Based on reported router telemetry" />
       <StatCard label="Open sessions" value={metrics?.activeHotspotSessions ?? "—"} icon={<Radio className="h-5 w-5" />} hintText="Accounting sessions without a stop record" />
     </div>
     <section className={`${panel} flex flex-wrap items-center justify-between gap-4 p-5`}>

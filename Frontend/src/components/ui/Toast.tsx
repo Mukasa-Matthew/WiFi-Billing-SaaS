@@ -1,6 +1,6 @@
 "use client";
 import React, { createContext, useCallback, useContext, useRef, useState } from "react";
-import { CheckCircle2, AlertTriangle, XCircle, X } from "lucide-react";
+import { CheckCircle, Warning, XCircle, X } from "@phosphor-icons/react";
 
 type ToastKind = "success" | "error" | "info";
 interface Toast { id: number; kind: ToastKind; text: string }
@@ -19,9 +19,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const icons = {
-    success: <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />,
+    success: <CheckCircle className="h-4 w-4 shrink-0 text-emerald-600" />,
     error: <XCircle className="h-4 w-4 shrink-0 text-red-600" />,
-    info: <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />,
+    info: <Warning className="h-4 w-4 shrink-0 text-amber-600" />,
   };
 
   return (

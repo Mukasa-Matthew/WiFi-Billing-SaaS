@@ -6,15 +6,15 @@ import api from "@/lib/api";
 import {
   ArrowLeft,
   Check,
-  CheckCircle2,
-  ChevronRight,
-  CircleAlert,
+  CheckCircle,
+  CaretRight,
+  WarningCircle,
   Copy,
-  LoaderCircle,
-  Router as RouterIcon,
+  CircleNotch,
+  CellTower as RouterIcon,
   Terminal,
-  Wifi,
-} from "lucide-react";
+  WifiHigh,
+} from "@phosphor-icons/react";
 
 interface RouterRecord {
   id: number;
@@ -132,7 +132,7 @@ export default function AddRouterPage() {
 
       <div>
         <div className="mb-2 flex items-center gap-2 text-xs text-slate-500">
-          <span>MikroTik</span><ChevronRight className="h-3.5 w-3.5" /><span>Create</span>
+          <span>MikroTik</span><CaretRight className="h-3.5 w-3.5" /><span>Create</span>
         </div>
         <h1 className="text-3xl font-bold tracking-tight text-slate-900">Add MikroTik Device</h1>
         <p className="mt-1 max-w-2xl text-sm text-slate-500">
@@ -202,7 +202,7 @@ export default function AddRouterPage() {
                   <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition ${hasWireless ? "left-6" : "left-1"}`} />
                 </button>
                 <span>
-                  <span className="block text-sm font-semibold text-slate-900">Router has Wireless</span>
+                  <span className="block text-sm font-semibold text-slate-900">CellTower has Wireless</span>
                   <span className="mt-1 block text-xs text-slate-500">Enable this if your MikroTik router has Wi-Fi capabilities.</span>
                 </span>
               </label>
@@ -231,17 +231,17 @@ export default function AddRouterPage() {
                 </div>
                 <pre className="overflow-x-auto whitespace-pre bg-[#0B1F36] px-5 py-5 font-mono text-xs text-slate-200">{provisioningCommand}</pre>
                 <div className="flex gap-3 border-t border-slate-200 bg-white px-5 py-4 text-xs text-slate-500">
-                  <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                  <WarningCircle className="mt-0.5 h-4 w-4 shrink-0" />
                   <p>If the router reports <strong className="text-slate-700">device mode not allowed</strong>, run <code className="text-blue-600">/system/device-mode/update mode=advanced</code>, power-cycle the router, and retry the command.</p>
                 </div>
               </div>
 
               <div className={`rounded-xl border p-5 ${connected ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-slate-50"}`}>
                 <div className="flex items-start gap-3">
-                  {connected ? <CheckCircle2 className="h-6 w-6 text-emerald-700" /> : <LoaderCircle className="h-6 w-6 animate-spin text-blue-700" />}
+                  {connected ? <CheckCircle className="h-6 w-6 text-emerald-700" /> : <CircleNotch className="h-6 w-6 animate-spin text-blue-700" />}
                   <div>
                     <p className={`font-mono text-sm font-semibold ${connected ? "text-emerald-700" : "text-slate-900"}`}>
-                      {connected ? "Router is verified and ready" : degraded ? "Router connected, but readiness checks failed" : "$ Paste the provisioning command in your MikroTik terminal to begin"}
+                      {connected ? "CellTower is verified and ready" : degraded ? "CellTower connected, but readiness checks failed" : "$ Paste the provisioning command in your MikroTik terminal to begin"}
                     </p>
                     <p className="mt-2 text-xs text-slate-500">
                       {connected
@@ -265,14 +265,14 @@ export default function AddRouterPage() {
           {step === 3 && router && (
             <div className="space-y-6">
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 text-center">
-                <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-700" />
-                <h2 className="mt-3 text-xl font-bold text-slate-900">Router verified and ready</h2>
+                <CheckCircle className="mx-auto h-12 w-12 text-emerald-700" />
+                <h2 className="mt-3 text-xl font-bold text-slate-900">CellTower verified and ready</h2>
                 <p className="mt-2 text-sm text-slate-500">{router.name} is reporting its managed hotspot, RADIUS configuration and captive portal assets as ready.</p>
               </div>
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="rounded-xl border border-slate-200 bg-[#F5F7FA]/50 p-4"><p className="text-xs text-slate-500">WAN interface</p><p className="mt-1 font-mono text-sm text-slate-900">{router.wanInterface}</p></div>
                 <div className="rounded-xl border border-slate-200 bg-[#F5F7FA]/50 p-4"><p className="text-xs text-slate-500">Hotspot ports</p><p className="mt-1 font-mono text-sm text-slate-900">{router.hotspotInterfaces.length > 0 ? router.hotspotInterfaces.join(", ") : `All ports except ${router.wanInterface} (auto)`}</p></div>
-                <div className="rounded-xl border border-slate-200 bg-[#F5F7FA]/50 p-4"><p className="text-xs text-slate-500">Wi-Fi name</p><p className="mt-1 flex items-center gap-2 text-sm text-slate-900"><Wifi className="h-4 w-4 text-blue-700" />{hasWireless ? router.wifiSsid : "Wireless disabled"}</p></div>
+                <div className="rounded-xl border border-slate-200 bg-[#F5F7FA]/50 p-4"><p className="text-xs text-slate-500">Wi-Fi name</p><p className="mt-1 flex items-center gap-2 text-sm text-slate-900"><WifiHigh className="h-4 w-4 text-blue-700" />{hasWireless ? router.wifiSsid : "Wireless disabled"}</p></div>
               </div>
               <div className="flex justify-end border-t border-slate-200 pt-5">
                 <button onClick={() => navigation.push("/dashboard/routers")} className="flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-500">

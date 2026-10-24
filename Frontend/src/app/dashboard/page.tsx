@@ -6,7 +6,7 @@ import { DashboardLoading, LoadingIndicator } from "@/components/LoadingUI";
 import { EmptyState } from "@/components/BillingUI";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
-import { ArrowUpRight, Eye, EyeOff, RefreshCw, Router, Ticket, Users, Wallet, Activity, AlertCircle } from "lucide-react";
+import { ArrowUpRight, Eye, EyeSlash, ArrowClockwise, CellTower, Ticket, Users, Wallet, ChartLine, WarningCircle } from "@phosphor-icons/react";
 
 interface WeeklySale { date: string; day: string; revenue: number; transactions: number }
 interface Consumer { radAcctId: number; username: string; framedIpAddress: string; totalOctets: number; acctSessionTime: number }
@@ -74,10 +74,10 @@ export default function TenantDashboardOverview() {
     { label: "Last 7 days revenue", value: money(weeklyRevenue), detail: `${number(transactions)} successful payments`, icon: Wallet, color: "text-amber-700" },
     { label: "Monthly revenue", value: money(stats?.revenueMonth || 0), detail: "Successful payments this month", icon: Wallet, color: "text-blue-700" },
     { label: "Active users", value: number(stats?.activeUsers || 0), detail: "Current hotspot sessions", icon: Users, color: "text-blue-700" },
-    { label: "Data in active sessions", value: bytes(stats?.totalDataConsumedBytes || 0), detail: "Combined upload and download", icon: Activity, color: "text-emerald-700" },
+    { label: "Data in active sessions", value: bytes(stats?.totalDataConsumedBytes || 0), detail: "Combined upload and download", icon: ChartLine, color: "text-emerald-700" },
     { label: "Remaining vouchers", value: number(stats?.totalVouchers || 0), detail: "Unused or still active", icon: Ticket, color: "text-blue-700" },
     { label: "Active vouchers", value: number(stats?.activeVouchers || 0), detail: "Vouchers marked active", icon: Ticket, color: "text-emerald-700" },
-    { label: "Router health", value: `${stats?.totalRouters || 0} router${stats?.totalRouters === 1 ? "" : "s"}`, detail: `${stats?.onlineRouters || 0} online · ${Math.max(0, (stats?.totalRouters || 0) - (stats?.onlineRouters || 0))} offline / pending`, icon: Router, color: "text-amber-700" },
+    { label: "CellTower health", value: `${stats?.totalRouters || 0} router${stats?.totalRouters === 1 ? "" : "s"}`, detail: `${stats?.onlineRouters || 0} online · ${Math.max(0, (stats?.totalRouters || 0) - (stats?.onlineRouters || 0))} offline / pending`, icon: CellTower, color: "text-amber-700" },
   ];
 
   if (loading && !stats) return <DashboardLoading />;
@@ -91,12 +91,12 @@ export default function TenantDashboardOverview() {
           <p className="mt-1 text-sm text-slate-500">Sales, customers, and your hotspot network in one place.</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setHidden(!hidden)} aria-label={hidden ? "Show revenue" : "Hide revenue"} className="rounded-lg border border-slate-300 p-2.5 text-slate-500 hover:text-slate-900">{hidden ? <EyeOff size={16} /> : <Eye size={16} />}</button>
-          <button onClick={() => void fetchStats()} disabled={loading} aria-label="Refresh dashboard" className="rounded-lg border border-slate-300 p-2.5 text-slate-500 hover:text-slate-900 disabled:opacity-50"><RefreshCw size={16} className={loading ? "animate-spin" : ""} /></button>
+          <button onClick={() => setHidden(!hidden)} aria-label={hidden ? "Show revenue" : "Hide revenue"} className="rounded-lg border border-slate-300 p-2.5 text-slate-500 hover:text-slate-900">{hidden ? <EyeSlash size={16} /> : <Eye size={16} />}</button>
+          <button onClick={() => void fetchStats()} disabled={loading} aria-label="Refresh dashboard" className="rounded-lg border border-slate-300 p-2.5 text-slate-500 hover:text-slate-900 disabled:opacity-50"><ArrowClockwise size={16} className={loading ? "animate-spin" : ""} /></button>
         </div>
       </section>
 
-      {error && <div role="alert" className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700"><AlertCircle size={16} />{stats ? "Unable to refresh. Showing the last available data." : "Dashboard data could not be loaded. Please try refreshing."}</div>}
+      {error && <div role="alert" className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700"><WarningCircle size={16} />{stats ? "Unable to refresh. Showing the last available data." : "Dashboard data could not be loaded. Please try refreshing."}</div>}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-busy={loading}>
         {cards.map(({ label, value, detail, icon: Icon, color }) => (
@@ -206,7 +206,7 @@ export default function TenantDashboardOverview() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
-                <th className="px-5 py-3 font-medium">Router</th>
+                <th className="px-5 py-3 font-medium">CellTower</th>
                 <th className="px-5 py-3 font-medium">Status</th>
                 <th className="px-5 py-3 text-right font-medium">Users</th>
                 <th className="px-5 py-3 text-right font-medium">Today</th>
@@ -231,7 +231,7 @@ export default function TenantDashboardOverview() {
               ))}
             </tbody>
           </table>
-          {!stats?.routerRevenue?.length && <div className="py-12 text-center"><Router className="mx-auto mb-3 h-7 w-7 text-slate-600" /><p className="text-sm text-slate-500">{loading ? "Loading routers…" : "No routers linked yet"}</p><p className="mt-1 text-xs text-slate-500">Revenue will be tracked per router once you link one.</p></div>}
+          {!stats?.routerRevenue?.length && <div className="py-12 text-center"><CellTower className="mx-auto mb-3 h-7 w-7 text-slate-600" /><p className="text-sm text-slate-500">{loading ? "Loading routers…" : "No routers linked yet"}</p><p className="mt-1 text-xs text-slate-500">Revenue will be tracked per router once you link one.</p></div>}
         </div>
       </section>
 

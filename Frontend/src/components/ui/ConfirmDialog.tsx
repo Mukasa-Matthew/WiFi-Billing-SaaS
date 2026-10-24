@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
-import { AlertTriangle } from "lucide-react";
+import { Warning } from "@phosphor-icons/react";
 import { button, buttonGhost } from "@/components/BillingUI";
 
 export interface ConfirmRequest {
@@ -46,7 +46,7 @@ function ConfirmDialog({ req, onClose }: { req: ConfirmRequest; onClose: () => v
       >
         <div className="flex items-start gap-3">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600">
-            <AlertTriangle className="h-4.5 w-4.5" />
+            <Warning className="h-4.5 w-4.5" />
           </div>
           <div>
             <h2 id="confirm-title" className="text-sm font-semibold text-slate-900">{req.title}</h2>

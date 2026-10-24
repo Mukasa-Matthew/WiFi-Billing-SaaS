@@ -7,24 +7,24 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
 import {
-  LayoutDashboard,
-  Router as RouterIcon,
-  Layers,
+  SquaresFour,
+  CellTower as RouterIcon,
+  Stack,
   Ticket,
   Radio,
-  History,
-  LogOut,
-  Wifi,
+  ClockCounterClockwise,
+  SignOut,
+  WifiHigh,
   ShieldCheck,
   ArrowRight,
-  Menu,
-  Settings,
+  List,
+  GearSix,
   Users,
-  Banknote,
-  Link2,
+  Money,
+  LinkSimple,
   FileText,
-  ChevronDown,
-} from "lucide-react";
+  CaretDown,
+} from "@phosphor-icons/react";
 
 const NAVY = "#122B49";
 
@@ -79,21 +79,21 @@ export default function TenantDashboardLayout({
   };
 
   const navItems = [
-    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, group: "Overview" },
+    { name: "Dashboard", href: "/dashboard", icon: SquaresFour, group: "Overview" },
     { name: "Active users", href: "/dashboard/users", icon: Radio, group: "Users" },
     { name: "Customers", href: "/dashboard/customers", icon: Users, group: "Users" },
-    { name: "Expired users", href: "/dashboard/expired", icon: History, group: "Users" },
-    { name: "IP bindings", href: "/dashboard/bindings", icon: Link2, group: "Users" },
-    { name: "Packages", href: "/dashboard/packages", icon: Layers, group: "Finance" },
+    { name: "Expired users", href: "/dashboard/expired", icon: ClockCounterClockwise, group: "Users" },
+    { name: "IP bindings", href: "/dashboard/bindings", icon: LinkSimple, group: "Users" },
+    { name: "Packages", href: "/dashboard/packages", icon: Stack, group: "Finance" },
     { name: "Vouchers", href: "/dashboard/vouchers", icon: Ticket, group: "Finance" },
-    { name: "Payments", href: "/dashboard/payments", icon: Banknote, group: "Finance" },
+    { name: "Payments", href: "/dashboard/payments", icon: Money, group: "Finance" },
     { name: "MikroTik routers", href: "/dashboard/routers", icon: RouterIcon, group: "Devices" },
     { name: "Sessions", href: "/dashboard/sessions", icon: Radio, group: "Accounting" },
     { name: "Accounting logs", href: "/dashboard/logs", icon: FileText, group: "Accounting" },
-    { name: "Settings", href: "/dashboard/settings", icon: Settings, group: "Settings" },
+    { name: "GearSix", href: "/dashboard/settings", icon: GearSix, group: "GearSix" },
   ];
 
-  const activeItem = [...navItems, { name: "Add router", href: "/dashboard/routers/new", icon: Wifi, group: "Devices" }].sort((a, b) => b.href.length - a.href.length).find(
+  const activeItem = [...navItems, { name: "Add router", href: "/dashboard/routers/new", icon: WifiHigh, group: "Devices" }].sort((a, b) => b.href.length - a.href.length).find(
     (item) => item.href === "/dashboard" ? pathname === item.href : pathname?.startsWith(item.href)
   );
 
@@ -113,7 +113,7 @@ export default function TenantDashboardLayout({
           {/* Brand */}
           <div className="flex h-16 items-center gap-3 border-b border-white/10 px-5">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 text-white">
-              <Wifi className="h-4.5 w-4.5" />
+              <WifiHigh className="h-4.5 w-4.5" />
             </div>
             <div className="min-w-0">
               <span className="block truncate text-sm font-bold tracking-tight text-white">
@@ -161,7 +161,7 @@ export default function TenantDashboardLayout({
                       className={`flex w-full items-center justify-between px-3 pb-1.5 ${index === 0 ? "" : "pt-3"} text-[10px] font-bold uppercase tracking-widest text-blue-200/70 hover:text-blue-100`}
                     >
                       <span>{item.group}</span>
-                      <ChevronDown className={`h-3 w-3 transition-transform ${isGroupCollapsed ? "-rotate-90" : ""}`} />
+                      <CaretDown className={`h-3 w-3 transition-transform ${isGroupCollapsed ? "-rotate-90" : ""}`} />
                     </button>
                   )}
                   {!isGroupCollapsed && (
@@ -207,7 +207,7 @@ export default function TenantDashboardLayout({
             onClick={logout}
             className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 py-2 px-3 text-xs font-semibold text-blue-100 transition hover:bg-red-500/20 hover:text-white"
           >
-            <LogOut className="h-3.5 w-3.5" />
+            <SignOut className="h-3.5 w-3.5" />
             <span>Sign out</span>
           </button>
         </div>
@@ -219,7 +219,7 @@ export default function TenantDashboardLayout({
           <div className="flex min-w-0 items-center gap-3">
             <button aria-label="Open navigation" onClick={() => setMenuOpen(true)}
               className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 md:hidden">
-              <Menu className="h-5 w-5" />
+              <List className="h-5 w-5" />
             </button>
             <div className="min-w-0">
               <span className="block truncate text-sm font-semibold text-slate-900">

@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useRef } from "react";
-import { X } from "lucide-react";
+import { X } from "@phosphor-icons/react";
 
 export function Dialog({ title, description, children, onClose, wide = false }: {
   title: string; description?: string; children: React.ReactNode; onClose: () => void; wide?: boolean;

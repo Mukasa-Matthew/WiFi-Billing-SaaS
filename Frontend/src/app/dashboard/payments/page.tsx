@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import { useResource, Table, Badge, Notice, FilterTabs, date } from "@/components/BillingUI";
-import { Wallet, Banknote, CalendarDays, Eye, EyeOff } from "lucide-react";
+import { Wallet, Money, CalendarBlank, Eye, EyeSlash } from "@phosphor-icons/react";
 
 interface Payment {
   reference: string; method: string; amount: number; status: string;
@@ -40,7 +40,7 @@ export default function Page() {
         </div>
         <button onClick={() => setHidden(!hidden)} aria-label={hidden ? "Show revenue" : "Hide revenue"}
           className="rounded-lg border border-slate-300 p-2.5 text-slate-500 hover:text-slate-900">
-          {hidden ? <EyeOff size={16} /> : <Eye size={16} />}
+          {hidden ? <EyeSlash size={16} /> : <Eye size={16} />}
         </button>
       </div>
 
@@ -48,7 +48,7 @@ export default function Page() {
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Today's revenue (online)</p>
           <p className="mt-2 text-2xl font-bold tabular-nums text-slate-900">{money(todayOnline)}</p>
-          <p className="mt-1 flex items-center gap-1.5 text-xs text-emerald-700"><Banknote size={12} />Paid via mobile money</p>
+          <p className="mt-1 flex items-center gap-1.5 text-xs text-emerald-700"><Money size={12} />Paid via mobile money</p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Today's revenue (walk-in)</p>
@@ -58,12 +58,12 @@ export default function Page() {
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Weekly revenue</p>
           <p className="mt-2 text-2xl font-bold tabular-nums text-slate-900">{money(weekTotal)}</p>
-          <p className="mt-1 flex items-center gap-1.5 text-xs text-blue-700"><CalendarDays size={12} />Last 7 days</p>
+          <p className="mt-1 flex items-center gap-1.5 text-xs text-blue-700"><CalendarBlank size={12} />Last 7 days</p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Monthly revenue</p>
           <p className="mt-2 text-2xl font-bold tabular-nums text-slate-900">{money(monthTotal)}</p>
-          <p className="mt-1 flex items-center gap-1.5 text-xs text-blue-700"><CalendarDays size={12} />This month</p>
+          <p className="mt-1 flex items-center gap-1.5 text-xs text-blue-700"><CalendarBlank size={12} />This month</p>
         </div>
       </div>
 
@@ -92,7 +92,7 @@ export default function Page() {
           { label: "Method", render: p => <Badge tone="slate">{p.method}</Badge> },
           { label: "Amount", render: p => <span className="font-semibold">UGX {Number(p.amount).toLocaleString()}</span> },
           { label: "Status", render: p => <Badge tone={p.status === "SUCCESSFUL" ? "green" : p.status === "FAILED" ? "red" : "amber"}>{p.status}</Badge> },
-          { label: "Router", render: p => p.router },
+          { label: "CellTower", render: p => p.router },
           { label: "Recorded", render: p => <span className="text-slate-500">{date(p.createdAt)}</span> },
         ]}
       />

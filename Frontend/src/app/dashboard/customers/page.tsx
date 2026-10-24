@@ -4,7 +4,7 @@ import api from "@/lib/api";
 import { useResource, Table, Notice, field, button, buttonGhost, message, PageContainer,PageHeader, EmptyState, label } from "@/components/BillingUI";
 import { Dialog } from "@/components/ui/Dialog";
 import { useToast } from "@/components/ui/Toast";
-import { Users, UserPlus } from "lucide-react";
+import { Users, UserPlus } from "@phosphor-icons/react";
 
 interface Customer { id: number; name: string; phone: string; notes: string }
 
@@ -80,7 +80,7 @@ export default function Page() {
             </div>
             <div className="flex justify-end gap-2 pt-1">
               <button type="button" onClick={() => setEdit(null)} disabled={saving} className={buttonGhost}>Cancel</button>
-              <button disabled={saving} className={button}>{saving ? "Saving…" : edit.id ? "Save customer" : "Add customer"}</button>
+              <button disabled={saving} className={button}>{saving ? "Saving…" : edit.id ? "FloppyDisk customer" : "Add customer"}</button>
             </div>
           </form>
         </Dialog>

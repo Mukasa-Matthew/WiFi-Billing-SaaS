@@ -5,7 +5,7 @@ import api from "@/lib/api";
 import {useResource,Table,Badge,Notice,FilterTabs,button,date,message,PageContainer,PageHeader} from "@/components/BillingUI";
 import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
-import { Link2 } from "lucide-react";
+import { LinkSimple } from "@phosphor-icons/react";
 
 interface Binding{id:number;name:string;address:string;mac:string;router:string;packageName:string;status:string;synced:boolean;expiresAt:string}
 
@@ -26,7 +26,7 @@ export default function Page(){
  });
  return <PageContainer>
   {dialog}
-  <PageHeader title="IP bindings" description="Manage device bypass access and automatic expiry." action={<Link href="/dashboard/bindings/new" className={button}><Link2 size={14}/>Bind IP</Link>}/>
+  <PageHeader title="IP bindings" description="Manage device bypass access and automatic expiry." action={<Link href="/dashboard/bindings/new" className={button}><LinkSimple size={14}/>Bind IP</Link>}/>
   <Notice text={error||note}/>
   <div className="flex sm:justify-end">
    <FilterTabs value={tab} onChange={setTab} options={[{key:"ACTIVE",label:"Active"},{key:"EXPIRED",label:"Expired"},{key:"ALL",label:"All"}].map(t=>({...t,count:data.filter(b=>t.key==="ALL"||b.status===t.key).length}))}/>
@@ -35,10 +35,10 @@ export default function Page(){
    {label:"Name",render:b=><span className="font-medium">{b.name}</span>},
    {label:"IP",render:b=>b.address?<span className="font-mono text-xs">{b.address}</span>:"MAC only"},
    {label:"MAC",render:b=><span className="font-mono text-xs">{b.mac}</span>},
-   {label:"Router",render:b=>b.router},
+   {label:"CellTower",render:b=>b.router},
    {label:"Package",render:b=>b.packageName||"Free / internal"},
    {label:"Status",render:b=><Badge tone={b.status==="ACTIVE"?"green":"red"}>{b.status}</Badge>},
-   {label:"Router sync",render:b=><Badge tone={b.synced?"green":"amber"}>{b.synced?"Acknowledged":"Pending"}</Badge>},
+   {label:"CellTower sync",render:b=><Badge tone={b.synced?"green":"amber"}>{b.synced?"Acknowledged":"Pending"}</Badge>},
    {label:"Expiry",render:b=>b.expiresAt?date(b.expiresAt):"Never"},
    {label:"",render:b=><button disabled={b.status==="REMOVED"} onClick={()=>remove(b)} className="text-xs font-medium text-red-600 hover:underline disabled:opacity-30">Remove</button>}
   ]}/>
