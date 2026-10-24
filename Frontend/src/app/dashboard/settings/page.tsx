@@ -126,7 +126,7 @@ export default function TenantSettingsPage() {
     typeof html === "string" &&
     html.includes("portal-card") &&
     !html.includes("/_next/") &&
-    !/<title[^>]*>\s*WiFi-Billing/i.test(html);
+    !/<title[^>]*>\s*(WiFi-Billing|AirPairy)/i.test(html);
 
   useEffect(() => {
     if (!form) return;
