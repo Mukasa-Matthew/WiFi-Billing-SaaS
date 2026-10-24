@@ -2,6 +2,7 @@ package com.wifibilling.controller;
 
 import com.wifibilling.config.PlatformProperties;
 import com.wifibilling.dto.PortalPackageResponse;
+import com.wifibilling.dto.PortalConfigResponse;
 import com.wifibilling.model.PackagePlan;
 import com.wifibilling.model.Router;
 import com.wifibilling.repository.PackagePlanRepository;
@@ -19,6 +20,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import java.util.List;
 
 @Slf4j
@@ -31,6 +34,49 @@ public class PortalController {
     private final PackagePlanRepository packagePlanRepository;
     private final TransactionRepository transactionRepository;
     private final PlatformProperties props;
+
+    private List<PortalPackageResponse> portalPackages(Router router) {
+        if (!Boolean.TRUE.equals(router.getTenant().getPortalShowPackages())) return List.of();
+        return packagePlanRepository.findAllByTenantIdOrderByPriceAsc(router.getTenant().getId()).stream()
+                .filter(p -> "ACTIVE".equals(p.effectiveAvailability()))
+                .filter(p -> p.getRouter() == null || p.getRouter().getId().equals(router.getId()))
+                .sorted(java.util.Comparator.<PackagePlan, Boolean>comparing(p -> !Boolean.TRUE.equals(p.getFeatured()))
+                        .thenComparing(PackagePlan::getPrice)
+                        .thenComparing(p -> p.getDisplayOrder() == null ? 0 : p.getDisplayOrder()))
+                .map(p -> new PortalPackageResponse(p.getId(), p.getName(), p.getPrice(), p.getRateLimit(),
+                        p.getSessionTimeout(), Boolean.TRUE.equals(p.getFeatured())))
+                .toList();
+    }
+
+    /** A tenant- and router-scoped snapshot. Client supplied tenant ids are never accepted. */
+    @GetMapping(value = "/config", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<PortalConfigResponse> getConfig(
+            @RequestParam("token") String token,
+            @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch) {
+        Router router = resolveRouter(token);
+        var tenant = router.getTenant();
+        var packages = portalPackages(router);
+        var settings = new PortalConfigResponse.PortalSettings(
+                tenant.getName(), tenant.getSupportPhone(), tenant.getSupportEmail(),
+                tenant.getBrandColor() == null ? "#3B82F6" : tenant.getBrandColor(),
+                tenant.getRedirectUrl(), tenant.getPortalTemplate() == null ? "midnight" : tenant.getPortalTemplate(),
+                Boolean.TRUE.equals(tenant.getPortalShowPackages()));
+        String fingerprint = settings.toString() + "|" + packages.toString();
+        String version;
+        try {
+            version = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                    .digest(fingerprint.getBytes(StandardCharsets.UTF_8)));
+        } catch (Exception e) {
+            throw new IllegalStateException("Unable to version portal configuration", e);
+        }
+        String etag = "\"" + version + "\"";
+        if (etag.equals(ifNoneMatch)) {
+            return ResponseEntity.status(HttpStatus.NOT_MODIFIED)
+                    .eTag(version).cacheControl(CacheControl.noCache()).build();
+        }
+        return ResponseEntity.ok().eTag(version).cacheControl(CacheControl.noCache())
+                .body(new PortalConfigResponse(version, settings, packages));
+    }
     private String packagesJson(Router router) {
         StringBuilder b = new StringBuilder("[");
         var plans = packagePlanRepository.findAllByTenantIdOrderByPriceAsc(router.getTenant().getId());
@@ -63,25 +109,7 @@ public class PortalController {
      */
     @GetMapping(value = "/packages", produces = MediaType.APPLICATION_JSON_VALUE)
     public List<PortalPackageResponse> getPackages(@RequestParam("token") String token) {
-        Router router = resolveRouter(token);
-        if (!Boolean.TRUE.equals(router.getTenant().getPortalShowPackages())) {
-            return List.of();
-        }
-        List<PackagePlan> plans = packagePlanRepository.findAllByTenantIdOrderByPriceAsc(router.getTenant().getId());
-
-        return plans.stream()
-                .filter(p -> "ACTIVE".equals(p.effectiveAvailability()))
-                .filter(p -> p.getRouter() == null || p.getRouter().getId().equals(router.getId()))
-                .sorted(java.util.Comparator.<PackagePlan, Boolean>comparing(p -> !Boolean.TRUE.equals(p.getFeatured()))
-                        .thenComparing(PackagePlan::getPrice)
-                        .thenComparing(p -> p.getDisplayOrder() == null ? 0 : p.getDisplayOrder()))
-                .map(p -> new PortalPackageResponse(
-                        p.getId(),
-                        p.getName(),
-                        p.getPrice(),
-                        p.getRateLimit(),
-                        p.getSessionTimeout(), Boolean.TRUE.equals(p.getFeatured())))
-                .toList();
+        return portalPackages(resolveRouter(token));
     }
 
     /**
@@ -168,8 +196,8 @@ public class PortalController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid filename");
         }
 
-        // The router caches the tenant's packages as a static file so unauthenticated
-        // clients get plans instantly from flash — no WAN or walled-garden dependency.
+        // Retained for backward compatibility and emergency diagnostics. Current
+        // portals never authorize purchases from this potentially stale snapshot.
         if ("packages.json".equals(filename)) {
             return ResponseEntity.ok()
                     .cacheControl(CacheControl.noStore())
@@ -177,10 +205,8 @@ public class PortalController {
                     .body(packagesJson(router));
         }
 
-        // The router serves the full portal page itself as login.html so clients see
-        // the branded plans instantly; only the JSON calls cross the WAN. The page is
-        // the same portal.html used by /api/portal/page, with its runtime config swapped
-        // from query-string parsing to RouterOS $(variables) + baked-in endpoints.
+        // The router serves the lightweight shell. Runtime tenant configuration is
+        // obtained from /config, so ordinary dashboard edits never require re-upload.
         boolean isLogin = "login.html".equals(filename);
         Resource resource = new ClassPathResource("static/hotspot/" + (isLogin ? "portal.html" : filename));
         if (!resource.exists()) {
@@ -205,11 +231,7 @@ public class PortalController {
                         .replace("var MT_ERROR = Q.get('error') || '';",
                                 "var MT_ERROR = '$(error)';")
                         .replace("var BASE = location.origin;",
-                                "var BASE = 'SERVER_BASE_URL_PLACEHOLDER';")
-                        // Packages come from the router-cached JSON file (instant),
-                        // not a live WAN request that can stall.
-                        .replace("fetch(BASE + '/api/portal/packages?token=' + encodeURIComponent(TOKEN))",
-                                "fetch('packages.json')");
+                                "var BASE = 'SERVER_BASE_URL_PLACEHOLDER';");
             }
 
             content = content

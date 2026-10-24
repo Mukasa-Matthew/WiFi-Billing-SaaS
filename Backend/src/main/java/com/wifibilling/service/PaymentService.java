@@ -55,6 +55,9 @@ public class PaymentService {
         if (!"ACTIVE".equals(packagePlan.effectiveAvailability())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Package is unavailable for purchase");
         }
+        if (packagePlan.getRouter() != null && !packagePlan.getRouter().getId().equals(router.getId())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Package not found for router");
+        }
 
         String reference = "PAY-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16).toUpperCase();
 
