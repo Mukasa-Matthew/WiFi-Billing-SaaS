@@ -88,10 +88,11 @@ public class TenantDashboardService {
 
         // Vouchers
         List<Voucher> vouchers = voucherRepository.findAllByTenantIdOrderByCreatedAtDesc(tenantId);
-        long totalVouchers = vouchers.size();
+        // Remaining vouchers only — used, expired, and revoked ones no longer count.
         long activeVouchers = vouchers.stream().filter(v -> "active".equalsIgnoreCase(v.getStatus())).count();
         long usedVouchers = vouchers.stream().filter(v -> "used".equalsIgnoreCase(v.getStatus())).count();
         long expiredVouchers = vouchers.stream().filter(v -> "expired".equalsIgnoreCase(v.getStatus()) || "revoked".equalsIgnoreCase(v.getStatus())).count();
+        long totalVouchers = vouchers.size() - usedVouchers - expiredVouchers;
 
         // Sessions
         List<ActiveSessionDto> activeSessions = sessionService.getActiveSessions(tenantId, role);

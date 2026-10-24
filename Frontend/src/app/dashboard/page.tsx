@@ -60,7 +60,7 @@ export default function TenantDashboardOverview() {
     { label: "Monthly revenue", value: money(stats?.revenueMonth || 0), detail: "Successful payments this month", icon: Wallet, color: "text-blue-700" },
     { label: "Active users", value: number(stats?.activeUsers || 0), detail: "Current hotspot sessions", icon: Users, color: "text-blue-700" },
     { label: "Data in active sessions", value: bytes(stats?.totalDataConsumedBytes || 0), detail: "Combined upload and download", icon: Activity, color: "text-emerald-700" },
-    { label: "Total vouchers", value: number(stats?.totalVouchers || 0), detail: "All vouchers created", icon: Ticket, color: "text-blue-700" },
+    { label: "Remaining vouchers", value: number(stats?.totalVouchers || 0), detail: "Unused or still active", icon: Ticket, color: "text-blue-700" },
     { label: "Active vouchers", value: number(stats?.activeVouchers || 0), detail: "Vouchers marked active", icon: Ticket, color: "text-emerald-700" },
     { label: "Router health", value: `${stats?.totalRouters || 0} router${stats?.totalRouters === 1 ? "" : "s"}`, detail: `${stats?.onlineRouters || 0} online · ${Math.max(0, (stats?.totalRouters || 0) - (stats?.onlineRouters || 0))} offline / pending`, icon: Router, color: "text-amber-700" },
   ];
