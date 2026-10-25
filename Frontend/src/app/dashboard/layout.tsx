@@ -60,12 +60,13 @@ export default function TenantDashboardLayout({
   }, [user]);
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.replace("/login");
+    if (!loading) {
+      if (!user) router.replace("/login");
+      else if (user.mustChangePassword) router.replace("/change-password");
     }
   }, [user, loading, router]);
 
-  const ready = !loading && !!user;
+  const ready = !loading && !!user && !user.mustChangePassword;
 
   const counts: Record<string, number | undefined> = {
     "Active users": stats?.activeUsers,

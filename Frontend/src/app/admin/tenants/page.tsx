@@ -36,9 +36,9 @@ export default function AdminTenantsPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [password, setPassword] = useState("");
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [createNotice, setCreateNotice] = useState<string | null>(null);
 
   const fetchTenants = async () => {
     try {
@@ -62,18 +62,19 @@ export default function AdminTenantsPage() {
     setFormLoading(true);
 
     try {
-      await api.post("/api/admin/tenants", {
+      const res = await api.post<{ temporaryPassword: string | null; welcomeEmailSent: boolean }>("/api/admin/tenants", {
         name: name.trim(),
         email: email.trim(),
         phone: phone.trim(),
-        password: password,
       });
 
       setIsModalOpen(false);
       setName("");
       setEmail("");
       setPhone("");
-      setPassword("");
+      setCreateNotice(res.data.welcomeEmailSent
+        ? "Operator created. Their temporary login details were sent by email."
+        : `Operator created, but the welcome email was not sent. Give them this temporary password securely: ${res.data.temporaryPassword}`);
       await fetchTenants();
     } catch (err: unknown) {
       if (err && typeof err === "object" && "response" in err) {
@@ -147,6 +148,13 @@ export default function AdminTenantsPage() {
           Showing <b>{filteredTenants.length}</b> operators
         </span>
       </div>
+
+      {createNotice && (
+        <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-start justify-between gap-3">
+          <span>{createNotice}</span>
+          <button type="button" aria-label="Dismiss notice" onClick={() => setCreateNotice(null)} className="shrink-0"><X className="w-4 h-4" /></button>
+        </div>
+      )}
 
       {/* Operators Table */}
       <div className="rounded-xl bg-[var(--surface)] border border-[var(--border)] overflow-hidden">
@@ -255,7 +263,7 @@ export default function AdminTenantsPage() {
                 <span>Register Hotspot Operator</span>
               </h2>
               <p className="text-xs text-[var(--fg-muted)] mt-1">
-                Creates a new business tenant and credentials for their dashboard.
+                A temporary password will be generated and emailed to the operator.
               </p>
             </div>
 
@@ -305,21 +313,6 @@ export default function AdminTenantsPage() {
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="e.g. +256770000000"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-xs text-[var(--fg)] placeholder-[var(--fg-muted)] focus:outline-none focus:border-indigo-500 transition"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-[var(--fg-body)] mb-1">
-                  Initial Password
-                </label>
-                <input
-                  type="password"
-                  required
-                  minLength={6}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Minimum 6 characters"
                   className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-xs text-[var(--fg)] placeholder-[var(--fg-muted)] focus:outline-none focus:border-indigo-500 transition"
                 />
               </div>

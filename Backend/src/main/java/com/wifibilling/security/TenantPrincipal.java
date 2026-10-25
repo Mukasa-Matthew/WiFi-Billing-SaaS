@@ -15,12 +15,14 @@ public class TenantPrincipal implements UserDetails {
     private final String email;
     private final String name;
     private final String role;
+    private final boolean mustChangePassword;
 
-    public TenantPrincipal(Long tenantId, String email, String name, String role) {
+    public TenantPrincipal(Long tenantId, String email, String name, String role, boolean mustChangePassword) {
         this.tenantId = tenantId;
         this.email = email;
         this.name = name;
         this.role = (role != null && !role.isBlank()) ? role : "ROLE_ADMIN";
+        this.mustChangePassword = mustChangePassword;
     }
 
     @Override

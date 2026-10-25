@@ -82,6 +82,31 @@ public class EmailTemplates {
         return shell("Reset your password", body, "");
     }
 
+    public String tenantWelcomeEmail(String businessName, String email, String temporaryPassword,
+                                     String loginUrl) {
+        String body = """
+                <p style="margin:0 0 16px;font-size:14px;color:#334155;line-height:1.6;">
+                  Welcome, %s!
+                </p>
+                <p style="margin:0 0 18px;font-size:14px;color:#334155;line-height:1.6;">
+                  Your AirPairy business account has been created. Use the temporary credentials below to sign in.
+                </p>
+                <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;padding:16px;margin-bottom:18px;">
+                  <p style="margin:0 0 8px;font-size:13px;color:#475569;"><b>Email:</b> %s</p>
+                  <p style="margin:0;font-size:13px;color:#475569;"><b>Temporary password:</b>
+                    <span style="font-family:Menlo,Consolas,monospace;">%s</span></p>
+                </div>
+                <p style="margin:0 0 18px;font-size:13px;color:#B45309;line-height:1.6;">
+                  For your security, you will be required to create a new password immediately after signing in.
+                </p>
+                <p style="margin:0;text-align:center;">
+                  <a href="%s" style="display:inline-block;background:#1D4ED8;color:#ffffff;text-decoration:none;
+                     border-radius:9px;padding:11px 22px;font-size:13px;font-weight:bold;">Sign in to AirPairy</a>
+                </p>
+                """.formatted(escape(businessName), escape(email), escape(temporaryPassword), escape(loginUrl));
+        return shell("Your AirPairy account is ready", body, "");
+    }
+
     private String escape(String s) {
         if (s == null) return "";
         return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
