@@ -2,8 +2,10 @@ package com.wifibilling.controller;
 
 import com.wifibilling.dto.AuthRequest;
 import com.wifibilling.dto.AuthResponse;
+import com.wifibilling.dto.TwoFactorVerifyRequest;
 import com.wifibilling.service.AuthService;
 import com.wifibilling.security.TenantPrincipal;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -20,11 +22,19 @@ public class AuthController {
 
     /**
      * Unified login for both Superadmin and Hotspot Admins.
-     * Public self-registration is disabled. Tenants are provisioned exclusively by Superadmin.
+     * If 2FA is active, returns requires2fa=true and a short-lived tempToken.
      */
     @PostMapping("/login")
-    public AuthResponse login(@Valid @RequestBody AuthRequest req) {
-        return authService.login(req);
+    public AuthResponse login(@Valid @RequestBody AuthRequest req, HttpServletRequest servletRequest) {
+        return authService.login(req, servletRequest);
+    }
+
+    /**
+     * Step 2 of 2FA login: verifies the 6-digit TOTP or one-time recovery code.
+     */
+    @PostMapping("/2fa/verify")
+    public AuthResponse verifyTwoFactor(@Valid @RequestBody TwoFactorVerifyRequest req, HttpServletRequest servletRequest) {
+        return authService.verifyTwoFactorLogin(req, servletRequest);
     }
 
     public record ForgotRequest(String email) {}
@@ -51,7 +61,7 @@ public class AuthController {
             throw new org.springframework.web.server.ResponseStatusException(
                     org.springframework.http.HttpStatus.UNAUTHORIZED, "Authentication required");
         }
-        authService.changePassword(principal.getTenantId(), req.currentPassword(), req.newPassword());
+        authService.changePassword(principal.getTenantId(), req.currentPassword(), req.newPassword(), principal.getSessionId());
         return Map.of("message", "Password changed successfully.");
     }
 }

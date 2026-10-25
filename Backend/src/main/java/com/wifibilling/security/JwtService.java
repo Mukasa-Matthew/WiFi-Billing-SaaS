@@ -30,13 +30,36 @@ public class JwtService {
     }
 
     public String generateToken(Long tenantId, String email, String role) {
+        return generateToken(tenantId, email, role, null);
+    }
+
+    public String generateToken(Long tenantId, String email, String role, String sessionId) {
         Instant now = Instant.now();
-        return Jwts.builder()
+        var builder = Jwts.builder()
                 .subject(email)
                 .claim("tenantId", tenantId)
                 .claim("role", role)
                 .issuedAt(Date.from(now))
-                .expiration(Date.from(now.plus(expirationHours, ChronoUnit.HOURS)))
+                .expiration(Date.from(now.plus(expirationHours, ChronoUnit.HOURS)));
+
+        if (sessionId != null) {
+            builder.claim("sessionId", sessionId);
+        }
+
+        return builder.signWith(key).compact();
+    }
+
+    /**
+     * Issues a short-lived (5 min) restricted challenge token used strictly to complete 2FA.
+     */
+    public String generate2faChallengeToken(Long tenantId, String email) {
+        Instant now = Instant.now();
+        return Jwts.builder()
+                .subject(email)
+                .claim("tenantId", tenantId)
+                .claim("purpose", "2FA_CHALLENGE")
+                .issuedAt(Date.from(now))
+                .expiration(Date.from(now.plus(5, ChronoUnit.MINUTES)))
                 .signWith(key)
                 .compact();
     }
@@ -64,6 +87,16 @@ public class JwtService {
     public String extractRole(String token) {
         Object role = extractAllClaims(token).get("role");
         return role != null ? role.toString() : "ROLE_ADMIN";
+    }
+
+    public String extractSessionId(String token) {
+        Object sid = extractAllClaims(token).get("sessionId");
+        return sid != null ? sid.toString() : null;
+    }
+
+    public String extractPurpose(String token) {
+        Object p = extractAllClaims(token).get("purpose");
+        return p != null ? p.toString() : null;
     }
 
     public boolean isTokenValid(String token) {
