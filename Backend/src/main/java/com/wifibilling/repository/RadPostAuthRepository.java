@@ -18,8 +18,8 @@ public interface RadPostAuthRepository extends JpaRepository<RadPostAuth, Long> 
     @Query("""
             SELECT e FROM RadPostAuth e
             WHERE e.username IN :usernames
-              AND (:reply IS NULL OR e.reply = :reply)
-              AND (:username IS NULL OR LOWER(e.username) LIKE LOWER(CONCAT('%', :username, '%')))
+              AND (:reply IS NULL OR e.reply = CAST(:reply AS String))
+              AND (:username IS NULL OR LOWER(e.username) LIKE LOWER(CONCAT('%', CAST(:username AS String), '%')))
               AND (:fromTs IS NULL OR e.authDate >= :fromTs)
               AND (:toTs IS NULL OR e.authDate < :toTs)
             ORDER BY e.authDate DESC
