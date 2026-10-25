@@ -322,7 +322,7 @@ public class RouterScriptGenerator {
                 .append("\n}\n");
         s.append("/system/scheduler add name=wb-pkg-sync interval=1m on-event=")
                 .append(q("/system script run wb-pkg-sync"))
-                .append(" policy=").append(POLICY).append(" comment=").append(tag).append("\n");
+                .append(" comment=").append(tag).append("\n");
         // wb-portal-sync stays a tiny bootstrap: it pulls the server-generated
         // portal-sync.rsc every run, so new portal files sync without ever
         // rewriting this on-router script.
@@ -331,7 +331,7 @@ public class RouterScriptGenerator {
                 .append(portalSyncBootstrap(c.publicBaseUrl(), c.token())).append("}\n");
         s.append("/system/scheduler add name=wb-portal-sync interval=30m on-event=")
                 .append(q("/system script run wb-portal-sync"))
-                .append(" policy=").append(POLICY).append(" comment=").append(tag).append("\n");
+                .append(" comment=").append(tag).append("\n");
         s.append("\n");
 
         // 4. Walled garden (portal/API reachable before login)
@@ -374,7 +374,7 @@ public class RouterScriptGenerator {
         s.append("}\n");
         s.append("/system/scheduler add name=").append(q(TELEMETRY_NAME))
                 .append(" interval=2m on-event=").append(q("/system script run " + TELEMETRY_NAME))
-                .append(" policy=").append(POLICY).append(" comment=").append(tag).append("\n\n");
+                .append(" comment=").append(tag).append("\n\n");
 
         // 6. Key registration — retried every 30s until it succeeds, then self-removes.
         //    Survives partial-import failure and transient network issues.
@@ -398,7 +398,7 @@ public class RouterScriptGenerator {
         s.append("        :log info \"wifi-billing: WireGuard public key registered\"\n");
         s.append("    }\n");
         s.append("}\n");
-        s.append("/system/scheduler/add name=wb-register interval=30s on-event=wb-register policy=read,write,test comment=").append(tag).append("\n");
+        s.append("/system/scheduler/add name=wb-register interval=30s on-event=\"/system script run wb-register\" comment=").append(tag).append("\n");
         s.append(":do { /system script run wb-register } on-error={}\n\n");
 
         s.append("/system/script/add name=wb-provisioned policy=read comment=")
@@ -429,7 +429,7 @@ public class RouterScriptGenerator {
                         " http-method=post http-header-field=\"Content-Type: application/json\" http-data=[:serialize to=json value=$hosts] output=none",
                         ":log warning \"wifi-billing host report failed\"")
                 + " } on-error={}\n}\n"
-                + "/system/scheduler/add name=wb-management interval=1m on-event=wb-management policy=read,write,test\n"
+                + "/system/scheduler/add name=wb-management interval=1m on-event=\"/system script run wb-management\"\n"
                 + ":do { /system/script/run wb-management } on-error={}\n";
     }
 
