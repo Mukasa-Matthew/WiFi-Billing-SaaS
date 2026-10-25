@@ -254,7 +254,8 @@ public class RouterScriptGenerator {
         // router's RADIUS secret (already known to the backend).
         s.append("/user/group/remove [find name=wb-api]\n");
         s.append("/user/remove [find name=wb-api]\n");
-        s.append("/user/group/add name=wb-api policy=read,write,test,rest\n");
+        s.append(":do { /user/group/add name=wb-api policy=read,write,test,rest-api }"
+                + " on-error={ /user/group/add name=wb-api policy=read,write,test }\n");
         s.append("/user/add name=wb-api password=").append(q(c.radiusSecret())).append(" group=wb-api\n");
         s.append("/ip/service/set www disabled=no address=").append(c.tunnelSubnet()).append("\n");
         String coaRule = "/ip/firewall/filter add chain=input in-interface=" + iface
