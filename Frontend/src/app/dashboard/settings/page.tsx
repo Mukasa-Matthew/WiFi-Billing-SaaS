@@ -221,30 +221,24 @@ export default function TenantSettingsPage() {
       .catch(() => setError("Could not load settings"));
   }, []);
 
-  /* The preview is the real /portal route in an iframe, fed the unsaved form
-     state. Debounced so typing a business name doesn't reload it per keystroke. */
+  /* The preview is the real router-served portal (/api/portal/page), the same
+     HTML customers get on the hotspot. Needs one router for its token. */
+  const [routerToken, setRouterToken] = useState<string | null>(null);
   useEffect(() => {
-    if (!form) return;
+    api.get<{ token: string }[]>("/api/routers")
+      .then((r) => setRouterToken(r.data[0]?.token ?? null))
+      .catch(() => setRouterToken(null));
+  }, []);
+
+  useEffect(() => {
+    if (!form || !routerToken) return;
     const timer = window.setTimeout(() => {
-      const q = new URLSearchParams({
-        preview: "1",
-        theme: form.portalTemplate,
-        name: form.name,
-        showPackages: form.portalShowPackages ? "1" : "0",
-        allowPurchases: form.portalAllowPurchases ? "1" : "0",
-        deviceLimits: form.portalShowDeviceLimits ? "1" : "0",
-        packageTime: form.portalShowPackageTime ? "1" : "0",
-        deviceMac: form.portalShowDeviceMac ? "1" : "0",
-        buyForOther: form.portalBuyForOther ? "1" : "0",
-        feedback: form.portalShowFeedback ? "1" : "0",
-      });
-      if (form.portalFont) q.set("font", form.portalFont);
-      if (form.portalLanguage) q.set("lang", form.portalLanguage);
+      const q = new URLSearchParams({ token: routerToken, template: form.portalTemplate });
       setPreviewLoading(true);
-      setPreviewSrc(`/portal?${q.toString()}`);
+      setPreviewSrc(`/api/portal/page?${q.toString()}`);
     }, 350);
     return () => window.clearTimeout(timer);
-  }, [form, previewKey]);
+  }, [form, routerToken, previewKey]);
 
   const set = <K extends keyof TenantSettings>(key: K, value: TenantSettings[K]) =>
     setForm((f) => (f ? { ...f, [key]: value } : f));
@@ -488,17 +482,24 @@ export default function TenantSettingsPage() {
                   <div className="overflow-hidden rounded-xl border border-[var(--border-strong)] bg-[var(--canvas)]">
                     <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] px-3 py-2">
                       <span className="text-[10px] text-[var(--fg-muted)]">Live preview — {form.portalTemplate}</span>
-                      <a
-                        href={previewSrc ?? "/portal"}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 rounded text-[10px] font-semibold text-[var(--accent-text)] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
-                      >
-                        Open in new tab
-                        <ArrowSquareOut size={12} aria-hidden />
-                      </a>
+                      {previewSrc && (
+                        <a
+                          href={previewSrc}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 rounded text-[10px] font-semibold text-[var(--accent-text)] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+                        >
+                          Open in new tab
+                          <ArrowSquareOut size={12} aria-hidden />
+                        </a>
+                      )}
                     </div>
                     <div className="relative h-[420px]">
+                      {!routerToken && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-[var(--canvas)] px-6 text-center text-xs text-[var(--fg-muted)]">
+                          Link a router to preview your portal exactly as customers see it.
+                        </div>
+                      )}
                       {previewSrc && (
                         <iframe
                           key={previewKey}
