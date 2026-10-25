@@ -108,9 +108,9 @@ class RouterScriptGeneratorTest {
     @Test
     void ntpWaitLoopIsASingleStatement() {
         String s = render("s3cret");
-        assertTrue(s.contains(":for wbNtpWait from=1 to=24 do={ :set wbDate"),
-                "NTP wait loop must be emitted as one line");
-        assertFalse(s.contains(":for wbNtpWait from=1 to=24 do={\n"),
-                "NTP wait loop must not open a multi-line block");
+        // No :for loop or :set inside blocks — strict parsers reject them.
+        assertFalse(s.contains(":for wbNtpWait"), "NTP wait must not use a :for loop");
+        assertFalse(s.contains(":set wbDate"), "NTP wait must not re-:set inside a block");
+        assertTrue(s.contains(":delay 10s"), "NTP wait must use a bounded :delay");
     }
 }
