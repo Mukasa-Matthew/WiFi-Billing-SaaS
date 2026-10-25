@@ -38,7 +38,13 @@ A partial run has no final marker, so retrying cleans known WiFi-Billing objects
 - The management REST user is restricted to the WireGuard subnet and a limited RouterOS group.
 - Hub peer management uses a forced SSH command and constrained sudo rule.
 
-The existing router token is also used at runtime, so it is long-lived rather than single-use. Splitting enrollment and runtime credentials needs a migration and coordinated router rotation; see `operations.md`.
+Enrollment and runtime identifiers are separate:
+
+- The router's public identifier (`routers.token`) is embedded in captive portal pages and used by the router's recurring calls (portal sync, telemetry, management polling). It authorizes nothing credential-bearing.
+- Setup uses a one-time code the owner generates in the dashboard (`POST /api/routers/{id}/setup-code`). `GET /api/router/setup/{code}` releases the script once, within 30 minutes; the code then authorizes only that setup's `register`/`complete` callbacks for 2 hours. Only a hash of the code is stored.
+- The old `/api/router/provision/{token}` script, `register`, `complete` and `install-management.rsc` routes return `410 Gone`.
+
+See `security/router-provisioning-remediation.md` for the migration, rotation and verification runbook.
 
 ## Deliberate repair
 

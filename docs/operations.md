@@ -49,7 +49,7 @@ Application rollback uses the prior database-compatible image. Router rollback i
 
 ## Remaining infrastructure work
 
-- Add short-lived, single-use enrollment credentials distinct from runtime tokens; this needs migration and rotation.
+- Enrollment now uses short-lived, single-use setup codes (see `security/router-provisioning-remediation.md`). Still open: a private per-router agent credential for recurring router calls, and rotation of credentials exposed under the old scheme.
 - Baseline production under Flyway/Liquibase before schema-backed provisioning audit events.
 - Test CHR and physical devices across supported v7 and wireless-package variants.
 - Add an active RADIUS Access-Request readiness probe; current readiness confirms configured presence.
