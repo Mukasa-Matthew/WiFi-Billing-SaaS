@@ -126,14 +126,12 @@ public class RouterScriptGenerator {
         s.append("/system/clock/set time-zone-name=Etc/UTC time-zone-autodetect=no\n");
         s.append("/system/ntp/client/set enabled=yes\n");
         s.append(":if ([:len [/system/ntp/client/servers find address=pool.ntp.org]] = 0) do={ /system/ntp/client/servers add address=pool.ntp.org }\n");
-        s.append(":local wbNtpWait 0\n");
         s.append(":local wbDate [/system/clock get date]\n");
         s.append(":local wbYear [:tonum [:pick $wbDate ([:len $wbDate] - 4) [:len $wbDate]]]\n");
-        s.append(":while (($wbYear < 2026) && ($wbNtpWait < 24)) do={\n");
-        s.append("    :delay 5s\n");
-        s.append("    :set wbNtpWait ($wbNtpWait + 1)\n");
+        s.append(":for wbNtpWait from=1 to=24 do={\n");
         s.append("    :set wbDate [/system/clock get date]\n");
         s.append("    :set wbYear [:tonum [:pick $wbDate ([:len $wbDate] - 4) [:len $wbDate]]]\n");
+        s.append("    :if ($wbYear < 2026) do={ :delay 5s }\n");
         s.append("}\n\n");
 
         // 0. Cleanup of any previous run
