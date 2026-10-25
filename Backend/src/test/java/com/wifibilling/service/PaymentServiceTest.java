@@ -246,6 +246,7 @@ class PaymentServiceTest {
             return holder[0];
         });
         when(transactionRepository.findById(any())).thenAnswer(i -> Optional.ofNullable(holder[0]));
+        when(transactionRepository.findByIdFetchRefs(any())).thenAnswer(i -> Optional.ofNullable(holder[0]));
         when(transactionRepository.claimDispatch(any())).thenReturn(1);
         when(marzPay.collectMoney(any(), anyLong(), anyString(), anyString(), anyString(), anyString(), anyString()))
                 .thenThrow(new RuntimeException("connect timed out"));

@@ -266,7 +266,7 @@
         <p>A payment request has been sent. Enter your Mobile Money PIN to complete access.</p>
         <div class="spinner"></div>
         <p id="modal-status" style="font-size:12px">Waiting for confirmation…</p>
-        <button type="button" class="btn btn-outline" style="margin-top:8px" onclick="cancelPaymentPolling()">Cancel</button>
+        <button type="button" class="btn btn-outline" style="margin-top:8px" onclick="cancelCheckout()">Cancel</button>
     </div>
 </div>
 
@@ -649,7 +649,7 @@ function pollPayment(reference, attempt) {
         // Long-unresolved: do NOT offer a fresh payment. Keep the checkout and
         // let the customer reopen/resume — a second charge is worse than a wait.
         document.getElementById('modal-status').textContent = 'Still waiting for the network. Keep this page open or reopen it later — do not pay again.';
-        pollTimer = setTimeout(function(){ pollPayment(reference, attempt + 1); }, 10000);
+        pollTimer = setTimeout(function(){ pollPayment(reference, attempt + 1); }, 8000);
         return;
     }
     pollTimer = setTimeout(function(){
@@ -668,7 +668,7 @@ function pollPayment(reference, attempt) {
                 }
             })
             .catch(function(){ pollPayment(reference, attempt + 1); });
-    }, 3000);
+    }, 2000);
 }
 
 function finishSuccess(reference, codeFromPoll) {
@@ -710,12 +710,21 @@ function autoConnect(code) {
         document.getElementById('username-input').value = code;
         document.getElementById('password-input').value = code;
         document.getElementById('login-form').submit();
-    }, 900);
+    }, 400);
 }
 
 function cancelPaymentPolling() {
     if (pollTimer) clearTimeout(pollTimer);
     document.getElementById('payment-modal').classList.remove('show');
+}
+
+/* Abandoning a checkout never cancels the server-side transaction — it stays
+   PENDING and the reconciler resolves it. If it later completes the voucher
+   is issued anyway; we simply stop blocking this browser on it. */
+function cancelCheckout() {
+    cancelPaymentPolling();
+    clearCheckout();
+    showMsg('Cancelled. If you were charged, your voucher will still arrive — otherwise start a new payment.', false);
 }
 
 /* Resume an interrupted checkout on page load (browser closed mid-payment,
