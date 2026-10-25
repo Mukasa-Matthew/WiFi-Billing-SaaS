@@ -44,6 +44,11 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
 
     Optional<Transaction> findById(Long id);
 
+    /** Eagerly loads the lazy associations used by out-of-transaction dispatch. */
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"tenant", "packagePlan", "router"})
+    @org.springframework.data.jpa.repository.Query("select t from Transaction t where t.id = :id")
+    Optional<Transaction> findByIdFetchRefs(Long id);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @org.springframework.data.jpa.repository.Query("select t from Transaction t where t.id = :id")
     Optional<Transaction> findByIdForUpdate(Long id);

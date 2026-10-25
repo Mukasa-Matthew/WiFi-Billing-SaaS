@@ -16,6 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -302,7 +303,10 @@ public class PaymentService {
      * Commits dispatch_at if and only if this transaction is still PENDING and
      * was never dispatched. Atomic — exactly one caller wins the claim.
      */
-    @Transactional
+    // REQUIRES_NEW: callers may run inside afterCommit, where the just-committed
+    // transaction is still bound to the thread. REQUIRED would join that stale
+    // transaction and the @Modifying claimDispatch would see "no active transaction".
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public boolean claimCollectionDispatch(Long txId) {
         Transaction tx = transactionRepository.findById(txId).orElse(null);
         if (tx == null || !STATUS_PENDING.equals(tx.getStatus())
@@ -325,7 +329,7 @@ public class PaymentService {
         if (!self.claimCollectionDispatch(txId)) {
             return; // not dispatchable, or another dispatcher claimed it
         }
-        Transaction tx = transactionRepository.findById(txId).orElse(null);
+        Transaction tx = transactionRepository.findByIdFetchRefs(txId).orElse(null);
         if (tx == null || !STATUS_PENDING.equals(tx.getStatus())) return;
         String collectRef = tx.getExternalReference();
         try {
@@ -388,7 +392,12 @@ public class PaymentService {
     private void registerAfterCommit(Runnable r) {
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override public void afterCommit() { r.run(); }
+                // Post-commit work must not fail the HTTP request — the caller's
+                // transaction is already committed by the time this runs.
+                @Override public void afterCommit() {
+                    try { r.run(); }
+                    catch (Exception e) { log.error("afterCommit task failed: {}", e.getMessage(), e); }
+                }
             });
         } else {
             r.run();
