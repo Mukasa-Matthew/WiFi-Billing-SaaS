@@ -32,8 +32,8 @@ export function DashboardLoading({ label = "Loading your dashboard…" }: { labe
   return <div className="mx-auto w-full max-w-7xl space-y-5" aria-busy="true">
     <LoadingIndicator label={label} />
     <div aria-hidden="true" className="space-y-5 animate-pulse motion-reduce:animate-none">
-      <div className="h-28 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6"><div className="h-5 w-56 max-w-full rounded bg-slate-200" /><div className="mt-4 h-3 w-72 max-w-full rounded bg-[var(--fill)]" /></div>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{Array.from({ length: 8 }, (_, i) => <div key={i} className="h-36 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5"><div className="h-3 w-24 rounded bg-[var(--fill)]" /><div className="mt-5 h-7 w-32 rounded bg-slate-200" /><div className="mt-4 h-3 w-36 rounded bg-[var(--fill)]" /></div>)}</div>
+      <div className="h-28 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6"><div className="h-5 w-56 max-w-full rounded bg-[var(--border)]" /><div className="mt-4 h-3 w-72 max-w-full rounded bg-[var(--fill)]" /></div>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{Array.from({ length: 8 }, (_, i) => <div key={i} className="h-36 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5"><div className="h-3 w-24 rounded bg-[var(--fill)]" /><div className="mt-5 h-7 w-32 rounded bg-[var(--border)]" /><div className="mt-4 h-3 w-36 rounded bg-[var(--fill)]" /></div>)}</div>
       <div className="grid gap-5 lg:grid-cols-2"><div className="h-64 rounded-xl border border-[var(--border)] bg-[var(--surface)]" /><div className="h-64 rounded-xl border border-[var(--border)] bg-[var(--surface)]" /></div>
     </div>
   </div>;
