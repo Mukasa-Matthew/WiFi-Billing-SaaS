@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import api from "@/lib/api";
+import { Dialog } from "@/components/ui/Dialog";
 import {
   Users,
   UserPlus,
@@ -40,9 +41,14 @@ export default function AdminTenantsPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [createNotice, setCreateNotice] = useState<string | null>(null);
 
+  const closeCreateDialog = () => {
+    if (formLoading) return;
+    setIsModalOpen(false);
+    setFormError(null);
+  };
+
   const fetchTenants = async () => {
     try {
-      setLoading(true);
       const res = await api.get<TenantSummary[]>("/api/admin/tenants");
       setTenants(res.data);
     } catch (err) {
@@ -248,94 +254,100 @@ export default function AdminTenantsPage() {
 
       {/* Modal: Create Operator */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-[var(--canvas)]/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-[var(--surface)] border border-[var(--border)] rounded-xl p-6 shadow-sm relative">
-            <button
-              onClick={() => setIsModalOpen(false)}
-              className="absolute right-5 top-5 text-[var(--fg-muted)] hover:text-[var(--fg)]"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="mb-6">
-              <h2 className="text-lg font-bold text-[var(--fg)] flex items-center gap-2">
-                <UserPlus className="w-5 h-5 text-[var(--accent-text)]" />
-                <span>Register Hotspot Operator</span>
-              </h2>
-              <p className="text-xs text-[var(--fg-muted)] mt-1">
-                A temporary password will be generated and emailed to the operator.
+        <Dialog
+          title="Register hotspot operator"
+          description="Create a secure dashboard account for a new business."
+          onClose={closeCreateDialog}
+        >
+          <div className="mb-5 flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 p-3.5 text-blue-900">
+            <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-100">
+              <UserPlus className="h-4 w-4 text-blue-700" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold">Login details are handled automatically</p>
+              <p className="mt-0.5 text-[11px] leading-5 text-blue-700">
+                We’ll generate a temporary password, email it to the operator, and ask them to change it on first sign-in.
               </p>
             </div>
-
+          </div>
             {formError && (
-              <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs flex items-center gap-2">
+              <div className="mb-4 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">
                 <WarningCircle className="w-4 h-4 shrink-0" />
                 <span>{formError}</span>
               </div>
             )}
 
-            <form onSubmit={handleCreateTenant} className="space-y-4">
+            <form onSubmit={handleCreateTenant} className="space-y-5">
               <div>
-                <label className="block text-xs font-medium text-[var(--fg-body)] mb-1">
-                  Business / Company Name
+                <label htmlFor="operator-business" className="mb-1.5 block text-xs font-semibold text-[var(--fg-body)]">
+                  Business name
                 </label>
                 <input
+                  id="operator-business"
                   type="text"
                   required
+                  autoFocus
+                  maxLength={120}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g. Acacia Cafe & Lounge"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-xs text-[var(--fg)] placeholder-[var(--fg-muted)] focus:outline-none focus:border-indigo-500 transition"
+                  className="w-full rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 py-3 text-sm text-[var(--fg)] outline-none transition placeholder:text-[var(--fg-faint)] focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-[var(--fg-body)] mb-1">
-                  Admin Email Address
+                <label htmlFor="operator-email" className="mb-1.5 block text-xs font-semibold text-[var(--fg-body)]">
+                  Operator email
                 </label>
                 <input
+                  id="operator-email"
                   type="email"
                   required
+                  autoComplete="email"
+                  maxLength={120}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="e.g. manager@acaciacafe.ug"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-xs text-[var(--fg)] placeholder-[var(--fg-muted)] focus:outline-none focus:border-indigo-500 transition"
+                  className="w-full rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 py-3 text-sm text-[var(--fg)] outline-none transition placeholder:text-[var(--fg-faint)] focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-[var(--fg-body)] mb-1">
-                  Contact Phone Number
+                <label htmlFor="operator-phone" className="mb-1.5 block text-xs font-semibold text-[var(--fg-body)]">
+                  Contact phone number
                 </label>
                 <input
+                  id="operator-phone"
                   type="tel"
                   required
+                  autoComplete="tel"
+                  maxLength={30}
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="e.g. +256770000000"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-xs text-[var(--fg)] placeholder-[var(--fg-muted)] focus:outline-none focus:border-indigo-500 transition"
+                  className="w-full rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 py-3 text-sm text-[var(--fg)] outline-none transition placeholder:text-[var(--fg-faint)] focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-[var(--border)]">
+              <div className="flex flex-col-reverse gap-2 border-t border-[var(--border)] pt-5 sm:flex-row sm:items-center sm:justify-end">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-medium text-[var(--fg-muted)] hover:text-[var(--fg)] transition cursor-pointer"
+                  onClick={closeCreateDialog}
+                  disabled={formLoading}
+                  className="rounded-xl border border-[var(--border)] px-4 py-2.5 text-xs font-semibold text-[var(--fg-body)] transition hover:bg-[var(--fill)] disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={formLoading}
-                  className="px-4 py-2 rounded-xl bg-blue-700 hover:bg-blue-600 disabled:opacity-50 text-xs font-semibold text-white shadow-sm transition cursor-pointer"
+                  className="inline-flex min-w-48 items-center justify-center gap-2 rounded-xl bg-blue-700 px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {formLoading ? "Creating Operator..." : "Create Operator Account"}
+                  {formLoading ? <><span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" />Creating account…</> : <><UserPlus className="h-4 w-4" />Create operator account</>}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </Dialog>
       )}
     </div>
   );
