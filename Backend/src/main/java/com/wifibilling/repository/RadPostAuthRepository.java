@@ -20,16 +20,28 @@ public interface RadPostAuthRepository extends JpaRepository<RadPostAuth, Long> 
             WHERE e.username IN :usernames
               AND (:reply IS NULL OR e.reply = CAST(:reply AS String))
               AND (:username IS NULL OR LOWER(e.username) LIKE LOWER(CONCAT('%', CAST(:username AS String), '%')))
-              AND (:fromTs IS NULL OR e.authDate >= :fromTs)
-              AND (:toTs IS NULL OR e.authDate < :toTs)
+              AND e.authDate >= :fromTs
+              AND e.authDate < :toTs
             ORDER BY e.authDate DESC
             """)
-    Page<RadPostAuth> findEvents(@Param("usernames") Collection<String> usernames,
-                                 @Param("reply") String reply,
-                                 @Param("username") String username,
-                                 @Param("fromTs") OffsetDateTime fromTs,
-                                 @Param("toTs") OffsetDateTime toTs,
-                                 Pageable pageable);
+    Page<RadPostAuth> findEventsInRange(@Param("usernames") Collection<String> usernames,
+                                        @Param("reply") String reply,
+                                        @Param("username") String username,
+                                        @Param("fromTs") OffsetDateTime fromTs,
+                                        @Param("toTs") OffsetDateTime toTs,
+                                        Pageable pageable);
+
+    /**
+     * Null date bounds mean "unbounded". They're replaced with wide sentinels
+     * because PostgreSQL can't infer the type of an untyped NULL parameter.
+     */
+    default Page<RadPostAuth> findEvents(Collection<String> usernames, String reply, String username,
+                                         OffsetDateTime fromTs, OffsetDateTime toTs, Pageable pageable) {
+        return findEventsInRange(usernames, reply, username,
+                fromTs != null ? fromTs : OffsetDateTime.parse("1970-01-01T00:00:00Z"),
+                toTs != null ? toTs : OffsetDateTime.parse("3000-01-01T00:00:00Z"),
+                pageable);
+    }
 
     /** Reject count within a window — used for burst detection. */
     long countByUsernameInAndReplyAndAuthDateAfter(Collection<String> usernames, String reply, OffsetDateTime after);
