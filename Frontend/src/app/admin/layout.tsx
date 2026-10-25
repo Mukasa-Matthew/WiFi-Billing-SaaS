@@ -17,9 +17,8 @@ import {
   Building2,
   CreditCard,
   LayoutDashboard,
+  GearSix,
 } from "@/components/icons";
-
-
 
 export default function AdminLayout({
   children,
@@ -52,6 +51,7 @@ export default function AdminLayout({
     { name: "Finance", href: "/admin/finance", icon: Bank, group: "Financial management" },
     { name: "Router fleet", href: "/admin/routers", icon: RouterIcon, group: "Network operations" },
     { name: "System health", href: "/admin/health", icon: HardDrives, group: "Network operations" },
+    { name: "Settings & Security", href: "/admin/settings", icon: GearSix, group: "System & Governance" },
   ];
 
   const activeItem = [...navItems].sort((a, b) => b.href.length - a.href.length).find(
@@ -108,7 +108,6 @@ export default function AdminLayout({
                     {isActive && <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r bg-blue-400" />}
                     <Icon
                       aria-hidden="true"
-
                       className={`h-5 w-5 shrink-0 ${isActive ? "text-blue-300" : "text-[var(--sidebar-fg-dim)]"}`}
                     />
                     <span className="flex-1">{item.name}</span><LinkPending />
@@ -120,21 +119,25 @@ export default function AdminLayout({
         </div>
 
         <div className="border-t border-white/10 p-4">
-          <div className="mb-3 flex items-center gap-3 px-1">
+          <Link
+            href="/admin/settings"
+            onClick={() => setMenuOpen(false)}
+            className="mb-3 flex items-center gap-3 px-2 py-1.5 rounded-xl hover:bg-white/10 transition group"
+          >
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white">
               <ShieldCheck className="h-4 w-4" />
             </div>
-            <div className="min-w-0">
-              <p className="truncate text-xs font-semibold text-white">{user?.name}</p>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-semibold text-white group-hover:text-blue-300 transition">{user?.name}</p>
               <p className="truncate text-[11px] text-[var(--sidebar-fg-dim)]">{user?.email}</p>
             </div>
-          </div>
+          </Link>
           <div className="mb-3 flex justify-center">
             <ThemeToggle compact />
           </div>
           <button
             onClick={logout}
-            className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 py-2 px-3 text-xs font-semibold text-[var(--sidebar-fg-dim)] transition hover:bg-red-500/20 hover:text-white"
+            className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 py-2 px-3 text-xs font-semibold text-[var(--sidebar-fg-dim)] transition hover:bg-red-500/20 hover:text-white cursor-pointer"
           >
             <SignOut className="h-3.5 w-3.5" />
             <span>Sign out</span>
@@ -167,10 +170,6 @@ export default function AdminLayout({
         </main>
       </div>
 
-      {/* Covers the console instead of replacing it: the layout has to keep
-          rendering {children} so Next can validate the segments below it for
-          instant navigation. Platform data is fetched with the bearer token,
-          so a non-superadmin never receives it behind this. */}
       {!ready && (
         <div role="status" aria-live="polite"
           className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--canvas)] text-[var(--fg-muted)]">
