@@ -57,7 +57,9 @@ public class RouterManagementService {
  // COMMITTED gives each check a fresh snapshot.
  @Transactional(readOnly=true) public String script(String token,int waitSeconds){
   Router r=resolve(token);
-  long deadline=System.currentTimeMillis()+Math.min(waitSeconds,30)*1000L;
+  // Capped below RouterOS /tool fetch's ~10s idle timeout: a longer hold makes
+  // the router abort (nginx 499) and fall back to importing its previous file.
+  long deadline=System.currentTimeMillis()+Math.min(waitSeconds,8)*1000L;
   while(System.currentTimeMillis()<deadline&&tasks.findFirstByRouterIdAndStatusOrderByIdAsc(r.getId(),"PENDING").isEmpty()){
    try{Thread.sleep(300);}catch(InterruptedException e){Thread.currentThread().interrupt();break;}
   }
