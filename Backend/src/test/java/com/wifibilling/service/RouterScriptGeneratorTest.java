@@ -77,4 +77,40 @@ class RouterScriptGeneratorTest {
         assertFalse(RouterScriptGenerator.q("Cafe\n/system reset-configuration")
                 .contains("\n/system reset-configuration"));
     }
+
+    /**
+     * /import parses a top-level multi-line do={ } block as ending at its first
+     * inner statement, aborting the whole import with a syntax error. Blocks
+     * inside a script body (source={ ... }) are stored as text and parsed later
+     * by RouterOS, so only the top level is constrained.
+     */
+    @Test
+    void topLevelBlocksStayOnOneLine() {
+        String s = render("s3cret");
+        int scriptBodyDepth = 0;
+        int lineNo = 0;
+        for (String line : s.split("\n", -1)) {
+            lineNo++;
+            String trimmed = line.trim();
+            if (scriptBodyDepth == 0 && trimmed.endsWith("do={")) {
+                throw new AssertionError(
+                        "Top-level multi-line do={ block at line " + lineNo + ": " + trimmed
+                                + " — /import cannot parse this; keep it on one line.");
+            }
+            if (trimmed.contains("source={")) {
+                scriptBodyDepth++;
+            } else if (scriptBodyDepth > 0 && trimmed.equals("}")) {
+                scriptBodyDepth--;
+            }
+        }
+    }
+
+    @Test
+    void ntpWaitLoopIsASingleStatement() {
+        String s = render("s3cret");
+        assertTrue(s.contains(":for wbNtpWait from=1 to=24 do={ :set wbDate"),
+                "NTP wait loop must be emitted as one line");
+        assertFalse(s.contains(":for wbNtpWait from=1 to=24 do={\n"),
+                "NTP wait loop must not open a multi-line block");
+    }
 }
