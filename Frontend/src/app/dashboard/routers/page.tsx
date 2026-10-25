@@ -1,62 +1,15 @@
 "use client";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import api from "@/lib/api";
 import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
+import { ActionMenu, ActionMenuItem } from "@/components/ui/ActionMenu";
 import { useResource, Table, Badge, Notice, FilterTabs, button, date, message, panel } from "@/components/BillingUI";
-import { DotsThreeVertical, Eye, ArrowClockwise, FileArrowDown, Clock, Terminal, Trash } from "@/components/icons";
+import { Eye, ArrowClockwise, FileArrowDown, Clock, Terminal, Trash } from "@/components/icons";
 
 interface RouterRec { id: number; name: string; token: string; wgIp: string; wgPublicKey: string | null; cpuLoad: number; memoryUsage: number; status: string; lastSeen: string | null; uptime: string | null; hotspotReady: boolean | null; radiusReady: boolean | null; portalReady: boolean | null }
 interface Task { id: number; action: string; status: string; createdAt: string }
-
-function Kebab({ children }: { children: React.ReactNode }) {
-  const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState({ top: 0, left: 0 });
-  const ref = useRef<HTMLDivElement>(null);
-  const btnRef = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    const close = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
-  }, []);
-  const toggle = () => {
-    if (!open && btnRef.current) {
-      const r = btnRef.current.getBoundingClientRect();
-      const width = 208;
-      const estimatedHeight = 230;
-      const spaceBelow = window.innerHeight - r.bottom;
-      setPos({
-        left: Math.min(r.right - width, window.innerWidth - width - 8),
-        top: spaceBelow >= estimatedHeight ? r.bottom + 6 : Math.max(8, r.top - estimatedHeight - 6),
-      });
-    }
-    setOpen(!open);
-  };
-  return (
-    <div ref={ref}>
-      <button ref={btnRef} aria-label="Router actions" aria-expanded={open} onClick={toggle}
-        className="rounded-lg p-1.5 text-[var(--fg-muted)] hover:bg-[var(--fill)] hover:text-[var(--fg)]">
-        <DotsThreeVertical size={16} />
-      </button>
-      {open && (
-        <div className="fixed z-50 w-52 rounded-xl border border-[var(--border)] bg-[var(--surface)] py-1.5 shadow-lg"
-          style={{ top: pos.top, left: pos.left }} onClick={() => setOpen(false)}>
-          {children}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function MenuItem({ icon, label, danger, onClick }: { icon: React.ReactNode; label: string; danger?: boolean; onClick: () => void }) {
-  return (
-    <button onClick={onClick}
-      className={`flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-xs font-medium transition ${danger ? "text-red-600 hover:bg-red-50" : "text-[var(--fg-body)] hover:bg-[var(--subtle)]"}`}>
-      {icon}{label}
-    </button>
-  );
-}
 
 export default function Page() {
   const { data, loading, error, load } = useResource<RouterRec>("/api/routers", true);
@@ -82,11 +35,18 @@ export default function Page() {
   const { confirm, dialog } = useConfirmDialog();
   const remove = (r: RouterRec) => confirm({
     title: "Delete router",
-    body: `Delete ${r.name}? Payment history may prevent deletion.`,
-    confirmLabel: "Delete",
+    body: `Are you sure you want to delete ${r.name}? Active customer sessions and payment history linked to this router will be affected.`,
+    confirmLabel: "Delete router",
     onConfirm: async () => {
-      try { await api.delete(`/api/routers/${r.id}`); toast("success", `${r.name} deleted.`); await load(); setSelected(null); }
-      catch (e) { toast("error", message(e)); }
+      try { 
+        await api.delete(`/api/routers/${r.id}`); 
+        toast("success", `${r.name} deleted.`); 
+        await load(); 
+        setSelected(null); 
+      }
+      catch (e) { 
+        toast("error", message(e)); 
+      }
     },
   });
   const showCommand = (r: RouterRec, install = false) => {
@@ -113,10 +73,10 @@ export default function Page() {
       <Notice text={error || note} />
       <FilterTabs options={tabs} value={tab} onChange={setTab} />
       <Table
-        rows={data.filter(r => tab === "ALL" || (tab === "ONLINE" ? r.status === "online" : r.status !== "online"))}
         loading={loading}
+        rows={data.filter(r => tab === "ALL" || (tab === "ONLINE" && r.status === "online") || (tab === "OFFLINE" && r.status !== "online"))}
         columns={[
-          { label: "Name", render: r => <button onClick={() => open(r)} className="font-medium text-[var(--accent-text)] hover:underline">{r.name}</button> },
+          { label: "Router", render: r => <span className="font-semibold text-[var(--fg)]">{r.name}</span> },
           { label: "Provisioning", render: r => <Badge tone={r.status === "online" ? "green" : r.status === "degraded" ? "red" : "amber"}>{r.status === "online" ? "Verified" : r.status === "degraded" ? "Needs attention" : r.status === "provisioned" ? "Awaiting checks" : r.wgPublicKey ? "Registered" : "Awaiting router"}</Badge> },
           { label: "CPU", render: r => r.lastSeen ? `${r.cpuLoad || 0}%` : "—" },
           { label: "Memory", render: r => r.lastSeen ? `${r.memoryUsage || 0}%` : "—" },
@@ -135,14 +95,14 @@ export default function Page() {
           { label: "Last telemetry", render: r => <span className="text-[var(--fg-muted)]">{date(r.lastSeen)}</span> },
           {
             label: "", render: r => (
-              <Kebab>
-                <MenuItem icon={<Eye size={14} />} label="View / manage" onClick={() => open(r)} />
-                <MenuItem icon={<Terminal size={14} />} label="Reprovision command" onClick={() => showCommand(r)} />
-                <MenuItem icon={<FileArrowDown size={14} />} label="Sync hotspot files" onClick={() => action(r, "SYNC_PORTAL")} />
-                <MenuItem icon={<Clock size={14} />} label="Sync router time" onClick={() => action(r, "SYNC_TIME")} />
-                <MenuItem icon={<ArrowClockwise size={14} />} label="Install mgmt agent" onClick={() => showCommand(r, true)} />
-                <MenuItem icon={<Trash size={14} />} label="Delete" danger onClick={() => remove(r)} />
-              </Kebab>
+              <ActionMenu ariaLabel={`Actions for ${r.name}`}>
+                <ActionMenuItem icon={<Eye size={14} />} label="View / manage" onClick={() => open(r)} />
+                <ActionMenuItem icon={<Terminal size={14} />} label="Reprovision command" onClick={() => showCommand(r)} />
+                <ActionMenuItem icon={<FileArrowDown size={14} />} label="Sync hotspot files" onClick={() => action(r, "SYNC_PORTAL")} />
+                <ActionMenuItem icon={<Clock size={14} />} label="Sync router time" onClick={() => action(r, "SYNC_TIME")} />
+                <ActionMenuItem icon={<ArrowClockwise size={14} />} label="Install mgmt agent" onClick={() => showCommand(r, true)} />
+                <ActionMenuItem icon={<Trash size={14} />} label="Delete router" danger onClick={() => remove(r)} />
+              </ActionMenu>
             )
           },
         ]}
