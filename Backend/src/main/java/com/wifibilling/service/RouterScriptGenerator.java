@@ -259,8 +259,8 @@ public class RouterScriptGenerator {
         // router's RADIUS secret (already known to the backend).
         s.append("/user/group/remove [find name=wb-api]\n");
         s.append("/user/remove [find name=wb-api]\n");
-        s.append(":do { /user/group/add name=wb-api policy=read,write,test,rest-api }"
-                + " on-error={ /user/group/add name=wb-api policy=read,write,test }\n");
+        s.append(":do { /user/group/add name=wb-api policy=read,write,test,api,rest-api }"
+                + " on-error={ /user/group/add name=wb-api policy=read,write,test,api }\n");
         s.append("/user/add name=wb-api password=").append(q(c.radiusSecret())).append(" group=wb-api\n");
         s.append(":do { /ip/service/set www disabled=no allowed-address=").append(c.tunnelSubnet())
                 .append(" } on-error={ /ip/service/set www disabled=no address=").append(c.tunnelSubnet())
@@ -423,8 +423,9 @@ public class RouterScriptGenerator {
                 + ":if ([:len [/system/ntp/client/servers find address=pool.ntp.org]] = 0) do={ /system/ntp/client/servers add address=pool.ntp.org }\n"
                 + "/system/script/add name=wb-management policy=read,write,test source={\n"
                 + ":for i from=1 to=3 do={\n"
-                + tlsFetch(prefix + "/management.rsc?wait=25", " dst-path=wb-management.rsc", ":delay 2s")
-                + "; :do { /import wb-management.rsc } on-error={}\n"
+                + ":do { /file remove [find name=\"wb-management.rsc\"] } on-error={}\n"
+                + tlsFetch(prefix + "/management.rsc?wait=8", " dst-path=wb-management.rsc", ":delay 2s")
+                + "; :if ([:len [/file find name=\"wb-management.rsc\"]] > 0) do={ :do { /import wb-management.rsc } on-error={} }\n"
                 + "}\n"
                 + ":do { :local hosts [/ip/dhcp-server/lease/print as-value where status=bound]; "
                 + tlsFetch(prefix + "/hosts",
