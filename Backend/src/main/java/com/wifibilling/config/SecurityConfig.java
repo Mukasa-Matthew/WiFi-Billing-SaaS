@@ -79,6 +79,9 @@ public class SecurityConfig {
                 .requestMatchers("/api/portal/**").permitAll()
                 .requestMatchers("/api/router/provision/**", "/api/router/telemetry").permitAll()
                 .requestMatchers("/api/payments/**").permitAll()
+                // /error must be public or a failed public request re-dispatches
+                // to /error and gets a misleading 401 instead of the real status.
+                .requestMatchers("/error").permitAll()
                 .requestMatchers("/api/admin/**").hasAuthority("ROLE_SUPERADMIN")
                 .requestMatchers("/api/vouchers/**", "/api/routers/**", "/api/packages/**").authenticated()
                 .anyRequest().authenticated()
