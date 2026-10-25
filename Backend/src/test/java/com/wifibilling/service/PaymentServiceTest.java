@@ -293,4 +293,20 @@ class PaymentServiceTest {
         verify(transactionRepository, atLeastOnce()).save(captor.capture());
         assertEquals("AA:BB:CC:DD:EE:FF", captor.getValue().getClientMac());
     }
+
+    @Test
+    void customerFailureMessageExplainsKnownProviderReasons() {
+        assertTrue(PaymentService.customerFailureMessage(
+                "Provider status: failed — WiFi Minute Internet - MTN Payment Requested - Failed: LOW_BALANCE_OR_PAYEE_LIMIT_REACHED_OR_NOT_ALLOWED")
+                .contains("balance is too low"));
+        assertTrue(PaymentService.customerFailureMessage(
+                "Provider rejected collection: MarzPay 422: The minimum amount is 500 UGX").contains("minimum"));
+        assertTrue(PaymentService.customerFailureMessage(
+                "Provider rejected collection: MarzPay 422: invalid request").contains("could not be started"));
+        assertTrue(PaymentService.customerFailureMessage("Provider status: cancelled").contains("cancelled"));
+        assertTrue(PaymentService.customerFailureMessage("Provider status: expired").contains("expired"));
+        // No established reason -> null so the portal keeps its generic message.
+        assertNull(PaymentService.customerFailureMessage("Provider status: failed"));
+        assertNull(PaymentService.customerFailureMessage(null));
+    }
 }

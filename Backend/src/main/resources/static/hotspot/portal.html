@@ -661,7 +661,7 @@ function pollPayment(reference, attempt) {
                 } else if (res.status === 'FAILED') {
                     cancelPaymentPolling();
                     clearCheckout();
-                    showMsg('Payment was not completed. You have not been charged by a confirmed transaction — you can try again.', true);
+                    showMsg(res.failureMessage || 'Payment was not completed. You have not been charged by a confirmed transaction — you can try again.', true);
                 } else {
                     document.getElementById('modal-status').textContent = 'Verifying your payment. Please wait…';
                     pollPayment(reference, attempt + 1);

@@ -63,7 +63,7 @@ class PaymentControllerTest {
     void getStatus_ReturnsStatus() {
         PaymentDto.StatusResponse expected = new PaymentDto.StatusResponse(
                 "PAY-123", "SUCCESSFUL", "VOUCH-ABC", new BigDecimal("1000"),
-                OffsetDateTime.now(), OffsetDateTime.now()
+                OffsetDateTime.now(), OffsetDateTime.now(), null
         );
         when(paymentService.getStatus("PAY-123")).thenReturn(expected);
 
