@@ -65,6 +65,9 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
 
     List<Transaction> findTop1000ByTenantIdOrderByCreatedAtDesc(Long tenantId);
 
+    /** Newest-first page of a tenant's transactions, for callers that only need the latest few. */
+    List<Transaction> findByTenantIdOrderByCreatedAtDesc(Long tenantId, org.springframework.data.domain.Pageable pageable);
+
     List<Transaction> findAllByTenantIdAndStatusOrderByCreatedAtDesc(Long tenantId, String status);
 
     Optional<Transaction> findFirstByTenantIdAndPhoneAndStatusOrderByCreatedAtDesc(
