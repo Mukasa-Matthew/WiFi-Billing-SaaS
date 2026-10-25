@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useId, useRef } from "react";
+import { createPortal } from "react-dom";
 import { X } from "@/components/icons";
 
 export function Dialog({ title, description, children, onClose, wide = false }: {
@@ -32,7 +33,9 @@ export function Dialog({ title, description, children, onClose, wide = false }: 
     };
   }, [onClose]);
 
-  return (
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-4" role="presentation">
       <div className="absolute inset-0 bg-slate-950/55 backdrop-blur-[2px]" onClick={onClose} />
       <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={description ? descriptionId : undefined}
@@ -49,6 +52,7 @@ export function Dialog({ title, description, children, onClose, wide = false }: 
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
