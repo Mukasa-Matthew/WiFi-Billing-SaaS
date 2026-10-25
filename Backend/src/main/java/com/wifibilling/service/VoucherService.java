@@ -155,7 +155,8 @@ public class VoucherService {
         }
         if (plan.getRateLimit() != null && !plan.getRateLimit().isBlank()) {
             radReplyRepository.save(RadReply.builder()
-                    .username(code).attribute("Mikrotik-Rate-Limit").op(":=").value(plan.getRateLimit()).build());
+                    .username(code).attribute("Mikrotik-Rate-Limit").op(":=")
+                    .value(com.wifibilling.controller.PackagePlanController.sanitizeRateLimit(plan.getRateLimit())).build());
         }
         if (plan.getSessionTimeout() != null && plan.getSessionTimeout() > 0) {
             radReplyRepository.save(RadReply.builder()

@@ -56,7 +56,7 @@ public class PackagePlanController {
                             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Router not found")))
                 .name(req.name().trim())
                 .price(req.price())
-                .rateLimit(req.rateLimit().trim())
+                .rateLimit(sanitizeRateLimit(req.rateLimit()))
                 .sessionTimeout(req.sessionTimeout())
                 .sharedUsers(req.sharedUsers() != null ? req.sharedUsers() : 1)
                 .description(req.description())
@@ -80,7 +80,7 @@ public class PackagePlanController {
 
         plan.setName(req.name().trim());
         plan.setPrice(req.price());
-        plan.setRateLimit(req.rateLimit().trim());
+        plan.setRateLimit(sanitizeRateLimit(req.rateLimit()));
         plan.setSessionTimeout(req.sessionTimeout());
         plan.setSharedUsers(req.sharedUsers() != null ? req.sharedUsers() : 1);
         plan.setDescription(req.description());
@@ -131,6 +131,26 @@ public class PackagePlanController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Package not found"));
         packagePlanRepository.delete(plan);
         syncPortals(principal.getTenantId());
+    }
+
+    /** RouterOS simple queues only accept whole-number rates (e.g. "10M/10M").
+     *  Fractional values like "9.7M" cause "invalid rate limit" and break hotspot login,
+     *  so each side of the limit is rounded to the nearest whole unit. */
+    private static final java.util.regex.Pattern RATE_PART =
+            java.util.regex.Pattern.compile("(?i)^(\\d+(?:\\.\\d+)?)([kmg])$");
+
+    public static String sanitizeRateLimit(String rateLimit) {
+        if (rateLimit == null) return null;
+        StringBuilder out = new StringBuilder();
+        String[] parts = rateLimit.trim().split("/", -1);
+        for (int i = 0; i < parts.length; i++) {
+            if (i > 0) out.append('/');
+            var m = RATE_PART.matcher(parts[i].trim());
+            out.append(m.matches()
+                    ? Math.max(1, Math.round(Double.parseDouble(m.group(1)))) + m.group(2).toUpperCase()
+                    : parts[i].trim());
+        }
+        return out.toString();
     }
 
     private PackagePlanDto.Response toResponse(PackagePlan p) {

@@ -72,7 +72,7 @@ public class RouterManagementService {
      s.append(":local boundIp ").append(q(v.getAddress()==null?"":v.getAddress())).append('\n');
      s.append(":if ($boundIp = \"\") do={ :local lease [/ip/dhcp-server/lease find mac-address=").append(mac).append(" status=bound]; :if ([:len $lease] > 0) do={ :set boundIp [/ip/dhcp-server/lease get [:pick $lease 0] address] } }\n");
      s.append(":if ($boundIp = \"\") do={ :error \"Binding speed limit requires a current DHCP lease or explicit address\" }\n");
-     s.append("/queue/simple/add name=").append(q(tag)).append(" target=($boundIp . \"/32\") max-limit=").append(q(v.getPackagePlan().getRateLimit())).append('\n');
+     s.append("/queue/simple/add name=").append(q(tag)).append(" target=($boundIp . \"/32\") max-limit=").append(q(com.wifibilling.controller.PackagePlanController.sanitizeRateLimit(v.getPackagePlan().getRateLimit()))).append('\n');
     }
     if(v.getExpiresAt()!=null){
      String removal="/ip/hotspot/ip-binding/remove [find comment="+q(tag)+"]; /queue/simple/remove [find name="+q(tag)+"]; /ip/hotspot/active/remove [find mac-address="+mac+"]";
