@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { Dialog } from "@/components/ui/Dialog";
 import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { ActionMenu, ActionMenuItem } from "@/components/ui/ActionMenu";
 import {
   Users,
   UserPlus,
@@ -14,7 +15,6 @@ import {
   Ticket,
   X,
   WarningCircle,
-  DotsThreeVertical,
   Prohibit,
   Check,
   EnvelopeSimple,
@@ -39,8 +39,6 @@ export default function AdminTenantsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
-  const menuRef = useRef<HTMLDivElement | null>(null);
   const { confirm, dialog } = useConfirmDialog();
 
   // Form state
@@ -50,21 +48,6 @@ export default function AdminTenantsPage() {
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [createNotice, setCreateNotice] = useState<string | null>(null);
-
-  // Close dropdown menu when clicking outside
-  useEffect(() => {
-    const handleOutsideClick = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setOpenMenuId(null);
-      }
-    };
-    if (openMenuId !== null) {
-      document.addEventListener("mousedown", handleOutsideClick);
-    }
-    return () => {
-      document.removeEventListener("mousedown", handleOutsideClick);
-    };
-  }, [openMenuId]);
 
   const closeCreateDialog = () => {
     if (formLoading) return;
@@ -120,7 +103,6 @@ export default function AdminTenantsPage() {
   };
 
   const handleUpdateStatus = async (tenant: TenantSummary, newStatus: string) => {
-    setOpenMenuId(null);
     try {
       await api.put(`/api/admin/tenants/${tenant.id}/status`, {
         status: newStatus,
@@ -132,14 +114,12 @@ export default function AdminTenantsPage() {
   };
 
   const handleCopyDetails = (tenant: TenantSummary) => {
-    setOpenMenuId(null);
     const details = `Business: ${tenant.name}\nEmail: ${tenant.email}\nPhone: ${tenant.phone}\nID: #${tenant.id}`;
     navigator.clipboard.writeText(details);
     setCreateNotice(`Copied details for "${tenant.name}" to clipboard.`);
   };
 
   const handleRequestDelete = (tenant: TenantSummary) => {
-    setOpenMenuId(null);
     confirm({
       title: `Decommission ${tenant.name}?`,
       body: `Permanently deleting a tenant with live transactions and routers is restricted to preserve financial audit logs. You can disable the operator account to instantly block portal access and logins. Would you like to set their status to DISABLED?`,
@@ -210,7 +190,7 @@ export default function AdminTenantsPage() {
 
       {/* Operators Table */}
       <div className="rounded-xl bg-[var(--surface)] border border-[var(--border)]">
-        <div className="overflow-x-auto overflow-y-visible">
+        <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="border-b border-[var(--border)] bg-[var(--subtle)] text-[var(--fg-muted)]">
@@ -280,70 +260,44 @@ export default function AdminTenantsPage() {
                     <td className="py-4 px-4 text-[var(--fg-muted)]">
                       {new Date(t.createdAt).toLocaleDateString()}
                     </td>
-                    <td className="py-4 px-6 text-right relative">
-                      <div className="inline-block text-left" ref={openMenuId === t.id ? menuRef : null}>
-                        <button
-                          type="button"
-                          onClick={() => setOpenMenuId(openMenuId === t.id ? null : t.id)}
-                          aria-label={`Actions for ${t.name}`}
-                          className="p-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--fg-muted)] hover:text-[var(--fg)] hover:bg-[var(--fill)] transition cursor-pointer"
-                        >
-                          <DotsThreeVertical className="w-4 h-4" />
-                        </button>
-
-                        {openMenuId === t.id && (
-                          <div className="absolute right-6 top-12 z-50 w-44 rounded-xl border border-[var(--border)] bg-[var(--surface)] py-1.5 shadow-[var(--shadow-overlay)] animate-in fade-in-0 zoom-in-95 text-left">
-                            {t.status === "ACTIVE" ? (
-                              <button
-                                type="button"
-                                onClick={() => handleUpdateStatus(t, "SUSPENDED")}
-                                className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-medium text-amber-600 hover:bg-amber-500/10 transition cursor-pointer"
-                              >
-                                <Prohibit className="w-4 h-4 text-amber-500 shrink-0" />
-                                <span>Suspend Operator</span>
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => handleUpdateStatus(t, "ACTIVE")}
-                                className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-medium text-emerald-600 hover:bg-emerald-500/10 transition cursor-pointer"
-                              >
-                                <Check className="w-4 h-4 text-emerald-500 shrink-0" />
-                                <span>Activate Operator</span>
-                              </button>
-                            )}
-
-                            <a
-                              href={`mailto:${t.email}`}
-                              onClick={() => setOpenMenuId(null)}
-                              className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-medium text-[var(--fg-body)] hover:bg-[var(--fill)] transition cursor-pointer"
-                            >
-                              <EnvelopeSimple className="w-4 h-4 text-[var(--fg-muted)] shrink-0" />
-                              <span>Email Operator</span>
-                            </a>
-
-                            <button
-                              type="button"
-                              onClick={() => handleCopyDetails(t)}
-                              className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-medium text-[var(--fg-body)] hover:bg-[var(--fill)] transition cursor-pointer"
-                            >
-                              <Copy className="w-4 h-4 text-[var(--fg-muted)] shrink-0" />
-                              <span>Copy Info</span>
-                            </button>
-
-                            <div className="my-1 border-t border-[var(--border)]" />
-
-                            <button
-                              type="button"
-                              onClick={() => handleRequestDelete(t)}
-                              className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-medium text-red-600 hover:bg-red-500/10 transition cursor-pointer"
-                            >
-                              <Trash className="w-4 h-4 text-red-500 shrink-0" />
-                              <span>Decommission / Delete</span>
-                            </button>
-                          </div>
+                    <td className="py-4 px-6 text-right">
+                      <ActionMenu ariaLabel={`Actions for ${t.name}`}>
+                        {t.status === "ACTIVE" ? (
+                          <ActionMenuItem
+                            icon={<Prohibit className="w-4 h-4 text-amber-500" />}
+                            label="Suspend Operator"
+                            danger
+                            onClick={() => handleUpdateStatus(t, "SUSPENDED")}
+                          />
+                        ) : (
+                          <ActionMenuItem
+                            icon={<Check className="w-4 h-4 text-emerald-500" />}
+                            label="Activate Operator"
+                            onClick={() => handleUpdateStatus(t, "ACTIVE")}
+                          />
                         )}
-                      </div>
+
+                        <ActionMenuItem
+                          icon={<EnvelopeSimple className="w-4 h-4 text-[var(--fg-muted)]" />}
+                          label="Email Operator"
+                          onClick={() => {
+                            window.location.href = `mailto:${t.email}`;
+                          }}
+                        />
+
+                        <ActionMenuItem
+                          icon={<Copy className="w-4 h-4 text-[var(--fg-muted)]" />}
+                          label="Copy Info"
+                          onClick={() => handleCopyDetails(t)}
+                        />
+
+                        <ActionMenuItem
+                          icon={<Trash className="w-4 h-4 text-red-500" />}
+                          label="Decommission / Delete"
+                          danger
+                          onClick={() => handleRequestDelete(t)}
+                        />
+                      </ActionMenu>
                     </td>
                   </tr>
                 ))
