@@ -19,7 +19,8 @@ import {
   Check,
   EnvelopeSimple,
   Copy,
-  Trash
+  Trash,
+  Key
 } from "@/components/icons";
 
 interface TenantSummary {
@@ -88,7 +89,7 @@ export default function AdminTenantsPage() {
       setPhone("");
       setCreateNotice(res.data.welcomeEmailSent
         ? "Operator created. Their temporary login details were sent by email."
-        : `Operator created, but the welcome email was not sent. Give them this temporary password securely: ${res.data.temporaryPassword}`);
+        : `Operator created! Since email is not configured, give them this temporary password securely: ${res.data.temporaryPassword}`);
       await fetchTenants();
     } catch (err: unknown) {
       if (err && typeof err === "object" && "response" in err) {
@@ -99,6 +100,22 @@ export default function AdminTenantsPage() {
       }
     } finally {
       setFormLoading(false);
+    }
+  };
+
+  const handleResendCredentials = async (tenant: TenantSummary) => {
+    try {
+      const res = await api.post<{ temporaryPassword: string; welcomeEmailSent: boolean }>(
+        `/api/admin/tenants/${tenant.id}/resend-credentials`
+      );
+      if (res.data.welcomeEmailSent) {
+        setCreateNotice(`New temporary credentials generated and emailed to ${tenant.email}`);
+      } else {
+        setCreateNotice(`Temporary password generated for ${tenant.name}: ${res.data.temporaryPassword} (Give this to the operator securely).`);
+      }
+    } catch (err) {
+      console.error("Failed to regenerate credentials:", err);
+      setCreateNotice("Failed to generate credentials for operator.");
     }
   };
 
@@ -183,7 +200,7 @@ export default function AdminTenantsPage() {
 
       {createNotice && (
         <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-start justify-between gap-3">
-          <span>{createNotice}</span>
+          <span className="font-medium">{createNotice}</span>
           <button type="button" aria-label="Dismiss notice" onClick={() => setCreateNotice(null)} className="shrink-0"><X className="w-4 h-4" /></button>
         </div>
       )}
@@ -262,6 +279,12 @@ export default function AdminTenantsPage() {
                     </td>
                     <td className="py-4 px-6 text-right">
                       <ActionMenu ariaLabel={`Actions for ${t.name}`}>
+                        <ActionMenuItem
+                          icon={<Key className="w-4 h-4 text-blue-600" />}
+                          label="Generate / Resend Password"
+                          onClick={() => handleResendCredentials(t)}
+                        />
+
                         {t.status === "ACTIVE" ? (
                           <ActionMenuItem
                             icon={<Prohibit className="w-4 h-4 text-amber-500" />}
