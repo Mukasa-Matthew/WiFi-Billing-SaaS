@@ -262,7 +262,9 @@ public class RouterScriptGenerator {
         s.append(":do { /user/group/add name=wb-api policy=read,write,test,rest-api }"
                 + " on-error={ /user/group/add name=wb-api policy=read,write,test }\n");
         s.append("/user/add name=wb-api password=").append(q(c.radiusSecret())).append(" group=wb-api\n");
-        s.append("/ip/service/set www disabled=no address=").append(c.tunnelSubnet()).append("\n");
+        s.append(":do { /ip/service/set www disabled=no allowed-address=").append(c.tunnelSubnet())
+                .append(" } on-error={ /ip/service/set www disabled=no address=").append(c.tunnelSubnet())
+                .append(" }\n");
         String coaRule = "/ip/firewall/filter add chain=input in-interface=" + iface
                 + " src-address=" + c.radiusServerIp()
                 + " protocol=udp dst-port=3799 action=accept comment=" + tag;
