@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import api from "@/lib/api";
 import {
   field, label, hint, panel, ErrorNotice, ugx,
@@ -19,7 +19,18 @@ const presets: Record<string, { name: string; duration: string; unit: string; pr
 const UNITS: Record<string, string> = { "60": "minute", "3600": "hour", "86400": "day" };
 
 export default function CreatePackagePage() {
+  return (
+    <Suspense>
+      <PackageFormPage />
+    </Suspense>
+  );
+}
+
+function PackageFormPage() {
   const nav = useRouter();
+  const searchParams = useSearchParams();
+  const idParam = searchParams.get("id");
+  const templateParam = searchParams.get("template");
   const [editId, setEditId] = useState<number | null>(null);
   const [name, setName] = useState(""); const [duration, setDuration] = useState("1"); const [unit, setUnit] = useState("86400");
   const [description, setDescription] = useState(""); const [upload, setUpload] = useState("5"); const [download, setDownload] = useState("5");
@@ -29,10 +40,12 @@ export default function CreatePackagePage() {
   const [routers, setRouters] = useState<{ id: number; name: string }[]>([]); const [routerId, setRouterId] = useState("");
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const template = presets[params.get("template") || ""];
+    setEditId(null); setName(""); setDuration("1"); setUnit("86400");
+    setDescription(""); setUpload("5"); setDownload("5"); setPrice("");
+    setDevices("1"); setAvailability("ACTIVE"); setFeatured(false); setOrder("0"); setRouterId("");
+    const template = presets[templateParam || ""];
     if (template) { setName(template.name); setDuration(template.duration); setUnit(template.unit); setPrice(template.price); }
-    const id = params.get("id");
+    const id = idParam;
     if (id) {
       api.get<{
         id: number; name: string; price: number; rateLimit: string; sessionTimeout: number;
@@ -56,7 +69,7 @@ export default function CreatePackagePage() {
         setRouterId(p.routerId ? String(p.routerId) : "");
       }).catch(() => setError("Could not load this package for editing."));
     }
-  }, []);
+  }, [idParam, templateParam]);
   useEffect(() => { api.get<{ id: number; name: string }[]>("/api/routers").then((r) => setRouters(r.data)).catch(() => {}); }, []);
 
   const n = Number(duration) || 0;
