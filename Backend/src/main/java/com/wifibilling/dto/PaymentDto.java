@@ -39,6 +39,7 @@ public class PaymentDto {
             String voucherCode,
             BigDecimal amount,
             OffsetDateTime createdAt,
-            OffsetDateTime completedAt) {
+            OffsetDateTime completedAt,
+            String failureMessage) {
     }
 }

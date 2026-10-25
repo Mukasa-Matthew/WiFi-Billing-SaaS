@@ -525,9 +525,44 @@ public class PaymentService {
         } else if ("failed".equals(status) || "cancelled".equals(status) || "expired".equals(status)) {
             tx.setStatus(STATUS_FAILED);
             tx.setCompletedAt(OffsetDateTime.now());
-            tx.setNotes("Provider status: " + status);
+            String reason = txn.path("description").asText("");
+            tx.setNotes("Provider status: " + status
+                    + (reason.isBlank() ? "" : " — " + reason.substring(0, Math.min(reason.length(), 300))));
             transactionRepository.save(tx);
         }
+    }
+
+    /**
+     * Customer-safe explanation for a failed payment, derived from the provider
+     * reason stored in notes. Returns null when no reason can be established —
+     * the portal then shows its generic message. Never echoes raw notes.
+     */
+    static String customerFailureMessage(String notes) {
+        if (notes == null) return null;
+        String n = notes.toUpperCase();
+        if (n.contains("MINIMUM")) {
+            return "This package is below the mobile money minimum amount. Please choose another package.";
+        }
+        if (n.contains("BALANCE") || n.contains("FUNDS") || n.contains("LIMIT")) {
+            return "Your mobile money balance is too low or a transaction limit was reached. Top up or use another number, then try again.";
+        }
+        if (n.contains("PIN")) {
+            return "The mobile money PIN was incorrect. Please try again.";
+        }
+        if (n.contains("EXPIRE") || n.contains("TIMEOUT") || n.contains("TIMED OUT")) {
+            return "The payment prompt expired before it was approved. Please try again and approve it on your phone.";
+        }
+        if (n.contains("NOT_FOUND") || n.contains("NOT REGISTERED") || n.contains("INVALID_NUMBER")
+                || n.contains("INVALID PHONE") || n.contains("PAYER_NOT")) {
+            return "This number could not be charged — check it is registered for mobile money, or use another number.";
+        }
+        if (n.startsWith("PROVIDER REJECTED COLLECTION")) {
+            return "The payment could not be started. Check your phone number and try again.";
+        }
+        if (n.contains("REJECT") || n.contains("DECLIN") || n.contains("CANCEL")) {
+            return "The payment was declined or cancelled on your phone. You can try again.";
+        }
+        return null;
     }
 
     /**
@@ -555,7 +590,8 @@ public class PaymentService {
                 tx.getVoucherCode(),
                 tx.getAmount(),
                 tx.getCreatedAt(),
-                tx.getCompletedAt()
+                tx.getCompletedAt(),
+                STATUS_FAILED.equals(tx.getStatus()) ? customerFailureMessage(tx.getNotes()) : null
         );
     }
 
