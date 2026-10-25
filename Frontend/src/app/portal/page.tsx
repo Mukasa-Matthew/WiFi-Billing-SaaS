@@ -13,7 +13,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import api from "@/lib/api";
+import { publicApi } from "@/lib/api";
 import {
   WifiHigh, Ticket, ShieldCheck, Lightning, Devices, ArrowRight,
   CheckCircle, WarningCircle, Phone, WhatsappLogo, ChatCircleText, X,
@@ -90,6 +90,18 @@ const COPY: Record<string, Strings> = {
 
 const stringsFor = (language: string | null): Strings =>
   COPY[language || "English"] ?? COPY.English;
+
+/* Used when the backend has no portal config endpoint. Deliberately empty of
+   business data: no packages and no support numbers are invented. */
+const PORTAL_DEFAULTS: PortalConfig = {
+  tenantName: "", template: "midnight", font: null, language: "English",
+  primaryColor: null, logoSize: 64, hasLogo: false,
+  showPackages: true, allowPurchases: false, showDeviceLimits: true,
+  showPackageTime: true, showDeviceMac: false, buyForOther: false,
+  showFeedback: true, supportPhone: null, whatsappPhone: null,
+  supportEmail: null, redirectUrl: null, voucherCodeLength: 8,
+  device: { mac: "", ip: "", router: "" }, packages: [],
+};
 
 const THEMES = ["midnight", "daylight", "ember"];
 
@@ -187,7 +199,7 @@ export default function CaptivePortalPage() {
   const codeRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    api.get<PortalConfig>("/api/portal/config")
+    publicApi.get<PortalConfig>("/api/portal/config")
       .then((r) => { setConfig(r.data); setStage("enter"); })
       .catch(() => setStage("enter"));
   }, []);
@@ -207,16 +219,20 @@ export default function CaptivePortalPage() {
   const search = useSyncExternalStore(subscribeNever, () => window.location.search, () => "");
   const overrides = useMemo(() => previewOverrides(search), [search]);
 
-  const view: PortalConfig | null = config ? { ...config, ...overrides } : null;
+  /* /api/portal/config is not served by every deployment. When it is missing the
+     portal still has to render — a customer standing at the hotspot cannot be
+     shown a blank page — so fall back to defaults and let the query overrides
+     (which carry the operator's settings in the preview) fill in the rest. */
+  const view: PortalConfig = { ...PORTAL_DEFAULTS, ...(config ?? {}), ...overrides };
   const t = stringsFor(view?.language ?? null);
-  const theme = overrides.template || config?.template || "midnight";
+  const theme = view.template || "midnight";
 
   const redeem = useCallback(async (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
     setStage("connecting");
     try {
-      const r = await api.post<{ ok: boolean; message?: string; session?: PortalSession }>(
+      const r = await publicApi.post<{ ok: boolean; message?: string; session?: PortalSession }>(
         "/api/portal/redeem", { code: code.trim().toUpperCase() },
       );
       if (r.data.ok && r.data.session) {
@@ -593,7 +609,7 @@ function PurchaseSheet({ t, plan, config, onClose }: {
     setError(null);
     setBusy(true);
     try {
-      const r = await api.post<{ ok: boolean; message?: string }>(
+      const r = await publicApi.post<{ ok: boolean; message?: string }>(
         "/api/portal/purchase", { packageId: plan.id, phone: phone.trim(), forOther },
       );
       if (r.data.ok) setDone(r.data.message || t.payHint);
@@ -670,7 +686,7 @@ function FeedbackSheet({ t, onClose }: { t: Strings; onClose: () => void }) {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
-    try { await api.post("/api/portal/feedback", { rating, message: text.trim() }); setDone(true); }
+    try { await publicApi.post("/api/portal/feedback", { rating, message: text.trim() }); setDone(true); }
     catch { setDone(true); }
     finally { setBusy(false); }
   };

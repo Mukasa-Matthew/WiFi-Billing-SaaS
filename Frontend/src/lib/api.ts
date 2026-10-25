@@ -59,3 +59,17 @@ api.interceptors.response.use(
 );
 
 export default api;
+
+/**
+ * Unauthenticated client for the captive portal.
+ *
+ * The portal is public and runs before a customer has any session, so it must
+ * not share the dashboard's interceptors: a 401 there would clear wb_token and
+ * redirect the whole page to /login, which also signs out the operator who
+ * opened the preview. Portal requests fail quietly and the UI falls back.
+ */
+export const publicApi = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 20000,
+  headers: { "Content-Type": "application/json" },
+});
