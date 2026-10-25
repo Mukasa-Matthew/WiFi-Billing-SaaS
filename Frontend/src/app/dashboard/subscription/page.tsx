@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { Table, Badge, Notice, panel, message } from "@/components/BillingUI";
-import { CalendarCheck, CreditCard, WarningCircle } from "@phosphor-icons/react";
+import { CalendarCheck, CreditCard, WarningCircle } from "@/components/icons";
 
 interface SubView {
   subscribed: boolean;

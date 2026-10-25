@@ -1,35 +1,58 @@
 "use client";
-import React, { useEffect, useRef } from "react";
-import { X } from "@phosphor-icons/react";
+import React, { useEffect, useId, useRef } from "react";
+import { createPortal } from "react-dom";
+import { X } from "@/components/icons";
 
 export function Dialog({ title, description, children, onClose, wide = false }: {
   title: string; description?: string; children: React.ReactNode; onClose: () => void; wide?: boolean;
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  const descriptionId = useId();
   useEffect(() => {
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     closeRef.current?.focus();
-    const key = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    const key = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      if (e.key !== "Tab" || !dialogRef.current) return;
+      const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'));
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
     document.addEventListener("keydown", key);
-    return () => document.removeEventListener("keydown", key);
+    return () => {
+      document.removeEventListener("keydown", key);
+      document.body.style.overflow = previousOverflow;
+      previousFocus?.focus();
+    };
   }, [onClose]);
 
-  return (
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-4" role="presentation">
-      <div className="absolute inset-0 bg-slate-900/50" onClick={onClose} />
-      <div role="dialog" aria-modal="true" aria-label={title}
-        className={`relative w-full ${wide ? "max-w-2xl" : "max-w-md"} rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-lg`}>
+      <div className="absolute inset-0 bg-slate-950/55 backdrop-blur-[2px]" onClick={onClose} />
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={description ? descriptionId : undefined}
+        className={`dialog-enter relative max-h-[calc(100dvh-2rem)] w-full overflow-y-auto ${wide ? "max-w-2xl" : "max-w-md"} rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--shadow-overlay)] sm:p-6`}>
         <div className="mb-5 flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-sm font-semibold text-[var(--fg)]">{title}</h2>
-            {description && <p className="mt-1 text-xs text-[var(--fg-muted)]">{description}</p>}
+            <h2 id={titleId} className="text-sm font-semibold text-[var(--fg)]">{title}</h2>
+            {description && <p id={descriptionId} className="mt-1 text-xs text-[var(--fg-muted)]">{description}</p>}
           </div>
           <button ref={closeRef} aria-label="Close dialog" onClick={onClose}
-            className="rounded-lg p-1.5 text-[var(--fg-faint)] hover:bg-[var(--fill)] hover:text-[var(--fg-body)]">
+            className="min-h-10 min-w-10 rounded-lg p-1.5 text-[var(--fg-faint)] transition hover:bg-[var(--fill)] hover:text-[var(--fg-body)]">
             <X className="h-4 w-4" />
           </button>
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

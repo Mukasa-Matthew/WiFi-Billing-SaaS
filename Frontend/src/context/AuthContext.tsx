@@ -9,12 +9,14 @@ export interface UserSession {
   name: string;
   email: string;
   role: "ROLE_SUPERADMIN" | "ROLE_ADMIN" | string;
+  mustChangePassword: boolean;
 }
 
 interface AuthContextType {
   user: UserSession | null;
   loading: boolean;
   login: (data: UserSession) => void;
+  markPasswordChanged: () => void;
   logout: () => void;
 }
 
@@ -22,6 +24,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   login: () => {},
+  markPasswordChanged: () => {},
   logout: () => {},
 });
 
@@ -52,11 +55,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     localStorage.setItem("wb_user", JSON.stringify(data));
     setUser(data);
 
-    if (data.role === "ROLE_SUPERADMIN") {
+    if (data.mustChangePassword) {
+      router.push("/change-password");
+    } else if (data.role === "ROLE_SUPERADMIN") {
       router.push("/admin");
     } else {
       router.push("/dashboard");
     }
+  };
+
+  const markPasswordChanged = () => {
+    if (!user) return;
+    const updated = { ...user, mustChangePassword: false };
+    localStorage.setItem("wb_user", JSON.stringify(updated));
+    setUser(updated);
+    router.replace(updated.role === "ROLE_SUPERADMIN" ? "/admin" : "/dashboard");
   };
 
   const logout = () => {
@@ -67,7 +80,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, markPasswordChanged, logout }}>
       {children}
     </AuthContext.Provider>
   );

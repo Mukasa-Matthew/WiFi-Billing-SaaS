@@ -1,20 +1,13 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useCallback, useEffect, useState, useMemo } from "react";
 import api from "@/lib/api";
 import {
   FileText,
-  ArrowClockwise,
   MagnifyingGlass,
   Download,
-  Calendar,
   Clock,
-  HardDrive,
-  ArrowCircleDown,
-  ArrowCircleUp,
-  CheckCircle,
-  WarningCircle
-} from "@phosphor-icons/react";
+} from "@/components/icons";
 
 interface SessionHistory {
   radAcctId: number;
@@ -38,7 +31,7 @@ export default function TenantSessionLogsPage() {
   const [search, setSearch] = useState("");
   const [causeFilter, setCauseFilter] = useState("ALL");
 
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     try {
       setLoading(true);
       const res = await api.get<SessionHistory[]>("/api/sessions/history");
@@ -48,13 +41,13 @@ export default function TenantSessionLogsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchLogs();
-    const interval = setInterval(fetchLogs, 30000);
-    return () => clearInterval(interval);
-  }, []);
+    const initial = window.setTimeout(fetchLogs, 0);
+    const interval = window.setInterval(fetchLogs, 30000);
+    return () => { window.clearTimeout(initial); window.clearInterval(interval); };
+  }, [fetchLogs]);
 
   const formatBytes = (bytes: number | null) => {
     if (!bytes || bytes === 0) return "0 MB";
@@ -150,10 +143,10 @@ export default function TenantSessionLogsPage() {
         <div>
           <h1 className="text-xl font-bold tracking-tight text-[var(--fg)] flex items-center gap-2.5">
             <FileText className="w-6 h-6 text-[var(--accent-text)]" />
-            <span>Accounting Logs & ClockCounterClockwise</span>
+            <span>Accounting Logs</span>
           </h1>
           <p className="text-xs text-[var(--fg-muted)] mt-1">
-            Historical radius accounting records (radacct) storing session durations, disconnect causes, and byte transfers.
+            Historical session records — durations, disconnect causes, and data transferred.
           </p>
         </div>
 
@@ -161,7 +154,7 @@ export default function TenantSessionLogsPage() {
           <button
             onClick={exportCsv}
             disabled={filteredLogs.length === 0}
-            className="px-3.5 py-2.5 rounded-xl bg-[var(--fill)] hover:bg-slate-200 text-[var(--fg-body)] hover:text-[var(--fg)] border border-[var(--border-strong)] text-xs font-semibold flex items-center gap-2 transition cursor-pointer disabled:opacity-40"
+            className="px-3.5 py-2.5 rounded-xl bg-[var(--fill)] hover:bg-[var(--border)] text-[var(--fg-body)] hover:text-[var(--fg)] border border-[var(--border-strong)] text-xs font-semibold flex items-center gap-2 transition cursor-pointer disabled:opacity-40"
           >
             <Download className="w-4 h-4" />
             <span>Export CSV</span>
@@ -170,7 +163,7 @@ export default function TenantSessionLogsPage() {
       </div>
 
       {/* Summary Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-sm">
           <span className="text-xs font-medium text-[var(--fg-muted)]">Total Logged Sessions</span>
           <div className="text-2xl font-bold tabular-nums text-[var(--fg)] mt-1">{logs.length} Records</div>
@@ -181,11 +174,6 @@ export default function TenantSessionLogsPage() {
           <div className="text-2xl font-bold tabular-nums text-[var(--accent-text)] mt-1">
             {formatBytes(totalHistoricalBytes)}
           </div>
-        </div>
-
-        <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-sm">
-          <span className="text-xs font-medium text-[var(--fg-muted)]">Compliance & Storage</span>
-          <div className="text-2xl font-bold tabular-nums text-emerald-700 mt-1">FreeRADIUS SQL</div>
         </div>
       </div>
 
@@ -220,11 +208,11 @@ export default function TenantSessionLogsPage() {
       </div>
 
       {/* Logs Table */}
-      <div className="rounded-2xl border border-[var(--border)] overflow-hidden bg-white/30">
+      <div className="rounded-2xl border border-[var(--border)] overflow-hidden bg-[var(--surface)]">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="border-b border-[var(--border)] bg-white/80 text-[var(--fg-muted)] font-medium">
+              <tr className="border-b border-[var(--border)] bg-[var(--subtle)] text-[var(--fg-muted)] font-medium">
                 <th className="py-3 px-4">User / Code</th>
                 <th className="py-3 px-4">IP Address</th>
                 <th className="py-3 px-4">Device MAC</th>
@@ -235,14 +223,9 @@ export default function TenantSessionLogsPage() {
                 <th className="py-3 px-4">Terminate Reason</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100/60">
+            <tbody className="divide-y divide-[var(--border)]">
               {loading ? (
-                <tr>
-                  <td colSpan={8} className="py-12 text-center text-[var(--fg-muted)]">
-                    <ArrowClockwise className="w-5 h-5 mx-auto animate-spin text-[var(--accent-text)] mb-2" />
-                    <span>Loading accounting logs...</span>
-                  </td>
-                </tr>
+                Array.from({ length: 6 }, (_, row) => <tr key={row} aria-hidden="true">{Array.from({ length: 8 }, (_, column) => <td key={column} className="px-4 py-4"><span className="block h-3.5 animate-pulse rounded bg-[var(--fill)] motion-reduce:animate-none" style={{ width: `${55 + ((row + column) % 4) * 10}%` }} /></td>)}</tr>)
               ) : filteredLogs.length > 0 ? (
                 filteredLogs.map((log) => (
                   <tr key={log.radAcctId} className="hover:bg-[var(--subtle)] transition">
@@ -251,7 +234,7 @@ export default function TenantSessionLogsPage() {
                         {log.username}
                       </span>
                     </td>
-                    <td className="py-3 px-4 font-mono text-cyan-300">
+                    <td className="py-3 px-4 font-mono text-[var(--accent-text)]">
                       {log.framedIpAddress || <span className="text-[var(--fg-muted)]">—</span>}
                     </td>
                     <td className="py-3 px-4 font-mono text-[var(--fg-muted)]">
@@ -269,7 +252,7 @@ export default function TenantSessionLogsPage() {
                           ↓ {formatBytes(log.acctOutputOctets)}
                         </span>
                         <span className="text-[var(--fg-muted)]">/</span>
-                        <span className="text-amber-700 flex items-center gap-0.5">
+                        <span className="text-amber-500 flex items-center gap-0.5">
                           ↑ {formatBytes(log.acctInputOctets)}
                         </span>
                       </div>

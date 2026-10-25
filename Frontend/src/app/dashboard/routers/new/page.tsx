@@ -14,7 +14,7 @@ import {
   CellTower as RouterIcon,
   Terminal,
   WifiHigh,
-} from "@phosphor-icons/react";
+} from "@/components/icons";
 
 interface RouterRecord {
   id: number;

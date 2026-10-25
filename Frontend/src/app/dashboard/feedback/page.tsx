@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import api from "@/lib/api";
-import { ChatCircleText, Star, Trash } from "@phosphor-icons/react";
+import { ChatCircleText, Star, Trash } from "@/components/icons";
 import { useResource, Notice, ErrorNotice, message, date, PageContainer, PageHeader } from "@/components/BillingUI";
 import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
@@ -23,7 +23,7 @@ function Stars({ n }: { n: number | null }) {
   return (
     <span className="flex items-center gap-0.5" aria-label={`${n} out of 5 stars`}>
       {[1, 2, 3, 4, 5].map((i) => (
-        <Star key={i} size={13} weight={i <= n ? "fill" : "regular"} className={i <= n ? "text-amber-500" : "text-slate-300"} />
+        <Star key={i} size={13} className={i <= n ? "text-amber-500" : "text-slate-300"} />
       ))}
     </span>
   );

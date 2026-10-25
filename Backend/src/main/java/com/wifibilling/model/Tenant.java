@@ -29,6 +29,11 @@ public class Tenant {
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 
+    /** Set on admin-provisioned accounts; cleared when the tenant sets their own password. */
+    @Column(name = "must_change_password")
+    @Builder.Default
+    private Boolean mustChangePassword = false;
+
     @Column(nullable = false, length = 30)
     @Builder.Default
     private String role = "ROLE_ADMIN"; // ROLE_SUPERADMIN, ROLE_ADMIN

@@ -28,6 +28,53 @@ public class TenantSettingsController {
     private final RouterRepository routerRepository;
     private final RouterManagementService managementService;
     private final PlatformProperties props;
+    private final com.wifibilling.service.OtpService otpService;
+
+    public record EmailChangeRequest(String newEmail, String otp) {}
+    public record OtpResponse(boolean sent, String devCode) {}
+
+    /**
+     * Step 1 of changing the account email: a code is sent to the CURRENT
+     * address. The account email is the security channel for withdrawal and
+     * password-reset codes, so the change must be authorised from it.
+     */
+    @PostMapping("/email/otp")
+    public OtpResponse requestEmailChangeOtp(@AuthenticationPrincipal TenantPrincipal principal,
+                                             @RequestBody(required = false) EmailChangeRequest req) {
+        Tenant tenant = load(principal.getTenantId());
+        validateNewEmail(tenant, req != null ? req.newEmail() : null);
+        String devCode = otpService.issue(tenant.getEmail(), com.wifibilling.model.EmailOtp.PURPOSE_EMAIL_CHANGE,
+                tenant.getId(), tenant.getName(),
+                "You asked to change the email on your AirPairy account. Enter this code to confirm it.");
+        return new OtpResponse(true, devCode);
+    }
+
+    /** Step 2: verify the code sent to the current email, then switch address. */
+    @PostMapping("/email")
+    @Transactional
+    public TenantSettingsDto changeEmail(@AuthenticationPrincipal TenantPrincipal principal,
+                                         @RequestBody EmailChangeRequest req) {
+        Tenant tenant = load(principal.getTenantId());
+        String newEmail = validateNewEmail(tenant, req != null ? req.newEmail() : null);
+        otpService.verify(tenant.getEmail(), com.wifibilling.model.EmailOtp.PURPOSE_EMAIL_CHANGE, req.otp());
+        tenant.setEmail(newEmail);
+        return toDto(tenantRepository.save(tenant));
+    }
+
+    private String validateNewEmail(Tenant tenant, String newEmail) {
+        if (newEmail == null || newEmail.isBlank()
+                || !newEmail.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$") || newEmail.length() > 120) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Enter a valid new email address");
+        }
+        String normalized = newEmail.trim().toLowerCase();
+        if (normalized.equalsIgnoreCase(tenant.getEmail())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "That is already your account email");
+        }
+        if (tenantRepository.findByEmailIgnoreCase(normalized).isPresent()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "That email is already in use");
+        }
+        return normalized;
+    }
 
     @GetMapping
     @Transactional(readOnly = true)

@@ -7,8 +7,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import ThemeToggle from "@/components/ThemeToggle";
 import {
-  ChartLine,
-  Users,
   CellTower as RouterIcon,
   HardDrives,
   SignOut,
@@ -16,7 +14,10 @@ import {
   ShieldCheck,
   List,
   Bank,
-} from "@phosphor-icons/react";
+  Building2,
+  CreditCard,
+  LayoutDashboard,
+} from "@/components/icons";
 
 
 
@@ -34,21 +35,23 @@ export default function AdminLayout({
     if (!loading) {
       if (!user) {
         router.replace("/login");
+      } else if (user.mustChangePassword) {
+        router.replace("/change-password");
       } else if (user.role !== "ROLE_SUPERADMIN") {
         router.replace("/dashboard");
       }
     }
   }, [user, loading, router]);
 
-  const ready = !loading && user?.role === "ROLE_SUPERADMIN";
+  const ready = !loading && user?.role === "ROLE_SUPERADMIN" && !user.mustChangePassword;
 
   const navItems = [
-    { name: "Platform overview", href: "/admin", icon: ChartLine, group: "Platform" },
-    { name: "Tenants", href: "/admin/tenants", icon: Users, group: "Platform" },
-    { name: "Finance", href: "/admin/finance", icon: Bank, group: "Platform" },
-    { name: "Subscriptions", href: "/admin/subscriptions", icon: ShieldCheck, group: "Platform" },
-    { name: "Router fleet", href: "/admin/routers", icon: RouterIcon, group: "Devices" },
-    { name: "Network health", href: "/admin/health", icon: HardDrives, group: "Devices" },
+    { name: "Command center", href: "/admin", icon: LayoutDashboard, group: "Overview" },
+    { name: "Tenants", href: "/admin/tenants", icon: Building2, group: "Business management" },
+    { name: "Subscriptions", href: "/admin/subscriptions", icon: CreditCard, group: "Business management" },
+    { name: "Finance", href: "/admin/finance", icon: Bank, group: "Financial management" },
+    { name: "Router fleet", href: "/admin/routers", icon: RouterIcon, group: "Network operations" },
+    { name: "System health", href: "/admin/health", icon: HardDrives, group: "Network operations" },
   ];
 
   const activeItem = [...navItems].sort((a, b) => b.href.length - a.href.length).find(
@@ -103,7 +106,11 @@ export default function AdminLayout({
                     }`}
                   >
                     {isActive && <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r bg-blue-400" />}
-                    <Icon className="h-4 w-4 shrink-0" />
+                    <Icon
+                      aria-hidden="true"
+
+                      className={`h-5 w-5 shrink-0 ${isActive ? "text-blue-300" : "text-[var(--sidebar-fg-dim)]"}`}
+                    />
                     <span className="flex-1">{item.name}</span><LinkPending />
                   </Link>
                 </React.Fragment>
@@ -121,6 +128,9 @@ export default function AdminLayout({
               <p className="truncate text-xs font-semibold text-white">{user?.name}</p>
               <p className="truncate text-[11px] text-[var(--sidebar-fg-dim)]">{user?.email}</p>
             </div>
+          </div>
+          <div className="mb-3 flex justify-center">
+            <ThemeToggle compact />
           </div>
           <button
             onClick={logout}
@@ -145,7 +155,6 @@ export default function AdminLayout({
             </span>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
-            <ThemeToggle />
             <Link href="/dashboard"
               className="rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 py-2 text-xs font-semibold text-[var(--fg-body)] transition hover:bg-[var(--subtle)]">
               Tenant workspace →
@@ -154,7 +163,7 @@ export default function AdminLayout({
         </header>
 
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-          <div className="mx-auto w-full max-w-[1440px]">{children}</div>
+          <div className="page-enter mx-auto w-full max-w-[1440px]">{children}</div>
         </main>
       </div>
 

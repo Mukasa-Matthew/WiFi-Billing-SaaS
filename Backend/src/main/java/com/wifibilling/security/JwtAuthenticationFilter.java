@@ -46,7 +46,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                 tenant.getId(),
                                 tenant.getEmail(),
                                 tenant.getName(),
-                                tenant.getRole()
+                                tenant.getRole(),
+                                Boolean.TRUE.equals(tenant.getMustChangePassword())
                         );
                         UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                                 principal,
@@ -55,6 +56,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         );
                         authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                         SecurityContextHolder.getContext().setAuthentication(authToken);
+
+                        String path = request.getRequestURI();
+                        if (principal.isMustChangePassword()
+                                && !path.equals("/api/auth/change-password")) {
+                            response.sendError(HttpServletResponse.SC_FORBIDDEN,
+                                    "Password change required before accessing the account");
+                            return;
+                        }
                     }
                 }
             }

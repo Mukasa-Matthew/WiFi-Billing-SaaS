@@ -3,7 +3,7 @@ import React,{useState} from "react";
 import {useRouter} from "next/navigation";
 import api from "@/lib/api";
 import {useResource,Notice,field,message,label,hint,FormHeader,FormSection,FormActions,FormLayout,SummaryCard} from "@/components/BillingUI";
-import { Money, CellTower } from "@phosphor-icons/react";
+import { Money, CellTower } from "@/components/icons";
 
 interface RouterRec{id:number;name:string}
 interface Plan{id:number;name:string;price:number;sessionTimeout:number}
@@ -39,7 +39,7 @@ export default function Page(){
      {label:"Expires",value:expires?new Date(expires).toLocaleString():"Never"},
     ]} footer="A bound device connects without entering a voucher code."/>
    }>
-   <FormSection icon={<CellTower size={18} weight="duotone" aria-hidden/>} title="Device and access"
+   <FormSection icon={<CellTower size={18} aria-hidden/>} title="Device and access"
     hint="Identify the device on a router and choose what access it gets.">
     <div className="grid gap-5 sm:grid-cols-2">
     <div className="sm:col-span-2">
@@ -86,7 +86,7 @@ export default function Page(){
     </div>
     </div>
    </FormSection>
-   <FormSection icon={<Money size={18} weight="duotone" aria-hidden/>} title="Payment recording"
+   <FormSection icon={<Money size={18} aria-hidden/>} title="Payment recording"
     hint="Records an already received payment in revenue. Leave off for free or internal access.">
     <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-[var(--border)] p-4 transition hover:bg-[var(--subtle)]">
      <input type="checkbox" checked={paid} onChange={e=>setPaid(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-blue-700"/>

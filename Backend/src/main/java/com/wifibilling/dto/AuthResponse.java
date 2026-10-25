@@ -5,5 +5,6 @@ public record AuthResponse(
         Long tenantId,
         String name,
         String email,
-        String role) {
+        String role,
+        boolean mustChangePassword) {
 }
