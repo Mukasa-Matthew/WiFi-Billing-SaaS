@@ -38,6 +38,10 @@ public class OtpService {
     private int maxAttempts;
     @Value("${otp.resend-cooldown-seconds:60}")
     private int resendCooldownSeconds;
+    /** Dev-only: return the plaintext code in the API response when email is
+     *  unconfigured. MUST stay false in production. */
+    @Value("${otp.dev-fallback-enabled:false}")
+    private boolean devFallbackEnabled;
 
     /**
      * Issue a code to an email. Returns the plaintext code ONLY when email
@@ -73,7 +77,14 @@ public class OtpService {
                 ? templates.passwordResetEmail(businessName, code, ttlMinutes)
                 : templates.otpEmail(businessName, code, ttlMinutes, context);
         emailService.send(normalized, subject, html);
-        return emailService.configured() ? null : code;
+        if (!emailService.configured()) {
+            if (!devFallbackEnabled) {
+                throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                        "Email delivery is not configured on this server");
+            }
+            return code;
+        }
+        return null;
     }
 
     /** Verify and consume a code. Throws 400 on any mismatch — no detail leakage. */
