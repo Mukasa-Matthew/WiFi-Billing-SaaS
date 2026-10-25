@@ -24,7 +24,7 @@ import java.util.Set;
 public class RouterScriptGenerator {
 
     /** Bump only for a deliberate, reviewed RouterOS infrastructure migration. */
-    public static final String PROVISIONING_VERSION = "2026.10.4";
+    public static final String PROVISIONING_VERSION = "2026.10.5";
 
     private static final String IFACE_NAME = "wg-billing";
     private static final String TELEMETRY_NAME = "wb-telemetry";
@@ -424,7 +424,7 @@ public class RouterScriptGenerator {
                 + "/system/script/add name=wb-management policy=read,write,test source={\n"
                 + ":for i from=1 to=3 do={\n"
                 + tlsFetch(prefix + "/management.rsc?wait=25", " dst-path=wb-management.rsc", ":delay 2s")
-                + ":do { /import wb-management.rsc } on-error={}\n"
+                + "; :do { /import wb-management.rsc } on-error={}\n"
                 + "}\n"
                 + ":do { :local hosts [/ip/dhcp-server/lease/print as-value where status=bound]; "
                 + tlsFetch(prefix + "/hosts",
@@ -449,7 +449,7 @@ public class RouterScriptGenerator {
     public static String portalSyncBootstrap(String publicBaseUrl, String token) {
         return tlsFetch(publicBaseUrl + "/api/portal/templates/portal-sync.rsc?token=" + token,
                 " dst-path=" + q("wb-portal-sync.rsc"), "")
-                + ":do { /import wb-portal-sync.rsc } on-error={}\n";
+                + "; :do { /import wb-portal-sync.rsc } on-error={}\n";
     }
 
     /**
