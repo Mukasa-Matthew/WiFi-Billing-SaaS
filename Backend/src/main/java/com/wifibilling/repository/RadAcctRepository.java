@@ -90,9 +90,9 @@ public interface RadAcctRepository extends JpaRepository<RadAcct, Long> {
     @Query("""
             SELECT r FROM RadAcct r
             WHERE r.nasIpAddress = :nasIp
-              AND (:username IS NULL OR LOWER(r.username) LIKE LOWER(CONCAT('%', :username, '%')))
+              AND (:username IS NULL OR LOWER(r.username) LIKE LOWER(CONCAT('%', CAST(:username AS String), '%')))
               AND (:openOnly = false OR r.acctStopTime IS NULL)
-              AND (:cause IS NULL OR r.acctTerminateCause = :cause)
+              AND (:cause IS NULL OR r.acctTerminateCause = CAST(:cause AS String))
               AND (:fromTs IS NULL OR COALESCE(r.acctStartTime, r.acctStopTime) >= :fromTs)
               AND (:toTs IS NULL OR COALESCE(r.acctStartTime, r.acctStopTime) < :toTs)
             ORDER BY r.acctStartTime DESC NULLS LAST
