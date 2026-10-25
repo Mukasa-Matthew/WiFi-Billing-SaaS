@@ -2,6 +2,8 @@ package com.wifibilling.controller;
 
 import com.wifibilling.dto.RouterDto;
 import com.wifibilling.model.Router;
+import com.wifibilling.model.RouterSetupCode;
+import com.wifibilling.service.RouterSetupService;
 import com.wifibilling.model.Tenant;
 import com.wifibilling.repository.RouterRepository;
 import com.wifibilling.repository.NasRepository;
@@ -34,6 +36,8 @@ public class RouterController {
     private final TransactionRepository transactionRepository;
     private final NasRepository nasRepository;
     private final WireGuardPeerService wireGuardPeerService;
+    private final RouterSetupService setupService;
+    private final com.wifibilling.repository.RouterSetupCodeRepository setupCodeRepository;
 
     @GetMapping
     public List<RouterDto.Response> list(@AuthenticationPrincipal TenantPrincipal principal) {
@@ -87,6 +91,40 @@ public class RouterController {
         return toResponse(router);
     }
 
+    /**
+     * Issues a one-time setup code for one of the caller's own routers. FULL
+     * releases the provisioning script (with credentials) once; MANAGEMENT
+     * releases only the management-agent installer. Issuing revokes any
+     * earlier unfinished code for the router.
+     */
+    @PostMapping("/{id}/setup-code")
+    public RouterDto.SetupCode setupCode(
+            @AuthenticationPrincipal TenantPrincipal principal,
+            @PathVariable Long id,
+            @RequestBody(required = false) RouterDto.SetupCodeRequest req) {
+        Router router = ownRouter(principal, id);
+        RouterSetupCode.Purpose purpose = req != null && "MANAGEMENT".equalsIgnoreCase(req.purpose())
+                ? RouterSetupCode.Purpose.MANAGEMENT : RouterSetupCode.Purpose.FULL;
+        RouterSetupService.Issued issued = setupService.issue(router, purpose);
+        String path = "/api/router/setup/" + issued.code()
+                + (purpose == RouterSetupCode.Purpose.MANAGEMENT ? "/install-management.rsc" : "");
+        return new RouterDto.SetupCode(router.getId(), purpose.name(), path, issued.expiresAt());
+    }
+
+    /** Public portal identifier for the owner's portal preview (authorizes nothing sensitive). */
+    @GetMapping("/{id}/portal-id")
+    public RouterDto.PortalId portalId(
+            @AuthenticationPrincipal TenantPrincipal principal,
+            @PathVariable Long id) {
+        Router router = ownRouter(principal, id);
+        return new RouterDto.PortalId(router.getId(), router.getToken());
+    }
+
+    private Router ownRouter(TenantPrincipal principal, Long id) {
+        return routerRepository.findByIdAndTenantId(id, principal.getTenantId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Router not found"));
+    }
+
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Transactional
@@ -104,6 +142,7 @@ public class RouterController {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Router has binding history and cannot be deleted");
         }
         taskRepository.deleteAllByRouterId(id);
+        setupCodeRepository.deleteAllByRouterId(id);
         String publicKey = router.getWgPublicKey();
         if (router.getWgIp() != null && !router.getWgIp().isBlank()) {
             nasRepository.deleteByNasname(router.getWgIp());
@@ -120,9 +159,8 @@ public class RouterController {
         return new RouterDto.Response(
                 r.getId(),
                 r.getName(),
-                r.getToken(),
                 r.getWgIp(),
-                r.getWgPublicKey(),
+                r.getWgPublicKey() != null && !r.getWgPublicKey().isBlank(),
                 valueOrDefault(r.getWanInterface(), "ether1"),
                 hotspotInterfaces(r.getHotspotInterfaces()),
                 valueOrDefault(r.getWifiSsid(), "WiFi Hotspot"),

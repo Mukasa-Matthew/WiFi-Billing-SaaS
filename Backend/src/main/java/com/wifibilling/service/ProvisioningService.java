@@ -7,7 +7,6 @@ import com.wifibilling.radius.Nas;
 import com.wifibilling.repository.NasRepository;
 import com.wifibilling.repository.RouterRepository;
 import com.wifibilling.util.Ipv4Subnet;
-import com.wifibilling.util.RouterTokens;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -48,10 +47,31 @@ public class ProvisioningService {
     private final WireGuardPeerService peerService;
     private final RouterScriptGenerator scriptGenerator;
     private final PlatformProperties props;
+    private final RouterSetupService setupService;
+
+    /**
+     * Redeems a FULL setup code and builds its script in one transaction: if
+     * building fails, the redemption rolls back and the owner's code still works.
+     */
+    @Transactional
+    public String buildScriptForSetup(String setupCode) {
+        Long routerId = setupService.redeem(setupCode, com.wifibilling.model.RouterSetupCode.Purpose.FULL);
+        return buildProvisioningScript(load(routerId), setupCode);
+    }
+
+    private Router load(Long routerId) {
+        return routerRepository.findById(routerId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Router not found"));
+    }
 
     @Transactional
-    public String buildProvisioningScript(String token) {
-        Router router = findRouter(token);
+    /**
+     * The credential-bearing setup script. Callers must already have authorized
+     * the router through a redeemed setup code (RouterSetupService); the
+     * router's public identifier is never enough. {@code setupCode} is baked
+     * into the script's register/complete callbacks.
+     */
+    public String buildProvisioningScript(Router router, String setupCode) {
         Ipv4Subnet subnet = Ipv4Subnet.parse(props.getWgSubnet());
 
         String wgIp = Ipv4Subnet.stripPrefix(router.getWgIp());
@@ -92,7 +112,8 @@ public class ProvisioningService {
                 props.getPublicBaseUrl(),
                 walledGardenIps(),
                 walledGardenHosts(),
-                defaultValue(router.getTenant().getTetheringProtection(), "OFF")));
+                defaultValue(router.getTenant().getTetheringProtection(), "OFF"),
+                setupCode));
     }
 
     /**
@@ -100,8 +121,8 @@ public class ProvisioningService {
      * reconfigured. If the wg command fails, the key is still stored and will be
      * applied by {@link WireGuardPeerSync} on next startup (or a re-run).
      */
-    public RegisterKeyResponse registerPublicKey(String token, String publicKey) {
-        Router router = findRouter(token);
+    public RegisterKeyResponse registerPublicKey(Long routerId, String publicKey) {
+        Router router = load(routerId);
         String wgIp = Ipv4Subnet.stripPrefix(router.getWgIp());
         if (wgIp == null || wgIp.isBlank()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Router has not fetched its provisioning script yet");
@@ -127,8 +148,8 @@ public class ProvisioningService {
 
     /** Router signals the import ran end-to-end — mark it provisioned. */
     @Transactional
-    public void markComplete(String token) {
-        Router router = findRouter(token);
+    public void markComplete(Long routerId) {
+        Router router = load(routerId);
         if (!TelemetryService.STATUS_ONLINE.equals(router.getStatus())
                 && !TelemetryService.STATUS_DEGRADED.equals(router.getStatus())) {
             router.setStatus(STATUS_PROVISIONED);
@@ -137,13 +158,6 @@ public class ProvisioningService {
         log.info("Router {} reported provisioning complete", router.getId());
     }
 
-    private Router findRouter(String token) {
-        if (!RouterTokens.isValid(token)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown router token");
-        }
-        return routerRepository.findByToken(token)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown router token"));
-    }
 
     private void upsertNas(Router router) {
         Nas nas = nasRepository.findByNasname(router.getWgIp()).orElseGet(Nas::new);
