@@ -140,15 +140,15 @@ export default function AddRouterPage() {
         </p>
       </div>
 
-      <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-white/70 shadow-sm">
+      <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm">
         <div className="grid border-b border-[var(--border)] md:grid-cols-3">
           {steps.map((item) => {
             const complete = step > item.number;
             const active = step === item.number;
             return (
-              <div key={item.number} className={`flex items-center gap-4 px-6 py-5 ${active ? "bg-slate-100/40" : ""}`}>
+              <div key={item.number} className={`flex items-center gap-4 px-6 py-5 ${active ? "bg-[var(--fill)]" : ""}`}>
                 <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border text-sm font-semibold ${
-                  complete ? "border-blue-600 bg-blue-600 text-white" : active ? "border-blue-500 text-[var(--accent-text)]" : "border-slate-600 text-[var(--fg-muted)]"
+                  complete ? "border-blue-600 bg-blue-600 text-white" : active ? "border-blue-500 text-[var(--accent-text)]" : "border-[var(--border-strong)] text-[var(--fg-muted)]"
                 }`}>
                   {complete ? <Check className="h-5 w-5" /> : String(item.number).padStart(2, "0")}
                 </div>
@@ -171,7 +171,7 @@ export default function AddRouterPage() {
                   maxLength={80}
                   value={identity}
                   onChange={(event) => setIdentity(event.target.value)}
-                  className="w-full rounded-xl border border-[var(--border-strong)] bg-[var(--canvas)]/70 px-4 py-3 text-sm text-[var(--fg)] outline-none transition focus:border-blue-500"
+                  className="w-full rounded-xl border border-[var(--border-strong)] bg-[var(--canvas)] px-4 py-3 text-sm text-[var(--fg)] outline-none transition focus:border-blue-500"
                 />
                 <p className="mt-2 text-xs text-[var(--fg-muted)]">Auto-generated name — you can change it if needed.</p>
               </div>
@@ -183,7 +183,7 @@ export default function AddRouterPage() {
                   maxLength={32}
                   value={wanInterface}
                   onChange={(event) => setWanInterface(event.target.value)}
-                  className="w-full rounded-xl border border-[var(--border-strong)] bg-[var(--canvas)]/70 px-4 py-3 font-mono text-sm text-[var(--fg)] outline-none transition focus:border-blue-500"
+                  className="w-full rounded-xl border border-[var(--border-strong)] bg-[var(--canvas)] px-4 py-3 font-mono text-sm text-[var(--fg)] outline-none transition focus:border-blue-500"
                   placeholder="ether1"
                 />
                 <p className="mt-2 text-xs text-[var(--fg-muted)]">
@@ -197,9 +197,9 @@ export default function AddRouterPage() {
                   role="switch"
                   aria-checked={hasWireless}
                   onClick={() => setHasWireless((value) => !value)}
-                  className={`relative mt-0.5 h-6 w-11 rounded-full transition ${hasWireless ? "bg-blue-600" : "bg-slate-700"}`}
+                  className={`relative mt-0.5 h-6 w-11 rounded-full transition ${hasWireless ? "bg-blue-600" : "bg-[var(--border-strong)]"}`}
                 >
-                  <span className={`absolute top-1 h-4 w-4 rounded-full bg-[var(--surface)] transition ${hasWireless ? "left-6" : "left-1"}`} />
+                  <span className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition ${hasWireless ? "left-6" : "left-1"}`} />
                 </button>
                 <span>
                   <span className="block text-sm font-semibold text-[var(--fg)]">Router has Wireless</span>
@@ -207,7 +207,7 @@ export default function AddRouterPage() {
                 </span>
               </label>
 
-              {error && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-300">{error}</div>}
+              {error && <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-500">{error}</div>}
 
               <div className="flex justify-between border-t border-[var(--border)] pt-5">
                 <button type="button" onClick={() => navigation.push("/dashboard/routers")} className="rounded-lg border border-[var(--border-strong)] px-4 py-2 text-sm text-[var(--fg-body)] hover:bg-[var(--fill)]">Cancel</button>
@@ -220,9 +220,9 @@ export default function AddRouterPage() {
 
           {step === 2 && router && (
             <div className="space-y-6">
-              {error && <p role="alert" className="text-xs text-amber-700">{error}</p>}
+              {error && <p role="alert" className="text-xs text-amber-500">{error}</p>}
               {attempt >= MAX_ATTEMPTS && !connected && <button className="text-xs text-[var(--accent-text)]" onClick={() => setAttempt(0)}>Polling timed out. Retry connection checks</button>}
-              <div className="overflow-hidden rounded-xl border border-[var(--border-strong)] bg-[var(--canvas)]/60">
+              <div className="overflow-hidden rounded-xl border border-[var(--border-strong)] bg-[var(--canvas)]">
                 <div className="flex items-center justify-between border-b border-[var(--border-strong)] px-5 py-4">
                   <span className="flex items-center gap-2 text-sm font-semibold text-[var(--fg)]"><Terminal className="h-4 w-4" /> Provisioning Command</span>
                   <button onClick={copyCommand} className="flex items-center gap-1.5 text-xs font-medium text-[var(--accent-text)] hover:text-blue-600">
@@ -236,11 +236,11 @@ export default function AddRouterPage() {
                 </div>
               </div>
 
-              <div className={`rounded-xl border p-5 ${connected ? "border-emerald-200 bg-emerald-50" : "border-[var(--border)] bg-[var(--subtle)]"}`}>
+              <div className={`rounded-xl border p-5 ${connected ? "border-emerald-500/30 bg-emerald-500/10" : "border-[var(--border)] bg-[var(--subtle)]"}`}>
                 <div className="flex items-start gap-3">
-                  {connected ? <CheckCircle className="h-6 w-6 text-emerald-700" /> : <CircleNotch className="h-6 w-6 animate-spin text-[var(--accent-text)]" />}
+                  {connected ? <CheckCircle className="h-6 w-6 text-emerald-500" /> : <CircleNotch className="h-6 w-6 animate-spin text-[var(--accent-text)]" />}
                   <div>
-                    <p className={`font-mono text-sm font-semibold ${connected ? "text-emerald-700" : "text-[var(--fg)]"}`}>
+                    <p className={`font-mono text-sm font-semibold ${connected ? "text-emerald-500" : "text-[var(--fg)]"}`}>
                       {connected ? "Router is verified and ready" : degraded ? "Router connected, but readiness checks failed" : "$ Paste the provisioning command in your MikroTik terminal to begin"}
                     </p>
                     <p className="mt-2 text-xs text-[var(--fg-muted)]">
@@ -264,15 +264,15 @@ export default function AddRouterPage() {
 
           {step === 3 && router && (
             <div className="space-y-6">
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 text-center">
-                <CheckCircle className="mx-auto h-12 w-12 text-emerald-700" />
-                <h2 className="mt-3 text-xl font-bold text-[var(--fg)]">CellTower verified and ready</h2>
+              <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-6 text-center">
+                <CheckCircle className="mx-auto h-12 w-12 text-emerald-500" />
+                <h2 className="mt-3 text-xl font-bold text-[var(--fg)]">Router verified and ready</h2>
                 <p className="mt-2 text-sm text-[var(--fg-muted)]">{router.name} is reporting its managed hotspot, RADIUS configuration and captive portal assets as ready.</p>
               </div>
               <div className="grid gap-4 md:grid-cols-3">
-                <div className="rounded-xl border border-[var(--border)] bg-[var(--canvas)]/50 p-4"><p className="text-xs text-[var(--fg-muted)]">WAN interface</p><p className="mt-1 font-mono text-sm text-[var(--fg)]">{router.wanInterface}</p></div>
-                <div className="rounded-xl border border-[var(--border)] bg-[var(--canvas)]/50 p-4"><p className="text-xs text-[var(--fg-muted)]">Hotspot ports</p><p className="mt-1 font-mono text-sm text-[var(--fg)]">{router.hotspotInterfaces.length > 0 ? router.hotspotInterfaces.join(", ") : `All ports except ${router.wanInterface} (auto)`}</p></div>
-                <div className="rounded-xl border border-[var(--border)] bg-[var(--canvas)]/50 p-4"><p className="text-xs text-[var(--fg-muted)]">Wi-Fi name</p><p className="mt-1 flex items-center gap-2 text-sm text-[var(--fg)]"><WifiHigh className="h-4 w-4 text-[var(--accent-text)]" />{hasWireless ? router.wifiSsid : "Wireless disabled"}</p></div>
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--canvas)] p-4"><p className="text-xs text-[var(--fg-muted)]">WAN interface</p><p className="mt-1 font-mono text-sm text-[var(--fg)]">{router.wanInterface}</p></div>
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--canvas)] p-4"><p className="text-xs text-[var(--fg-muted)]">Hotspot ports</p><p className="mt-1 font-mono text-sm text-[var(--fg)]">{router.hotspotInterfaces.length > 0 ? router.hotspotInterfaces.join(", ") : `All ports except ${router.wanInterface} (auto)`}</p></div>
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--canvas)] p-4"><p className="text-xs text-[var(--fg-muted)]">Wi-Fi name</p><p className="mt-1 flex items-center gap-2 text-sm text-[var(--fg)]"><WifiHigh className="h-4 w-4 text-[var(--accent-text)]" />{hasWireless ? router.wifiSsid : "Wireless disabled"}</p></div>
               </div>
               <div className="flex justify-end border-t border-[var(--border)] pt-5">
                 <button onClick={() => navigation.push("/dashboard/routers")} className="flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-500">
