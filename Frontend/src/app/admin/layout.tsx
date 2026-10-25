@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { LinkPending } from "@/components/LoadingUI";
-import React, { useEffect, useState } from "react";
+import React, { Suspense, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -21,6 +21,18 @@ import {
 } from "@/components/icons";
 
 export default function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <Suspense>
+      <AdminLayoutInner>{children}</AdminLayoutInner>
+    </Suspense>
+  );
+}
+
+function AdminLayoutInner({
   children,
 }: {
   children: React.ReactNode;
@@ -49,6 +61,7 @@ export default function AdminLayout({
     { name: "Tenants", href: "/admin/tenants", icon: Building2, group: "Business management" },
     { name: "Subscriptions", href: "/admin/subscriptions", icon: CreditCard, group: "Business management" },
     { name: "Finance", href: "/admin/finance", icon: Bank, group: "Financial management" },
+    { name: "Network operations", href: "/admin/network", icon: Radio, group: "Network operations" },
     { name: "Router fleet", href: "/admin/routers", icon: RouterIcon, group: "Network operations" },
     { name: "System health", href: "/admin/health", icon: HardDrives, group: "Network operations" },
     { name: "Settings & Security", href: "/admin/settings", icon: GearSix, group: "System & Governance" },
