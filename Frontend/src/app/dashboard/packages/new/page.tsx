@@ -20,6 +20,7 @@ const UNITS: Record<string, string> = { "60": "minute", "3600": "hour", "86400":
 
 export default function CreatePackagePage() {
   const nav = useRouter();
+  const [editId, setEditId] = useState<number | null>(null);
   const [name, setName] = useState(""); const [duration, setDuration] = useState("1"); const [unit, setUnit] = useState("86400");
   const [description, setDescription] = useState(""); const [upload, setUpload] = useState("5"); const [download, setDownload] = useState("5");
   const [price, setPrice] = useState(""); const [devices, setDevices] = useState("1"); const [availability, setAvailability] = useState("ACTIVE");
@@ -28,8 +29,33 @@ export default function CreatePackagePage() {
   const [routers, setRouters] = useState<{ id: number; name: string }[]>([]); const [routerId, setRouterId] = useState("");
 
   useEffect(() => {
-    const template = presets[new URLSearchParams(window.location.search).get("template") || ""];
+    const params = new URLSearchParams(window.location.search);
+    const template = presets[params.get("template") || ""];
     if (template) { setName(template.name); setDuration(template.duration); setUnit(template.unit); setPrice(template.price); }
+    const id = params.get("id");
+    if (id) {
+      api.get<{
+        id: number; name: string; price: number; rateLimit: string; sessionTimeout: number;
+        sharedUsers: number; description: string | null; availability: string; featured: boolean;
+        displayOrder: number; routerId: number | null;
+      }>(`/api/packages/${id}`).then((r) => {
+        const p = r.data;
+        setEditId(p.id);
+        setName(p.name); setPrice(String(p.price));
+        setDescription(p.description || "");
+        // Prefer the largest whole unit that divides the stored seconds.
+        const secs = p.sessionTimeout;
+        if (secs % 86400 === 0) { setDuration(String(secs / 86400)); setUnit("86400"); }
+        else if (secs % 3600 === 0) { setDuration(String(secs / 3600)); setUnit("3600"); }
+        else { setDuration(String(Math.ceil(secs / 60))); setUnit("60"); }
+        const [up, down] = (p.rateLimit || "/").split("/");
+        setUpload((up || "5").replace(/M$/i, "")); setDownload((down || "5").replace(/M$/i, ""));
+        setDevices(String(p.sharedUsers || 1));
+        setAvailability(p.availability); setFeatured(p.featured);
+        setOrder(String(p.displayOrder ?? 0));
+        setRouterId(p.routerId ? String(p.routerId) : "");
+      }).catch(() => setError("Could not load this package for editing."));
+    }
   }, []);
   useEffect(() => { api.get<{ id: number; name: string }[]>("/api/routers").then((r) => setRouters(r.data)).catch(() => {}); }, []);
 
@@ -44,11 +70,13 @@ export default function CreatePackagePage() {
     }
     setSaving(true);
     try {
-      await api.post("/api/packages", {
+      const body = {
         name: name.trim(), description: description.trim(), price: Number(price),
         sessionTimeout: seconds, rateLimit: `${upload}M/${download}M`, sharedUsers: Number(devices),
         availability, featured, displayOrder: Number(order), routerId: routerId ? Number(routerId) : null,
-      });
+      };
+      if (editId) await api.put(`/api/packages/${editId}`, body);
+      else await api.post("/api/packages", body);
       nav.push("/dashboard/packages");
     } catch { setError("Could not save the package. Check your entries and try again."); }
     finally { setSaving(false); }
@@ -58,8 +86,10 @@ export default function CreatePackagePage() {
     <div className="mx-auto max-w-6xl space-y-6">
       <FormHeader
         backHref="/dashboard/packages" backLabel="Packages"
-        title="Create package"
-        description="Set the plan's duration, speeds, price and where customers can see it."
+        title={editId ? "Edit package" : "Create package"}
+        description={editId
+          ? "Update the plan's duration, speeds, price and visibility. Changes push to the portal immediately."
+          : "Set the plan's duration, speeds, price and where customers can see it."}
       />
 
       <form onSubmit={save}>
@@ -226,7 +256,7 @@ export default function CreatePackagePage() {
           )}
 
           <ErrorNotice text={error} />
-          <FormActions busy={saving} busyLabel="Saving…" submitLabel="Create package" cancelHref="/dashboard/packages" />
+          <FormActions busy={saving} busyLabel="Saving…" submitLabel={editId ? "Save changes" : "Create package"} cancelHref="/dashboard/packages" />
         </FormLayout>
       </form>
     </div>

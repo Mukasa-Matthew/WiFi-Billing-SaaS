@@ -70,6 +70,32 @@ public class PackagePlanController {
         return toResponse(plan);
     }
 
+    @PutMapping("/{id}")
+    public PackagePlanDto.Response update(
+            @AuthenticationPrincipal TenantPrincipal principal,
+            @PathVariable Long id,
+            @Valid @RequestBody PackagePlanDto.CreateRequest req) {
+        PackagePlan plan = packagePlanRepository.findByIdAndTenantId(id, principal.getTenantId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Package not found"));
+
+        plan.setName(req.name().trim());
+        plan.setPrice(req.price());
+        plan.setRateLimit(req.rateLimit().trim());
+        plan.setSessionTimeout(req.sessionTimeout());
+        plan.setSharedUsers(req.sharedUsers() != null ? req.sharedUsers() : 1);
+        plan.setDescription(req.description());
+        if (req.availability() != null) plan.setAvailability(req.availability());
+        plan.setFeatured(Boolean.TRUE.equals(req.featured()));
+        plan.setDisplayOrder(req.displayOrder() == null ? 0 : req.displayOrder());
+        plan.setRouter(req.routerId() == null ? null
+                : routerRepository.findByIdAndTenantId(req.routerId(), plan.getTenant().getId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Router not found")));
+
+        PackagePlan saved = packagePlanRepository.save(plan);
+        syncPortals(plan.getTenant().getId());
+        return toResponse(saved);
+    }
+
     @GetMapping("/{id}")
     public PackagePlanDto.Response get(
             @AuthenticationPrincipal TenantPrincipal principal,

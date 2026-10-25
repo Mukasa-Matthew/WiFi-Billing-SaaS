@@ -79,6 +79,7 @@ export {
   Sun,
   Terminal,
   Ticket,
+  Pencil as NotePencil,
   Trash2 as Trash,
   TriangleAlert as Warning,
   TriangleAlert as WarningCircle,
