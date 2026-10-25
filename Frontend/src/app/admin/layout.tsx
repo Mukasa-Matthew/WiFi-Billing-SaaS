@@ -35,13 +35,15 @@ export default function AdminLayout({
     if (!loading) {
       if (!user) {
         router.replace("/login");
+      } else if (user.mustChangePassword) {
+        router.replace("/change-password");
       } else if (user.role !== "ROLE_SUPERADMIN") {
         router.replace("/dashboard");
       }
     }
   }, [user, loading, router]);
 
-  const ready = !loading && user?.role === "ROLE_SUPERADMIN";
+  const ready = !loading && user?.role === "ROLE_SUPERADMIN" && !user.mustChangePassword;
 
   const navItems = [
     { name: "Command center", href: "/admin", icon: LayoutDashboard, group: "Overview" },

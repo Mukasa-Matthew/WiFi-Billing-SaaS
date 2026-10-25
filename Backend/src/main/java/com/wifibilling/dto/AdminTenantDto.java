@@ -11,8 +11,15 @@ public class AdminTenantDto {
     public record CreateRequest(
             @NotBlank @Size(max = 120) String name,
             @NotBlank @Email @Size(max = 120) String email,
-            @NotBlank @Size(max = 30) String phone,
-            @NotBlank @Size(min = 6) String password) {
+            @NotBlank @Size(max = 30) String phone) {
+    }
+
+    /** Returned once on creation — the temp password is also emailed; it is
+     *  surfaced here only when the welcome email could not be delivered. */
+    public record CreateResponse(
+            SummaryResponse tenant,
+            String temporaryPassword,
+            boolean welcomeEmailSent) {
     }
 
     public record UpdateStatusRequest(

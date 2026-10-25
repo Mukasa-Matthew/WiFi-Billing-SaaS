@@ -3,6 +3,8 @@ package com.wifibilling.controller;
 import com.wifibilling.dto.AdminTenantDto;
 import com.wifibilling.model.Tenant;
 import com.wifibilling.repository.*;
+import com.wifibilling.service.EmailService;
+import com.wifibilling.service.EmailTemplates;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -12,6 +14,9 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.security.SecureRandom;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 @RestController
@@ -26,6 +31,11 @@ public class AdminTenantController {
     private final TransactionRepository transactionRepository;
     private final RadAcctRepository radAcctRepository;
     private final PasswordEncoder passwordEncoder;
+    private final EmailService emailService;
+    private final EmailTemplates emailTemplates;
+
+    @org.springframework.beans.factory.annotation.Value("${app.public-base-url:http://localhost:3000}")
+    private String publicBaseUrl;
 
     /**
      * Lists all hotspot owners along with their router and voucher metrics.
@@ -58,24 +68,26 @@ public class AdminTenantController {
      */
     @PostMapping("/tenants")
     @ResponseStatus(HttpStatus.CREATED)
-    public AdminTenantDto.SummaryResponse createTenant(@Valid @RequestBody AdminTenantDto.CreateRequest req) {
+    public AdminTenantDto.CreateResponse createTenant(@Valid @RequestBody AdminTenantDto.CreateRequest req) {
         String email = req.email().trim().toLowerCase();
         if (tenantRepository.existsByEmailIgnoreCase(email)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Tenant email is already registered");
         }
 
+        String temporaryPassword = generateTemporaryPassword();
         Tenant tenant = Tenant.builder()
                 .name(req.name().trim())
                 .email(email)
                 .phone(req.phone().trim())
-                .passwordHash(passwordEncoder.encode(req.password()))
+                .passwordHash(passwordEncoder.encode(temporaryPassword))
+                .mustChangePassword(true)
                 .role("ROLE_ADMIN")
                 .status("ACTIVE")
                 .build();
 
         tenant = tenantRepository.save(tenant);
 
-        return new AdminTenantDto.SummaryResponse(
+        AdminTenantDto.SummaryResponse summary = new AdminTenantDto.SummaryResponse(
                 tenant.getId(),
                 tenant.getName(),
                 tenant.getEmail(),
@@ -86,6 +98,39 @@ public class AdminTenantController {
                 0L,
                 tenant.getCreatedAt()
         );
+
+        boolean emailSent = false;
+        if (emailService.configured()) {
+            try {
+                String loginUrl = publicBaseUrl.replaceAll("/+$", "") + "/login";
+                emailService.send(tenant.getEmail(), "Welcome to AirPairy — your account is ready",
+                        emailTemplates.tenantWelcomeEmail(tenant.getName(), tenant.getEmail(),
+                                temporaryPassword, loginUrl));
+                emailSent = true;
+            } catch (EmailService.EmailDeliveryException ignored) {
+                // The account remains usable; the Superadmin receives the password as a fallback.
+            }
+        }
+        return new AdminTenantDto.CreateResponse(summary, emailSent ? null : temporaryPassword, emailSent);
+    }
+
+    private String generateTemporaryPassword() {
+        SecureRandom random = new SecureRandom();
+        String upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+        String lower = "abcdefghijkmnopqrstuvwxyz";
+        String digits = "23456789";
+        String symbols = "!@#$%";
+        String all = upper + lower + digits + symbols;
+        List<Character> chars = new ArrayList<>();
+        chars.add(upper.charAt(random.nextInt(upper.length())));
+        chars.add(lower.charAt(random.nextInt(lower.length())));
+        chars.add(digits.charAt(random.nextInt(digits.length())));
+        chars.add(symbols.charAt(random.nextInt(symbols.length())));
+        while (chars.size() < 16) chars.add(all.charAt(random.nextInt(all.length())));
+        Collections.shuffle(chars, random);
+        StringBuilder result = new StringBuilder(chars.size());
+        chars.forEach(result::append);
+        return result.toString();
     }
 
     /**

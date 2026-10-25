@@ -24,7 +24,7 @@ export default function LoginPage() {
         password: password,
       });
 
-      // response.data: { token, tenantId, name, email, role }
+      // Temporary accounts are routed to the mandatory password-change screen.
       login(response.data);
     } catch (err: unknown) {
       if (err && typeof err === "object" && "response" in err) {
