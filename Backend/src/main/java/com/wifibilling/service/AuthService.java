@@ -19,6 +19,7 @@ public class AuthService {
     private final TenantRepository tenantRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final OtpService otpService;
 
     @Transactional(readOnly = true)
     public AuthResponse login(AuthRequest req) {
@@ -35,6 +36,55 @@ public class AuthService {
         }
 
         String token = jwtService.generateToken(tenant.getId(), tenant.getEmail(), tenant.getRole());
-        return new AuthResponse(token, tenant.getId(), tenant.getName(), tenant.getEmail(), tenant.getRole());
+        return new AuthResponse(token, tenant.getId(), tenant.getName(), tenant.getEmail(), tenant.getRole(),
+                Boolean.TRUE.equals(tenant.getMustChangePassword()));
+    }
+
+    /**
+     * Sends a reset code if the account exists. Always succeeds — callers cannot
+     * distinguish registered from unregistered emails.
+     */
+    @Transactional
+    public void forgotPassword(String email) {
+        String normalized = email == null ? "" : email.trim().toLowerCase();
+        tenantRepository.findByEmailIgnoreCase(normalized).ifPresent(tenant -> {
+            if (!"DISABLED".equalsIgnoreCase(tenant.getStatus())
+                    && !"SUSPENDED".equalsIgnoreCase(tenant.getStatus())) {
+                otpService.issue(normalized, com.wifibilling.model.EmailOtp.PURPOSE_PASSWORD_RESET,
+                        tenant.getId(), tenant.getName(), null);
+            }
+        });
+    }
+
+    @Transactional
+    public void resetPassword(String email, String code, String newPassword) {
+        String normalized = email == null ? "" : email.trim().toLowerCase();
+        if (newPassword == null || newPassword.length() < 8) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password must be at least 8 characters");
+        }
+        Tenant tenant = tenantRepository.findByEmailIgnoreCase(normalized)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid or expired code"));
+        otpService.verify(normalized, com.wifibilling.model.EmailOtp.PURPOSE_PASSWORD_RESET, code);
+        tenant.setPasswordHash(passwordEncoder.encode(newPassword));
+        tenant.setMustChangePassword(false);
+        tenantRepository.save(tenant);
+    }
+
+    @Transactional
+    public void changePassword(Long tenantId, String currentPassword, String newPassword) {
+        if (newPassword == null || newPassword.length() < 8) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password must be at least 8 characters");
+        }
+        Tenant tenant = tenantRepository.findById(tenantId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found"));
+        if (currentPassword == null || !passwordEncoder.matches(currentPassword, tenant.getPasswordHash())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Current password is incorrect");
+        }
+        if (passwordEncoder.matches(newPassword, tenant.getPasswordHash())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "New password must be different from the temporary password");
+        }
+        tenant.setPasswordHash(passwordEncoder.encode(newPassword));
+        tenant.setMustChangePassword(false);
+        tenantRepository.save(tenant);
     }
 }

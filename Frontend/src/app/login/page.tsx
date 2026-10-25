@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
-import { Lock, EnvelopeSimple, Radio, WarningCircle, ArrowRight, ShieldCheck, Eye, EyeSlash } from "@phosphor-icons/react";
+import { Lock, EnvelopeSimple, Radio, WarningCircle, ArrowRight, Eye, EyeSlash } from "@/components/icons";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -24,7 +24,7 @@ export default function LoginPage() {
         password: password,
       });
 
-      // response.data: { token, tenantId, name, email, role }
+      // Temporary accounts are routed to the mandatory password-change screen.
       login(response.data);
     } catch (err: unknown) {
       if (err && typeof err === "object" && "response" in err) {
@@ -64,9 +64,6 @@ export default function LoginPage() {
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-8 shadow-sm">
           <div className="mb-6">
             <h2 className="text-lg font-semibold text-[var(--fg)]">Account Sign In</h2>
-            <p className="text-xs text-[var(--fg-muted)] mt-1">
-              Hotspot Admins and Superadmin unified portal
-            </p>
           </div>
 
           {error && (
@@ -95,9 +92,14 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-[var(--fg-body)] mb-1.5">
-                Password
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-medium text-[var(--fg-body)]">
+                  Password
+                </label>
+                <a href="/forgot-password" className="text-xs font-semibold text-[var(--accent-text)] hover:underline">
+                  Forgot password?
+                </a>
+              </div>
               <div className="relative">
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--fg-muted)]" />
                 <input
@@ -138,18 +140,7 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-[var(--border)] text-center">
-            <div className="flex items-center justify-center gap-2 text-xs text-[var(--fg-muted)]">
-              <ShieldCheck className="w-4 h-4 text-emerald-500" />
-              <span>FreeRADIUS & WireGuard Secured</span>
-            </div>
-          </div>
         </div>
-
-        {/* Footer info */}
-        <p className="text-center text-xs text-[var(--fg-muted)] mt-6">
-          Hotspot operator accounts are provisioned exclusively by platform administrators.
-        </p>
         <p className="text-center text-[11px] text-[var(--fg-faint)] mt-3">
           AirPairy is a product by Thewton.
         </p>

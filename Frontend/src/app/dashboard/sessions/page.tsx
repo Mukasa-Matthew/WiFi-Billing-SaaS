@@ -1,22 +1,19 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useCallback, useEffect, useState, useMemo } from "react";
 import api from "@/lib/api";
+import { Dialog } from "@/components/ui/Dialog";
+import { buttonGhost, message } from "@/components/BillingUI";
 import {
   Users,
-  ArrowClockwise,
   MagnifyingGlass,
-  WifiHigh,
   Radio,
   ArrowCircleDown,
   ArrowCircleUp,
   Clock,
   UserMinus,
-  Warning,
-  CheckCircle,
   ShieldWarning,
-  HardDrive
-} from "@phosphor-icons/react";
+} from "@/components/icons";
 
 interface ActiveSession {
   radAcctId: number;
@@ -45,7 +42,7 @@ export default function TenantActiveSessionsPage() {
   const [disconnectTarget, setDisconnectTarget] = useState<ActiveSession | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
 
-  const fetchActiveSessions = async () => {
+  const fetchActiveSessions = useCallback(async () => {
     try {
       const res = await api.get<ActiveSession[]>("/api/sessions/active");
       setSessions(res.data);
@@ -54,24 +51,19 @@ export default function TenantActiveSessionsPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchActiveSessions();
   }, []);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      fetchActiveSessions();
-    }, 10000);
-    return () => clearInterval(interval);
-  }, []);
+    const initial = window.setTimeout(fetchActiveSessions, 0);
+    const interval = window.setInterval(fetchActiveSessions, 10000);
+    return () => { window.clearTimeout(initial); window.clearInterval(interval); };
+  }, [fetchActiveSessions]);
 
   const handleDisconnect = async () => {
     if (!disconnectTarget) return;
     try {
       setDisconnecting(true);
-      const res = await api.post("/api/sessions/disconnect", {
+      await api.post("/api/sessions/disconnect", {
         username: disconnectTarget.username
       });
       setMsg({
@@ -80,9 +72,9 @@ export default function TenantActiveSessionsPage() {
       });
       setDisconnectTarget(null);
       fetchActiveSessions();
-    } catch (err: any) {
+    } catch (err: unknown) {
       setMsg({
-        text: err.response?.data?.message || "Failed to disconnect session",
+        text: message(err),
         type: "error"
       });
     } finally {
@@ -138,11 +130,11 @@ export default function TenantActiveSessionsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-[var(--fg)] flex items-center gap-2.5">
-            <Radio className="w-6 h-6 text-emerald-700 animate-pulse" />
+            <Radio className="w-6 h-6 text-emerald-500 animate-pulse" />
             <span>Live Active Sessions</span>
           </h1>
           <p className="text-xs text-[var(--fg-muted)] mt-1">
-            Real-time accounting telemetry streamed from MikroTik NAS devices via FreeRADIUS radacct.
+            Customers currently connected through your routers, updating in real time.
           </p>
         </div>
 
@@ -155,8 +147,8 @@ export default function TenantActiveSessionsPage() {
         <div
           className={`p-4 rounded-2xl text-xs font-medium border flex items-center justify-between ${
             msg.type === "success"
-              ? "bg-emerald-50 border-emerald-200 text-emerald-700"
-              : "bg-red-50 border-red-200 text-red-600"
+              ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500"
+              : "bg-red-500/10 border-red-500/30 text-red-500"
           }`}
         >
           <span>{msg.text}</span>
@@ -173,13 +165,13 @@ export default function TenantActiveSessionsPage() {
             <span className="text-xs font-medium text-[var(--fg-muted)]">Connected Users</span>
             <div className="text-2xl font-bold tabular-nums text-[var(--fg)] flex items-center gap-2">
               <span>{sessions.length}</span>
-              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/30">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
                 Online
               </span>
             </div>
           </div>
-          <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700">
+          <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500">
             <Users className="w-5 h-5" />
           </div>
         </div>
@@ -199,11 +191,11 @@ export default function TenantActiveSessionsPage() {
         <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-sm flex items-center justify-between">
           <div className="space-y-1">
             <span className="text-xs font-medium text-[var(--fg-muted)]">Total Live Upload</span>
-            <div className="text-2xl font-bold tabular-nums text-amber-700">
+            <div className="text-2xl font-bold tabular-nums text-amber-500">
               {formatBytes(totalUploadBytes)}
             </div>
           </div>
-          <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-amber-700">
+          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500">
             <ArrowCircleUp className="w-5 h-5" />
           </div>
         </div>
@@ -222,29 +214,24 @@ export default function TenantActiveSessionsPage() {
       </div>
 
       {/* Active Sessions Table */}
-      <div className="rounded-2xl border border-[var(--border)] overflow-hidden bg-white/30">
+      <div className="rounded-2xl border border-[var(--border)] overflow-hidden bg-[var(--surface)]">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="border-b border-[var(--border)] bg-white/80 text-[var(--fg-muted)] font-medium">
+              <tr className="border-b border-[var(--border)] bg-[var(--subtle)] text-[var(--fg-muted)] font-medium">
                 <th className="py-3 px-4">User / Voucher</th>
                 <th className="py-3 px-4">Assigned IP</th>
                 <th className="py-3 px-4">Device MAC</th>
-                <th className="py-3 px-4">NAS CellTower</th>
+                <th className="py-3 px-4">Router</th>
                 <th className="py-3 px-4">Session Uptime</th>
                 <th className="py-3 px-4">Data Usage (Down / Up)</th>
                 <th className="py-3 px-4">Started At</th>
-                <th className="py-3 px-4 text-right">RFC 5176 Action</th>
+                <th className="py-3 px-4 text-right">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100/60">
+            <tbody className="divide-y divide-[var(--border)]">
               {loading && sessions.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="py-12 text-center text-[var(--fg-muted)]">
-                    <ArrowClockwise className="w-5 h-5 mx-auto animate-spin text-emerald-700 mb-2" />
-                    <span>Streaming active sessions from FreeRADIUS...</span>
-                  </td>
-                </tr>
+                Array.from({ length: 5 }, (_, row) => <tr key={row} aria-hidden="true">{Array.from({ length: 8 }, (_, column) => <td key={column} className="px-4 py-4"><span className="block h-3.5 animate-pulse rounded bg-[var(--fill)] motion-reduce:animate-none" style={{ width: `${55 + ((row + column) % 4) * 10}%` }} /></td>)}</tr>)
               ) : filteredSessions.length > 0 ? (
                 filteredSessions.map((session) => (
                   <tr key={session.radAcctId || session.username} className="hover:bg-[var(--subtle)] transition">
@@ -256,7 +243,7 @@ export default function TenantActiveSessionsPage() {
                         </span>
                       </div>
                     </td>
-                    <td className="py-3 px-4 font-mono text-cyan-300">
+                    <td className="py-3 px-4 font-mono text-[var(--accent-text)]">
                       {session.framedIpAddress || <span className="text-[var(--fg-muted)]">Pending</span>}
                     </td>
                     <td className="py-3 px-4 font-mono text-[var(--fg-muted)]">
@@ -277,7 +264,7 @@ export default function TenantActiveSessionsPage() {
                           ↓ {formatBytes(session.acctOutputOctets)}
                         </span>
                         <span className="text-[var(--fg-muted)]">/</span>
-                        <span className="text-amber-700 flex items-center gap-0.5">
+                        <span className="text-amber-500 flex items-center gap-0.5">
                           ↑ {formatBytes(session.acctInputOctets)}
                         </span>
                       </div>
@@ -288,7 +275,7 @@ export default function TenantActiveSessionsPage() {
                     <td className="py-3 px-4 text-right">
                       <button
                         onClick={() => setDisconnectTarget(session)}
-                        className="px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-500/20 text-red-600 border border-red-200 text-[11px] font-semibold transition cursor-pointer flex items-center gap-1.5 ml-auto"
+                        className="px-2.5 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/30 text-[11px] font-semibold transition cursor-pointer flex items-center gap-1.5 ml-auto"
                       >
                         <UserMinus className="w-3 h-3" />
                         <span>Disconnect</span>
@@ -310,16 +297,13 @@ export default function TenantActiveSessionsPage() {
 
       {/* Disconnect Modal */}
       {disconnectTarget && (
-        <div className="fixed inset-0 bg-[var(--canvas)]/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-[var(--surface)] border border-[var(--border)] rounded-xl p-6 space-y-6 shadow-sm">
-            <div className="flex items-center gap-3 text-red-600">
-              <div className="p-3 rounded-2xl bg-red-50 border border-red-200">
+        <Dialog title="Revoke user session" description="Immediately ends the customer's active hotspot session." onClose={() => { if (!disconnecting) setDisconnectTarget(null); }}>
+          <div className="space-y-5">
+            <div className="flex items-center gap-3 text-red-500">
+              <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/30">
                 <ShieldWarning className="w-6 h-6" />
               </div>
-              <div>
-                <h3 className="text-base font-bold text-[var(--fg)]">Revoke User Session</h3>
-                <p className="text-xs text-[var(--fg-muted)]">RFC 5176 Disconnect-Request (PoD)</p>
-              </div>
+              <p className="text-xs font-semibold text-red-600">This action interrupts the customer&apos;s connection.</p>
             </div>
 
             <p className="text-xs text-[var(--fg-body)] leading-relaxed">
@@ -327,8 +311,8 @@ export default function TenantActiveSessionsPage() {
               <span className="font-mono font-bold text-[var(--fg)] bg-[var(--fill)] px-1.5 py-0.5 rounded">
                 {disconnectTarget.username}
               </span>
-              ? A UDP 3799 CoA packet will be immediately transmitted to MikroTik router{" "}
-              <span className="font-mono text-cyan-300">{disconnectTarget.nasIpAddress || "10.9.0.x"}</span> to terminate this hotspot session.
+              ? A disconnect request will be sent immediately to router{" "}
+              <span className="font-mono text-[var(--accent-text)]">{disconnectTarget.nasIpAddress || "10.9.0.x"}</span> to terminate this hotspot session.
             </p>
 
             <div className="p-3 rounded-xl bg-[var(--canvas)] border border-[var(--border)] space-y-1.5 text-[11px] font-mono">
@@ -346,11 +330,11 @@ export default function TenantActiveSessionsPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-2">
+            <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
               <button
                 type="button"
                 onClick={() => setDisconnectTarget(null)}
-                className="px-4 py-2.5 rounded-xl bg-[var(--fill)] text-xs font-medium text-[var(--fg-body)] hover:text-[var(--fg)] transition"
+                className={buttonGhost}
               >
                 Cancel
               </button>
@@ -360,11 +344,11 @@ export default function TenantActiveSessionsPage() {
                 disabled={disconnecting}
                 className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-semibold shadow-red-600/25 transition disabled:opacity-50"
               >
-                {disconnecting ? "Transmitting CoA..." : "Terminate Session"}
+                {disconnecting ? "Disconnecting..." : "Terminate Session"}
               </button>
             </div>
           </div>
-        </div>
+        </Dialog>
       )}
     </div>
   );

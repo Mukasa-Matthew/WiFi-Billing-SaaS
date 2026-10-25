@@ -7,7 +7,7 @@ import {
   useResource, Notice, field, label, hint, message,
   FormHeader, FormSection, FormActions, FormLayout, SummaryCard,
 } from "@/components/BillingUI";
-import { Stack, Ticket, Gift } from "@phosphor-icons/react";
+import { Stack, Ticket, Gift } from "@/components/icons";
 
 interface Plan { id: number; name: string; availability: string }
 
@@ -90,7 +90,7 @@ export default function CreateVouchersPage() {
           }
         >
           <FormSection
-            icon={<Stack size={18} weight="duotone" aria-hidden />}
+            icon={<Stack size={18} aria-hidden />}
             title="Package and quantity"
             hint="Which plan these codes unlock, and how many to produce."
           >
@@ -118,7 +118,7 @@ export default function CreateVouchersPage() {
           </FormSection>
 
           <FormSection
-            icon={<Ticket size={18} weight="duotone" aria-hidden />}
+            icon={<Ticket size={18} aria-hidden />}
             title="Code format"
             hint="Defaults come from Settings → Vouchers. Changing them here affects this batch only."
           >
@@ -148,7 +148,7 @@ export default function CreateVouchersPage() {
           </FormSection>
 
           <FormSection
-            icon={<Gift size={18} weight="duotone" aria-hidden />}
+            icon={<Gift size={18} aria-hidden />}
             title="Revenue"
             hint="Mark complimentary batches so they stay out of your sales figures."
           >

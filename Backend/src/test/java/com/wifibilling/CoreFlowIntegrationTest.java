@@ -163,20 +163,46 @@ class CoreFlowIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
         String adminJwt = JsonPath.read(adminLoginBody, "$.token");
 
-        mockMvc.perform(post("/api/admin/tenants")
+        String createdBody = mockMvc.perform(post("/api/admin/tenants")
                         .header("Authorization", "Bearer " + adminJwt)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
                                   "name":"New Hotspot Business",
                                   "email":"operator@example.test",
-                                  "phone":"+256700000002",
-                                  "password":"tenant-password"
+                                  "phone":"+256700000002"
                                 }
                                 """))
                 .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.tenant.role").value("ROLE_ADMIN"))
+                .andExpect(jsonPath("$.tenant.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.temporaryPassword").isNotEmpty())
+                .andReturn().getResponse().getContentAsString();
+        String temporaryPassword = JsonPath.read(createdBody, "$.temporaryPassword");
+
+        String tenantLoginBody = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"operator@example.test","password":"%s"}
+                                """.formatted(temporaryPassword)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("New Hotspot Business"))
+                .andExpect(jsonPath("$.email").value("operator@example.test"))
                 .andExpect(jsonPath("$.role").value("ROLE_ADMIN"))
-                .andExpect(jsonPath("$.status").value("ACTIVE"));
+                .andExpect(jsonPath("$.mustChangePassword").value(true))
+                .andExpect(jsonPath("$.token").isNotEmpty())
+                .andReturn().getResponse().getContentAsString();
+        String tenantJwt = JsonPath.read(tenantLoginBody, "$.token");
+
+        mockMvc.perform(get("/api/dashboard/stats").header("Authorization", "Bearer " + tenantJwt))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/auth/change-password")
+                        .header("Authorization", "Bearer " + tenantJwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"currentPassword":"%s","newPassword":"tenant-password"}
+                                """.formatted(temporaryPassword)))
+                .andExpect(status().isOk());
 
         mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -184,10 +210,7 @@ class CoreFlowIntegrationTest {
                                 {"email":"operator@example.test","password":"tenant-password"}
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name").value("New Hotspot Business"))
-                .andExpect(jsonPath("$.email").value("operator@example.test"))
-                .andExpect(jsonPath("$.role").value("ROLE_ADMIN"))
-                .andExpect(jsonPath("$.token").isNotEmpty());
+                .andExpect(jsonPath("$.mustChangePassword").value(false));
     }
 
     @Test

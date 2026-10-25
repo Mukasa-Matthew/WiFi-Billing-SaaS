@@ -5,7 +5,7 @@ import api from "@/lib/api";
 import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
 import { useResource, Table, Badge, Notice, FilterTabs, button, date, message, panel } from "@/components/BillingUI";
-import { DotsThreeVertical, Eye, ArrowClockwise, FileArrowDown, Clock, Terminal, Trash } from "@phosphor-icons/react";
+import { DotsThreeVertical, Eye, ArrowClockwise, FileArrowDown, Clock, Terminal, Trash } from "@/components/icons";
 
 interface RouterRec { id: number; name: string; token: string; wgIp: string; wgPublicKey: string | null; cpuLoad: number; memoryUsage: number; status: string; lastSeen: string | null; uptime: string | null; hotspotReady: boolean | null; radiusReady: boolean | null; portalReady: boolean | null }
 interface Task { id: number; action: string; status: string; createdAt: string }

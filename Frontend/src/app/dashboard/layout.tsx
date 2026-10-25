@@ -28,7 +28,7 @@ import {
   LinkSimple,
   FileText,
   CaretDown,
-} from "@phosphor-icons/react";
+} from "@/components/icons";
 
 
 
@@ -60,12 +60,13 @@ export default function TenantDashboardLayout({
   }, [user]);
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.replace("/login");
+    if (!loading) {
+      if (!user) router.replace("/login");
+      else if (user.mustChangePassword) router.replace("/change-password");
     }
   }, [user, loading, router]);
 
-  const ready = !loading && !!user;
+  const ready = !loading && !!user && !user.mustChangePassword;
 
   const counts: Record<string, number | undefined> = {
     "Active users": stats?.activeUsers,
@@ -174,7 +175,11 @@ export default function TenantDashboardLayout({
                       }`}
                     >
                       {isActive && <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r bg-blue-400" />}
-                      <Icon className="h-4 w-4 shrink-0" />
+                      <Icon
+                        aria-hidden="true"
+
+                        className={`h-5 w-5 shrink-0 ${isActive ? "text-blue-300" : "text-[var(--sidebar-fg-dim)]"}`}
+                      />
                       <span className="flex-1">{item.name}</span>
                       {count !== undefined && count > 0 && (
                         <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${isActive ? "bg-[var(--sidebar-active-fg)]/12 text-[var(--sidebar-active-fg)]" : "bg-white/15 text-white"}`}>
@@ -200,6 +205,9 @@ export default function TenantDashboardLayout({
               <p className="truncate text-xs font-semibold text-white">{user?.name}</p>
               <p className="truncate text-[11px] text-[var(--sidebar-fg-dim)]">{user?.email}</p>
             </div>
+          </div>
+          <div className="mb-3 flex justify-center">
+            <ThemeToggle compact />
           </div>
           <button
             onClick={logout}
@@ -232,7 +240,6 @@ export default function TenantDashboardLayout({
             </div>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
-            <ThemeToggle />
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#122B49] text-xs font-bold text-white" title={user?.email}>
               {(user?.name ?? "").substring(0, 2).toUpperCase()}
             </div>
@@ -240,7 +247,7 @@ export default function TenantDashboardLayout({
         </header>
 
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-          <div className="mx-auto w-full max-w-[1440px]">{children}</div>
+          <div className="page-enter mx-auto w-full max-w-[1440px]">{children}</div>
         </main>
       </div>
 

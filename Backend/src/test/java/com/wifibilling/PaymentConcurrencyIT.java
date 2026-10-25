@@ -48,6 +48,7 @@ import static org.junit.jupiter.api.Assertions.*;
         "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect",
         "spring.jpa.hibernate.ddl-auto=create-drop",
         "jwt.secret=test-only-jwt-secret-with-at-least-32-characters",
+        "payment.mock-enabled=true",
         "payment.gateway.mock.auto-approve-seconds=3600",
         "payment.reconcile.initial-delay-ms=3600000",
         "wireguard.server.endpoint=203.0.113.10:443",

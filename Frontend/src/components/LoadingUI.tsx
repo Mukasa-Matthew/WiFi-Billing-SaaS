@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleNotch } from "@phosphor-icons/react";
+import { CircleNotch } from "@/components/icons";
 import { useLinkStatus } from "next/link";
 import { useSyncExternalStore } from "react";
 import { getPendingRequests, subscribeRequests } from "@/lib/api";
