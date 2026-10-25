@@ -8,7 +8,7 @@ import { ActionMenu, ActionMenuItem } from "@/components/ui/ActionMenu";
 import { useResource, Table, Badge, Notice, FilterTabs, button, date, message, panel } from "@/components/BillingUI";
 import { Eye, ArrowClockwise, FileArrowDown, Clock, Terminal, Trash } from "@/components/icons";
 
-interface RouterRec { id: number; name: string; token: string; wgIp: string; wgPublicKey: string | null; cpuLoad: number; memoryUsage: number; status: string; lastSeen: string | null; uptime: string | null; hotspotReady: boolean | null; radiusReady: boolean | null; portalReady: boolean | null }
+interface RouterRec { id: number; name: string; wgIp: string; registered: boolean; cpuLoad: number; memoryUsage: number; status: string; lastSeen: string | null; uptime: string | null; hotspotReady: boolean | null; radiusReady: boolean | null; portalReady: boolean | null }
 interface Task { id: number; action: string; status: string; createdAt: string }
 
 export default function Page() {
@@ -18,6 +18,7 @@ export default function Page() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [note, setNote] = useState("");
   const [command, setCommand] = useState("");
+  const [commandExpiry, setCommandExpiry] = useState<string | null>(null);
 
   const open = async (r: RouterRec) => {
     setSelected(r); setCommand("");
@@ -49,10 +50,17 @@ export default function Page() {
       }
     },
   });
-  const showCommand = (r: RouterRec, install = false) => {
-    const url = `${window.location.origin}/api/router/provision/${r.token}${install ? "/install-management.rsc" : ""}`;
-    setCommand(`:do { /tool fetch url="${url}" dst-path=wb-setup.rsc; /import wb-setup.rsc } on-error={ :put "Setup failed. Check router logs." }`);
-    if (!selected || selected.id !== r.id) void open(r);
+  // Each command carries a fresh one-time setup code from the owner-only endpoint.
+  const showCommand = async (r: RouterRec, install = false) => {
+    try {
+      const p = (await api.post<{ path: string; expiresAt: string }>(`/api/routers/${r.id}/setup-code`, { purpose: install ? "MANAGEMENT" : "FULL" })).data;
+      const url = `${window.location.origin}${p.path}`;
+      setCommandExpiry(p.expiresAt);
+      // open() resets the command, so select the router first, then show it.
+      if (!selected || selected.id !== r.id) await open(r);
+      // The downloaded script holds the router's RADIUS secret: delete it from flash either way.
+      setCommand(`:do { /tool fetch url="${url}" dst-path=wb-setup.rsc; /import wb-setup.rsc; /file remove wb-setup.rsc } on-error={ :do { /file remove wb-setup.rsc } on-error={}; :put "Setup failed. Check router logs." }`);
+    } catch (e) { setNote(message(e)); }
   };
 
   const tabs = [
@@ -77,7 +85,7 @@ export default function Page() {
         rows={data.filter(r => tab === "ALL" || (tab === "ONLINE" && r.status === "online") || (tab === "OFFLINE" && r.status !== "online"))}
         columns={[
           { label: "Router", render: r => <span className="font-semibold text-[var(--fg)]">{r.name}</span> },
-          { label: "Provisioning", render: r => <Badge tone={r.status === "online" ? "green" : r.status === "degraded" ? "red" : "amber"}>{r.status === "online" ? "Verified" : r.status === "degraded" ? "Needs attention" : r.status === "provisioned" ? "Awaiting checks" : r.wgPublicKey ? "Registered" : "Awaiting router"}</Badge> },
+          { label: "Provisioning", render: r => <Badge tone={r.status === "online" ? "green" : r.status === "degraded" ? "red" : "amber"}>{r.status === "online" ? "Verified" : r.status === "degraded" ? "Needs attention" : r.status === "provisioned" ? "Awaiting checks" : r.registered ? "Registered" : "Awaiting router"}</Badge> },
           { label: "CPU", render: r => r.lastSeen ? `${r.cpuLoad || 0}%` : "—" },
           { label: "Memory", render: r => r.lastSeen ? `${r.memoryUsage || 0}%` : "—" },
           { label: "Status", render: r => <Badge tone={r.status === "online" ? "green" : "amber"}>{r.status}</Badge> },
@@ -121,7 +129,7 @@ export default function Page() {
               <p className="mb-2 text-xs font-medium text-amber-700">Run this in the router terminal. Full reprovisioning moves customer interfaces; management-agent installation only enables sync and UTC/NTP time.</p>
               <textarea aria-label="Router setup command" readOnly value={command} onFocus={e => e.target.select()}
                 className="h-24 w-full rounded-lg border border-[var(--border-strong)] bg-[#0B1F36] p-3 font-mono text-xs text-slate-200" />
-              <p className="mt-1 text-xs text-[var(--fg-muted)]">Select the command and copy it. Keep this token private.</p>
+              <p className="mt-1 text-xs text-[var(--fg-muted)]">Select the command and copy it. It works once{commandExpiry ? ` and expires at ${new Date(commandExpiry).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}. Generating another command cancels this one.</p>
             </div>
           )}
           <Table rows={tasks} columns={[

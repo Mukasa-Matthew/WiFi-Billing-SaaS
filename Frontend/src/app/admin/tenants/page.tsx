@@ -1,432 +1,140 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import Link from "next/link";
+import React, { useMemo, useState } from "react";
 import api from "@/lib/api";
 import { Dialog } from "@/components/ui/Dialog";
-import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { ActionMenu, ActionMenuItem } from "@/components/ui/ActionMenu";
+import { ActionMenu } from "@/components/ui/ActionMenu";
+import { useToast } from "@/components/ui/Toast";
+import { accountTone, subscriptionTone, useTenantActions } from "@/components/admin/useTenantActions";
+import { Building2, UserPlus, WarningCircle } from "@/components/icons";
+import { summarizeRouters } from "@/lib/routerState";
 import {
-  Users,
-  UserPlus,
-  MagnifyingGlass,
-  CheckCircle,
-  XCircle,
-  CellTower,
-  Ticket,
-  X,
-  WarningCircle,
-  Prohibit,
-  Check,
-  EnvelopeSimple,
-  Copy,
-  Trash,
-  Key
-} from "@/components/icons";
+  Badge, ErrorNotice, PageHeader, Segmented, StatusDot, Table, button, buttonGhost, field, humanize, label,
+  message, relativeTime, ugx, useNow, useResource,
+} from "@/components/BillingUI";
 
 interface TenantSummary {
-  id: number;
-  name: string;
-  email: string;
-  phone: string;
-  role: string;
-  status: string;
-  routerCount: number;
-  voucherCount: number;
-  createdAt: string;
+  id: number; name: string; email: string; phone: string; role: string; status: string;
+  routerCount: number; voucherCount: number; createdAt: string;
 }
+interface FleetRouter { tenantId: number; status: string; lastSeen: string | null }
+interface Subscription { id: number; tenantId: number; monthlyFee: number; nextRenewalDate: string; status: string; displayStatus: string; outstanding: number }
+
+type StatusFilter = "ALL" | "ACTIVE" | "SUSPENDED" | "DISABLED";
 
 export default function AdminTenantsPage() {
-  const [tenants, setTenants] = useState<TenantSummary[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const { confirm, dialog } = useConfirmDialog();
+  const tenants = useResource<TenantSummary>("/api/admin/tenants");
+  const network = useResource<FleetRouter>("/api/admin/noc/routers");
+  const subs = useResource<Subscription>("/api/admin/subscriptions");
+  const actions = useTenantActions(tenants.load);
+  const now = useNow();
+  const [filter, setFilter] = useState<StatusFilter>("ALL");
+  const [creating, setCreating] = useState(false);
 
-  // Form state
+  const netBy = useMemo(() => {
+    const groups = new Map<number, FleetRouter[]>();
+    network.data.forEach((r) => groups.set(r.tenantId, [...(groups.get(r.tenantId) ?? []), r]));
+    return new Map([...groups].map(([id, rs]) => [id, summarizeRouters(rs, now)]));
+  }, [network.data, now]);
+  const subBy = useMemo(() => new Map(subs.data.map((s) => [s.tenantId, s])), [subs.data]);
+  const sorted = useMemo(() => [...tenants.data].sort((a, b) => a.name.localeCompare(b.name)), [tenants.data]);
+  const isDisabled = (t: TenantSummary) => t.status !== "ACTIVE" && t.status !== "SUSPENDED";
+  const rows = sorted.filter((t) => filter === "ALL" || (filter === "DISABLED" ? isDisabled(t) : t.status === filter));
+  const count = (f: StatusFilter) => f === "ALL" ? tenants.data.length : tenants.data.filter((t) => f === "DISABLED" ? isDisabled(t) : t.status === f).length;
+
+  return (
+    <div className="mx-auto max-w-7xl space-y-6">
+      {actions.dialog}
+      <PageHeader
+        title="Tenants"
+        description="Every hotspot business on the platform: account status, subscription standing and router health."
+        action={<button onClick={() => setCreating(true)} className={button}><UserPlus className="h-4 w-4" />Register operator</button>}
+      />
+      {actions.noticeBanner}
+      {tenants.error && <ErrorNotice text={`Couldn't load tenants: ${tenants.error}`} />}
+      {!tenants.error && (network.error || subs.error) && <ErrorNotice text={`Some columns are unavailable: ${[network.error && "router health", subs.error && "subscriptions"].filter(Boolean).join(" and ")} failed to load.`} />}
+
+      <Table
+        rows={rows} loading={tenants.loading} rowKey={(t) => t.id}
+        searchPlaceholder="Search name, email or phone…"
+        emptyIcon={<Building2 />}
+        emptyTitle={tenants.data.length ? "No tenants match" : "No tenants yet"}
+        emptyDescription={tenants.data.length ? "Try another status or search." : "Register the first hotspot operator to get started."}
+        toolbar={<Segmented label="Account status" value={filter} onChange={setFilter} options={(["ALL", "ACTIVE", "SUSPENDED", "DISABLED"] as StatusFilter[]).map((k) => ({ key: k, label: k === "ALL" ? "All" : humanize(k), count: tenants.loading ? undefined : count(k) }))} />}
+        columns={[
+          { label: "Business", render: (t) => (
+            <Link href={`/admin/tenants/${t.id}`} className="group block min-w-0">
+              <span className="block font-medium text-[var(--fg)] group-hover:text-[var(--accent-text)] group-hover:underline">{t.name}</span>
+              <span className="block text-xs text-[var(--fg-muted)]">{t.email}</span>
+            </Link>) },
+          { label: "Account", render: (t) => <Badge tone={accountTone(t.status)} dot>{humanize(t.status)}</Badge> },
+          { label: "Subscription", hideBelow: "lg", render: (t) => {
+            const s = subBy.get(t.id);
+            if (subs.error) return <span className="text-xs text-[var(--fg-faint)]">—</span>;
+            if (!s) return <span className="text-xs text-[var(--fg-faint)]">{subs.loading ? "…" : "None"}</span>;
+            return <span className="flex flex-col items-start gap-0.5"><Badge tone={subscriptionTone(s.displayStatus)}>{humanize(s.displayStatus)}</Badge><span className="num text-[11.5px] text-[var(--fg-muted)]">{ugx(s.monthlyFee)}/mo{s.outstanding > 0 ? ` · ${ugx(s.outstanding)} due` : ""}</span></span>;
+          } },
+          { label: "Routers", render: (t) => {
+            if (!t.routerCount) return <span className="text-xs text-[var(--fg-faint)]">None linked</span>;
+            const n = netBy.get(t.id);
+            if (!n) return <span className="num text-[13px]">{network.loading ? "…" : t.routerCount}</span>;
+            return <span className="flex flex-col gap-0.5"><StatusDot tone={n.tone}><span className="num">{n.label}</span></StatusDot>{n.tone !== "green" && n.detail && <span className="pl-4 text-[11.5px] text-[var(--fg-muted)]">{n.detail}</span>}</span>;
+          } },
+          { label: "Active vouchers", render: (t) => t.voucherCount.toLocaleString(), align: "right", hideBelow: "md" },
+          { label: "Joined", render: (t) => <span className="text-xs text-[var(--fg-muted)]" title={new Date(t.createdAt).toLocaleString()}>{relativeTime(t.createdAt, now)}</span>, align: "right", hideBelow: "sm" },
+          { label: "", render: (t) => <ActionMenu ariaLabel={`Actions for ${t.name}`}>{actions.menuItems(t)}</ActionMenu>, className: "w-10 !px-2 text-right" },
+        ]}
+      />
+
+      {creating && <CreateOperatorDialog onClose={() => setCreating(false)} onCreated={(text) => { actions.setNotice(text); void tenants.load(); }} />}
+    </div>
+  );
+}
+
+function CreateOperatorDialog({ onClose, onCreated }: { onClose: () => void; onCreated: (notice: { text: string; secret?: string }) => void }) {
+  const toast = useToast();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [formLoading, setFormLoading] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
-  const [createNotice, setCreateNotice] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const close = () => { if (!busy) onClose(); };
 
-  const closeCreateDialog = () => {
-    if (formLoading) return;
-    setIsModalOpen(false);
-    setFormError(null);
-  };
-
-  const fetchTenants = async () => {
-    try {
-      const res = await api.get<TenantSummary[]>("/api/admin/tenants");
-      setTenants(res.data);
-    } catch (err) {
-      console.error("Failed to fetch tenants:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchTenants();
-  }, []);
-
-  const handleCreateTenant = async (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setFormError(null);
-    setFormLoading(true);
-
+    setError(null);
+    setBusy(true);
     try {
-      const res = await api.post<{ temporaryPassword: string | null; welcomeEmailSent: boolean }>("/api/admin/tenants", {
-        name: name.trim(),
-        email: email.trim(),
-        phone: phone.trim(),
-      });
-
-      setIsModalOpen(false);
-      setName("");
-      setEmail("");
-      setPhone("");
-      setCreateNotice(res.data.welcomeEmailSent
-        ? "Operator created. Their temporary login details were sent by email."
-        : `Operator created! Since email is not configured, give them this temporary password securely: ${res.data.temporaryPassword}`);
-      await fetchTenants();
-    } catch (err: unknown) {
-      if (err && typeof err === "object" && "response" in err) {
-        const axErr = err as { response?: { data?: { message?: string } } };
-        setFormError(axErr.response?.data?.message || "Failed to create tenant.");
-      } else {
-        setFormError("Network error occurred.");
-      }
+      const res = await api.post<{ temporaryPassword: string | null; welcomeEmailSent: boolean }>("/api/admin/tenants", { name: name.trim(), email: email.trim(), phone: phone.trim() });
+      onClose();
+      if (res.data.welcomeEmailSent) toast("success", "Operator created. Their temporary login details were sent by email.");
+      else onCreated({ text: "Operator created. Email isn't configured, so give them this temporary password securely. It won't be shown again.", secret: res.data.temporaryPassword ?? undefined });
+    } catch (err) {
+      setError(message(err) === "Request failed. Please retry." ? "Failed to create tenant." : message(err));
     } finally {
-      setFormLoading(false);
+      setBusy(false);
     }
   };
-
-  const handleResendCredentials = async (tenant: TenantSummary) => {
-    try {
-      const res = await api.post<{ temporaryPassword: string; welcomeEmailSent: boolean }>(
-        `/api/admin/tenants/${tenant.id}/resend-credentials`
-      );
-      if (res.data.welcomeEmailSent) {
-        setCreateNotice(`New temporary credentials generated and emailed to ${tenant.email}`);
-      } else {
-        setCreateNotice(`Temporary password generated for ${tenant.name}: ${res.data.temporaryPassword} (Give this to the operator securely).`);
-      }
-    } catch (err) {
-      console.error("Failed to regenerate credentials:", err);
-      setCreateNotice("Failed to generate credentials for operator.");
-    }
-  };
-
-  const handleUpdateStatus = async (tenant: TenantSummary, newStatus: string) => {
-    try {
-      await api.put(`/api/admin/tenants/${tenant.id}/status`, {
-        status: newStatus,
-      });
-      await fetchTenants();
-    } catch (err) {
-      console.error("Failed to update status:", err);
-    }
-  };
-
-  const handleCopyDetails = (tenant: TenantSummary) => {
-    const details = `Business: ${tenant.name}\nEmail: ${tenant.email}\nPhone: ${tenant.phone}\nID: #${tenant.id}`;
-    navigator.clipboard.writeText(details);
-    setCreateNotice(`Copied details for "${tenant.name}" to clipboard.`);
-  };
-
-  const handleRequestDelete = (tenant: TenantSummary) => {
-    confirm({
-      title: `Decommission ${tenant.name}?`,
-      body: `Permanently deleting a tenant with live transactions and routers is restricted to preserve financial audit logs. You can disable the operator account to instantly block portal access and logins. Would you like to set their status to DISABLED?`,
-      confirmLabel: "Disable Account",
-      onConfirm: async () => {
-        await handleUpdateStatus(tenant, "DISABLED");
-      },
-    });
-  };
-
-  const filteredTenants = tenants.filter((t) => {
-    const q = search.toLowerCase();
-    return (
-      t.name.toLowerCase().includes(q) ||
-      t.email.toLowerCase().includes(q) ||
-      t.phone.toLowerCase().includes(q)
-    );
-  });
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
-      {dialog}
-
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-[var(--fg)] flex items-center gap-2.5">
-            <Users className="w-6 h-6 text-[var(--accent-text)]" />
-            <span>Hotspot Business Operators</span>
-          </h1>
-          <p className="text-xs text-[var(--fg-muted)] mt-1">
-            Provision, manage, and monitor all tenant organizations and accounts
-          </p>
+    <Dialog title="Register hotspot operator" description="Create a secure dashboard account for a new business." onClose={close}>
+      <p className="mb-5 rounded-lg border border-[var(--border)] bg-[var(--subtle)] p-3.5 text-xs leading-5 text-[var(--fg-muted)]">
+        We generate a temporary password, email it to the operator, and ask them to change it on first sign-in.
+      </p>
+      {error && <p role="alert" className="mb-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700"><WarningCircle className="h-4 w-4 shrink-0" />{error}</p>}
+      <form onSubmit={submit} className="space-y-4">
+        <div><label htmlFor="operator-business" className={label}>Business name</label>
+          <input id="operator-business" required autoFocus maxLength={120} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Acacia Cafe & Lounge" className={field} /></div>
+        <div><label htmlFor="operator-email" className={label}>Operator email</label>
+          <input id="operator-email" type="email" required autoComplete="email" maxLength={120} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="e.g. manager@acaciacafe.ug" className={field} /></div>
+        <div><label htmlFor="operator-phone" className={label}>Contact phone number</label>
+          <input id="operator-phone" type="tel" required autoComplete="tel" maxLength={30} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="e.g. +256770000000" className={field} /></div>
+        <div className="flex flex-col-reverse gap-2 border-t border-[var(--border)] pt-5 sm:flex-row sm:justify-end">
+          <button type="button" onClick={close} disabled={busy} className={buttonGhost}>Cancel</button>
+          <button type="submit" disabled={busy} className={button}>{busy ? "Creating account…" : <><UserPlus className="h-4 w-4" />Create operator account</>}</button>
         </div>
-
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-700 hover:bg-blue-600 text-xs font-semibold text-white shadow-sm transition cursor-pointer"
-        >
-          <UserPlus className="w-4 h-4" />
-          <span>Register New Operator</span>
-        </button>
-      </div>
-
-      {/* Filter / Search Bar */}
-      <div className="p-4 rounded-xl bg-[var(--surface)] border border-[var(--border)] flex items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-md">
-          <MagnifyingGlass className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--fg-muted)]" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search operator name, email, or phone..."
-            className="w-full pl-10 pr-4 py-2 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-xs text-[var(--fg)] placeholder-[var(--fg-muted)] focus:outline-none focus:border-indigo-500 transition"
-          />
-        </div>
-        <span className="text-xs text-[var(--fg-muted)]">
-          Showing <b>{filteredTenants.length}</b> operators
-        </span>
-      </div>
-
-      {createNotice && (
-        <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-start justify-between gap-3">
-          <span className="font-medium">{createNotice}</span>
-          <button type="button" aria-label="Dismiss notice" onClick={() => setCreateNotice(null)} className="shrink-0"><X className="w-4 h-4" /></button>
-        </div>
-      )}
-
-      {/* Operators Table */}
-      <div className="rounded-xl bg-[var(--surface)] border border-[var(--border)]">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="border-b border-[var(--border)] bg-[var(--subtle)] text-[var(--fg-muted)]">
-                <th className="py-3.5 px-6 font-semibold">Operator Business</th>
-                <th className="py-3.5 px-4 font-semibold">Contact Email</th>
-                <th className="py-3.5 px-4 font-semibold">Phone</th>
-                <th className="py-3.5 px-4 font-semibold">Routers</th>
-                <th className="py-3.5 px-4 font-semibold">Vouchers</th>
-                <th className="py-3.5 px-4 font-semibold">Status</th>
-                <th className="py-3.5 px-4 font-semibold">Date Joined</th>
-                <th className="py-3.5 px-6 font-semibold text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100/60">
-              {loading ? (
-                <tr>
-                  <td colSpan={8} className="py-12 text-center text-[var(--fg-muted)]">
-                    <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
-                    <p className="mt-2 text-xs">Loading hotspot operators...</p>
-                  </td>
-                </tr>
-              ) : filteredTenants.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="py-12 text-center text-[var(--fg-muted)]">
-                    No operators found matching your criteria.
-                  </td>
-                </tr>
-              ) : (
-                filteredTenants.map((t) => (
-                  <tr key={t.id} className="hover:bg-[var(--subtle)] transition">
-                    <td className="py-4 px-6 font-medium text-slate-100">
-                      <div className="font-semibold text-[var(--fg)]">{t.name}</div>
-                      <span className="text-[10px] text-[var(--fg-muted)]">ID: #{t.id}</span>
-                    </td>
-                    <td className="py-4 px-4 text-[var(--fg-body)]">{t.email}</td>
-                    <td className="py-4 px-4 text-[var(--fg-body)]">{t.phone}</td>
-                    <td className="py-4 px-4">
-                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--fill)] text-[var(--fg-body)] font-semibold">
-                        <CellTower className="w-3.5 h-3.5 text-[var(--accent-text)]" />
-                        <span>{t.routerCount}</span>
-                      </div>
-                    </td>
-                    <td className="py-4 px-4">
-                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--fill)] text-[var(--fg-body)] font-semibold">
-                        <Ticket className="w-3.5 h-3.5 text-emerald-700" />
-                        <span>{t.voucherCount}</span>
-                      </div>
-                    </td>
-                    <td className="py-4 px-4">
-                      <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${
-                          t.status === "ACTIVE"
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                            : t.status === "SUSPENDED"
-                            ? "bg-amber-50 text-amber-700 border border-amber-200"
-                            : "bg-red-50 text-red-600 border border-red-200"
-                        }`}
-                      >
-                        {t.status === "ACTIVE" ? (
-                          <CheckCircle className="w-3 h-3" />
-                        ) : (
-                          <XCircle className="w-3 h-3" />
-                        )}
-                        <span>{t.status}</span>
-                      </span>
-                    </td>
-                    <td className="py-4 px-4 text-[var(--fg-muted)]">
-                      {new Date(t.createdAt).toLocaleDateString()}
-                    </td>
-                    <td className="py-4 px-6 text-right">
-                      <ActionMenu ariaLabel={`Actions for ${t.name}`}>
-                        <ActionMenuItem
-                          icon={<Key className="w-4 h-4 text-blue-600" />}
-                          label="Generate / Resend Password"
-                          onClick={() => handleResendCredentials(t)}
-                        />
-
-                        {t.status === "ACTIVE" ? (
-                          <ActionMenuItem
-                            icon={<Prohibit className="w-4 h-4 text-amber-500" />}
-                            label="Suspend Operator"
-                            danger
-                            onClick={() => handleUpdateStatus(t, "SUSPENDED")}
-                          />
-                        ) : (
-                          <ActionMenuItem
-                            icon={<Check className="w-4 h-4 text-emerald-500" />}
-                            label="Activate Operator"
-                            onClick={() => handleUpdateStatus(t, "ACTIVE")}
-                          />
-                        )}
-
-                        <ActionMenuItem
-                          icon={<EnvelopeSimple className="w-4 h-4 text-[var(--fg-muted)]" />}
-                          label="Email Operator"
-                          onClick={() => {
-                            window.location.href = `mailto:${t.email}`;
-                          }}
-                        />
-
-                        <ActionMenuItem
-                          icon={<Copy className="w-4 h-4 text-[var(--fg-muted)]" />}
-                          label="Copy Info"
-                          onClick={() => handleCopyDetails(t)}
-                        />
-
-                        <ActionMenuItem
-                          icon={<Trash className="w-4 h-4 text-red-500" />}
-                          label="Decommission / Delete"
-                          danger
-                          onClick={() => handleRequestDelete(t)}
-                        />
-                      </ActionMenu>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Modal: Create Operator */}
-      {isModalOpen && (
-        <Dialog
-          title="Register hotspot operator"
-          description="Create a secure dashboard account for a new business."
-          onClose={closeCreateDialog}
-        >
-          <div className="mb-5 flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 p-3.5 text-blue-900">
-            <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-100">
-              <UserPlus className="h-4 w-4 text-blue-700" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold">Login details are handled automatically</p>
-              <p className="mt-0.5 text-[11px] leading-5 text-blue-700">
-                We’ll generate a temporary password, email it to the operator, and ask them to change it on first sign-in.
-              </p>
-            </div>
-          </div>
-            {formError && (
-              <div className="mb-4 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">
-                <WarningCircle className="w-4 h-4 shrink-0" />
-                <span>{formError}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleCreateTenant} className="space-y-5">
-              <div>
-                <label htmlFor="operator-business" className="mb-1.5 block text-xs font-semibold text-[var(--fg-body)]">
-                  Business name
-                </label>
-                <input
-                  id="operator-business"
-                  type="text"
-                  required
-                  autoFocus
-                  maxLength={120}
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Acacia Cafe & Lounge"
-                  className="w-full rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 py-3 text-sm text-[var(--fg)] outline-none transition placeholder:text-[var(--fg-faint)] focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="operator-email" className="mb-1.5 block text-xs font-semibold text-[var(--fg-body)]">
-                  Operator email
-                </label>
-                <input
-                  id="operator-email"
-                  type="email"
-                  required
-                  autoComplete="email"
-                  maxLength={120}
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="e.g. manager@acaciacafe.ug"
-                  className="w-full rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 py-3 text-sm text-[var(--fg)] outline-none transition placeholder:text-[var(--fg-faint)] focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="operator-phone" className="mb-1.5 block text-xs font-semibold text-[var(--fg-body)]">
-                  Contact phone number
-                </label>
-                <input
-                  id="operator-phone"
-                  type="tel"
-                  required
-                  autoComplete="tel"
-                  maxLength={30}
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="e.g. +256770000000"
-                  className="w-full rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 py-3 text-sm text-[var(--fg)] outline-none transition placeholder:text-[var(--fg-faint)] focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15"
-                />
-              </div>
-
-              <div className="flex flex-col-reverse gap-2 border-t border-[var(--border)] pt-5 sm:flex-row sm:items-center sm:justify-end">
-                <button
-                  type="button"
-                  onClick={closeCreateDialog}
-                  disabled={formLoading}
-                  className="rounded-xl border border-[var(--border)] px-4 py-2.5 text-xs font-semibold text-[var(--fg-body)] transition hover:bg-[var(--fill)] disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={formLoading}
-                  className="inline-flex min-w-48 items-center justify-center gap-2 rounded-xl bg-blue-700 px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {formLoading ? <><span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" />Creating account…</> : <><UserPlus className="h-4 w-4" />Create operator account</>}
-                </button>
-              </div>
-            </form>
-        </Dialog>
-      )}
-    </div>
+      </form>
+    </Dialog>
   );
 }

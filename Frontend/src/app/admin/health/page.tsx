@@ -1,80 +1,42 @@
 "use client";
 
-import React from "react";
-import { HardDrives, ChartLine, CheckCircle, ShieldCheck, Database, Radio } from "@/components/icons";
+import Link from "next/link";
+import { ChartLine, Database, HardDrives, Radio } from "@/components/icons";
+import { Badge, Card, PageHeader } from "@/components/BillingUI";
+
+// Configured platform services. No live probes are wired to this page, so it
+// states that plainly rather than implying a health result.
+const components = [
+  { name: "WireGuard hub (wg0)", description: "Virtual network hub on 10.9.0.1/16 that every tenant router tunnels into.", port: "UDP 443", icon: Radio },
+  { name: "FreeRADIUS", description: "SQL-backed authorization via radcheck/radreply, plus RFC 5176 CoA/PoD disconnects.", port: "1812 · 3799", icon: ChartLine },
+  { name: "PostgreSQL", description: "Shared radius_db used by both the Spring Boot backend and FreeRADIUS.", port: "5432", icon: Database },
+  { name: "Voucher expiry worker", description: "30-second background task that activates first logins and disconnects expired sessions.", port: "Scheduled", icon: HardDrives },
+];
 
 export default function AdminHealthPage() {
-  const components = [
-    {
-      name: "WireGuard Mesh Hub (wg0)",
-      description: "Virtual network hub on 10.9.0.1/16, listening on UDP 443",
-      status: "NOT VERIFIED",
-      icon: Radio,
-      badge: "UDP 443",
-    },
-    {
-      name: "FreeRADIUS core",
-      description: "SQL-backed authorization via radcheck/radreply and RFC 5176 CoA/PoD on port 3799",
-      status: "NOT VERIFIED",
-      icon: ChartLine,
-      badge: "RADIUS 1812/3799",
-    },
-    {
-      name: "PostgreSQL Database Engine",
-      description: "Shared database (radius_db) servicing both Spring Boot backend and FreeRADIUS",
-      status: "NOT VERIFIED",
-      icon: Database,
-      badge: "JDBC 5432",
-    },
-    {
-      name: "Voucher Expiration & Disconnect Worker",
-      description: "30-second scheduled background task detecting newly logged-in vouchers and kicking expired sessions",
-      status: "NOT VERIFIED",
-      icon: HardDrives,
-      badge: "WORKER",
-    },
-  ];
-
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
-      <div>
-        <h1 className="text-xl font-bold tracking-tight text-[var(--fg)] flex items-center gap-2.5">
-          <HardDrives className="w-6 h-6 text-amber-700" />
-          <span>System &amp; VPN Health</span>
-        </h1>
-        <p className="text-xs text-[var(--fg-muted)] mt-1">
-          Configured services. Live probes are not connected; these cards do not report current health.
-        </p>
+    <div className="mx-auto max-w-5xl space-y-6">
+      <PageHeader title="System health" description="Core services the platform depends on." />
+      <div role="status" className="rounded-xl border border-[var(--border)] bg-[var(--subtle)] px-4 py-3.5 text-[13px] leading-relaxed text-[var(--fg-body)]">
+        <b className="font-semibold">Live service probes aren&apos;t connected yet.</b> This page lists what runs, not whether it&apos;s healthy right now. For router-level health, use <Link href="/admin/network" className="text-[var(--accent-text)] hover:underline">Network operations</Link>, where diagnostics come from real telemetry and RADIUS data.
       </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {components.map((c) => {
-          const Icon = c.icon;
-          return (
-            <div
-              key={c.name}
-              className="p-5 rounded-2xl bg-white/70 border border-[var(--border)] flex items-start gap-4"
-            >
-              <div className="p-3 rounded-xl bg-[var(--canvas)] border border-[var(--border)] text-[var(--accent-text)] shrink-0">
-                <Icon className="w-5 h-5" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between mb-1">
-                  <h3 className="text-sm font-semibold text-[var(--fg)] truncate">{c.name}</h3>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-[var(--accent-text)] border border-blue-200">
-                    {c.badge}
-                  </span>
+      <Card bodyClassName="">
+        <ul className="divide-y divide-[var(--border-soft)]">
+          {components.map(({ name, description, port, icon: Icon }) => (
+            <li key={name} className="flex items-start gap-4 px-5 py-4">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--fill)] text-[var(--fg-muted)]"><Icon className="h-[18px] w-[18px]" /></span>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-[14px] font-medium text-[var(--fg)]">{name}</h2>
+                  <span className="font-mono text-[11px] text-[var(--fg-faint)]">{port}</span>
                 </div>
-                <p className="text-xs text-[var(--fg-muted)] mb-3">{c.description}</p>
-                <div className="flex items-center gap-1.5 text-xs text-amber-700 font-medium">
-                  <CheckCircle className="w-3.5 h-3.5" />
-                  <span>{c.status}</span>
-                </div>
+                <p className="mt-0.5 text-[13px] text-[var(--fg-muted)]">{description}</p>
               </div>
-            </div>
-          );
-        })}
-      </div>
+              <Badge tone="slate" dot>Not monitored</Badge>
+            </li>
+          ))}
+        </ul>
+      </Card>
     </div>
   );
 }

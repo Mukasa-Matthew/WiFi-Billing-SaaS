@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/lib/api";
 import {
@@ -19,9 +19,8 @@ import {
 interface RouterRecord {
   id: number;
   name: string;
-  token: string;
   wgIp: string;
-  wgPublicKey: string | null;
+  registered: boolean;
   wanInterface: string;
   hotspotInterfaces: string[];
   wifiSsid: string;
@@ -41,6 +40,11 @@ export default function AddRouterPage() {
   const [attempt, setAttempt] = useState(0);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // One-time setup code from the owner-only endpoint. It releases the setup
+  // script once and expires; the router record itself carries no secret.
+  const [setup, setSetup] = useState<{ path: string; expiresAt: string } | null>(null);
+  const issuedFor = useRef<number | null>(null);
+  const provisionPath = setup?.path ?? null;
 
   useEffect(() => {
     api.get<RouterRecord[]>("/api/routers").then((response) => {
@@ -48,11 +52,29 @@ export default function AddRouterPage() {
     }).catch(() => undefined);
   }, []);
 
+  const issueSetupCode = useCallback(async (routerId: number) => {
+    try {
+      const r = await api.post<{ path: string; expiresAt: string }>(`/api/routers/${routerId}/setup-code`, { purpose: "FULL" });
+      setSetup(r.data);
+      setCopied(false);
+    } catch {
+      setError("Couldn't create the setup command. Try again.");
+    }
+  }, []);
+
+  // Issue exactly once per router: a second issue would revoke the first code.
+  useEffect(() => {
+    if (!router?.id || issuedFor.current === router.id) return;
+    issuedFor.current = router.id;
+    void issueSetupCode(router.id);
+  }, [router?.id, issueSetupCode]);
+
   const provisioningCommand = useMemo(() => {
-    if (!router || typeof window === "undefined") return "";
-    const url = `${window.location.origin}/api/router/provision/${router.token}`;
-    return `:do { /tool fetch url="${url}" dst-path=wifi-billing.rsc; /import wifi-billing.rsc } on-error={ :put "Provisioning failed. Check internet access and try again." }`;
-  }, [router]);
+    if (!router || !provisionPath || typeof window === "undefined") return "";
+    const url = `${window.location.origin}${provisionPath}`;
+    // The downloaded script holds the router's RADIUS secret: delete it from flash either way.
+    return `:do { /tool fetch url="${url}" dst-path=wifi-billing.rsc; /import wifi-billing.rsc; /file remove wifi-billing.rsc } on-error={ :do { /file remove wifi-billing.rsc } on-error={}; :put "Provisioning failed. Check internet access and try again." }`;
+  }, [router, provisionPath]);
 
   // A public-key registration alone is not readiness. The backend only marks
   // the router online after telemetry confirms hotspot, RADIUS and portal assets.
@@ -229,7 +251,13 @@ export default function AddRouterPage() {
                     {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}{copied ? "Copied" : "Click to copy"}
                   </button>
                 </div>
-                <pre className="overflow-x-auto whitespace-pre bg-[#0B1F36] px-5 py-5 font-mono text-xs text-slate-200">{provisioningCommand}</pre>
+                <pre className="overflow-x-auto whitespace-pre bg-[#0B1F36] px-5 py-5 font-mono text-xs text-slate-200">{provisioningCommand || "Creating a one-time setup command…"}</pre>
+                {setup && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border)] bg-[var(--surface)] px-5 py-3 text-xs text-[var(--fg-muted)]">
+                    <span>Works once. Expires at {new Date(setup.expiresAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.</span>
+                    <button onClick={() => router && void issueSetupCode(router.id)} className="font-medium text-[var(--accent-text)] hover:underline">Generate a new command</button>
+                  </div>
+                )}
                 <div className="flex gap-3 border-t border-[var(--border)] bg-[var(--surface)] px-5 py-4 text-xs text-[var(--fg-muted)]">
                   <WarningCircle className="mt-0.5 h-4 w-4 shrink-0" />
                   <p>If the router reports <strong className="text-[var(--fg-body)]">device mode not allowed</strong>, run <code className="text-blue-600">/system/device-mode/update mode=advanced</code>, power-cycle the router, and retry the command.</p>
