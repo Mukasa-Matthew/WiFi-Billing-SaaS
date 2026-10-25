@@ -93,17 +93,30 @@ public interface RadAcctRepository extends JpaRepository<RadAcct, Long> {
               AND (:username IS NULL OR LOWER(r.username) LIKE LOWER(CONCAT('%', CAST(:username AS String), '%')))
               AND (:openOnly = false OR r.acctStopTime IS NULL)
               AND (:cause IS NULL OR r.acctTerminateCause = CAST(:cause AS String))
-              AND (:fromTs IS NULL OR COALESCE(r.acctStartTime, r.acctStopTime) >= :fromTs)
-              AND (:toTs IS NULL OR COALESCE(r.acctStartTime, r.acctStopTime) < :toTs)
+              AND COALESCE(r.acctStartTime, r.acctStopTime) >= :fromTs
+              AND COALESCE(r.acctStartTime, r.acctStopTime) < :toTs
             ORDER BY r.acctStartTime DESC NULLS LAST
             """)
-    org.springframework.data.domain.Page<RadAcct> findByNas(@Param("nasIp") String nasIp,
-                                                            @Param("username") String username,
-                                                            @Param("openOnly") boolean openOnly,
-                                                            @Param("cause") String cause,
-                                                            @Param("fromTs") OffsetDateTime fromTs,
-                                                            @Param("toTs") OffsetDateTime toTs,
-                                                            org.springframework.data.domain.Pageable pageable);
+    org.springframework.data.domain.Page<RadAcct> findByNasInRange(@Param("nasIp") String nasIp,
+                                                                   @Param("username") String username,
+                                                                   @Param("openOnly") boolean openOnly,
+                                                                   @Param("cause") String cause,
+                                                                   @Param("fromTs") OffsetDateTime fromTs,
+                                                                   @Param("toTs") OffsetDateTime toTs,
+                                                                   org.springframework.data.domain.Pageable pageable);
+
+    /**
+     * Null date bounds mean "unbounded". They're replaced with wide sentinels
+     * because PostgreSQL can't infer the type of an untyped NULL parameter.
+     */
+    default org.springframework.data.domain.Page<RadAcct> findByNas(String nasIp, String username, boolean openOnly,
+                                                                    String cause, OffsetDateTime fromTs, OffsetDateTime toTs,
+                                                                    org.springframework.data.domain.Pageable pageable) {
+        return findByNasInRange(nasIp, username, openOnly, cause,
+                fromTs != null ? fromTs : OffsetDateTime.parse("1970-01-01T00:00:00Z"),
+                toTs != null ? toTs : OffsetDateTime.parse("3000-01-01T00:00:00Z"),
+                pageable);
+    }
 
     /** Open (no Stop record) sessions for one NAS. */
     List<RadAcct> findAllByNasIpAddressAndAcctStopTimeIsNull(String nasIp);
