@@ -24,7 +24,7 @@ import java.util.Set;
 public class RouterScriptGenerator {
 
     /** Bump only for a deliberate, reviewed RouterOS infrastructure migration. */
-    public static final String PROVISIONING_VERSION = "2026.10.2";
+    public static final String PROVISIONING_VERSION = "2026.10.3";
 
     private static final String IFACE_NAME = "wg-billing";
     private static final String TELEMETRY_NAME = "wb-telemetry";
@@ -128,11 +128,12 @@ public class RouterScriptGenerator {
         s.append(":if ([:len [/system/ntp/client/servers find address=pool.ntp.org]] = 0) do={ /system/ntp/client/servers add address=pool.ntp.org }\n");
         s.append(":local wbDate [/system/clock get date]\n");
         s.append(":local wbYear [:tonum [:pick $wbDate ([:len $wbDate] - 4) [:len $wbDate]]]\n");
-        s.append(":for wbNtpWait from=1 to=24 do={\n");
-        s.append("    :set wbDate [/system/clock get date]\n");
-        s.append("    :set wbYear [:tonum [:pick $wbDate ([:len $wbDate] - 4) [:len $wbDate]]]\n");
-        s.append("    :if ($wbYear < 2026) do={ :delay 5s }\n");
-        s.append("}\n\n");
+        // Kept on one line: /import parses a top-level multi-line do={ } block as
+        // ending at the first inner statement, which aborts the import with a
+        // syntax error. Single-line blocks (used throughout this script) are fine.
+        s.append(":for wbNtpWait from=1 to=24 do={ :set wbDate [/system/clock get date]; ")
+                .append(":set wbYear [:tonum [:pick $wbDate ([:len $wbDate] - 4) [:len $wbDate]]]; ")
+                .append(":if ($wbYear < 2026) do={ :delay 5s } }\n\n");
 
         // 0. Cleanup of any previous run
         s.append("# --- 0. Remove previous provisioning (safe to re-run) ---\n");
