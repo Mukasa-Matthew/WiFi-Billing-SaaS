@@ -7,8 +7,8 @@ import com.wifibilling.service.EmailService;
 import com.wifibilling.service.EmailTemplates;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
@@ -22,7 +22,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/admin")
 @RequiredArgsConstructor
-@PreAuthorize("hasAuthority('ROLE_SUPERADMIN')")
 public class AdminTenantController {
 
     private final TenantRepository tenantRepository;
@@ -34,11 +33,11 @@ public class AdminTenantController {
     private final EmailService emailService;
     private final EmailTemplates emailTemplates;
 
-    @org.springframework.beans.factory.annotation.Value("${app.public-base-url:http://localhost:3000}")
+    @Value("${app.public-base-url:http://localhost:3000}")
     private String publicBaseUrl;
 
     /**
-     * Lists all hotspot owners along with their router and voucher metrics.
+     * Lists all provisioned tenants with aggregate metrics.
      */
     @GetMapping("/tenants")
     public List<AdminTenantDto.SummaryResponse> listTenants() {
@@ -112,6 +111,43 @@ public class AdminTenantController {
             }
         }
         return new AdminTenantDto.CreateResponse(summary, emailSent ? null : temporaryPassword, emailSent);
+    }
+
+    /**
+     * Resends or regenerates temporary credentials for an operator.
+     */
+    @PostMapping("/tenants/{id}/resend-credentials")
+    public AdminTenantDto.ResetCredentialsResponse resendCredentials(@PathVariable Long id) {
+        Tenant tenant = tenantRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tenant not found"));
+
+        if ("ROLE_SUPERADMIN".equals(tenant.getRole())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot reset Superadmin credentials through this endpoint");
+        }
+
+        String temporaryPassword = generateTemporaryPassword();
+        tenant.setPasswordHash(passwordEncoder.encode(temporaryPassword));
+        tenant.setMustChangePassword(true);
+        tenantRepository.save(tenant);
+
+        boolean emailSent = false;
+        if (emailService.configured()) {
+            try {
+                String loginUrl = publicBaseUrl.replaceAll("/+$", "") + "/login";
+                emailService.send(tenant.getEmail(), "AirPairy — Your login credentials",
+                        emailTemplates.tenantWelcomeEmail(tenant.getName(), tenant.getEmail(),
+                                temporaryPassword, loginUrl));
+                emailSent = true;
+            } catch (EmailService.EmailDeliveryException ignored) {
+            }
+        }
+
+        return new AdminTenantDto.ResetCredentialsResponse(
+                tenant.getId(),
+                tenant.getEmail(),
+                temporaryPassword,
+                emailSent
+        );
     }
 
     private String generateTemporaryPassword() {

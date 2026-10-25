@@ -9,22 +9,18 @@ import java.time.OffsetDateTime;
 public class AdminTenantDto {
 
     public record CreateRequest(
-            @NotBlank @Size(max = 120) String name,
-            @NotBlank @Email @Size(max = 120) String email,
-            @NotBlank @Size(max = 30) String phone) {
-    }
+            @NotBlank(message = "Business name is required")
+            @Size(max = 120)
+            String name,
 
-    /** Returned once on creation — the temp password is also emailed; it is
-     *  surfaced here only when the welcome email could not be delivered. */
-    public record CreateResponse(
-            SummaryResponse tenant,
-            String temporaryPassword,
-            boolean welcomeEmailSent) {
-    }
+            @NotBlank(message = "Email is required")
+            @Email(message = "Valid email is required")
+            String email,
 
-    public record UpdateStatusRequest(
-            @NotBlank String status) { // ACTIVE, SUSPENDED, DISABLED
-    }
+            @NotBlank(message = "Phone number is required")
+            @Size(max = 30)
+            String phone
+    ) {}
 
     public record SummaryResponse(
             Long id,
@@ -35,8 +31,26 @@ public class AdminTenantDto {
             String status,
             int routerCount,
             long voucherCount,
-            OffsetDateTime createdAt) {
-    }
+            OffsetDateTime createdAt
+    ) {}
+
+    public record CreateResponse(
+            SummaryResponse tenant,
+            String temporaryPassword,
+            boolean welcomeEmailSent
+    ) {}
+
+    public record ResetCredentialsResponse(
+            Long tenantId,
+            String email,
+            String temporaryPassword,
+            boolean welcomeEmailSent
+    ) {}
+
+    public record UpdateStatusRequest(
+            @NotBlank(message = "Status is required")
+            String status
+    ) {}
 
     public record PlatformMetricsResponse(
             long totalTenants,
@@ -44,9 +58,9 @@ public class AdminTenantDto {
             long onlineRouters,
             long totalVouchers,
             long totalTransactions,
-            java.math.BigDecimal totalRevenueUgx,
-            long activeHotspotSessions) {
-    }
+            java.math.BigDecimal totalRevenue,
+            long activeGuestSessions
+    ) {}
 
     public record RouterFleetResponse(
             Long id,
@@ -63,6 +77,6 @@ public class AdminTenantDto {
             Boolean radiusReady,
             Boolean portalReady,
             OffsetDateTime lastSeen,
-            OffsetDateTime createdAt) {
-    }
+            OffsetDateTime createdAt
+    ) {}
 }

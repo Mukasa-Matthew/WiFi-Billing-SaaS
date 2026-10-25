@@ -16,18 +16,24 @@ public class TenantPrincipal implements UserDetails {
     private final String name;
     private final String role;
     private final boolean mustChangePassword;
+    private final String sessionId;
 
     public TenantPrincipal(Long tenantId, String email, String name, String role, boolean mustChangePassword) {
+        this(tenantId, email, name, role, mustChangePassword, null);
+    }
+
+    public TenantPrincipal(Long tenantId, String email, String name, String role, boolean mustChangePassword, String sessionId) {
         this.tenantId = tenantId;
         this.email = email;
         this.name = name;
-        this.role = (role != null && !role.isBlank()) ? role : "ROLE_ADMIN";
+        this.role = role;
         this.mustChangePassword = mustChangePassword;
+        this.sessionId = sessionId;
     }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of(new SimpleGrantedAuthority(this.role));
+        return List.of(new SimpleGrantedAuthority(role));
     }
 
     @Override
