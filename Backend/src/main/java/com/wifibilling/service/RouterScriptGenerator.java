@@ -126,8 +126,13 @@ public class RouterScriptGenerator {
         s.append("/system/clock/set time-zone-name=Etc/UTC time-zone-autodetect=no\n");
         s.append("/system/ntp/client/set enabled=yes\n");
         s.append(":if ([:len [/system/ntp/client/servers find address=pool.ntp.org]] = 0) do={ /system/ntp/client/servers add address=pool.ntp.org }\n");
-        s.append(":local wbNtpWait 0\n");
-        s.append(":while ([:tonum [:pick [/system/clock get date] ([:len [/system/clock get date]] - 4) [:len [/system/clock get date]]]] < 2026 && $wbNtpWait < 24) do={ :delay 5s; :set wbNtpWait ($wbNtpWait + 1) }\n\n");
+        s.append(":local wbDate [/system/clock get date]\n");
+        s.append(":local wbYear [:tonum [:pick $wbDate ([:len $wbDate] - 4) [:len $wbDate]]]\n");
+        s.append(":for wbNtpWait from=1 to=24 do={\n");
+        s.append("    :set wbDate [/system/clock get date]\n");
+        s.append("    :set wbYear [:tonum [:pick $wbDate ([:len $wbDate] - 4) [:len $wbDate]]]\n");
+        s.append("    :if ($wbYear < 2026) do={ :delay 5s }\n");
+        s.append("}\n\n");
 
         // 0. Cleanup of any previous run
         s.append("# --- 0. Remove previous provisioning (safe to re-run) ---\n");
@@ -254,9 +259,12 @@ public class RouterScriptGenerator {
         // router's RADIUS secret (already known to the backend).
         s.append("/user/group/remove [find name=wb-api]\n");
         s.append("/user/remove [find name=wb-api]\n");
-        s.append("/user/group/add name=wb-api policy=read,write,test,rest\n");
+        s.append(":do { /user/group/add name=wb-api policy=read,write,test,rest-api }"
+                + " on-error={ /user/group/add name=wb-api policy=read,write,test }\n");
         s.append("/user/add name=wb-api password=").append(q(c.radiusSecret())).append(" group=wb-api\n");
-        s.append("/ip/service/set www disabled=no address=").append(c.tunnelSubnet()).append("\n");
+        s.append(":do { /ip/service/set www disabled=no allowed-address=").append(c.tunnelSubnet())
+                .append(" } on-error={ /ip/service/set www disabled=no address=").append(c.tunnelSubnet())
+                .append(" }\n");
         String coaRule = "/ip/firewall/filter add chain=input in-interface=" + iface
                 + " src-address=" + c.radiusServerIp()
                 + " protocol=udp dst-port=3799 action=accept comment=" + tag;
@@ -316,7 +324,7 @@ public class RouterScriptGenerator {
                 .append("\n}\n");
         s.append("/system/scheduler add name=wb-pkg-sync interval=1m on-event=")
                 .append(q("/system script run wb-pkg-sync"))
-                .append(" policy=").append(POLICY).append(" comment=").append(tag).append("\n");
+                .append(" comment=").append(tag).append("\n");
         // wb-portal-sync stays a tiny bootstrap: it pulls the server-generated
         // portal-sync.rsc every run, so new portal files sync without ever
         // rewriting this on-router script.
@@ -325,7 +333,7 @@ public class RouterScriptGenerator {
                 .append(portalSyncBootstrap(c.publicBaseUrl(), c.token())).append("}\n");
         s.append("/system/scheduler add name=wb-portal-sync interval=30m on-event=")
                 .append(q("/system script run wb-portal-sync"))
-                .append(" policy=").append(POLICY).append(" comment=").append(tag).append("\n");
+                .append(" comment=").append(tag).append("\n");
         s.append("\n");
 
         // 4. Walled garden (portal/API reachable before login)
@@ -368,7 +376,7 @@ public class RouterScriptGenerator {
         s.append("}\n");
         s.append("/system/scheduler add name=").append(q(TELEMETRY_NAME))
                 .append(" interval=2m on-event=").append(q("/system script run " + TELEMETRY_NAME))
-                .append(" policy=").append(POLICY).append(" comment=").append(tag).append("\n\n");
+                .append(" comment=").append(tag).append("\n\n");
 
         // 6. Key registration — retried every 30s until it succeeds, then self-removes.
         //    Survives partial-import failure and transient network issues.
@@ -392,7 +400,7 @@ public class RouterScriptGenerator {
         s.append("        :log info \"wifi-billing: WireGuard public key registered\"\n");
         s.append("    }\n");
         s.append("}\n");
-        s.append("/system/scheduler/add name=wb-register interval=30s on-event=wb-register policy=read,write,test comment=").append(tag).append("\n");
+        s.append("/system/scheduler/add name=wb-register interval=30s on-event=\"/system script run wb-register\" comment=").append(tag).append("\n");
         s.append(":do { /system script run wb-register } on-error={}\n\n");
 
         s.append("/system/script/add name=wb-provisioned policy=read comment=")
@@ -423,7 +431,7 @@ public class RouterScriptGenerator {
                         " http-method=post http-header-field=\"Content-Type: application/json\" http-data=[:serialize to=json value=$hosts] output=none",
                         ":log warning \"wifi-billing host report failed\"")
                 + " } on-error={}\n}\n"
-                + "/system/scheduler/add name=wb-management interval=1m on-event=wb-management policy=read,write,test\n"
+                + "/system/scheduler/add name=wb-management interval=1m on-event=\"/system script run wb-management\"\n"
                 + ":do { /system/script/run wb-management } on-error={}\n";
     }
 

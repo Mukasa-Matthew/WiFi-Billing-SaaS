@@ -42,6 +42,31 @@ public class Tenant {
     @Builder.Default
     private String status = "ACTIVE"; // ACTIVE, SUSPENDED, DISABLED
 
+    // ---- Two-Factor Authentication (TOTP) ----
+    @Column(name = "totp_enabled")
+    @Builder.Default
+    private Boolean totpEnabled = false;
+
+    /** Base64(IV + Ciphertext) of Base32 TOTP secret, encrypted with server master key. */
+    @Column(name = "totp_secret", length = 255)
+    private String totpSecret;
+
+    /** Delimited bcrypt/sha256 hashes of unused one-time emergency recovery codes. */
+    @Column(name = "recovery_codes_hash", length = 1500)
+    private String recoveryCodesHash;
+
+    @Column(name = "last_login_at")
+    private OffsetDateTime lastLoginAt;
+
+    @Column(name = "last_login_ip", length = 64)
+    private String lastLoginIp;
+
+    @Column(name = "pending_new_email", length = 120)
+    private String pendingNewEmail;
+
+    @Column(name = "pending_new_phone", length = 30)
+    private String pendingNewPhone;
+
     // ---- Tenant-configurable settings (captive portal + voucher defaults) ----
     @Column(name = "support_phone", length = 60)
     private String supportPhone;

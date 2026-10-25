@@ -1,7 +1,9 @@
 package com.wifibilling.security;
 
 import com.wifibilling.model.Tenant;
+import com.wifibilling.model.UserSession;
 import com.wifibilling.repository.TenantRepository;
+import com.wifibilling.repository.UserSessionRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -15,6 +17,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.time.OffsetDateTime;
 import java.util.Optional;
 
 @Component
@@ -23,6 +26,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final TenantRepository tenantRepository;
+    private final UserSessionRepository userSessionRepository;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -37,6 +41,26 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String token = authHeader.substring(7);
         try {
             if (jwtService.isTokenValid(token) && SecurityContextHolder.getContext().getAuthentication() == null) {
+                // Reject temporary 2FA challenge tokens on normal API endpoints
+                String purpose = jwtService.extractPurpose(token);
+                if ("2FA_CHALLENGE".equalsIgnoreCase(purpose)) {
+                    response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Two-factor authentication challenge incomplete");
+                    return;
+                }
+
+                String sessionId = jwtService.extractSessionId(token);
+                if (sessionId != null) {
+                    Optional<UserSession> sessionOpt = userSessionRepository.findBySessionId(sessionId);
+                    if (sessionOpt.isEmpty() || Boolean.TRUE.equals(sessionOpt.get().getRevoked())) {
+                        response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Session has been revoked or expired");
+                        return;
+                    }
+                    // Update last active
+                    UserSession session = sessionOpt.get();
+                    session.setLastActiveAt(OffsetDateTime.now());
+                    userSessionRepository.save(session);
+                }
+
                 Long tenantId = jwtService.extractTenantId(token);
                 Optional<Tenant> tenantOpt = tenantRepository.findById(tenantId);
                 if (tenantOpt.isPresent()) {
@@ -47,7 +71,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                 tenant.getEmail(),
                                 tenant.getName(),
                                 tenant.getRole(),
-                                Boolean.TRUE.equals(tenant.getMustChangePassword())
+                                Boolean.TRUE.equals(tenant.getMustChangePassword()),
+                                sessionId
                         );
                         UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                                 principal,

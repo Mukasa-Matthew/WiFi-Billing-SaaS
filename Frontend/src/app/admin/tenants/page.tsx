@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { Dialog } from "@/components/ui/Dialog";
+import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { ActionMenu, ActionMenuItem } from "@/components/ui/ActionMenu";
 import {
   Users,
   UserPlus,
@@ -12,7 +14,13 @@ import {
   CellTower,
   Ticket,
   X,
-  WarningCircle
+  WarningCircle,
+  Prohibit,
+  Check,
+  EnvelopeSimple,
+  Copy,
+  Trash,
+  Key
 } from "@/components/icons";
 
 interface TenantSummary {
@@ -32,6 +40,7 @@ export default function AdminTenantsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const { confirm, dialog } = useConfirmDialog();
 
   // Form state
   const [name, setName] = useState("");
@@ -80,7 +89,7 @@ export default function AdminTenantsPage() {
       setPhone("");
       setCreateNotice(res.data.welcomeEmailSent
         ? "Operator created. Their temporary login details were sent by email."
-        : `Operator created, but the welcome email was not sent. Give them this temporary password securely: ${res.data.temporaryPassword}`);
+        : `Operator created! Since email is not configured, give them this temporary password securely: ${res.data.temporaryPassword}`);
       await fetchTenants();
     } catch (err: unknown) {
       if (err && typeof err === "object" && "response" in err) {
@@ -94,16 +103,48 @@ export default function AdminTenantsPage() {
     }
   };
 
-  const handleToggleStatus = async (tenant: TenantSummary) => {
-    const nextStatus = tenant.status === "ACTIVE" ? "SUSPENDED" : "ACTIVE";
+  const handleResendCredentials = async (tenant: TenantSummary) => {
+    try {
+      const res = await api.post<{ temporaryPassword: string; welcomeEmailSent: boolean }>(
+        `/api/admin/tenants/${tenant.id}/resend-credentials`
+      );
+      if (res.data.welcomeEmailSent) {
+        setCreateNotice(`New temporary credentials generated and emailed to ${tenant.email}`);
+      } else {
+        setCreateNotice(`Temporary password generated for ${tenant.name}: ${res.data.temporaryPassword} (Give this to the operator securely).`);
+      }
+    } catch (err) {
+      console.error("Failed to regenerate credentials:", err);
+      setCreateNotice("Failed to generate credentials for operator.");
+    }
+  };
+
+  const handleUpdateStatus = async (tenant: TenantSummary, newStatus: string) => {
     try {
       await api.put(`/api/admin/tenants/${tenant.id}/status`, {
-        status: nextStatus,
+        status: newStatus,
       });
       await fetchTenants();
     } catch (err) {
       console.error("Failed to update status:", err);
     }
+  };
+
+  const handleCopyDetails = (tenant: TenantSummary) => {
+    const details = `Business: ${tenant.name}\nEmail: ${tenant.email}\nPhone: ${tenant.phone}\nID: #${tenant.id}`;
+    navigator.clipboard.writeText(details);
+    setCreateNotice(`Copied details for "${tenant.name}" to clipboard.`);
+  };
+
+  const handleRequestDelete = (tenant: TenantSummary) => {
+    confirm({
+      title: `Decommission ${tenant.name}?`,
+      body: `Permanently deleting a tenant with live transactions and routers is restricted to preserve financial audit logs. You can disable the operator account to instantly block portal access and logins. Would you like to set their status to DISABLED?`,
+      confirmLabel: "Disable Account",
+      onConfirm: async () => {
+        await handleUpdateStatus(tenant, "DISABLED");
+      },
+    });
   };
 
   const filteredTenants = tenants.filter((t) => {
@@ -117,6 +158,8 @@ export default function AdminTenantsPage() {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
+      {dialog}
+
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -157,13 +200,13 @@ export default function AdminTenantsPage() {
 
       {createNotice && (
         <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-start justify-between gap-3">
-          <span>{createNotice}</span>
+          <span className="font-medium">{createNotice}</span>
           <button type="button" aria-label="Dismiss notice" onClick={() => setCreateNotice(null)} className="shrink-0"><X className="w-4 h-4" /></button>
         </div>
       )}
 
       {/* Operators Table */}
-      <div className="rounded-xl bg-[var(--surface)] border border-[var(--border)] overflow-hidden">
+      <div className="rounded-xl bg-[var(--surface)] border border-[var(--border)]">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
@@ -218,6 +261,8 @@ export default function AdminTenantsPage() {
                         className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${
                           t.status === "ACTIVE"
                             ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                            : t.status === "SUSPENDED"
+                            ? "bg-amber-50 text-amber-700 border border-amber-200"
                             : "bg-red-50 text-red-600 border border-red-200"
                         }`}
                       >
@@ -233,16 +278,49 @@ export default function AdminTenantsPage() {
                       {new Date(t.createdAt).toLocaleDateString()}
                     </td>
                     <td className="py-4 px-6 text-right">
-                      <button
-                        onClick={() => handleToggleStatus(t)}
-                        className={`px-3 py-1 rounded-lg text-xs font-medium border transition cursor-pointer ${
-                          t.status === "ACTIVE"
-                            ? "bg-red-50 text-red-600 border-red-200 hover:bg-red-500/20"
-                            : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-500/20"
-                        }`}
-                      >
-                        {t.status === "ACTIVE" ? "Suspend" : "Activate"}
-                      </button>
+                      <ActionMenu ariaLabel={`Actions for ${t.name}`}>
+                        <ActionMenuItem
+                          icon={<Key className="w-4 h-4 text-blue-600" />}
+                          label="Generate / Resend Password"
+                          onClick={() => handleResendCredentials(t)}
+                        />
+
+                        {t.status === "ACTIVE" ? (
+                          <ActionMenuItem
+                            icon={<Prohibit className="w-4 h-4 text-amber-500" />}
+                            label="Suspend Operator"
+                            danger
+                            onClick={() => handleUpdateStatus(t, "SUSPENDED")}
+                          />
+                        ) : (
+                          <ActionMenuItem
+                            icon={<Check className="w-4 h-4 text-emerald-500" />}
+                            label="Activate Operator"
+                            onClick={() => handleUpdateStatus(t, "ACTIVE")}
+                          />
+                        )}
+
+                        <ActionMenuItem
+                          icon={<EnvelopeSimple className="w-4 h-4 text-[var(--fg-muted)]" />}
+                          label="Email Operator"
+                          onClick={() => {
+                            window.location.href = `mailto:${t.email}`;
+                          }}
+                        />
+
+                        <ActionMenuItem
+                          icon={<Copy className="w-4 h-4 text-[var(--fg-muted)]" />}
+                          label="Copy Info"
+                          onClick={() => handleCopyDetails(t)}
+                        />
+
+                        <ActionMenuItem
+                          icon={<Trash className="w-4 h-4 text-red-500" />}
+                          label="Decommission / Delete"
+                          danger
+                          onClick={() => handleRequestDelete(t)}
+                        />
+                      </ActionMenu>
                     </td>
                   </tr>
                 ))
