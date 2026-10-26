@@ -9,7 +9,7 @@ import { useToast } from "@/components/ui/Toast";
 import { useResource, Table, Badge, ErrorNotice, button, buttonGhost, field, date, message, FilterTabs, PageHeader, label, StatCard, ugx, humanize } from "@/components/BillingUI";
 import { Plus, DownloadSimple, Ticket, CheckCircle, Clock, Money, Copy, Archive } from "@/components/icons";
 
-interface Voucher { id: number; code: string; status: string; packageName: string; price: number; customerId: number | null; customerName: string | null; customerPhone: string | null; batchReference: string | null; saleType: string; delivery: string; archived: boolean; createdAt: string; firstLogin: string | null; expiresAt: string | null }
+interface Voucher { id: number; code: string; status: string; packageId?: number; packageName: string; price: number; customerId: number | null; customerName: string | null; customerPhone: string | null; batchReference: string | null; saleType: string; delivery: string; archived: boolean; createdAt: string; firstLogin: string | null; expiresAt: string | null }
 interface Customer { id: number; name: string }
 interface Router { id: number; name: string }
 
@@ -22,6 +22,7 @@ export default function VouchersPage() {
   const customers = useResource<Customer>("/api/customers");
   const routers = useResource<Router>("/api/routers");
   const [tab, setTab] = useState("AVAILABLE");
+  const [selectedPackage, setSelectedPackage] = useState<string>("ALL");
   const [selected, setSelected] = useState<string[]>([]);
   const [customer, setCustomer] = useState("");
   const [note, setNote] = useState("");
@@ -75,7 +76,30 @@ export default function VouchersPage() {
     toast("success", `${rows.length} voucher${rows.length === 1 ? "" : "s"} exported.`);
   };
 
-  const visible = useMemo(() => data.filter((voucher) => matches(voucher, tab)), [data, tab]);
+  const packageCounts = useMemo(() => {
+    // Counts how many vouchers belong to each package in the current status tab
+    const map = new Map<string, number>();
+    for (const v of data) {
+      if (matches(v, tab)) {
+        const name = v.packageName || "Unassigned";
+        map.set(name, (map.get(name) || 0) + 1);
+      }
+    }
+    return map;
+  }, [data, tab]);
+
+  const packageOptions = useMemo(() => {
+    const names = Array.from(packageCounts.keys()).sort();
+    return names;
+  }, [packageCounts]);
+
+  const visible = useMemo(() => {
+    return data.filter((voucher) => {
+      if (!matches(voucher, tab)) return false;
+      if (selectedPackage !== "ALL" && (voucher.packageName || "Unassigned") !== selectedPackage) return false;
+      return true;
+    });
+  }, [data, tab, selectedPackage]);
   const selectedVoucher = data.find((voucher) => voucher.code === selected[0]);
   const totals = useMemo(() => ({
     available: data.filter((voucher) => matches(voucher, "AVAILABLE")).length,
@@ -96,7 +120,40 @@ export default function VouchersPage() {
       <StatCard label="Available value" value={loading ? "—" : ugx(totals.value)} icon={<Money />} hintText="Face value of unsold inventory" />
     </div>
 
-    <div className="overflow-x-auto pb-1"><FilterTabs value={tab} onChange={(next) => { setTab(next); setSelected([]); }} options={tabs.map((key) => ({ key, label: key === "WALK_IN" ? "Walk-in" : humanize(key), count: data.filter((voucher) => matches(voucher, key)).length }))} /></div>
+    <div className="overflow-x-auto pb-1"><FilterTabs value={tab} onChange={(next) => { setTab(next); setSelected([]); setSelectedPackage("ALL"); }} options={tabs.map((key) => ({ key, label: key === "WALK_IN" ? "Walk-in" : humanize(key), count: data.filter((voucher) => matches(voucher, key)).length }))} /></div>
+
+    {packageOptions.length > 0 && (
+      <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-2">
+        <span className="px-2 text-xs font-semibold uppercase tracking-wider text-[var(--fg-muted)]">Package:</span>
+        <button
+          type="button"
+          onClick={() => setSelectedPackage("ALL")}
+          className={"inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition " + (selectedPackage === "ALL" ? "bg-[var(--primary)] text-white shadow-sm" : "text-[var(--fg)] hover:bg-[var(--fill)]")}
+        >
+          All Packages
+          <span className={"rounded-full px-1.5 py-0.2 text-[10px] font-bold " + (selectedPackage === "ALL" ? "bg-white/20 text-white" : "bg-[var(--fill)] text-[var(--fg-muted)]")}>
+            {data.filter((v) => matches(v, tab)).length}
+          </span>
+        </button>
+        {packageOptions.map((pkgName) => {
+          const count = packageCounts.get(pkgName) || 0;
+          const active = selectedPackage === pkgName;
+          return (
+            <button
+              key={pkgName}
+              type="button"
+              onClick={() => setSelectedPackage(pkgName)}
+              className={"inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition " + (active ? "bg-[var(--primary)] text-white shadow-sm" : "text-[var(--fg)] hover:bg-[var(--fill)]")}
+            >
+              {pkgName}
+              <span className={"rounded-full px-1.5 py-0.2 text-[10px] font-bold " + (active ? "bg-white/20 text-white" : "bg-[var(--fill)] text-[var(--fg-muted)]")}>
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    )}
 
     {selected.length > 0 && <section className="panel-shadow flex flex-col gap-3 rounded-xl border border-blue-200 bg-blue-50/60 p-4 lg:flex-row lg:items-center">
       <div className="min-w-28"><p className="text-xs font-semibold text-blue-900">{selected.length} selected</p><button onClick={() => setSelected([])} className="mt-0.5 text-[11px] text-blue-700 hover:underline">Clear selection</button></div>

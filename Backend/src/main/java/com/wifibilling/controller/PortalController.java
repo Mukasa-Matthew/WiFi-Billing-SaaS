@@ -5,6 +5,9 @@ import com.wifibilling.dto.PortalPackageResponse;
 import com.wifibilling.dto.PortalConfigResponse;
 import com.wifibilling.model.PackagePlan;
 import com.wifibilling.model.Router;
+import com.wifibilling.model.Transaction;
+import com.wifibilling.model.Voucher;
+import java.util.Map;
 import com.wifibilling.repository.PackagePlanRepository;
 import com.wifibilling.repository.RouterRepository;
 import com.wifibilling.repository.TransactionRepository;
@@ -33,6 +36,7 @@ public class PortalController {
     private final RouterRepository routerRepository;
     private final PackagePlanRepository packagePlanRepository;
     private final TransactionRepository transactionRepository;
+    private final com.wifibilling.repository.VoucherRepository voucherRepository;
     private final com.wifibilling.repository.PortalFeedbackRepository feedbackRepository;
     private final PlatformProperties props;
 
@@ -130,24 +134,106 @@ public class PortalController {
     }
 
     /**
-     * "Already bought? Find your voucher" — looks up the most recent successful
-     * purchase by phone number for this tenant and returns its voucher code.
+     * "Already bought? Find your voucher" — looks up vouchers for the given phone number.
+     * Returns the newest active/valid voucher for immediate login, along with the full history
+     * of active and past used vouchers with package details and timestamps.
      */
     @GetMapping(value = "/find-voucher", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<java.util.Map<String, Object>> findVoucher(
             @RequestParam("token") String token,
             @RequestParam("phone") String phone) {
         Router router = resolveRouter(token);
-        String normalized = phone == null ? "" : phone.replaceAll("[^0-9+]", "");
-        if (normalized.length() < 7) {
-            return ResponseEntity.badRequest().body(java.util.Map.of("voucherCode", ""));
+        String raw = phone == null ? "" : phone.replaceAll("[^0-9+]", "");
+        if (raw.length() < 7) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("voucherCode", "", "vouchers", List.of()));
         }
-        var tx = transactionRepository.findFirstByTenantIdAndPhoneAndStatusOrderByCreatedAtDesc(
-                router.getTenant().getId(), normalized, "SUCCESSFUL");
-        if (tx.isEmpty() || tx.get().getVoucherCode() == null) {
-            return ResponseEntity.ok(java.util.Map.of("voucherCode", ""));
+
+        // Generate phone variants: local (07...), international (2567...), and E.164 (+2567...)
+        java.util.Set<String> phoneVariants = new java.util.LinkedHashSet<>();
+        phoneVariants.add(raw);
+        String digits = raw.replaceAll("[^0-9]", "");
+        if (digits.startsWith("256") && digits.length() >= 12) {
+            phoneVariants.add("+" + digits);
+            phoneVariants.add(digits);
+            phoneVariants.add("0" + digits.substring(3));
+        } else if (digits.startsWith("0") && digits.length() >= 10) {
+            phoneVariants.add(digits);
+            phoneVariants.add("256" + digits.substring(1));
+            phoneVariants.add("+256" + digits.substring(1));
+        } else if (digits.length() == 9 && digits.startsWith("7")) {
+            phoneVariants.add("0" + digits);
+            phoneVariants.add("256" + digits);
+            phoneVariants.add("+256" + digits);
         }
-        return ResponseEntity.ok(java.util.Map.of("voucherCode", tx.get().getVoucherCode()));
+
+        List<Transaction> txList = transactionRepository.findAllByTenantIdAndPhoneInAndStatusOrderByCreatedAtDesc(
+                router.getTenant().getId(), phoneVariants, "SUCCESSFUL");
+
+        // Map voucher codes from transactions
+        java.util.Set<String> codes = new java.util.LinkedHashSet<>();
+        for (Transaction tx : txList) {
+            if (tx.getVoucherCode() != null && !tx.getVoucherCode().isBlank()) {
+                codes.add(tx.getVoucherCode().trim().toUpperCase());
+            }
+        }
+
+        Map<String, Voucher> voucherMap = codes.isEmpty() ? Map.of()
+                : voucherRepository.findAllByCodeIn(codes).stream()
+                        .collect(java.util.stream.Collectors.toMap(
+                                v -> v.getCode().toUpperCase(),
+                                v -> v,
+                                (a, b) -> a));
+
+        java.time.OffsetDateTime now = java.time.OffsetDateTime.now();
+        List<java.util.Map<String, Object>> voucherItems = new java.util.ArrayList<>();
+        String primaryActiveCode = "";
+
+        for (Transaction tx : txList) {
+            String code = tx.getVoucherCode();
+            if (code == null || code.isBlank()) continue;
+            String normalizedCode = code.trim().toUpperCase();
+            Voucher v = voucherMap.get(normalizedCode);
+
+            String status = v != null ? v.getStatus() : "unused";
+            java.time.OffsetDateTime expiresAt = v != null ? v.getExpiresAt() : null;
+            java.time.OffsetDateTime firstLogin = v != null ? v.getFirstLogin() : null;
+            java.time.OffsetDateTime createdAt = v != null && v.getCreatedAt() != null ? v.getCreatedAt() : tx.getCreatedAt();
+
+            boolean isExpired = "expired".equalsIgnoreCase(status)
+                    || "revoked".equalsIgnoreCase(status)
+                    || (expiresAt != null && expiresAt.isBefore(now));
+            boolean isActive = !isExpired && ("active".equalsIgnoreCase(status) || "unused".equalsIgnoreCase(status));
+
+            String packageName = tx.getPackagePlan() != null ? tx.getPackagePlan().getName()
+                    : (v != null && v.getPackagePlan() != null ? v.getPackagePlan().getName() : "WiFi Package");
+            java.math.BigDecimal price = tx.getAmount() != null ? tx.getAmount()
+                    : (v != null && v.getPackagePlan() != null ? v.getPackagePlan().getPrice() : java.math.BigDecimal.ZERO);
+
+            if (isActive && primaryActiveCode.isEmpty()) {
+                primaryActiveCode = normalizedCode;
+            }
+
+            java.util.Map<String, Object> item = new java.util.LinkedHashMap<>();
+            item.put("code", normalizedCode);
+            item.put("packageName", packageName);
+            item.put("price", price);
+            item.put("status", isExpired ? "expired" : ("active".equalsIgnoreCase(status) ? "active" : "unused"));
+            item.put("isActive", isActive);
+            item.put("firstLogin", firstLogin != null ? firstLogin.toString() : null);
+            item.put("expiresAt", expiresAt != null ? expiresAt.toString() : null);
+            item.put("createdAt", createdAt != null ? createdAt.toString() : null);
+            voucherItems.add(item);
+        }
+
+        // If no active voucher was found among all transactions, fallback to most recent voucher code
+        if (primaryActiveCode.isEmpty() && !voucherItems.isEmpty()) {
+            primaryActiveCode = (String) voucherItems.get(0).get("code");
+        }
+
+        java.util.Map<String, Object> response = new java.util.LinkedHashMap<>();
+        response.put("voucherCode", primaryActiveCode);
+        response.put("vouchers", voucherItems);
+        return ResponseEntity.ok(response);
     }
 
     /**
