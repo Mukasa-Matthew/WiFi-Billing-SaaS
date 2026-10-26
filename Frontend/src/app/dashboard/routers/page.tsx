@@ -25,11 +25,31 @@ export default function Page() {
     try { setTasks((await api.get<Task[]>(`/api/routers/${r.id}/tasks`)).data); }
     catch (e) { setNote(message(e)); }
   };
-  const action = async (r: RouterRec, action: string) => {
+  const action = async (r: RouterRec, actionName: string) => {
     try {
-      await api.post(`/api/routers/${r.id}/tasks`, { action });
-      setNote("Action queued. Applied status requires a successful router acknowledgement.");
+      setNote("");
+      await api.post(`/api/routers/${r.id}/tasks`, { action: actionName });
+      toast("info", `Action requested. Applying to ${r.name}...`);
       await open(r);
+
+      // Auto-poll tasks for immediate acknowledgment update
+      let attempts = 0;
+      const timer = setInterval(async () => {
+        attempts++;
+        try {
+          const res = (await api.get<Task[]>(`/api/routers/${r.id}/tasks`)).data;
+          setTasks(res);
+          const latest = res[0];
+          if (latest && latest.action === actionName && latest.status === "APPLIED") {
+            clearInterval(timer);
+            toast("success", `${actionName.replace("_", " ")} successfully applied to ${r.name}!`);
+          } else if (attempts >= 8) {
+            clearInterval(timer);
+          }
+        } catch (_) {
+          clearInterval(timer);
+        }
+      }, 1500);
     } catch (e) { setNote(message(e)); }
   };
   const toast = useToast();
