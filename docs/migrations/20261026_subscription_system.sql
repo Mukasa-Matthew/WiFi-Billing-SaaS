@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS subscription_plans (
     duration_unit VARCHAR(16) NOT NULL DEFAULT 'MONTHS',
     duration_value INT NOT NULL DEFAULT 1,
     description VARCHAR(500),
-    active BOOLEAN NOT NULL DEFAULT TRUE,
+    active BOOLEAN NOT NULL DEFAULT FALSE,
     display_order INT DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE
@@ -17,11 +17,11 @@ CREATE TABLE IF NOT EXISTS subscription_plans (
 
 -- Seed default plans if none exist
 INSERT INTO subscription_plans (name, price, duration_unit, duration_value, description, active, display_order)
-SELECT 'Monthly Basic', 50000, 'MONTHS', 1, 'Standard 1-month hotspot business subscription', TRUE, 1
+SELECT 'Monthly Basic', 50000, 'MONTHS', 1, 'Standard 1-month hotspot business subscription', FALSE, 1
 WHERE NOT EXISTS (SELECT 1 FROM subscription_plans WHERE name = 'Monthly Basic');
 
 INSERT INTO subscription_plans (name, price, duration_unit, duration_value, description, active, display_order)
-SELECT 'Quarterly Saver', 135000, 'MONTHS', 3, '3 months hotspot subscription (10% discount)', TRUE, 2
+SELECT 'Quarterly Saver', 135000, 'MONTHS', 3, '3 months hotspot subscription (10% discount)', FALSE, 2
 WHERE NOT EXISTS (SELECT 1 FROM subscription_plans WHERE name = 'Quarterly Saver');
 
 -- 2. Alter subscriptions table to add lifecycle & trial fields
