@@ -1,4 +1,5 @@
 "use client";
+import { mutateCache } from "@/lib/cacheInvalidation";
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -104,9 +105,9 @@ export default function CreateVouchersPage() {
               </div>
               <div>
                 <label htmlFor="v-count" className={label}>Number of vouchers *</label>
-                <input id="v-count" required type="number" min="1" max="500" value={count}
+                <input id="v-count" required type="number" min="1" max="1000" value={count}
                   onChange={(e) => setCount(e.target.value)} className={field} />
-                <p className={hint}>Up to 500 per batch.</p>
+                <p className={hint}>Up to 1,000 per batch.</p>
               </div>
             </div>
             <div>

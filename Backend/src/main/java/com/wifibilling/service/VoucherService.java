@@ -5,20 +5,20 @@ import com.wifibilling.dto.VoucherResponse;
 import com.wifibilling.model.PackagePlan;
 import com.wifibilling.model.Tenant;
 import com.wifibilling.model.Voucher;
-import com.wifibilling.radius.RadCheck;
-import com.wifibilling.radius.RadReply;
 import com.wifibilling.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.security.SecureRandom;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.sql.PreparedStatement;
+import java.sql.Statement;
+import java.sql.Timestamp;
+import java.time.OffsetDateTime;
+import java.util.*;
 
 /**
  * Voucher lifecycle. Each voucher code is both the RADIUS username and password
@@ -46,6 +46,7 @@ public class VoucherService {
     private final RadReplyRepository radReplyRepository;
     private final VoucherExpirationWorker expirationWorker;
     private final CustomerRepository customerRepository;
+    private final JdbcTemplate jdbcTemplate;
 
     @Transactional
     public List<VoucherResponse> generate(Long tenantId, GenerateVouchersRequest req) {
@@ -68,21 +69,109 @@ public class VoucherService {
 
         String batchReference = req.batchReference() == null || req.batchReference().isBlank()
                 ? "BATCH-" + java.util.UUID.randomUUID().toString().substring(0, 8).toUpperCase() : req.batchReference().trim();
-        Set<String> batch = new HashSet<>();
-        List<VoucherResponse> created = new ArrayList<>(req.count());
-        for (int i = 0; i < req.count(); i++) {
-            String code = uniqueCode(batch, req);
-            Voucher voucher = voucherRepository.save(Voucher.builder()
-                    .tenant(tenant)
-                    .packagePlan(plan)
-                    .code(code)
-                    .status(STATUS_UNUSED)
-                    .batchReference(batchReference).saleType(Boolean.TRUE.equals(req.giveaway()) ? "GIVEAWAY" : "INVENTORY").delivery("MANUAL").archived(false)
-                    .build());
-            writeRadiusAttributes(code, plan, mac, nasIp);
-            created.add(toResponse(voucher));
+
+        int targetCount = req.count();
+        List<String> generatedCodes = generateUniqueCodes(targetCount, req);
+        OffsetDateTime now = OffsetDateTime.now();
+        Timestamp nowTs = Timestamp.from(now.toInstant());
+        String saleType = Boolean.TRUE.equals(req.giveaway()) ? "GIVEAWAY" : "INVENTORY";
+
+        // 1. Bulk insert vouchers using JDBC Batch with generated keys
+        String insertVoucherSql = """
+            INSERT INTO vouchers (code, status, batch_reference, sale_type, delivery, archived, package_id, tenant_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """;
+
+        List<Long> generatedIds = new ArrayList<>(targetCount);
+        jdbcTemplate.execute((java.sql.Connection conn) -> {
+            try (PreparedStatement ps = conn.prepareStatement(insertVoucherSql, Statement.RETURN_GENERATED_KEYS)) {
+                for (String code : generatedCodes) {
+                    ps.setString(1, code);
+                    ps.setString(2, STATUS_UNUSED);
+                    ps.setString(3, batchReference);
+                    ps.setString(4, saleType);
+                    ps.setString(5, "MANUAL");
+                    ps.setBoolean(6, false);
+                    ps.setLong(7, plan.getId());
+                    ps.setLong(8, tenant.getId());
+                    ps.setTimestamp(9, nowTs);
+                    ps.addBatch();
+                }
+                ps.executeBatch();
+                try (var rs = ps.getGeneratedKeys()) {
+                    while (rs.next()) {
+                        generatedIds.add(rs.getLong(1));
+                    }
+                }
+            }
+            return null;
+        });
+
+        // 2. Prepare RADIUS check items
+        record RadiusItem(String username, String attribute, String op, String value) {}
+        List<RadiusItem> checks = new ArrayList<>(targetCount * 3);
+        List<RadiusItem> replies = new ArrayList<>(targetCount * 2);
+
+        String rateLimit = (plan.getRateLimit() != null && !plan.getRateLimit().isBlank())
+                ? com.wifibilling.controller.PackagePlanController.sanitizeRateLimit(plan.getRateLimit()) : null;
+
+        for (String code : generatedCodes) {
+            checks.add(new RadiusItem(code, "Cleartext-Password", ":=", code));
+            if (mac != null) {
+                checks.add(new RadiusItem(code, "Calling-Station-Id", "==", mac));
+            }
+            if (nasIp != null) {
+                checks.add(new RadiusItem(code, "NAS-IP-Address", "==", nasIp));
+            }
+            if (plan.getSharedUsers() != null && plan.getSharedUsers() > 0) {
+                checks.add(new RadiusItem(code, "Simultaneous-Use", ":=", String.valueOf(plan.getSharedUsers())));
+            }
+
+            if (rateLimit != null) {
+                replies.add(new RadiusItem(code, "Mikrotik-Rate-Limit", ":=", rateLimit));
+            }
+            if (plan.getSessionTimeout() != null && plan.getSessionTimeout() > 0) {
+                replies.add(new RadiusItem(code, "Session-Timeout", ":=", String.valueOf(plan.getSessionTimeout())));
+            }
         }
-        return created;
+
+        // 3. Bulk insert radcheck
+        if (!checks.isEmpty()) {
+            String insertCheckSql = "INSERT INTO radcheck (username, attribute, op, value) VALUES (?, ?, ?, ?)";
+            jdbcTemplate.batchUpdate(insertCheckSql, checks, 500, (ps, item) -> {
+                ps.setString(1, item.username());
+                ps.setString(2, item.attribute());
+                ps.setString(3, item.op());
+                ps.setString(4, item.value());
+            });
+        }
+
+        // 4. Bulk insert radreply
+        if (!replies.isEmpty()) {
+            String insertReplySql = "INSERT INTO radreply (username, attribute, op, value) VALUES (?, ?, ?, ?)";
+            jdbcTemplate.batchUpdate(insertReplySql, replies, 500, (ps, item) -> {
+                ps.setString(1, item.username());
+                ps.setString(2, item.attribute());
+                ps.setString(3, item.op());
+                ps.setString(4, item.value());
+            });
+        }
+
+        // 5. Construct response list
+        List<VoucherResponse> response = new ArrayList<>(targetCount);
+        for (int i = 0; i < targetCount; i++) {
+            Long id = (i < generatedIds.size()) ? generatedIds.get(i) : null;
+            String code = generatedCodes.get(i);
+            response.add(new VoucherResponse(
+                    id, code, STATUS_UNUSED,
+                    plan.getId(), plan.getName(), plan.getPrice(),
+                    null, null, null, now,
+                    null, null, null,
+                    batchReference, saleType, "MANUAL", false
+            ));
+        }
+
+        return response;
     }
 
     @Transactional(readOnly = true)
@@ -137,34 +226,6 @@ public class VoucherService {
         v.setArchived(true);voucherRepository.save(v);
     }
 
-    private void writeRadiusAttributes(String code, PackagePlan plan, String mac, String nasIp) {
-        radCheckRepository.save(RadCheck.builder()
-                .username(code).attribute("Cleartext-Password").op(":=").value(code).build());
-        if (mac != null) {
-            radCheckRepository.save(RadCheck.builder()
-                    .username(code).attribute("Calling-Station-Id").op("==").value(mac).build());
-        }
-        if (nasIp != null) {
-            radCheckRepository.save(RadCheck.builder()
-                    .username(code).attribute("NAS-IP-Address").op("==").value(nasIp).build());
-        }
-        if (plan.getSharedUsers() != null && plan.getSharedUsers() > 0) {
-            radCheckRepository.save(RadCheck.builder()
-                    .username(code).attribute("Simultaneous-Use").op(":=")
-                    .value(String.valueOf(plan.getSharedUsers())).build());
-        }
-        if (plan.getRateLimit() != null && !plan.getRateLimit().isBlank()) {
-            radReplyRepository.save(RadReply.builder()
-                    .username(code).attribute("Mikrotik-Rate-Limit").op(":=")
-                    .value(com.wifibilling.controller.PackagePlanController.sanitizeRateLimit(plan.getRateLimit())).build());
-        }
-        if (plan.getSessionTimeout() != null && plan.getSessionTimeout() > 0) {
-            radReplyRepository.save(RadReply.builder()
-                    .username(code).attribute("Session-Timeout").op(":=")
-                    .value(String.valueOf(plan.getSessionTimeout())).build());
-        }
-    }
-
     private Voucher findByCodeAndTenant(String code, Long tenantId) {
         String normalized = code == null ? "" : code.trim().toUpperCase();
         Voucher voucher = voucherRepository.findByCode(normalized)
@@ -175,21 +236,72 @@ public class VoucherService {
         return voucher;
     }
 
-    private String uniqueCode(Set<String> batch, GenerateVouchersRequest req) {
+    private List<String> generateUniqueCodes(int count, GenerateVouchersRequest req) {
         String prefix = req.prefix() == null ? "" : req.prefix().toUpperCase();
         int length = req.codeLength() == null ? CODE_LENGTH : req.codeLength();
         String alphabet = "NUMERIC".equals(req.codeFormat()) ? "23456789" : "LETTERS".equals(req.codeFormat()) ? "ABCDEFGHJKLMNPQRSTUVWXYZ" : CODE_ALPHABET;
-        for (int attempt = 0; attempt < 20; attempt++) {
+        
+        Set<String> uniqueSet = new LinkedHashSet<>(count * 2);
+        int maxAttempts = count * 50;
+        int attempts = 0;
+
+        while (uniqueSet.size() < count && attempts++ < maxAttempts) {
+            StringBuilder sb = new StringBuilder(prefix);
+            for (int i = 0; i < length - prefix.length(); i++) {
+                sb.append(alphabet.charAt(RANDOM.nextInt(alphabet.length())));
+            }
+            uniqueSet.add(sb.toString());
+        }
+
+        if (uniqueSet.size() < count) {
+            throw new IllegalStateException("Could not generate enough unique voucher codes. Try increasing code length.");
+        }
+
+        // Filter out any codes that already exist in database
+        List<String> candidates = new ArrayList<>(uniqueSet);
+        Set<String> existing = new HashSet<>();
+        // Query database in chunks of 500
+        for (int i = 0; i < candidates.size(); i += 500) {
+            List<String> sub = candidates.subList(i, Math.min(i + 500, candidates.size()));
+            String inSql = String.join(",", Collections.nCopies(sub.size(), "?"));
+            List<String> found = jdbcTemplate.query(
+                    "SELECT code FROM vouchers WHERE code IN (" + inSql + ") UNION SELECT username FROM radcheck WHERE username IN (" + inSql + ")",
+                    (rs, rowNum) -> rs.getString(1),
+                    concatArgs(sub, sub)
+            );
+            existing.addAll(found);
+        }
+
+        candidates.removeAll(existing);
+
+        // If collisions eliminated any, replenish them
+        while (candidates.size() < count && attempts++ < maxAttempts * 2) {
             StringBuilder sb = new StringBuilder(prefix);
             for (int i = 0; i < length - prefix.length(); i++) {
                 sb.append(alphabet.charAt(RANDOM.nextInt(alphabet.length())));
             }
             String code = sb.toString();
-            if (batch.add(code) && !voucherRepository.existsByCode(code) && !radCheckRepository.existsByUsername(code)) {
-                return code;
+            if (!uniqueSet.contains(code) && !existing.contains(code)) {
+                if (!voucherRepository.existsByCode(code) && !radCheckRepository.existsByUsername(code)) {
+                    candidates.add(code);
+                    uniqueSet.add(code);
+                }
             }
         }
-        throw new IllegalStateException("Could not generate a unique voucher code");
+
+        if (candidates.size() < count) {
+            throw new IllegalStateException("Could not generate enough unique voucher codes. Try increasing code length.");
+        }
+
+        return candidates.subList(0, count);
+    }
+
+    private static Object[] concatArgs(List<String> a, List<String> b) {
+        Object[] res = new Object[a.size() + b.size()];
+        int idx = 0;
+        for (String s : a) res[idx++] = s;
+        for (String s : b) res[idx++] = s;
+        return res;
     }
 
     private VoucherResponse toResponse(Voucher v) {
