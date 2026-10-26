@@ -59,6 +59,9 @@ class PaymentServiceTest {
     @Mock
     private com.wifibilling.config.PlatformProperties platformProperties;
 
+    @Mock
+    private SubscriptionService subscriptionService;
+
     private PaymentService paymentService;
 
     private Tenant tenant;
@@ -76,10 +79,12 @@ class PaymentServiceTest {
                 gatewayConfig,
                 marzPay,
                 walletService,
-                platformProperties
+                platformProperties,
+                subscriptionService
         );
         lenient().when(gatewayConfig.modeFor(any(Tenant.class))).thenReturn("PLATFORM");
         lenient().when(gatewayConfig.platformConfigured()).thenReturn(false);
+        lenient().when(subscriptionService.canTenantAcceptCustomerPayments(any())).thenReturn(true);
 
         tenant = Tenant.builder().id(1L).name("Test Tenant").email("test@example.com").build();
         router = Router.builder().id(10L).token("tok_valid123456").tenant(tenant).name("Test Router").build();

@@ -32,6 +32,7 @@ public class AdminTenantController {
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
     private final EmailTemplates emailTemplates;
+    private final com.wifibilling.service.SubscriptionService subscriptionService;
 
     @Value("${app.public-base-url:http://localhost:3000}")
     private String publicBaseUrl;
@@ -85,6 +86,11 @@ public class AdminTenantController {
                 .build();
 
         tenant = tenantRepository.save(tenant);
+
+        // Automatically grant the one-time 7-day free trial upon new tenant creation
+        if (subscriptionService != null) {
+            subscriptionService.grantTrialIfEligible(tenant);
+        }
 
         AdminTenantDto.SummaryResponse summary = new AdminTenantDto.SummaryResponse(
                 tenant.getId(),

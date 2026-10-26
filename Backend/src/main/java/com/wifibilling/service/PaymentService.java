@@ -56,6 +56,7 @@ public class PaymentService {
     private final com.wifibilling.service.payment.MarzPayClient marzPay;
     private final WalletService walletService;
     private final com.wifibilling.config.PlatformProperties platformProperties;
+    private final SubscriptionService subscriptionService;
 
     // Lazy self-injection so internal calls still go through the tx proxy.
     // Defaults to the raw instance so plain unit tests (no proxy) still work.
@@ -89,6 +90,12 @@ public class PaymentService {
 
         Router router = routerRepository.findByToken(req.token())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Router not found"));
+
+        // Enforce SaaS Subscription: block customer payments if tenant subscription is expired or suspended
+        if (subscriptionService != null && !subscriptionService.canTenantAcceptCustomerPayments(router.getTenant().getId())) {
+            throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED,
+                    "Tenant hotspot subscription is inactive or expired. Customer payments are temporarily unavailable.");
+        }
 
         PackagePlan packagePlan = packagePlanRepository.findByIdAndTenantId(req.packageId(), router.getTenant().getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Package not found for router tenant"));

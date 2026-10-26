@@ -60,6 +60,7 @@ class ProvisioningSecurityWebTest {
     @MockitoBean private RouterSetupCodeRepository setupCodeRepository;
     @MockitoBean private ProvisioningService provisioningService;
     @MockitoBean private RouterManagementService managementService;
+    @MockitoBean private SubscriptionService subscriptionService;
 
     private final Map<Long, RouterSetupCode> store = new HashMap<>();
     private final AtomicLong ids = new AtomicLong();

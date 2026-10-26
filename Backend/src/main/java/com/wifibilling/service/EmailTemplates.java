@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class EmailTemplates {
 
-    private String shell(String title, String body, String accent) {
+    public String shell(String title, String body, String accent) {
         return """
                 <!doctype html>
                 <html><body style="margin:0;padding:0;background:#F5F7FA;font-family:Arial,Helvetica,sans-serif;">

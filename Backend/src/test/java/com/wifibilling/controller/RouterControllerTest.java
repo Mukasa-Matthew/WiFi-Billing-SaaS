@@ -51,6 +51,7 @@ class RouterControllerTest {
     @Mock private WireGuardPeerService wireGuardPeerService;
     @Mock private RouterSetupService setupService;
     @Mock private RouterSetupCodeRepository setupCodeRepository;
+    @Mock private com.wifibilling.service.SubscriptionService subscriptionService;
     @InjectMocks private RouterController controller;
 
     private final JsonMapper json = JsonMapper.builder().build();
@@ -82,7 +83,7 @@ class RouterControllerTest {
 
     @Test
     void listNeverExposesCredentials() {
-        when(routerRepository.findAllByTenantId(7L)).thenReturn(List.of(router));
+        when(routerRepository.findAllByTenantIdAndStatusNot(7L, "DELETED")).thenReturn(List.of(router));
         List<RouterDto.Response> list = controller.list(owner);
         assertEquals(1, list.size());
         assertTrue(list.get(0).registered(), "registration state still reported without the key");
@@ -135,7 +136,7 @@ class RouterControllerTest {
     @Test
     void unregisteredRouterReportsNotRegistered() {
         router.setWgPublicKey(null);
-        when(routerRepository.findAllByTenantId(7L)).thenReturn(List.of(router));
+        when(routerRepository.findAllByTenantIdAndStatusNot(7L, "DELETED")).thenReturn(List.of(router));
         assertFalse(controller.list(owner).get(0).registered());
     }
 }

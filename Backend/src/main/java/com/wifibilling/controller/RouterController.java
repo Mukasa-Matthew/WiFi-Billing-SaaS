@@ -38,6 +38,7 @@ public class RouterController {
     private final WireGuardPeerService wireGuardPeerService;
     private final RouterSetupService setupService;
     private final com.wifibilling.repository.RouterSetupCodeRepository setupCodeRepository;
+    private final com.wifibilling.service.SubscriptionService subscriptionService;
 
     @GetMapping
     public List<RouterDto.Response> list(@AuthenticationPrincipal TenantPrincipal principal) {
@@ -51,6 +52,9 @@ public class RouterController {
     public RouterDto.Response create(
             @AuthenticationPrincipal TenantPrincipal principal,
             @Valid @RequestBody RouterDto.CreateRequest req) {
+        if (subscriptionService != null) {
+            subscriptionService.assertTenantManagementAllowed(principal.getTenantId());
+        }
         Tenant tenant = tenantRepository.findById(principal.getTenantId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tenant not found"));
 
