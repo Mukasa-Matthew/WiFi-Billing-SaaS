@@ -50,10 +50,12 @@ class CoreFlowIntegrationTest {
     @Autowired com.wifibilling.service.VoucherExpirationWorker lifecycle;
     @Autowired com.wifibilling.service.RouterManagementService management;
 
+    @Autowired com.wifibilling.service.SubscriptionService subscriptionService;
+
     private String actor(String suffix) throws Exception {
         String email = suffix + "@example.test";
-        tenantRepository.save(Tenant.builder().name(suffix).email(email).phone("+256700000010")
-                .passwordHash(passwordEncoder.encode("testing-password")).role("ROLE_ADMIN").status("ACTIVE").build());
+        Tenant createdTenant = tenantRepository.save(Tenant.builder().name(suffix).email(email).phone("+256700000010").passwordHash(passwordEncoder.encode("testing-password")).role("ROLE_ADMIN").status("ACTIVE").build());
+        subscriptionService.grantTrialIfEligible(createdTenant);
         return JsonPath.read(mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"email\":\"" + email + "\",\"password\":\"testing-password\"}"))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(), "$.token");
@@ -218,7 +220,7 @@ class CoreFlowIntegrationTest {
 
     @Test
     void tenantCanCreatePackageProvisionRouterAndGenerateVoucher() throws Exception {
-        tenantRepository.save(Tenant.builder()
+        Tenant flowTenant = tenantRepository.save(Tenant.builder()
                 .name("Flow Test Cafe")
                 .email("flow@example.test")
                 .phone("+256700000001")
@@ -226,6 +228,7 @@ class CoreFlowIntegrationTest {
                 .role("ROLE_ADMIN")
                 .status("ACTIVE")
                 .build());
+        subscriptionService.grantTrialIfEligible(flowTenant);
 
         String loginBody = mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)

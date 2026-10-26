@@ -21,6 +21,7 @@ public class VoucherController {
     private final com.wifibilling.repository.VoucherRepository vouchers;
     private final com.wifibilling.repository.RouterRepository routers;
     private final com.wifibilling.repository.TransactionRepository transactions;
+    private final com.wifibilling.service.SubscriptionService subscriptionService;
 
     public record SaleRequest(@jakarta.validation.constraints.NotNull Long routerId,
         @jakarta.validation.constraints.NotNull @jakarta.validation.constraints.DecimalMin("0.01") java.math.BigDecimal amount,
@@ -45,6 +46,9 @@ public class VoucherController {
     public List<VoucherResponse> generate(
             @AuthenticationPrincipal TenantPrincipal principal,
             @Valid @RequestBody GenerateVouchersRequest body) {
+        if (subscriptionService != null) {
+            subscriptionService.assertTenantManagementAllowed(principal.getTenantId());
+        }
         return voucherService.generate(principal.getTenantId(), body);
     }
 

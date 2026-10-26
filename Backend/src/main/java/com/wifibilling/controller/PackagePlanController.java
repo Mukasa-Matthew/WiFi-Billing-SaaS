@@ -24,6 +24,7 @@ public class PackagePlanController {
     private final TenantRepository tenantRepository;
     private final com.wifibilling.repository.RouterRepository routerRepository;
     private final com.wifibilling.service.RouterManagementService routerManagement;
+    private final com.wifibilling.service.SubscriptionService subscriptionService;
 
     /** Push an instant packages.json sync to every router the tenant owns
      *  (sub-second over the WireGuard tunnel; 1-min poll is the fallback). */
@@ -46,6 +47,9 @@ public class PackagePlanController {
     public PackagePlanDto.Response create(
             @AuthenticationPrincipal TenantPrincipal principal,
             @Valid @RequestBody PackagePlanDto.CreateRequest req) {
+        if (subscriptionService != null) {
+            subscriptionService.assertTenantManagementAllowed(principal.getTenantId());
+        }
         Tenant tenant = tenantRepository.findById(principal.getTenantId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tenant not found"));
 
@@ -75,6 +79,9 @@ public class PackagePlanController {
             @AuthenticationPrincipal TenantPrincipal principal,
             @PathVariable Long id,
             @Valid @RequestBody PackagePlanDto.CreateRequest req) {
+        if (subscriptionService != null) {
+            subscriptionService.assertTenantManagementAllowed(principal.getTenantId());
+        }
         PackagePlan plan = packagePlanRepository.findByIdAndTenantId(id, principal.getTenantId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Package not found"));
 
@@ -110,6 +117,9 @@ public class PackagePlanController {
             @AuthenticationPrincipal TenantPrincipal principal,
             @PathVariable Long id,
             @Valid @RequestBody AvailabilityRequest req) {
+        if (subscriptionService != null) {
+            subscriptionService.assertTenantManagementAllowed(principal.getTenantId());
+        }
         PackagePlan plan = packagePlanRepository.findByIdAndTenantId(id, principal.getTenantId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Package not found"));
         plan.setAvailability(req.availability());
@@ -127,6 +137,9 @@ public class PackagePlanController {
     public void delete(
             @AuthenticationPrincipal TenantPrincipal principal,
             @PathVariable Long id) {
+        if (subscriptionService != null) {
+            subscriptionService.assertTenantManagementAllowed(principal.getTenantId());
+        }
         PackagePlan plan = packagePlanRepository.findByIdAndTenantId(id, principal.getTenantId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Package not found"));
         packagePlanRepository.delete(plan);

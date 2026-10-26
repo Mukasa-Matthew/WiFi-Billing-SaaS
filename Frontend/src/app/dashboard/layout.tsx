@@ -5,6 +5,7 @@ import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import AppShell, { type NavItem } from "@/components/AppShell";
+import SubscriptionRestrictedBanner from "@/components/SubscriptionRestrictedBanner";
 import api from "@/lib/api";
 import { routerState } from "@/lib/routerState";
 import { useNow } from "@/components/BillingUI";
@@ -115,6 +116,7 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
       ready={ready}
       readyLabel="Loading workspace…"
     >
+      <SubscriptionRestrictedBanner />
       {children}
     </AppShell>
   );
