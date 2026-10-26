@@ -125,7 +125,7 @@ public class SubscriptionServiceTest {
                 .graceUntil(OffsetDateTime.now().plusDays(7))
                 .build();
 
-        when(subs.findByTenantId(2L)).thenReturn(Optional.of(sub));
+        lenient().when(subs.findByTenantId(2L)).thenReturn(Optional.of(sub));
 
         assertTrue(service.canTenantAcceptCustomerPayments(2L));
         assertTrue(service.isTenantManagementAllowed(2L));
@@ -143,7 +143,7 @@ public class SubscriptionServiceTest {
                 .graceUntil(now.plusDays(2))   // Within 2-day grace window
                 .build();
 
-        when(subs.findByTenantId(2L)).thenReturn(Optional.of(sub));
+        lenient().when(subs.findByTenantId(2L)).thenReturn(Optional.of(sub));
 
         assertFalse(service.canTenantAcceptCustomerPayments(2L), "Customer payments MUST be blocked when subscription expires");
         assertFalse(service.isTenantManagementAllowed(2L), "Tenant management operations MUST be restricted during grace period");
@@ -176,7 +176,7 @@ public class SubscriptionServiceTest {
                 .status(SubscriptionCheckout.STATUS_PENDING)
                 .build();
 
-        when(subs.findByTenantId(2L)).thenReturn(Optional.of(sub));
+        lenient().when(subs.findByTenantId(2L)).thenReturn(Optional.of(sub));
         when(invoices.save(any())).thenAnswer(i -> i.getArgument(0));
         when(payments.save(any())).thenAnswer(i -> i.getArgument(0));
         when(checkouts.findByReference("SUB-12345")).thenReturn(Optional.of(checkout));
@@ -215,5 +215,70 @@ public class SubscriptionServiceTest {
         service.checkAndDispatchReminders(sub, now);
 
         verify(notifications, times(1)).save(any(SubscriptionNotification.class));
+    }
+
+    @Test
+    @DisplayName("Failed or pending webhook callbacks never activate subscription")
+    void testFailedOrPendingWebhookNeverActivates() {
+        Subscription sub = Subscription.builder()
+                .id(1L)
+                .tenant(tenant)
+                .status(Subscription.STATUS_SUSPENDED)
+                .expiresAt(OffsetDateTime.now().minusDays(1))
+                .build();
+
+        SubscriptionCheckout checkout = SubscriptionCheckout.builder()
+                .id(102L)
+                .tenant(tenant)
+                .plan(defaultPlan)
+                .reference("SUB-FAIL-1")
+                .status(SubscriptionCheckout.STATUS_PENDING)
+                .build();
+
+        when(checkouts.findByReference("SUB-FAIL-1")).thenReturn(Optional.of(checkout));
+        lenient().when(subs.findByTenantId(2L)).thenReturn(Optional.of(sub));
+
+        tools.jackson.databind.ObjectMapper mapper = new tools.jackson.databind.ObjectMapper();
+        tools.jackson.databind.node.ObjectNode payload = mapper.createObjectNode();
+        tools.jackson.databind.node.ObjectNode txNode = payload.putObject("transaction");
+        txNode.put("status", "FAILED");
+
+        boolean handled = service.confirmSubscriptionCheckout("SUB-FAIL-1", payload);
+
+        assertTrue(handled);
+        assertEquals(SubscriptionCheckout.STATUS_FAILED, checkout.getStatus());
+        assertEquals(Subscription.STATUS_SUSPENDED, sub.getStatus(), "Subscription status must remain EXPIRED");
+    }
+
+    @Test
+    @DisplayName("Duplicate successful webhooks do not double-extend subscription")
+    void testDuplicateWebhookIdempotent() {
+        Subscription sub = Subscription.builder()
+                .id(1L)
+                .tenant(tenant)
+                .status(Subscription.STATUS_ACTIVE)
+                .expiresAt(OffsetDateTime.now().plusDays(30))
+                .build();
+
+        SubscriptionCheckout checkout = SubscriptionCheckout.builder()
+                .id(103L)
+                .tenant(tenant)
+                .plan(defaultPlan)
+                .reference("SUB-DUP-1")
+                .status(SubscriptionCheckout.STATUS_SUCCESSFUL) // already marked successful
+                .build();
+
+        when(checkouts.findByReference("SUB-DUP-1")).thenReturn(Optional.of(checkout));
+
+        tools.jackson.databind.ObjectMapper mapper = new tools.jackson.databind.ObjectMapper();
+        tools.jackson.databind.node.ObjectNode payload = mapper.createObjectNode();
+        tools.jackson.databind.node.ObjectNode txNode = payload.putObject("transaction");
+        txNode.put("status", "SUCCESSFUL");
+
+        boolean confirmed = service.confirmSubscriptionCheckout("SUB-DUP-1", payload);
+
+        assertTrue(confirmed, "Duplicate webhook should acknowledge 200 without reprocessing");
+        verify(subs, never()).save(any());
+        verify(periodHistoryRepository, never()).save(any());
     }
 }
