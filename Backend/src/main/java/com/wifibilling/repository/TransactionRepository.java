@@ -73,6 +73,9 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
     Optional<Transaction> findFirstByTenantIdAndPhoneAndStatusOrderByCreatedAtDesc(
             Long tenantId, String phone, String status);
 
+    List<Transaction> findAllByTenantIdAndPhoneInAndStatusOrderByCreatedAtDesc(
+            Long tenantId, java.util.Collection<String> phones, String status);
+
     boolean existsByRouterId(Long routerId);
 
     /** Revenue + count bucketed per period ('day' or 'month') for the dashboard charts. */
