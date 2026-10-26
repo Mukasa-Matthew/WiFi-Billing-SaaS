@@ -17,65 +17,110 @@ export function message(error: unknown) {
   return e.response?.data?.message || e.response?.data?.detail || "Request failed. Please retry.";
 }
 
-export function useResource<T>(url: string, refresh = false) {
-  const [data, setData] = useState<T[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [refreshing, setRefreshing] = useState(false);
-  const latestRequest = useRef(0);
-  const load = useCallback(async () => {
-    const requestId = ++latestRequest.current;
-    setRefreshing(true);
-    try {
-      const response = await api.get<T[]>(url);
-      if (requestId === latestRequest.current) { setData(response.data); setError(""); }
-    } catch (e) {
-      if (requestId === latestRequest.current) setError(message(e));
-    } finally {
-      if (requestId === latestRequest.current) { setLoading(false); setRefreshing(false); }
-    }
-  }, [url]);
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+
+/**
+ * Tenant-scoped shared cache hook for list-shaped endpoints.
+ * - Deduplicates requests across components/pages.
+ * - Preserves previously loaded data across navigation.
+ * - Revalidates in the background (stale-while-revalidate).
+ * - Background auto-refresh paused when window/tab is hidden.
+ */
+export function useResource<T>(url: string, refresh: boolean | number = false) {
+  const queryClient = useQueryClient();
+  const [userScope, setUserScope] = useState<string>("anon");
+
   useEffect(() => {
-    const initial = window.setTimeout(load, 0);
-    const timer = refresh ? window.setInterval(load, 30000) : undefined;
-    return () => { window.clearTimeout(initial); window.clearInterval(timer); latestRequest.current += 1; };
-  }, [load, refresh]);
-  return { data, loading, refreshing, error, load };
+    try {
+      const raw = localStorage.getItem("wb_user");
+      if (raw) {
+        const u = JSON.parse(raw);
+        setUserScope(u.role === "ROLE_SUPERADMIN" ? "superadmin" : `tenant-${u.tenantId || 0}`);
+      }
+    } catch {
+      setUserScope("anon");
+    }
+  }, []);
+
+  const refreshInterval = typeof refresh === "number" ? refresh : (refresh ? 20000 : false);
+
+  const queryKey = [userScope, url];
+
+  const query = useQuery<T[], Error>({
+    queryKey,
+    queryFn: async () => {
+      const response = await api.get<T[]>(url);
+      return response.data;
+    },
+    enabled: !!url && userScope !== "anon",
+    refetchInterval: refreshInterval,
+    refetchIntervalInBackground: false,
+    staleTime: 15000,
+  });
+
+  const load = useCallback(async () => {
+    await query.refetch();
+  }, [query]);
+
+  return {
+    data: query.data || [],
+    loading: query.isLoading,
+    refreshing: query.isFetching && !query.isLoading,
+    error: query.error ? message(query.error) : "",
+    load,
+  };
 }
 
 /**
- * Object-shaped endpoints (overview DTOs, detail records). `data` stays null
- * until the first success, so a failed load reads as "unavailable", never as
- * zeros; a failed refresh keeps the last good payload and reports `error`.
+ * Tenant-scoped shared cache hook for object-shaped endpoints (DTOs, stats, details).
+ * - SWR experience: renders cached record immediately, quiet background revalidation.
+ * - Intelligent refresh: defaults to ~20s if enabled, pauses when inactive/hidden.
  */
 export function useApi<T>(url: string | null, refreshMs = 0) {
-  const [data, setData] = useState<T | null>(null);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(!!url);
-  const [updatedAt, setUpdatedAt] = useState<number | null>(null);
-  const latest = useRef(0);
+  const [userScope, setUserScope] = useState<string>("anon");
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("wb_user");
+      if (raw) {
+        const u = JSON.parse(raw);
+        setUserScope(u.role === "ROLE_SUPERADMIN" ? "superadmin" : `tenant-${u.tenantId || 0}`);
+      }
+    } catch {
+      setUserScope("anon");
+    }
+  }, []);
+
+  const queryKey = [userScope, url || ""];
+
+  const query = useQuery<T, Error>({
+    queryKey,
+    queryFn: async () => {
+      if (!url) throw new Error("No URL provided");
+      const response = await api.get<T>(url);
+      return response.data;
+    },
+    enabled: !!url && userScope !== "anon",
+    refetchInterval: refreshMs > 0 ? refreshMs : false,
+    refetchIntervalInBackground: false,
+    staleTime: 15000,
+  });
+
   const load = useCallback(async () => {
     if (!url) return;
-    const id = ++latest.current;
-    setLoading(true);
-    try {
-      const response = await api.get<T>(url);
-      if (id === latest.current) { setData(response.data); setError(""); setUpdatedAt(Date.now()); }
-    } catch (e) {
-      if (id === latest.current) setError(message(e));
-    } finally {
-      if (id === latest.current) setLoading(false);
-    }
-  }, [url]);
-  useEffect(() => {
-    const initial = window.setTimeout(load, 0);
-    const timer = refreshMs ? window.setInterval(() => { if (document.visibilityState === "visible") void load(); }, refreshMs) : undefined;
-    return () => { window.clearTimeout(initial); window.clearInterval(timer); latest.current += 1; };
-  }, [load, refreshMs]);
-  return { data, error, loading, updatedAt, load };
+    await query.refetch();
+  }, [query, url]);
+
+  return {
+    data: query.data ?? null,
+    loading: query.isLoading,
+    refreshing: query.isFetching && !query.isLoading,
+    error: query.error ? message(query.error) : "",
+    updatedAt: query.dataUpdatedAt || null,
+    load,
+  };
 }
 
-/** Wall clock that ticks on an interval, so "x min ago" stays honest without impure renders. */
 export function useNow(intervalMs = 30000) {
   const [now, setNow] = useState(0);
   useEffect(() => {

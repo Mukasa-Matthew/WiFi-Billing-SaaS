@@ -25,6 +25,12 @@ public class TelemetryService {
 
     private final RouterRepository routerRepository;
     private final PlatformProperties props;
+    private LeaderLockService leaderLockService = new LeaderLockService();
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setLeaderLockService(LeaderLockService leaderLockService) {
+        this.leaderLockService = leaderLockService;
+    }
 
     @Transactional
     public void record(TelemetryRequest req) {
@@ -65,6 +71,11 @@ public class TelemetryService {
     @Scheduled(fixedDelayString = "PT1M", initialDelayString = "PT1M")
     @Transactional
     public void markStaleRoutersOffline() {
+        if (!leaderLockService.executeIfLeader(LeaderLockService.JOB_TELEMETRY_SWEEP, 120, 20, this::doMarkStaleRoutersOffline)) return;
+    }
+
+    @Transactional
+    public void doMarkStaleRoutersOffline() {
         OffsetDateTime cutoff = OffsetDateTime.now().minusMinutes(props.getOfflineAfterMinutes());
         int changed = routerRepository.markOfflineSeenBefore(cutoff);
         if (changed > 0) {

@@ -1,4 +1,5 @@
 "use client";
+import { mutateCache } from "@/lib/cacheInvalidation";
 import React, { useMemo, useState } from "react";
 import api from "@/lib/api";
 import { useResource, Table, ErrorNotice, field, button, buttonGhost, message, PageContainer, PageHeader, EmptyState, label, StatCard } from "@/components/BillingUI";
@@ -27,8 +28,8 @@ export default function Page() {
     e.preventDefault();
     setSaving(true);
     try {
-      if (edit?.id) { await api.put(`/api/customers/${edit.id}`, edit); toast("success", "Customer updated."); }
-      else { await api.post("/api/customers", edit); toast("success", "Customer added."); }
+      if (edit?.id) { await api.put(`/api/customers/${edit.id}`, edit); toast("success", "Customer updated."); mutateCache.customerChanged(); }
+      else { await api.post("/api/customers", edit); toast("success", "Customer added."); mutateCache.customerChanged(); }
       setEdit(null);
       await load();
     } catch (err) { setNote(message(err)); }

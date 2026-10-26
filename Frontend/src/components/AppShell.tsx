@@ -1,4 +1,5 @@
 "use client";
+import { prefetchRouteData } from "@/lib/dashboardPrefetch";
 
 /**
  * The one application frame shared by the business workspace (/dashboard) and
@@ -30,7 +31,7 @@ export interface NavItem {
 /** Routes that aren't in the sidebar but still deserve a proper header title. */
 export interface ExtraRoute { name: string; href: string; group: string }
 
-interface ShellUser { name?: string; email?: string }
+interface ShellUser { name?: string; email?: string; role?: string; tenantId?: number }
 
 interface AppShellProps {
   brand: { title: string; subtitle: string };
@@ -182,6 +183,7 @@ export default function AppShell(props: AppShellProps) {
                         <li key={item.href}>
                           <Link
                             href={item.href}
+                            onMouseEnter={() => prefetchRouteData(item.href, user?.role, user?.tenantId)}
                             aria-current={active ? "page" : undefined}
                             title={rail ? item.name : undefined}
                             className={`group relative flex h-9 items-center gap-3 rounded-lg px-3 text-[13.5px] font-medium transition-colors ${rail ? "lg:justify-center lg:px-0" : ""} ${

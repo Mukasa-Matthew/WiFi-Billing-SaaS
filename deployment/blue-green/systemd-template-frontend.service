@@ -1,0 +1,16 @@
+[Unit]
+Description=WiFi Billing Next.js Frontend (%I Slot)
+After=network.target
+
+[Service]
+User=matthew
+WorkingDirectory=/var/www/wifi-billing/slots/%I/Frontend
+Environment=NODE_ENV=production
+EnvironmentFile=/var/www/wifi-billing/deployment/slots/%I.env
+ExecStart=/usr/bin/node .next/standalone/server.js
+Restart=always
+RestartSec=5
+TimeoutStopSec=10
+
+[Install]
+WantedBy=multi-user.target

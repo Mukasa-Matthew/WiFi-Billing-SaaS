@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  generateBuildId: async () => {
+    return process.env.NEXT_PUBLIC_DEPLOY_ID || process.env.GIT_COMMIT_SHA || "production-release";
+  },
   cacheComponents: true,
   async headers() {
     // Production only. In dev, Turbopack reuses asset filenames across rebuilds,

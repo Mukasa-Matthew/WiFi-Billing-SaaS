@@ -1,3 +1,4 @@
+import { resetQueryCache } from "@/lib/queryClient";
 import axios from "axios";
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
@@ -50,6 +51,7 @@ api.interceptors.response.use(
     if (typeof window !== "undefined" && error.response?.status === 401) {
       localStorage.removeItem("wb_token");
       localStorage.removeItem("wb_user");
+      resetQueryCache();
       if (window.location.pathname !== "/login") {
         window.location.href = "/login";
       }

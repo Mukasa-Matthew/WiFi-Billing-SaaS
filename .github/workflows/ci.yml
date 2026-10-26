@@ -1,0 +1,90 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches: [ main, 'feature/**' ]
+  pull_request:
+    branches: [ main ]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-ci:
+    name: Backend Build & Tests (Spring Boot)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'maven'
+
+      - name: Compile & Run Maven Unit Tests
+        run: |
+          cd Backend
+          mvn clean test --batch-mode
+
+      - name: Build Immutable JAR Artifact
+        run: |
+          cd Backend
+          mvn package -DskipTests --batch-mode
+          sha256sum target/api-0.0.1-SNAPSHOT.jar > target/backend.sha256
+          cat target/backend.sha256
+
+      - name: Upload Backend Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-jar-${{ github.sha }}
+          path: |
+            Backend/target/api-0.0.1-SNAPSHOT.jar
+            Backend/target/backend.sha256
+          retention-days: 7
+
+  frontend-ci:
+    name: Frontend Build & TypeScript Validation (Next.js)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: Frontend/package-lock.json
+
+      - name: Install Dependencies
+        run: |
+          cd Frontend
+          npm ci
+
+      - name: Run TypeScript & Next.js Build
+        env:
+          NEXT_PUBLIC_DEPLOY_ID: ${{ github.sha }}
+        run: |
+          cd Frontend
+          npm run build
+
+      - name: Package Standalone Next.js Bundle
+        run: |
+          cd Frontend/.next/standalone
+          tar -czf ../../../frontend-standalone.tar.gz .
+          cd ../../..
+          sha256sum frontend-standalone.tar.gz > frontend.sha256
+          cat frontend.sha256
+
+      - name: Upload Frontend Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-bundle-${{ github.sha }}
+          path: |
+            frontend-standalone.tar.gz
+            frontend.sha256
+          retention-days: 7

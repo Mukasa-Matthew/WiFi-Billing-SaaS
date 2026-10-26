@@ -1,0 +1,25 @@
+[Unit]
+Description=WiFi Billing SaaS — Dedicated Background Worker
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=deployer
+Group=deployer
+WorkingDirectory=/var/www/wifi-billing/current
+EnvironmentFile=/var/www/wifi-billing/deployment/worker.env
+ExecStart=/usr/bin/java \
+    -Djava.net.preferIPv4Stack=true \
+    -Dserver.port=8089 \
+    -Dserver.address=127.0.0.1 \
+    -Dapp.scheduling.enabled=true \
+    -Dwireguard.peer-sync.enabled=false \
+    -jar /var/www/wifi-billing/current/Backend/api.jar
+Restart=always
+RestartSec=5
+SuccessExitStatus=143
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

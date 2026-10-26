@@ -1,4 +1,5 @@
 "use client";
+import { mutateCache } from "@/lib/cacheInvalidation";
 import React, { useState } from "react";
 import Link from "next/link";
 import api from "@/lib/api";
@@ -29,6 +30,7 @@ export default function Page() {
     try {
       setNote("");
       await api.post(`/api/routers/${r.id}/tasks`, { action: actionName });
+      mutateCache.routerChanged();
       toast("info", `Action requested. Applying to ${r.name}...`);
       await open(r);
 

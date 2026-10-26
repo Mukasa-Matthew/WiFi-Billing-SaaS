@@ -57,6 +57,12 @@ public class PaymentService {
     private final WalletService walletService;
     private final com.wifibilling.config.PlatformProperties platformProperties;
     private final SubscriptionService subscriptionService;
+    private LeaderLockService leaderLockService = new LeaderLockService();
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setLeaderLockService(LeaderLockService leaderLockService) {
+        this.leaderLockService = leaderLockService;
+    }
 
     // Lazy self-injection so internal calls still go through the tx proxy.
     // Defaults to the raw instance so plain unit tests (no proxy) still work.
@@ -371,6 +377,10 @@ public class PaymentService {
     @Scheduled(fixedDelayString = "${payment.reconcile.interval-ms:30000}",
                initialDelayString = "${payment.reconcile.initial-delay-ms:60000}")
     public void reconcilePendingCollections() {
+        if (!leaderLockService.executeIfLeader(LeaderLockService.JOB_PAYMENT_RECONCILE, 180, 20, this::doReconcilePendingCollections)) return;
+    }
+
+    public void doReconcilePendingCollections() {
         List<Transaction> pending = transactionRepository
                 .findTop50ByStatusAndCreatedAtBeforeOrderByCreatedAtAsc(
                         STATUS_PENDING, OffsetDateTime.now().minusSeconds(15));

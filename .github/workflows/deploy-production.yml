@@ -1,0 +1,86 @@
+name: Production Blue-Green Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_commit:
+        description: 'Exact Git Commit SHA to deploy (must have passed CI on main branch)'
+        required: true
+      confirm_production_release:
+        description: 'Type "DEPLOY" to confirm release to production'
+        required: true
+        default: 'NO'
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  verify-and-deploy:
+    name: Verify Tested Artifacts & Trigger Blue-Green Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify Explicit Approval Confirmation
+        run: |
+          if [ "${{ github.event.inputs.confirm_production_release }}" != "DEPLOY" ]; then
+            echo "ERROR: Production release cancelled. You must enter 'DEPLOY' to approve."
+            exit 1
+          fi
+
+      - name: Validate Commit SHA Format
+        run: |
+          COMMIT="${{ github.event.inputs.target_commit }}"
+          if [[ ! "${COMMIT}" =~ ^[0-9a-fA-F]{7,40}$ ]]; then
+            echo "ERROR: Invalid Git commit SHA format: ${COMMIT}"
+            exit 1
+          fi
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Verify Commit Exists on Main Branch
+        env:
+          COMMIT: ${{ github.event.inputs.target_commit }}
+        run: |
+          echo "Verifying that commit ${COMMIT} is merged into main branch..."
+          if ! git merge-base --is-ancestor "${COMMIT}" origin/main; then
+            echo "SECURITY ERROR: Commit ${COMMIT} is NOT on the main branch! Deployment aborted."
+            exit 1
+          fi
+          echo "Branch verification successful: Commit is on main."
+
+      - name: Verify Successful CI Build for Target Commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMIT: ${{ github.event.inputs.target_commit }}
+        run: |
+          echo "Verifying CI check runs for commit: ${COMMIT}"
+          CHECK_RUNS=$(gh api repos/${{ github.repository }}/commits/${COMMIT}/check-runs)
+          
+          BACKEND_STATUS=$(echo "${CHECK_RUNS}" | jq -r '.check_runs[] | select(.name | contains("Backend Build")) | .conclusion' | head -n 1)
+          FRONTEND_STATUS=$(echo "${CHECK_RUNS}" | jq -r '.check_runs[] | select(.name | contains("Frontend Build")) | .conclusion' | head -n 1)
+
+          if [ "${BACKEND_STATUS}" != "success" ] || [ "${FRONTEND_STATUS}" != "success" ]; then
+            echo "ERROR: Both Backend and Frontend builds must have passed CI!"
+            echo "Backend CI: ${BACKEND_STATUS}"
+            echo "Frontend CI: ${FRONTEND_STATUS}"
+            exit 1
+          fi
+          echo "CI check runs verified: Both Backend and Frontend passed."
+
+      - name: Set up SSH Key for Deployment
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PROD_DEPLOY_SSH_KEY }}
+
+      - name: Execute Blue-Green Release on Server
+        env:
+          APP_HOST: ${{ secrets.PROD_APP_HOST }}
+          COMMIT_SHA: ${{ github.event.inputs.target_commit }}
+        run: |
+          echo "Triggering zero-downtime deployment on ${APP_HOST} for commit ${COMMIT_SHA}..."
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new "${APP_HOST}" \
+            "/var/www/wifi-billing/deployment/blue-green/blue-green-deploy.sh '${COMMIT_SHA}' 60"
