@@ -24,9 +24,13 @@ deployer ALL=(ALL) NOPASSWD: \
     /usr/local/bin/deploy-service-control stop worker, \
     /usr/local/bin/deploy-service-control restart worker, \
     /usr/local/bin/deploy-service-control status worker, \
+    /usr/local/bin/deploy-service-control start legacy-backend, \
     /usr/local/bin/deploy-service-control stop legacy-backend, \
-    /usr/local/bin/deploy-service-control stop legacy-frontend, \
+    /usr/local/bin/deploy-service-control restart legacy-backend, \
     /usr/local/bin/deploy-service-control status legacy-backend, \
+    /usr/local/bin/deploy-service-control start legacy-frontend, \
+    /usr/local/bin/deploy-service-control stop legacy-frontend, \
+    /usr/local/bin/deploy-service-control restart legacy-frontend, \
     /usr/local/bin/deploy-service-control status legacy-frontend, \
     /usr/local/bin/deploy-nginx-control switch-slot blue, \
     /usr/local/bin/deploy-nginx-control switch-slot green, \

@@ -4,9 +4,9 @@ After=network.target postgresql.service
 
 [Service]
 Type=simple
-User=deployer
-Group=deployer
-WorkingDirectory=/var/www/wifi-billing/current
+User=matthew
+WorkingDirectory=/var/www/wifi-billing/current/Backend
+EnvironmentFile=/var/www/wifi-billing/Backend/.env
 EnvironmentFile=/var/www/wifi-billing/deployment/worker.env
 ExecStart=/usr/bin/java \
     -Djava.net.preferIPv4Stack=true \
@@ -14,7 +14,7 @@ ExecStart=/usr/bin/java \
     -Dserver.address=127.0.0.1 \
     -Dapp.scheduling.enabled=true \
     -Dwireguard.peer-sync.enabled=false \
-    -jar /var/www/wifi-billing/current/Backend/api.jar
+    -jar target/api-0.0.1-SNAPSHOT.jar
 Restart=always
 RestartSec=5
 SuccessExitStatus=143
