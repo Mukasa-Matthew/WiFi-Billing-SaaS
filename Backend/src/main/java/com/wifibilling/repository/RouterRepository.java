@@ -28,6 +28,9 @@ public interface RouterRepository extends JpaRepository<Router, Long> {
 
     List<Router> findAllByTenantId(Long tenantId);
 
+    @Query("select r from Router r where r.tenant.id = :tenantId and (r.status is null or r.status <> :excludedStatus)")
+    List<Router> findAllByTenantIdAndStatusNot(@Param("tenantId") Long tenantId, @Param("excludedStatus") String excludedStatus);
+
     Optional<Router> findByIdAndTenantId(Long id, Long tenantId);
 
     /** Routers that have completed the WireGuard key handshake (used to re-sync hub peers on startup). */

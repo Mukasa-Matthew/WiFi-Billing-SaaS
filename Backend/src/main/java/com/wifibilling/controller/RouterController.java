@@ -41,7 +41,7 @@ public class RouterController {
 
     @GetMapping
     public List<RouterDto.Response> list(@AuthenticationPrincipal TenantPrincipal principal) {
-        return routerRepository.findAllByTenantId(principal.getTenantId()).stream()
+        return routerRepository.findAllByTenantIdAndStatusNot(principal.getTenantId(), "DELETED").stream()
                 .map(this::toResponse)
                 .toList();
     }
@@ -133,25 +133,29 @@ public class RouterController {
             @PathVariable Long id) {
         Router router = routerRepository.findByIdAndTenantId(id, principal.getTenantId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Router not found"));
-        if (transactionRepository.existsByRouterId(router.getId())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Router has payment history and cannot be deleted");
-        }
 
-        if (bindingRepository.existsByRouterId(id)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Router has binding history and cannot be deleted");
-        }
         taskRepository.deleteAllByRouterId(id);
         setupCodeRepository.deleteAllByRouterId(id);
         String publicKey = router.getWgPublicKey();
         if (router.getWgIp() != null && !router.getWgIp().isBlank()) {
             nasRepository.deleteByNasname(router.getWgIp());
         }
-        routerRepository.delete(router);
-        routerRepository.flush();
 
         if (publicKey != null && !publicKey.isBlank()) {
             wireGuardPeerService.removePeer(publicKey);
+        }
+
+        // If payments, bindings, or packages exist, soft-delete so financial history remains valid
+        if (transactionRepository.existsByRouterId(router.getId()) || bindingRepository.existsByRouterId(id)) {
+            router.setStatus("DELETED");
+            router.setWgPublicKey(null);
+            router.setCpuLoad(0);
+            router.setMemoryUsage(0);
+            router.setActiveUsers(0);
+            routerRepository.save(router);
+        } else {
+            routerRepository.delete(router);
+            routerRepository.flush();
         }
     }
 
