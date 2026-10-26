@@ -5,6 +5,7 @@ import { NetworkActivity } from "@/components/LoadingUI";
 import { AuthProvider } from "@/context/AuthContext";
 import { ThemeProvider, themeBootstrapScript } from "@/context/ThemeContext";
 import { ToastProvider } from "@/components/ui/Toast";
+import QueryProvider from "@/components/QueryProvider";
 
 // globals.css already resolves --font-geist-* for Tailwind's font-sans/mono;
 // these load the faces so the UI stops falling back to Arial.
@@ -42,7 +43,7 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeBootstrapScript }} />
       </head>
       <body className="bg-[var(--canvas)] text-[var(--fg)] antialiased min-h-screen" suppressHydrationWarning>
-        <ThemeProvider><AuthProvider><ToastProvider>{children}<NetworkActivity /></ToastProvider></AuthProvider></ThemeProvider>
+        <QueryProvider><ThemeProvider><AuthProvider><ToastProvider>{children}<NetworkActivity /></ToastProvider></AuthProvider></ThemeProvider></QueryProvider>
       </body>
     </html>
   );

@@ -1,4 +1,5 @@
 "use client";
+import { getQueryClient } from "@/lib/queryClient";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -55,7 +56,7 @@ const SOURCES = [
   ["routers", "/api/admin/noc/routers", "router fleet"],
 ] as const;
 
-const REFRESH_MS = 60000;
+const REFRESH_MS = 20000;
 
 const reconTone = (s: string) => (s === "CLEAN" ? "green" : s === "DISCREPANCY" ? "red" : "amber");
 const statusTone = (s: string) => (s === "ACTIVE" ? "green" : s === "SUSPENDED" ? "amber" : "red");
@@ -107,24 +108,49 @@ export default function AdminOverviewPage() {
   const [loading, setLoading] = useState(true);
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const results = await Promise.allSettled(SOURCES.map(([, url]) => api.get(url)));
+  const qc = getQueryClient();
+  const load = useCallback(async (isBackground = false) => {
+    if (!isBackground) setLoading(true);
+    const results = await Promise.allSettled(SOURCES.map(async ([, url]) => {
+      return qc.fetchQuery({
+        queryKey: ["superadmin", url],
+        queryFn: async () => (await api.get(url)).data,
+        staleTime: 15000,
+      });
+    }));
     setData((prev) => {
       const next = { ...(prev || {}) } as Record<string, unknown>;
-      results.forEach((r, i) => { if (r.status === "fulfilled") next[SOURCES[i][0]] = r.value.data; else if (!(SOURCES[i][0] in next)) next[SOURCES[i][0]] = null; });
+      results.forEach((r, i) => {
+        if (r.status === "fulfilled") next[SOURCES[i][0]] = r.value;
+        else if (!(SOURCES[i][0] in next)) next[SOURCES[i][0]] = null;
+      });
       return next as unknown as Data;
     });
     setFailed(results.flatMap((r, i) => (r.status === "rejected" ? [SOURCES[i][2]] : [])));
     setUpdatedAt(Date.now());
     setLoading(false);
-  }, []);
+  }, [qc]);
 
   useEffect(() => {
-    const initial = window.setTimeout(load, 0);
-    const timer = window.setInterval(() => { if (document.visibilityState === "visible") void load(); }, REFRESH_MS);
+    // If preloaded data exists in query cache, immediately render it (SWR)
+    const cached: Record<string, unknown> = {};
+    let hasAnyCache = false;
+    SOURCES.forEach(([key, url]) => {
+      const val = qc.getQueryData(["superadmin", url]);
+      if (val !== undefined) {
+        cached[key] = val;
+        hasAnyCache = true;
+      }
+    });
+    if (hasAnyCache) {
+      setData((prev) => ({ ...(prev || {}), ...cached } as unknown as Data));
+      setLoading(false);
+    }
+
+    const initial = window.setTimeout(() => load(hasAnyCache), 0);
+    const timer = window.setInterval(() => { if (document.visibilityState === "visible") void load(true); }, REFRESH_MS);
     return () => { window.clearTimeout(initial); window.clearInterval(timer); };
-  }, [load]);
+  }, [load, qc]);
 
   const now = updatedAt ?? 0;
   const tenants = data?.tenants;
@@ -183,7 +209,7 @@ export default function AdminOverviewPage() {
           <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-[var(--status-good)]" aria-hidden />Updated {new Date(updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
           <span>Refreshes every minute</span>
         </>}
-        action={<button disabled={loading} onClick={load} className={buttonGhost}><ArrowClockwise className={`h-4 w-4 ${loading ? "animate-spin motion-reduce:animate-none" : ""}`} />{loading ? "Refreshing…" : "Refresh"}</button>}
+        action={<button disabled={loading} onClick={() => load(false)} className={buttonGhost}><ArrowClockwise className={`h-4 w-4 ${loading ? "animate-spin motion-reduce:animate-none" : ""}`} />{loading ? "Refreshing…" : "Refresh"}</button>}
       />
 
       {failed.length > 0 && <ErrorNotice text={`Couldn't load ${failed.join(", ")}. Those sections show the last data available or a dash.`} />}

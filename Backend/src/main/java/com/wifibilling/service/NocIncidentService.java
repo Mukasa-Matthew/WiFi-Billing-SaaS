@@ -31,10 +31,21 @@ public class NocIncidentService {
     private final RouterTaskRepository tasks;
     private final RadAcctRepository radAcct;
     private final RouterManagementService management;
+    private LeaderLockService leaderLockService = new LeaderLockService();
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setLeaderLockService(LeaderLockService leaderLockService) {
+        this.leaderLockService = leaderLockService;
+    }
 
     @Scheduled(fixedDelayString = "PT1M", initialDelayString = "PT2M")
     @Transactional
     public void evaluate() {
+        if (!leaderLockService.executeIfLeader(LeaderLockService.JOB_NOC_INCIDENT, 120, 20, this::doEvaluate)) return;
+    }
+
+    @Transactional
+    public void doEvaluate() {
         List<Router> all = routers.findAll();
         OffsetDateTime now = OffsetDateTime.now();
 

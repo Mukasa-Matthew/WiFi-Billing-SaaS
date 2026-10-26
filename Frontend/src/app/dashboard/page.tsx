@@ -1,5 +1,4 @@
 "use client";
-
 import Link from "next/link";
 import { useMemo, useState, useSyncExternalStore } from "react";
 import { useAuth } from "@/context/AuthContext";
@@ -57,7 +56,7 @@ export default function TenantDashboardOverview() {
   const { user } = useAuth();
   const now = useNow(60000);
   const [range, setRange] = useState("7d");
-  const stats = useApi<DashboardStats>(`/api/dashboard/stats?range=${range}`, 30000);
+  const stats = useApi<DashboardStats>(`/api/dashboard/stats?range=${range}`, 20000);
   const routers = useResource<RouterRec>("/api/routers", true);
   // Only the newest rows are needed here; the Payments page loads full history.
   const payments = useApi<Payment[]>("/api/finance/payments?limit=6", 60000);
@@ -97,6 +96,9 @@ export default function TenantDashboardOverview() {
           <h1 className="mt-0.5 truncate text-[1.45rem] font-semibold leading-tight tracking-tight text-[var(--fg)]">{greeting(now)}, {user?.name?.split(" ")[0] || "there"}</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <button onClick={() => { stats.load(); routers.load(); payments.load(); wallet.load(); }} disabled={stats.refreshing} className={`${buttonGhost} !px-3`} aria-label="Refresh dashboard" title="Refresh dashboard">
+            <ArrowClockwise className={`h-4 w-4 ${stats.refreshing ? "animate-spin" : ""}`} />
+          </button>
           <button onClick={() => hideStore.set(!hidden)} className={`${buttonGhost} !px-3`} aria-pressed={hidden} aria-label={hidden ? "Show revenue" : "Hide revenue"} title={hidden ? "Show revenue" : "Hide revenue"}>
             {hidden ? <EyeSlash className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>

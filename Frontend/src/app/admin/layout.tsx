@@ -1,4 +1,5 @@
 "use client";
+import { prefetchSuperAdminEssential } from "@/lib/dashboardPrefetch";
 
 import Link from "next/link";
 import React, { Suspense, useEffect, useState } from "react";
@@ -59,6 +60,12 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   }, [user, loading, router]);
 
   const ready = !loading && user?.role === "ROLE_SUPERADMIN" && !user.mustChangePassword;
+
+  useEffect(() => {
+    if (ready) {
+      prefetchSuperAdminEssential();
+    }
+  }, [ready]);
   const incidents = useOpenIncidents(ready);
 
   const nav: NavItem[] = [

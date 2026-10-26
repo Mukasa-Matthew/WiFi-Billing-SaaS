@@ -1,4 +1,5 @@
 "use client";
+import { prefetchTenantEssential } from "@/lib/dashboardPrefetch";
 
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
@@ -46,6 +47,7 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
 
   useEffect(() => {
     if (!user) return;
+    if (user.tenantId) prefetchTenantEssential(user.tenantId);
     api.get<SidebarStats>("/api/dashboard/stats")
       .then((r) => setStats(r.data))
       .catch(() => {});

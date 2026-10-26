@@ -45,6 +45,12 @@ public class SubscriptionService {
     private final SubscriptionNotificationRepository notificationRepository;
     private final SubscriptionPeriodHistoryRepository periodHistoryRepository;
     private final TenantRepository tenants;
+    private LeaderLockService leaderLockService = new LeaderLockService();
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setLeaderLockService(LeaderLockService leaderLockService) {
+        this.leaderLockService = leaderLockService;
+    }
     private final PlatformSettingRepository settings;
     private final MarzPayClient marzPay;
     private final GatewayConfigService gatewayConfig;
@@ -454,6 +460,11 @@ public class SubscriptionService {
     @Scheduled(cron = "0 0 9 * * *", zone = "${reporting.timezone:Africa/Kampala}")
     @Transactional
     public void dailyReminderSweep() {
+        if (!leaderLockService.executeIfLeader(LeaderLockService.JOB_SUBSCRIPTION_SWEEP, 600, 3600, this::doDailyReminderSweep)) return;
+    }
+
+    @Transactional
+    public void doDailyReminderSweep() {
         OffsetDateTime now = OffsetDateTime.now();
         List<Subscription> all = subscriptions.findAll();
 

@@ -1,4 +1,5 @@
 "use client";
+import { mutateCache } from "@/lib/cacheInvalidation";
 
 import React, { useMemo, useState } from "react";
 import Link from "next/link";
@@ -49,20 +50,20 @@ export default function VouchersPage() {
     title: "Revoke voucher?",
     body: `Revoke ${voucher.code}? The voucher will stop working and this cannot be undone.`,
     confirmLabel: "Revoke voucher",
-    onConfirm: async () => { try { await api.post(`/api/vouchers/${voucher.code}/revoke`); toast("success", `Voucher ${voucher.code} revoked.`); await load(); } catch (err) { toast("error", message(err)); } },
+    onConfirm: async () => { try { await api.post(`/api/vouchers/${voucher.code}/revoke`); toast("success", `Voucher ${voucher.code} revoked.`); mutateCache.voucherChanged(); await load(); } catch (err) { toast("error", message(err)); } },
   });
 
   const archiveVoucher = (voucher: Voucher) => confirm({
     title: "Archive voucher?",
     body: `Move ${voucher.code} out of the active voucher lists? You can still find it under Archived.`,
     confirmLabel: "Archive voucher",
-    onConfirm: async () => { try { await api.post(`/api/vouchers/${voucher.code}/archive`); setSelected((codes) => codes.filter((code) => code !== voucher.code)); toast("success", `Voucher ${voucher.code} archived.`); await load(); } catch (err) { toast("error", message(err)); } },
+    onConfirm: async () => { try { await api.post(`/api/vouchers/${voucher.code}/archive`); setSelected((codes) => codes.filter((code) => code !== voucher.code)); toast("success", `Voucher ${voucher.code} archived.`); mutateCache.voucherChanged(); await load(); } catch (err) { toast("error", message(err)); } },
   });
 
   const assign = async () => {
     if (!selected.length || !customer || busy) return;
     setBusy("assign"); setNote("");
-    try { await api.post("/api/vouchers/assign", { codes: selected, customerId: Number(customer) }); setSelected([]); toast("success", "Vouchers assigned to customer."); await load(); }
+    try { await api.post("/api/vouchers/assign", { codes: selected, customerId: Number(customer) }); setSelected([]); toast("success", "Vouchers assigned to customer."); mutateCache.voucherChanged(); await load(); }
     catch (err) { setNote(message(err)); }
     finally { setBusy(""); }
   };
