@@ -204,10 +204,12 @@ public class PortalController {
                     || (expiresAt != null && expiresAt.isBefore(now));
             boolean isActive = !isExpired && ("active".equalsIgnoreCase(status) || "unused".equalsIgnoreCase(status));
 
-            String packageName = tx.getPackagePlan() != null ? tx.getPackagePlan().getName()
-                    : (v != null && v.getPackagePlan() != null ? v.getPackagePlan().getName() : "WiFi Package");
+            PackagePlan plan = tx.getPackagePlan() != null ? tx.getPackagePlan()
+                    : (v != null ? v.getPackagePlan() : null);
+            String packageName = plan != null ? plan.getName() : "WiFi Package";
+            Integer sessionTimeout = plan != null ? plan.getSessionTimeout() : null;
             java.math.BigDecimal price = tx.getAmount() != null ? tx.getAmount()
-                    : (v != null && v.getPackagePlan() != null ? v.getPackagePlan().getPrice() : java.math.BigDecimal.ZERO);
+                    : (plan != null ? plan.getPrice() : java.math.BigDecimal.ZERO);
 
             if (isActive && primaryActiveCode.isEmpty()) {
                 primaryActiveCode = normalizedCode;
@@ -217,6 +219,7 @@ public class PortalController {
             item.put("code", normalizedCode);
             item.put("packageName", packageName);
             item.put("price", price);
+            item.put("durationSeconds", sessionTimeout);
             item.put("status", isExpired ? "expired" : ("active".equalsIgnoreCase(status) ? "active" : "unused"));
             item.put("isActive", isActive);
             item.put("firstLogin", firstLogin != null ? firstLogin.toString() : null);

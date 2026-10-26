@@ -462,13 +462,15 @@ function findVoucher(){
                 var statusBorder = isActive ? '#bbf7d0' : '#e2e8f0';
                 var statusLabel = isActive ? 'ACTIVE / READY' : (v.status ? v.status.toUpperCase() : 'EXPIRED');
 
-                var timeInfo = '';
+                var durationText = v.durationSeconds ? fmtDuration(v.durationSeconds) : '';
+                var purchasedText = v.createdAt ? 'Bought: ' + formatDate(v.createdAt) : '';
+                var statusTimeText = '';
                 if (v.expiresAt) {
-                    timeInfo = (isActive ? 'Expires: ' : 'Expired: ') + formatDate(v.expiresAt);
+                    statusTimeText = (isActive ? 'Expires: ' : 'Expired: ') + formatDate(v.expiresAt);
                 } else if (v.firstLogin) {
-                    timeInfo = 'First used: ' + formatDate(v.firstLogin);
-                } else if (v.createdAt) {
-                    timeInfo = 'Purchased: ' + formatDate(v.createdAt);
+                    statusTimeText = 'First used: ' + formatDate(v.firstLogin);
+                } else {
+                    statusTimeText = 'Not yet activated';
                 }
 
                 html += '<div style="padding:10px 12px;border:1px solid ' + statusBorder + ';background:' + statusBg + ';border-radius:10px;display:flex;justify-content:space-between;align-items:center;gap:8px;">';
@@ -477,10 +479,11 @@ function findVoucher(){
                 html += '      <span style="font-family:monospace;font-size:15px;font-weight:700;color:var(--text);letter-spacing:0.5px;">' + v.code + '</span>';
                 html += '      <span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:6px;background:' + (isActive ? '#dcfce7' : '#f1f5f9') + ';color:' + statusColor + ';">' + statusLabel + '</span>';
                 html += '    </div>';
-                html += '    <div style="font-size:12px;font-weight:600;color:var(--text);margin-top:2px;">' + (v.packageName || 'WiFi Package') + '</div>';
-                if (timeInfo) {
-                    html += '    <div style="font-size:11px;color:var(--muted);margin-top:1px;">' + timeInfo + '</div>';
-                }
+                html += '    <div style="font-size:12px;font-weight:600;color:var(--text);margin-top:2px;">' + (v.packageName || 'WiFi Package') + (durationText ? ' (' + durationText + ')' : '') + '</div>';
+                html += '    <div style="font-size:11px;color:var(--muted);margin-top:2px;display:flex;flex-direction:column;gap:1px;">';
+                if (purchasedText) html += '      <span>🗓️ ' + purchasedText + '</span>';
+                html += '      <span style="font-weight:500;color:' + (isActive ? '#15803d' : '#64748b') + ';">' + (isActive ? '⏳ ' : '⌛ ') + statusTimeText + '</span>';
+                html += '    </div>';
                 html += '  </div>';
 
                 if (isActive) {
