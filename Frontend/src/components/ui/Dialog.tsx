@@ -10,13 +10,21 @@ export function Dialog({ title, description, children, onClose, wide = false }: 
   const dialogRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const descriptionId = useId();
+
+  // Save the onClose callback in a ref to keep it stable across parent re-renders
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   useEffect(() => {
     const previousFocus = document.activeElement as HTMLElement | null;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     closeRef.current?.focus();
+
     const key = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") onCloseRef.current();
       if (e.key !== "Tab" || !dialogRef.current) return;
       const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'));
       if (!focusable.length) return;
@@ -31,13 +39,13 @@ export function Dialog({ title, description, children, onClose, wide = false }: 
       document.body.style.overflow = previousOverflow;
       previousFocus?.focus();
     };
-  }, [onClose]);
+  }, []); // Run only on mount and unmount
 
   if (typeof document === "undefined") return null;
 
   return createPortal(
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-4" role="presentation">
-      <div className="absolute inset-0 bg-slate-950/55 backdrop-blur-[2px]" onClick={onClose} />
+      <div className="absolute inset-0 bg-slate-950/55 backdrop-blur-[2px]" onClick={() => onCloseRef.current()} />
       <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={description ? descriptionId : undefined}
         className={`dialog-enter relative max-h-[calc(100dvh-2rem)] w-full overflow-y-auto ${wide ? "max-w-2xl" : "max-w-md"} rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--shadow-overlay)] sm:p-6`}>
         <div className="mb-5 flex items-start justify-between gap-3">
@@ -45,7 +53,7 @@ export function Dialog({ title, description, children, onClose, wide = false }: 
             <h2 id={titleId} className="text-sm font-semibold text-[var(--fg)]">{title}</h2>
             {description && <p id={descriptionId} className="mt-1 text-xs text-[var(--fg-muted)]">{description}</p>}
           </div>
-          <button ref={closeRef} aria-label="Close dialog" onClick={onClose}
+          <button ref={closeRef} aria-label="Close dialog" onClick={() => onCloseRef.current()}
             className="min-h-10 min-w-10 rounded-lg p-1.5 text-[var(--fg-faint)] transition hover:bg-[var(--fill)] hover:text-[var(--fg-body)]">
             <X className="h-4 w-4" />
           </button>
