@@ -451,7 +451,7 @@ public class SubscriptionService {
     // 4. Automated Reminders
     // ==========================================
 
-    @Scheduled(cron = "0 0 9 * * *")
+    @Scheduled(cron = "0 0 9 * * *", zone = "${reporting.timezone:Africa/Kampala}")
     @Transactional
     public void dailyReminderSweep() {
         OffsetDateTime now = OffsetDateTime.now();
