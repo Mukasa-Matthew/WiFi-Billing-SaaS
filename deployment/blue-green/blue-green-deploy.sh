@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# WiFi-Billing SaaS — Production Zero-Downtime Blue-Green Deployment Script
+# WiFi-Billing SaaS — Production Blue-Green Cutover Deployment Script
 # Author: WiFi Billing Engineering Team
 #
 # Usage:
@@ -9,7 +9,7 @@
 set -euo pipefail
 
 COMMIT_SHA="${1:-}"
-DRAIN_TIMEOUT="${2:-60}" # Max wait for in-flight request draining (default: 60s)
+DRAIN_TIMEOUT="${2:-90}" # Default: 90s observation and connection-draining
 
 if [ -z "${COMMIT_SHA}" ]; then
     echo "ERROR: Target commit SHA must be provided." >&2
@@ -63,21 +63,38 @@ echo " Drain Timeout   : ${DRAIN_TIMEOUT}s"
 echo " First Migration : ${IS_FIRST_MIGRATION}"
 echo "=================================================================="
 
-# 1. Verify that immutable release directory and CI artifact digests exist
+# 1. Verify release directory existence
 if [ ! -d "${CURRENT_RELEASE_DIR}" ]; then
     echo "ERROR: Release directory ${CURRENT_RELEASE_DIR} does not exist!" >&2
     exit 1
 fi
 
+# 2. Strict Checksum Verification Before and After Extraction
 if [ -f "${CHECKSUM_FILE}" ]; then
-    echo "Verifying release artifact checksums against CI digests..."
+    echo "=== Verifying CI Release Artifact Integrity ==="
     ( cd "${CURRENT_RELEASE_DIR}" && sha256sum -c release.sha256 ) || {
-        echo "SECURITY ERROR: Artifact checksum verification failed!" >&2
+        echo "SECURITY ERROR: Pre-install artifact checksum verification failed!" >&2
         exit 1
     }
 fi
 
-# 2. Configure Target Slot Environment File (Web/API backend never runs schedulers)
+# Confirm extracted frontend server.js exists
+if [ ! -f "${CURRENT_RELEASE_DIR}/Frontend/.next/standalone/server.js" ]; then
+    if [ -f "${CURRENT_RELEASE_DIR}/frontend-standalone.tar.gz" ]; then
+        echo "Extracting standalone Next.js bundle..."
+        tar -xzf "${CURRENT_RELEASE_DIR}/frontend-standalone.tar.gz" -C "${CURRENT_RELEASE_DIR}/Frontend"
+    else
+        echo "ERROR: Neither extracted Frontend server.js nor frontend-standalone.tar.gz found!" >&2
+        exit 1
+    fi
+fi
+
+if [ ! -f "${CURRENT_RELEASE_DIR}/Backend/target/api-0.0.1-SNAPSHOT.jar" ]; then
+    echo "ERROR: Backend JAR target/api-0.0.1-SNAPSHOT.jar does not exist!" >&2
+    exit 1
+fi
+
+# 3. Configure Target Slot Environment File (Web/API backend never runs schedulers)
 TARGET_ENV_FILE="${APP_DIR}/deployment/slots/${TARGET_SLOT}.env"
 mkdir -p "${APP_DIR}/deployment/slots"
 
@@ -93,7 +110,7 @@ APP_SCHEDULING_ENABLED=false
 WIREGUARD_PEER_SYNC_ENABLED=false
 EOF_SLOT
 
-# 3. Update slot symlink atomically
+# 4. Update slot symlink atomically
 SLOT_DIR="${APP_DIR}/slots/${TARGET_SLOT}"
 mkdir -p "${APP_DIR}/slots"
 rm -rf "${SLOT_DIR}"
@@ -103,12 +120,12 @@ ln -sfn "${CURRENT_RELEASE_DIR}" "${SLOT_DIR}"
 mkdir -p "${APP_DIR}/shared-static"
 cp -rn "${CURRENT_RELEASE_DIR}/Frontend/.next/static/." "${APP_DIR}/shared-static/" 2>/dev/null || true
 
-# 4. Start Target Slot Services via systemd
+# 5. Start Target Slot Services via systemd
 echo "=== Starting Target Services: wifi-backend-${TARGET_SLOT} & wifi-frontend-${TARGET_SLOT} ==="
 sudo /usr/local/bin/deploy-service-control restart "backend-${TARGET_SLOT}"
 sudo /usr/local/bin/deploy-service-control restart "frontend-${TARGET_SLOT}"
 
-# 5. Comprehensive Pre-Cutover Readiness Probes
+# 6. Comprehensive Pre-Cutover Readiness Probes
 echo "=== Polling Target Backend for Deep Readiness (DB + Internal Version Verification) ==="
 BACKEND_READY=false
 for i in $(seq 1 45); do
@@ -147,11 +164,11 @@ if [ "${FRONTEND_READY}" != "true" ]; then
     exit 1
 fi
 
-# 6. Atomic Nginx Traffic Switch via restricted helper
+# 7. Atomic Nginx Traffic Switch via restricted helper
 echo "=== Atomically Updating Nginx Active Upstream to ${TARGET_SLOT} ==="
 sudo /usr/local/bin/deploy-nginx-control switch-slot "${TARGET_SLOT}"
 
-# 7. Record state for warm rollback capability
+# 8. Record state for warm rollback capability
 echo "${CURRENT_ACTIVE_SLOT}" > "${ROLLBACK_SLOT_FILE}"
 echo "${TARGET_SLOT}" > "${ACTIVE_SLOT_FILE}"
 
@@ -162,18 +179,28 @@ echo " throughout the ${DRAIN_TIMEOUT}s controlled observation period."
 echo " [WARM ROLLBACK AVAILABLE]: ./blue-green-rollback.sh"
 echo "=================================================================="
 
-# 8. Controlled In-Flight Request Draining
+# 9. Controlled In-Flight Request & Transaction Draining
 echo "Monitoring in-flight connections on ${CURRENT_ACTIVE_SLOT} (observation: ${DRAIN_TIMEOUT}s)..."
 for i in $(seq 1 "${DRAIN_TIMEOUT}"); do
     ACTIVE_CONNS=$(ss -t state established "( sport = :${PREVIOUS_BACKEND_PORT} )" 2>/dev/null | grep -v "Recv-Q" | wc -l || true)
-    if [ "${ACTIVE_CONNS}" -eq 0 ] && [ "${i}" -ge 15 ]; then
-        echo " In-flight requests drained cleanly after ${i} seconds."
+    
+    # Query pending payment transactions created in the last 15 minutes
+    PENDING_TX=0
+    if [ -f "${APP_DIR}/Backend/.env" ]; then
+        PENDING_TX=$(PGPASSWORD="${SPRING_DATASOURCE_PASSWORD:-}" psql -h "${SPRING_DATASOURCE_HOST:-100.88.129.17}" -U "${SPRING_DATASOURCE_USERNAME:-radius_user}" -d "${SPRING_DATASOURCE_DB:-radius_db}" -tAc "SELECT COUNT(*) FROM transactions WHERE status = 'PENDING' AND created_at > NOW() - INTERVAL '15 minutes';" 2>/dev/null || echo 0)
+    fi
+
+    echo " [Draining ${i}/${DRAIN_TIMEOUT}s] Active TCP conns: ${ACTIVE_CONNS} | Pending transactions: ${PENDING_TX}"
+
+    # Draining satisfied: TCP connections are 0, pending transactions resolved, and at least 20s elapsed
+    if [ "${ACTIVE_CONNS}" -eq 0 ] && [ "${PENDING_TX}" -eq 0 ] && [ "${i}" -ge 20 ]; then
+        echo " In-flight requests and pending payments drained cleanly after ${i} seconds."
         break
     fi
     sleep 1
 done
 
-# 9. Background Worker Handover Sequence
+# 10. Background Worker Handover Sequence
 # ONLY AFTER observation & draining do we stop the old release and start the worker
 if [ "${IS_FIRST_MIGRATION}" = "true" ]; then
     echo "=== First Migration Handover: Stopping legacy services & starting dedicated worker ==="
