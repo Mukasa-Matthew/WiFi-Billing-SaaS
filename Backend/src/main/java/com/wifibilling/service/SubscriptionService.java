@@ -32,6 +32,8 @@ import java.util.*;
 public class SubscriptionService {
 
     public static final ZoneId TIMEZONE_KAMPALA = ZoneId.of("Africa/Kampala");
+    @org.springframework.beans.factory.annotation.Value("${app.subscription.enforcement.enabled:false}")
+    private boolean subscriptionEnforcementEnabled;
     public static final long FALLBACK_DEFAULT_FEE = 50_000L;
     public static final int TRIAL_DAYS = 7;
     public static final int GRACE_DAYS = 2;
@@ -175,6 +177,11 @@ public class SubscriptionService {
             return false;
         }
 
+        // Feature Flag: If production subscription enforcement is disabled, allow existing tenants to accept payments
+        if (!subscriptionEnforcementEnabled) {
+            return true;
+        }
+
         Optional<Subscription> subOpt = subscriptions.findByTenantId(tenantId);
         if (subOpt.isEmpty()) return false;
 
@@ -196,6 +203,11 @@ public class SubscriptionService {
         Optional<Tenant> tOpt = tenants.findById(tenantId);
         if (tOpt.isEmpty()) return false;
         if ("ROLE_SUPERADMIN".equals(tOpt.get().getRole())) return true;
+
+        // Feature Flag: If production subscription enforcement is disabled, allow existing tenant management
+        if (!subscriptionEnforcementEnabled) {
+            return true;
+        }
 
         Optional<Subscription> subOpt = subscriptions.findByTenantId(tenantId);
         if (subOpt.isEmpty()) return false;

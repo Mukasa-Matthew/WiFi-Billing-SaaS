@@ -181,21 +181,33 @@ echo "=================================================================="
 
 # 9. Controlled In-Flight Request & Transaction Draining
 # Differentiates active HTTP/TCP sockets from persisted Mobile Money transactions.
-# Persisted PENDING transactions safely survive the release because both slots share the
-# same database, and the dedicated worker reconciles them without interruption.
+# Fails safely: if active sockets remain open after timeout, shutdown is aborted to protect in-flight transactions.
 echo "Monitoring in-flight HTTP connections on ${CURRENT_ACTIVE_SLOT} (observation: ${DRAIN_TIMEOUT}s)..."
+DRAINED_SUCCESSFULLY=false
 for i in $(seq 1 "${DRAIN_TIMEOUT}"); do
     ACTIVE_CONNS=$(ss -t state established "( sport = :${PREVIOUS_BACKEND_PORT} )" 2>/dev/null | grep -v "Recv-Q" | wc -l || true)
     echo " [Draining ${i}/${DRAIN_TIMEOUT}s] Active HTTP socket connections on :${PREVIOUS_BACKEND_PORT}: ${ACTIVE_CONNS}"
 
-    # Active HTTP socket draining condition: 0 TCP connections and at least 25s observation elapsed
+    # Draining condition: 0 TCP connections and at least 25s observation elapsed
     if [ "${ACTIVE_CONNS}" -eq 0 ] && [ "${i}" -ge 25 ]; then
         echo " In-flight HTTP requests drained cleanly after ${i} seconds."
+        DRAINED_SUCCESSFULLY=true
         break
     fi
     sleep 1
 done
 
+if [ "${DRAINED_SUCCESSFULLY}" != "true" ]; then
+    echo "==================================================================" >&2
+    echo " WARNING / ERROR: Draining timed out after ${DRAIN_TIMEOUT}s!" >&2
+    echo " There are still ${ACTIVE_CONNS} active TCP socket(s) on :${PREVIOUS_BACKEND_PORT}." >&2
+    echo " ABORTING legacy backend shutdown to prevent terminating active requests." >&2
+    echo " Both slots (${TARGET_SLOT} and ${CURRENT_ACTIVE_SLOT}) remain running." >&2
+    echo " Warm rollback remains immediately available if needed:" >&2
+    echo "   ./blue-green-rollback.sh warm" >&2
+    echo "==================================================================" >&2
+    exit 1
+fi
 # 10. Background Worker Handover Sequence
 # ONLY AFTER observation & draining do we stop the old release and start the worker
 if [ "${IS_FIRST_MIGRATION}" = "true" ]; then
