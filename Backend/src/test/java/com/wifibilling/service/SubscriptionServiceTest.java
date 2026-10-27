@@ -293,4 +293,27 @@ public class SubscriptionServiceTest {
         assertTrue(service.isTenantManagementAllowed(2L), "Tenant MUST be allowed to manage routers/vouchers when enforcement is disabled");
         assertDoesNotThrow(() -> service.assertTenantManagementAllowed(2L));
     }
+
+    @Test
+    void whenEnforcementDisabled_dailyReminderSweepIsSkippedCompletely() {
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "subscriptionEnforcementEnabled", false);
+
+        service.dailyReminderSweep();
+
+        // When enforcement is disabled, background reminder sweeps must never touch tenant subscriptions or send notifications
+        verify(subs, never()).findAll();
+        verify(notifications, never()).save(any());
+        verify(emailService, never()).send(any(), any(), any());
+    }
+
+    @Test
+    void whenEnforcementDisabled_doDailyReminderSweepDoesNotDispatchReminders() {
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "subscriptionEnforcementEnabled", false);
+
+        service.doDailyReminderSweep();
+
+        verify(subs, never()).findAll();
+        verify(notifications, never()).save(any());
+        verify(emailService, never()).send(any(), any(), any());
+    }
 }
