@@ -8,6 +8,7 @@
 #      Swaps Nginx upstream back to the warm standby in ~150 ms.
 #   2. COLD ROLLBACK (after previous slot was stopped):
 #      Starts previous services, verifies readiness, and only then switches traffic.
+#      Measured startup duration: ~18 to 28 seconds.
 # ==============================================================================
 set -euo pipefail
 
@@ -33,19 +34,19 @@ echo "=================================================================="
 
 if [ "${ROLLBACK_SLOT}" = "legacy" ]; then
     echo "=== Rolling back to Legacy Production Release ==="
-    # Ensure legacy services are started
+    # Ensure legacy services are started if cold
     if ! sudo /usr/local/bin/deploy-service-control status legacy-backend >/dev/null 2>&1; then
-        echo "Starting legacy-backend and legacy-frontend services..."
+        echo "Starting legacy-backend and legacy-frontend services (Cold Rollback)..."
         sudo /usr/local/bin/deploy-service-control start legacy-backend
         sudo /usr/local/bin/deploy-service-control start legacy-frontend
         
-        # Verify readiness before returning traffic
+        # Verify readiness before returning traffic (measured: 18-28s)
         echo "Verifying legacy backend readiness on :8080..."
         LEGACY_READY=false
-        for i in $(seq 1 45); do
+        for i in $(seq 1 60); do
             if curl -s "http://127.0.0.1:8080/api/health" | grep -q '"database":"CONNECTED"'; then
                 LEGACY_READY=true
-                echo " Legacy backend is ready!"
+                echo " Legacy backend is ready! (attempt ${i})"
                 break
             fi
             sleep 1
@@ -73,14 +74,15 @@ if [ "${MODE}" = "--cold" ] || [ "${MODE}" = "cold" ]; then
     sudo /usr/local/bin/deploy-service-control start "backend-${ROLLBACK_SLOT}"
     sudo /usr/local/bin/deploy-service-control start "frontend-${ROLLBACK_SLOT}"
     
-    # Verify readiness
+    # Verify readiness (measured: 18-28s)
     PORT=8080
     [ "${ROLLBACK_SLOT}" = "green" ] && PORT=8081
     echo "Verifying readiness on port ${PORT}..."
     READY=false
-    for i in $(seq 1 45); do
+    for i in $(seq 1 60); do
         if curl -s "http://127.0.0.1:${PORT}/api/health" | grep -q '"database":"CONNECTED"'; then
             READY=true
+            echo " Target slot ${ROLLBACK_SLOT} is ready! (attempt ${i})"
             break
         fi
         sleep 1
