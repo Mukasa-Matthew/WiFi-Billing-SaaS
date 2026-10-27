@@ -84,7 +84,7 @@ public class VoucherService {
 
         List<Long> generatedIds = new ArrayList<>(targetCount);
         jdbcTemplate.execute((java.sql.Connection conn) -> {
-            try (PreparedStatement ps = conn.prepareStatement(insertVoucherSql, Statement.RETURN_GENERATED_KEYS)) {
+            try (PreparedStatement ps = conn.prepareStatement(insertVoucherSql, new String[]{"id"})) {
                 for (String code : generatedCodes) {
                     ps.setString(1, code);
                     ps.setString(2, STATUS_UNUSED);

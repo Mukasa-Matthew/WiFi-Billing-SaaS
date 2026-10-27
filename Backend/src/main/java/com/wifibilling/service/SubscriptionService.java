@@ -472,11 +472,19 @@ public class SubscriptionService {
     @Scheduled(cron = "0 0 9 * * *", zone = "${reporting.timezone:Africa/Kampala}")
     @Transactional
     public void dailyReminderSweep() {
+        if (!subscriptionEnforcementEnabled) {
+            log.info("Subscription enforcement is disabled via feature flag; skipping daily reminder sweep.");
+            return;
+        }
         if (!leaderLockService.executeIfLeader(LeaderLockService.JOB_SUBSCRIPTION_SWEEP, 600, 3600, this::doDailyReminderSweep)) return;
     }
 
     @Transactional
     public void doDailyReminderSweep() {
+        if (!subscriptionEnforcementEnabled) {
+            log.info("Subscription enforcement is disabled via feature flag; skipping doDailyReminderSweep.");
+            return;
+        }
         OffsetDateTime now = OffsetDateTime.now();
         List<Subscription> all = subscriptions.findAll();
 
