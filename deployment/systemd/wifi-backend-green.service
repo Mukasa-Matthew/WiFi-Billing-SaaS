@@ -1,0 +1,16 @@
+[Unit]
+Description=WiFi Billing Spring Boot Backend (Green Slot)
+After=network.target
+
+[Service]
+User=matthew
+WorkingDirectory=/var/www/wifi-billing/slots/green/Backend
+EnvironmentFile=/var/www/wifi-billing/Backend/.env
+EnvironmentFile=/var/www/wifi-billing/deployment/slots/green.env
+ExecStart=/usr/bin/java -Djava.net.preferIPv4Stack=true -Dapp.scheduling.enabled=false -Dwireguard.peer-sync.enabled=false -jar target/api-0.0.1-SNAPSHOT.jar
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

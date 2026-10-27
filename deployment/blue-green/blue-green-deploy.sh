@@ -180,21 +180,17 @@ echo " [WARM ROLLBACK AVAILABLE]: ./blue-green-rollback.sh"
 echo "=================================================================="
 
 # 9. Controlled In-Flight Request & Transaction Draining
-echo "Monitoring in-flight connections on ${CURRENT_ACTIVE_SLOT} (observation: ${DRAIN_TIMEOUT}s)..."
+# Differentiates active HTTP/TCP sockets from persisted Mobile Money transactions.
+# Persisted PENDING transactions safely survive the release because both slots share the
+# same database, and the dedicated worker reconciles them without interruption.
+echo "Monitoring in-flight HTTP connections on ${CURRENT_ACTIVE_SLOT} (observation: ${DRAIN_TIMEOUT}s)..."
 for i in $(seq 1 "${DRAIN_TIMEOUT}"); do
     ACTIVE_CONNS=$(ss -t state established "( sport = :${PREVIOUS_BACKEND_PORT} )" 2>/dev/null | grep -v "Recv-Q" | wc -l || true)
-    
-    # Query pending payment transactions created in the last 15 minutes
-    PENDING_TX=0
-    if [ -f "${APP_DIR}/Backend/.env" ]; then
-        PENDING_TX=$(PGPASSWORD="${SPRING_DATASOURCE_PASSWORD:-}" psql -h "${SPRING_DATASOURCE_HOST:-100.88.129.17}" -U "${SPRING_DATASOURCE_USERNAME:-radius_user}" -d "${SPRING_DATASOURCE_DB:-radius_db}" -tAc "SELECT COUNT(*) FROM transactions WHERE status = 'PENDING' AND created_at > NOW() - INTERVAL '15 minutes';" 2>/dev/null || echo 0)
-    fi
+    echo " [Draining ${i}/${DRAIN_TIMEOUT}s] Active HTTP socket connections on :${PREVIOUS_BACKEND_PORT}: ${ACTIVE_CONNS}"
 
-    echo " [Draining ${i}/${DRAIN_TIMEOUT}s] Active TCP conns: ${ACTIVE_CONNS} | Pending transactions: ${PENDING_TX}"
-
-    # Draining satisfied: TCP connections are 0, pending transactions resolved, and at least 20s elapsed
-    if [ "${ACTIVE_CONNS}" -eq 0 ] && [ "${PENDING_TX}" -eq 0 ] && [ "${i}" -ge 20 ]; then
-        echo " In-flight requests and pending payments drained cleanly after ${i} seconds."
+    # Active HTTP socket draining condition: 0 TCP connections and at least 25s observation elapsed
+    if [ "${ACTIVE_CONNS}" -eq 0 ] && [ "${i}" -ge 25 ]; then
+        echo " In-flight HTTP requests drained cleanly after ${i} seconds."
         break
     fi
     sleep 1
