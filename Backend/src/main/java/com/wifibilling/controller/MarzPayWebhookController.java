@@ -47,6 +47,7 @@ public class MarzPayWebhookController {
     private final TransactionRepository transactions;
     private final WebhookEventRepository webhookEvents;
     private final MarzPayClient marzPay;
+    private final com.wifibilling.service.SubscriptionService subscriptionService;
 
     @PostMapping("/callback")
     public ResponseEntity<Void> callback(
@@ -67,6 +68,15 @@ public class MarzPayWebhookController {
             }
 
             boolean collection = eventType.startsWith("collection") || eventType.isBlank();
+
+            // Intercept SaaS Subscription checkout callbacks (SUB- references)
+            if (reference != null && (reference.startsWith("SUB-") || (eventType.startsWith("collection") && transactions.findByReference(reference).isEmpty()))) {
+                if (subscriptionService != null && subscriptionService.confirmSubscriptionCheckout(reference, payload)) {
+                    record(hash, eventType, reference, WebhookEvent.PROCESSED, "Subscription checkout updated", rawBody);
+                    return ResponseEntity.ok().build();
+                }
+            }
+
             String secret = null;
             String mode = TenantGatewayConfig.MODE_PLATFORM;
             var tx = reference != null

@@ -49,6 +49,25 @@ body {
   --sidebar-fg-dim: #C3D6F0;
   --sidebar-fg-faint: #9DB6D9;
   --sidebar-warn: #FCD34D;
+  --sidebar-line: rgb(255 255 255 / 0.08);
+  --sidebar-hover: rgb(255 255 255 / 0.06);
+  --sidebar-current: rgb(255 255 255 / 0.10);
+  --sidebar-indicator: #5EEAD4;
+  --header: #FFFFFF;
+  --ring: #2563EB;
+  --primary: #1D4ED8;
+  --primary-hover: #1E40AF;
+  --primary-soft: #EFF4FF;
+  /* Charts: one validated series hue plus the reserved status set. Status
+     marks always ship with a text label, never colour alone. */
+  --chart-1: #2A78D6;
+  --chart-1-wash: rgb(42 120 214 / 0.10);
+  --chart-muted: #C9D6E6;
+  --chart-grid: #EEF2F6;
+  --status-good: #1BAF7A;
+  --status-warn: #EDA100;
+  --status-bad: #E34948;
+  --status-idle: #A3AEBD;
   --shadow-panel: 0 1px 2px rgb(15 23 42 / 0.04), 0 10px 28px -22px rgb(15 23 42 / 0.35);
   --shadow-overlay: 0 24px 64px -24px rgb(15 23 42 / 0.45);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -76,6 +95,23 @@ body {
   --sidebar-fg-dim: #B8BDC6;
   --sidebar-fg-faint: #8B929C;
   --sidebar-warn: #FCD34D;
+  --sidebar-line: rgb(255 255 255 / 0.06);
+  --sidebar-hover: rgb(255 255 255 / 0.04);
+  --sidebar-current: rgb(255 255 255 / 0.07);
+  --sidebar-indicator: #5EEAD4;
+  --header: #15171B;
+  --ring: #60A5FA;
+  --primary: #2563EB;
+  --primary-hover: #3B82F6;
+  --primary-soft: #16243C;
+  --chart-1: #3987E5;
+  --chart-1-wash: rgb(57 135 229 / 0.14);
+  --chart-muted: #33404F;
+  --chart-grid: #23272D;
+  --status-good: #199E70;
+  --status-warn: #D9A21B;
+  --status-bad: #E5484D;
+  --status-idle: #5B636E;
   --shadow-panel: 0 1px 2px rgb(0 0 0 / 0.24), 0 12px 32px -24px rgb(0 0 0 / 0.8);
   --shadow-overlay: 0 28px 72px -24px rgb(0 0 0 / 0.8);
   color-scheme: dark;
@@ -107,13 +143,18 @@ body {
 body { background: var(--canvas); color: var(--fg); }
 
 /* Keep keyboard navigation visible on both white panels and the navy sidebar. */
-:focus-visible { outline: 2px solid #3b82f6; outline-offset: 3px; }
+:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 button, a { touch-action: manipulation; }
 .panel-shadow { box-shadow: var(--shadow-panel); }
-.sidebar-scroll { scrollbar-width: thin; scrollbar-color: #54708e transparent; }
+.sidebar-scroll { scrollbar-width: thin; scrollbar-color: rgb(255 255 255 / 0.18) transparent; }
 .sidebar-scroll::-webkit-scrollbar { width: 6px; }
-.sidebar-scroll::-webkit-scrollbar-thumb { background: #54708e; border-radius: 8px; }
+.sidebar-scroll::-webkit-scrollbar-thumb { background: rgb(255 255 255 / 0.18); border-radius: 8px; }
+.main-scroll { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; scrollbar-gutter: stable; }
+/* Numbers that line up in columns; large standalone figures keep proportional digits. */
+.num { font-variant-numeric: tabular-nums; }
+@keyframes menu-enter { from { opacity: 0; transform: translate3d(0, -4px, 0) scale(.98); } to { opacity: 1; transform: none; } }
+.menu-enter { animation: menu-enter 140ms var(--ease-out) both; transform-origin: top right; }
 .request-progress { animation: request-progress 1.2s ease-in-out infinite; }
 @keyframes request-progress { from { transform: translateX(-100%); } to { transform: translateX(400%); } }
 @keyframes ui-enter { from { opacity: 0; transform: translate3d(0, 6px, 0); } to { opacity: 1; transform: none; } }

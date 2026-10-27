@@ -417,6 +417,27 @@ function hideFind(){ document.getElementById('find-modal').classList.remove('sho
 function hidePay(){ document.getElementById('pay-modal').classList.remove('show'); }
 
 
+function selectFoundVoucher(code) {
+    if (!code) return;
+    purchasedCode = code;
+    document.getElementById('voucher-code-display').textContent = code;
+    document.getElementById('voucher-result').classList.add('show');
+    document.getElementById('username-input').value = code;
+    hideFind();
+    showMsg('Voucher ' + code + ' selected — connecting...', false);
+    useVoucher();
+}
+
+function formatDate(isoStr) {
+    if (!isoStr) return '';
+    try {
+        var d = new Date(isoStr);
+        if (isNaN(d.getTime())) return isoStr;
+        return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' +
+               d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    } catch(e) { return isoStr; }
+}
+
 function findVoucher(){
     var phone = document.getElementById('find-phone').value.trim();
     if (!phone) return;
@@ -424,18 +445,59 @@ function findVoucher(){
     fetch(BASE + '/api/portal/find-voucher?token=' + encodeURIComponent(TOKEN) + '&phone=' + encodeURIComponent(phone))
         .then(function(r){ return r.json(); })
         .then(function(res){
-            if (res.voucherCode) {
-                purchasedCode = res.voucherCode;
-                document.getElementById('voucher-code-display').textContent = res.voucherCode;
-                document.getElementById('voucher-result').classList.add('show');
-                document.getElementById('username-input').value = res.voucherCode;
-                hideFind();
-                showMsg('Voucher found — press "Connect with this code".', false);
-            } else {
-                document.getElementById('find-result').innerHTML = '<div class="status-msg error">No voucher found for that number.</div>';
+            var list = res.vouchers || [];
+            if (!list.length && res.voucherCode) {
+                list = [{ code: res.voucherCode, packageName: 'WiFi Package', status: 'active', isActive: true }];
             }
+            if (!list.length) {
+                document.getElementById('find-result').innerHTML = '<div class="status-msg error" style="padding:10px;font-size:13px;border-radius:8px;">No vouchers found for that number. If you just paid, please allow a few seconds and check again.</div>';
+                return;
+            }
+
+            var html = '<div style="margin-top:14px;max-height:280px;overflow-y:auto;text-align:left;display:flex;flex-direction:column;gap:8px;">';
+            list.forEach(function(v) {
+                var isActive = v.isActive;
+                var statusColor = isActive ? '#16a34a' : '#94a3b8';
+                var statusBg = isActive ? '#f0fdf4' : '#f8fafc';
+                var statusBorder = isActive ? '#bbf7d0' : '#e2e8f0';
+                var statusLabel = isActive ? 'ACTIVE / READY' : (v.status ? v.status.toUpperCase() : 'EXPIRED');
+
+                var durationText = v.durationSeconds ? fmtDuration(v.durationSeconds) : '';
+                var purchasedText = v.createdAt ? 'Bought: ' + formatDate(v.createdAt) : '';
+                var statusTimeText = '';
+                if (v.expiresAt) {
+                    statusTimeText = (isActive ? 'Expires: ' : 'Expired: ') + formatDate(v.expiresAt);
+                } else if (v.firstLogin) {
+                    statusTimeText = 'First used: ' + formatDate(v.firstLogin);
+                } else {
+                    statusTimeText = 'Not yet activated';
+                }
+
+                html += '<div style="padding:10px 12px;border:1px solid ' + statusBorder + ';background:' + statusBg + ';border-radius:10px;display:flex;justify-content:space-between;align-items:center;gap:8px;">';
+                html += '  <div style="min-width:0;flex:1;">';
+                html += '    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">';
+                html += '      <span style="font-family:monospace;font-size:15px;font-weight:700;color:var(--text);letter-spacing:0.5px;">' + v.code + '</span>';
+                html += '      <span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:6px;background:' + (isActive ? '#dcfce7' : '#f1f5f9') + ';color:' + statusColor + ';">' + statusLabel + '</span>';
+                html += '    </div>';
+                html += '    <div style="font-size:12px;font-weight:600;color:var(--text);margin-top:2px;">' + (v.packageName || 'WiFi Package') + (durationText ? ' (' + durationText + ')' : '') + '</div>';
+                html += '    <div style="font-size:11px;color:var(--muted);margin-top:2px;display:flex;flex-direction:column;gap:1px;">';
+                if (purchasedText) html += '      <span>🗓️ ' + purchasedText + '</span>';
+                html += '      <span style="font-weight:500;color:' + (isActive ? '#15803d' : '#64748b') + ';">' + (isActive ? '⏳ ' : '⌛ ') + statusTimeText + '</span>';
+                html += '    </div>';
+                html += '  </div>';
+
+                if (isActive) {
+                    html += '  <button type="button" onclick="selectFoundVoucher(\'' + v.code + '\')" style="white-space:nowrap;padding:7px 12px;font-size:12px;font-weight:700;background:var(--primary);color:#fff;border:none;border-radius:8px;cursor:pointer;">Connect</button>';
+                } else {
+                    html += '  <button type="button" onclick="document.getElementById(\'username-input\').value=\'' + v.code + '\';hideFind();" style="white-space:nowrap;padding:6px 10px;font-size:11px;font-weight:600;background:#fff;border:1px solid #cbd5e1;color:#64748b;border-radius:8px;cursor:pointer;">Fill Code</button>';
+                }
+                html += '</div>';
+            });
+            html += '</div>';
+
+            document.getElementById('find-result').innerHTML = html;
         })
-        .catch(function(){ document.getElementById('find-result').innerHTML = '<div class="status-msg error">Lookup failed. Try again.</div>'; });
+        .catch(function(){ document.getElementById('find-result').innerHTML = '<div class="status-msg error">Lookup failed. Please check your connection and try again.</div>'; });
 }
 
 function fmtDuration(seconds) {

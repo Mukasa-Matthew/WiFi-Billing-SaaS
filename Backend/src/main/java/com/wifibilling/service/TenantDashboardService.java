@@ -16,7 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.time.format.TextStyle;
 import java.util.*;
 
@@ -31,6 +30,7 @@ public class TenantDashboardService {
     private final com.wifibilling.repository.RadAcctRepository radAcctRepository;
     private final com.wifibilling.repository.PackagePlanRepository planRepository;
     private final com.wifibilling.repository.CustomerRepository customerRepository;
+    private final ReportingClock clock;
 
     @Transactional(readOnly = true)
     public TenantDashboardStatsDto getStats(Long tenantId, String role) {
@@ -39,9 +39,12 @@ public class TenantDashboardService {
 
     @Transactional(readOnly = true)
     public TenantDashboardStatsDto getStats(Long tenantId, String role, String range) {
-        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-        OffsetDateTime startOfDay = now.toLocalDate().atStartOfDay().atOffset(ZoneOffset.UTC);
-        OffsetDateTime startOfMonth = now.toLocalDate().withDayOfMonth(1).atStartOfDay().atOffset(ZoneOffset.UTC);
+        // Stored timestamps are UTC instants; day/month boundaries are the
+        // reporting zone's (see ReportingClock), converted back to UTC.
+        OffsetDateTime now = clock.now();
+        LocalDate localToday = clock.today();
+        OffsetDateTime startOfDay = clock.startOf(localToday);
+        OffsetDateTime startOfMonth = clock.startOf(localToday.withDayOfMonth(1));
 
         // Transactions
         List<Transaction> transactions = transactionRepository.findAllByTenantIdOrderByCreatedAtDesc(tenantId);
@@ -51,7 +54,7 @@ public class TenantDashboardService {
         Map<LocalDate, BigDecimal> dailyTotals = new LinkedHashMap<>();
         Map<LocalDate, Integer> dailyCounts = new LinkedHashMap<>();
         for (int i = 6; i >= 0; i--) {
-            LocalDate d = now.toLocalDate().minusDays(i);
+            LocalDate d = localToday.minusDays(i);
             dailyTotals.put(d, BigDecimal.ZERO);
             dailyCounts.put(d, 0);
         }
@@ -66,7 +69,7 @@ public class TenantDashboardService {
                     if (!t.getCreatedAt().isBefore(startOfMonth)) {
                         revMonth = revMonth.add(amt);
                     }
-                    LocalDate txDate = t.getCreatedAt().toLocalDate();
+                    LocalDate txDate = clock.dateOf(t.getCreatedAt());
                     if (dailyTotals.containsKey(txDate)) {
                         dailyTotals.put(txDate, dailyTotals.get(txDate).add(amt));
                         dailyCounts.put(txDate, dailyCounts.get(txDate) + 1);
@@ -151,29 +154,33 @@ public class TenantDashboardService {
 
         // ---- Ranged analytics (period filters on the dashboard) ----
         String r = range == null ? "7d" : range;
-        LocalDate today = now.toLocalDate();
-        OffsetDateTime thisMonday = today.with(java.time.DayOfWeek.MONDAY).atStartOfDay().atOffset(ZoneOffset.UTC);
-        OffsetDateTime yearStart = today.withDayOfYear(1).atStartOfDay().atOffset(ZoneOffset.UTC);
+        LocalDate today = localToday;
+        OffsetDateTime thisMonday = clock.startOf(today.with(java.time.DayOfWeek.MONDAY));
+        OffsetDateTime yearStart = clock.startOf(today.withDayOfYear(1));
         record Win(OffsetDateTime s, OffsetDateTime e, boolean monthly) {}
         Win w = switch (r) {
             case "today" -> new Win(startOfDay, now, false);
             case "week" -> new Win(thisMonday, now, false);
             case "lastweek" -> new Win(thisMonday.minusDays(7), thisMonday, false);
             case "month" -> new Win(startOfMonth, now, false);
-            case "lastmonth" -> new Win(startOfMonth.minusMonths(1), startOfMonth, false);
+            case "lastmonth" -> new Win(clock.startOf(localToday.withDayOfMonth(1).minusMonths(1)), startOfMonth, false);
             case "year" -> new Win(yearStart, now, true);
-            case "lastyear" -> new Win(yearStart.minusYears(1), yearStart, true);
-            default -> new Win(startOfDay.minusDays(6), now, false);
+            case "lastyear" -> new Win(clock.startOf(today.withDayOfYear(1).minusYears(1)), yearStart, true);
+            default -> new Win(clock.startOf(localToday.minusDays(6)), now, false);
         };
         if (!List.of("today","7d","week","lastweek","month","lastmonth","year","lastyear").contains(r)) r = "7d";
         final OffsetDateTime rs = w.s(); final OffsetDateTime re = w.e(); final boolean monthly = w.monthly();
         List<LocalDate> buckets = new ArrayList<>();
+        // Window ends are exclusive, so the last bucket is the day of the final
+        // instant inside the window (last week ends Sunday, not next Monday).
+        LocalDate firstDay = clock.dateOf(rs);
+        LocalDate lastDay = clock.dateOf(re.minusNanos(1));
         if (monthly) {
-            LocalDate cursor = rs.toLocalDate().withDayOfMonth(1);
-            while (!cursor.isAfter(re.toLocalDate())) { buckets.add(cursor); cursor = cursor.plusMonths(1); }
+            LocalDate cursor = firstDay.withDayOfMonth(1);
+            while (!cursor.isAfter(lastDay)) { buckets.add(cursor); cursor = cursor.plusMonths(1); }
         } else {
-            LocalDate cursor = rs.toLocalDate();
-            while (!cursor.isAfter(re.toLocalDate())) { buckets.add(cursor); cursor = cursor.plusDays(1); }
+            LocalDate cursor = firstDay;
+            while (!cursor.isAfter(lastDay)) { buckets.add(cursor); cursor = cursor.plusDays(1); }
         }
         Map<LocalDate, BigDecimal> rev = new LinkedHashMap<>();
         Map<LocalDate, Integer> txCount = new LinkedHashMap<>();
@@ -182,7 +189,8 @@ public class TenantDashboardService {
         for (LocalDate d : buckets) { rev.put(d, BigDecimal.ZERO); txCount.put(d, 0); regs.put(d, 0); users.put(d, new HashSet<>()); }
         java.util.function.BiFunction<OffsetDateTime, Map<LocalDate, ?>, LocalDate> bucketKey = (ts, m) -> {
             if (ts == null || ts.isBefore(rs) || !ts.isBefore(re.plusNanos(1))) return null;
-            LocalDate k = monthly ? ts.toLocalDate().withDayOfMonth(1) : ts.toLocalDate();
+            LocalDate d = clock.dateOf(ts);
+            LocalDate k = monthly ? d.withDayOfMonth(1) : d;
             return m.containsKey(k) ? k : null;
         };
         for (Transaction t : transactions) {

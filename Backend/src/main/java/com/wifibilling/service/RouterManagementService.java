@@ -16,7 +16,7 @@ import java.util.*;
 import static com.wifibilling.service.RouterScriptGenerator.q;
 @Service @RequiredArgsConstructor
 public class RouterManagementService {
- private final RouterRepository routers; private final IpBindingRepository bindings; private final RouterTaskRepository tasks; private final PlatformProperties props;
+ private final RouterRepository routers; private final IpBindingRepository bindings; private final RouterTaskRepository tasks; private final PlatformProperties props; private final RouterSetupService setupService;
  private boolean active(IpBinding v){return !Boolean.TRUE.equals(v.getRemoved())&&(v.getExpiresAt()==null||v.getExpiresAt().isAfter(OffsetDateTime.now()));}
  private String hash(Router r){
   String data=bindings.findAllByRouterId(r.getId()).stream().filter(this::active).sorted(Comparator.comparing(IpBinding::getId)).map(v->v.getId()+":"+v.getMac()+":"+v.getAddress()+":"+v.getExpiresAt()+":"+(v.getPackagePlan()==null?"":v.getPackagePlan().getRateLimit())).reduce("",(a,b)->a+"|"+b);
@@ -48,7 +48,9 @@ public class RouterManagementService {
   return "'" + s.replace("'", "'\\''") + "'";
  }
  private String base(Router r){return props.getPublicBaseUrl()+"/api/router/provision/"+r.getToken();}
- @Transactional public String installer(String token){var r=resolve(token);r.setBindingsHash(null);routers.save(r);return RouterScriptGenerator.managementInstaller(props.getPublicBaseUrl(),token);}
+ // Redeems a MANAGEMENT setup code and builds the installer in one transaction,
+ // so a failure leaves the code usable.
+ @Transactional public String installerForSetup(String code){Long id=setupService.redeem(code,com.wifibilling.model.RouterSetupCode.Purpose.MANAGEMENT);var r=routers.findById(id).orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND));r.setBindingsHash(null);routers.save(r);return RouterScriptGenerator.managementInstaller(props.getPublicBaseUrl(),r.getToken());}
  @Transactional public void acknowledgeBindings(String token,String hash){var r=resolve(token);if(hash(r).equals(hash)){r.setBindingsHash(hash);r.setBindingsSyncedAt(OffsetDateTime.now());routers.save(r);}}
  @Transactional public void acknowledgeTask(String token,Long id,boolean success){var r=resolve(token);var t=tasks.findByIdAndRouterId(id,r.getId()).orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND));if("PENDING".equals(t.getStatus())){t.setStatus(success?"APPLIED":"FAILED");t.setAppliedAt(OffsetDateTime.now());tasks.save(t);}}
  @Transactional(readOnly=true) public String script(String token){return script(token,0);}

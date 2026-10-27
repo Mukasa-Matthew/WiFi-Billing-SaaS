@@ -38,10 +38,21 @@ public class VoucherExpirationWorker {
     private final RouterRepository routerRepository;
     private final RadiusDisconnectService disconnectService;
     private final RouterManagementService managementService;
+    private LeaderLockService leaderLockService = new LeaderLockService();
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setLeaderLockService(LeaderLockService leaderLockService) {
+        this.leaderLockService = leaderLockService;
+    }
 
     @Scheduled(fixedDelayString = "PT30S", initialDelayString = "PT10S")
     @Transactional
     public void processVoucherLifecycle() {
+        if (!leaderLockService.executeIfLeader(LeaderLockService.JOB_VOUCHER_EXPIRATION, 120, 15, this::doProcessVoucherLifecycle)) return;
+    }
+
+    @Transactional
+    public void doProcessVoucherLifecycle() {
         stampFirstLogins();
         expireOverdueVouchers();
     }

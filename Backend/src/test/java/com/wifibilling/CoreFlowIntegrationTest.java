@@ -50,10 +50,12 @@ class CoreFlowIntegrationTest {
     @Autowired com.wifibilling.service.VoucherExpirationWorker lifecycle;
     @Autowired com.wifibilling.service.RouterManagementService management;
 
+    @Autowired com.wifibilling.service.SubscriptionService subscriptionService;
+
     private String actor(String suffix) throws Exception {
         String email = suffix + "@example.test";
-        tenantRepository.save(Tenant.builder().name(suffix).email(email).phone("+256700000010")
-                .passwordHash(passwordEncoder.encode("testing-password")).role("ROLE_ADMIN").status("ACTIVE").build());
+        Tenant createdTenant = tenantRepository.save(Tenant.builder().name(suffix).email(email).phone("+256700000010").passwordHash(passwordEncoder.encode("testing-password")).role("ROLE_ADMIN").status("ACTIVE").build());
+        subscriptionService.grantTrialIfEligible(createdTenant);
         return JsonPath.read(mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"email\":\"" + email + "\",\"password\":\"testing-password\"}"))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(), "$.token");
@@ -121,7 +123,10 @@ class CoreFlowIntegrationTest {
     void bindingsRequireAcknowledgementAndTasksAreRouterScoped() throws Exception {
         String jwt=actor("binding-workflow"),other=actor("binding-other");
         String routerBody=request(jwt,"/api/routers","{\"name\":\"Binding Router\"}");
-        Number routerId=JsonPath.read(routerBody,"$.id");String token=JsonPath.read(routerBody,"$.token");
+        Number routerId=JsonPath.read(routerBody,"$.id");
+        String portalBody=mockMvc.perform(get("/api/routers/"+routerId+"/portal-id").header("Authorization","Bearer "+jwt))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String token=JsonPath.read(portalBody,"$.portalId");
         // A second pending router must not collide on an empty tunnel address.
         request(jwt,"/api/routers","{\"name\":\"Second Router\"}");
         Number bindingPlan=plan(jwt);
@@ -215,7 +220,7 @@ class CoreFlowIntegrationTest {
 
     @Test
     void tenantCanCreatePackageProvisionRouterAndGenerateVoucher() throws Exception {
-        tenantRepository.save(Tenant.builder()
+        Tenant flowTenant = tenantRepository.save(Tenant.builder()
                 .name("Flow Test Cafe")
                 .email("flow@example.test")
                 .phone("+256700000001")
@@ -223,6 +228,7 @@ class CoreFlowIntegrationTest {
                 .role("ROLE_ADMIN")
                 .status("ACTIVE")
                 .build());
+        subscriptionService.grantTrialIfEligible(flowTenant);
 
         String loginBody = mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -253,12 +259,20 @@ class CoreFlowIntegrationTest {
                 .andExpect(jsonPath("$.status").value("pending"))
                 .andReturn().getResponse().getContentAsString();
         Number routerId = JsonPath.read(routerBody, "$.id");
-        String routerToken = JsonPath.read(routerBody, "$.token");
 
-        mockMvc.perform(get("/api/router/provision/{token}", routerToken))
+        // Issue one-time secure setup code
+        String setupBody = mockMvc.perform(post("/api/routers/" + routerId + "/setup-code")
+                        .header("Authorization", "Bearer " + jwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"purpose\":\"FULL\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String setupPath = JsonPath.read(setupBody, "$.path");
+
+        mockMvc.perform(get(setupPath))
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("/interface/wireguard add")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString(routerToken)));
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("wifi-billing")));
 
         var router = routerRepository.findById(routerId.longValue()).orElseThrow();
         assertTrue(nasRepository.existsByNasname(router.getWgIp()));

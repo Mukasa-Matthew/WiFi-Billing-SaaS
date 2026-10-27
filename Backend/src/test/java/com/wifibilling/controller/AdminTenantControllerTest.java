@@ -43,6 +43,8 @@ class AdminTenantControllerTest {
     private EmailService emailService;
     @Mock
     private EmailTemplates emailTemplates;
+    @Mock
+    private com.wifibilling.service.SubscriptionService subscriptionService;
 
     private AdminTenantController controller;
 
@@ -56,7 +58,8 @@ class AdminTenantControllerTest {
                 radAcctRepository,
                 passwordEncoder,
                 emailService,
-                emailTemplates
+                emailTemplates,
+                subscriptionService
         );
     }
 

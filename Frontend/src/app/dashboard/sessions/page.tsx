@@ -1,4 +1,5 @@
 "use client";
+import { useResource } from "@/components/BillingUI";
 
 import React, { useCallback, useEffect, useState, useMemo } from "react";
 import api from "@/lib/api";
@@ -32,8 +33,7 @@ interface ActiveSession {
 }
 
 export default function TenantActiveSessionsPage() {
-  const [sessions, setSessions] = useState<ActiveSession[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: sessions, loading, refreshing, load: fetchActiveSessions } = useResource<ActiveSession>("/api/sessions/active", 20000);
   const [search, setSearch] = useState("");
 
   const [msg, setMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
@@ -41,23 +41,6 @@ export default function TenantActiveSessionsPage() {
   // Disconnect Confirmation Modal
   const [disconnectTarget, setDisconnectTarget] = useState<ActiveSession | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
-
-  const fetchActiveSessions = useCallback(async () => {
-    try {
-      const res = await api.get<ActiveSession[]>("/api/sessions/active");
-      setSessions(res.data);
-    } catch (err) {
-      console.error("Failed to load active sessions", err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    const initial = window.setTimeout(fetchActiveSessions, 0);
-    const interval = window.setInterval(fetchActiveSessions, 10000);
-    return () => { window.clearTimeout(initial); window.clearInterval(interval); };
-  }, [fetchActiveSessions]);
 
   const handleDisconnect = async () => {
     if (!disconnectTarget) return;

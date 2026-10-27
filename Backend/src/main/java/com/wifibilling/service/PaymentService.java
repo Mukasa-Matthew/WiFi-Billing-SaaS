@@ -56,6 +56,13 @@ public class PaymentService {
     private final com.wifibilling.service.payment.MarzPayClient marzPay;
     private final WalletService walletService;
     private final com.wifibilling.config.PlatformProperties platformProperties;
+    private final SubscriptionService subscriptionService;
+    private LeaderLockService leaderLockService = new LeaderLockService();
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setLeaderLockService(LeaderLockService leaderLockService) {
+        this.leaderLockService = leaderLockService;
+    }
 
     // Lazy self-injection so internal calls still go through the tx proxy.
     // Defaults to the raw instance so plain unit tests (no proxy) still work.
@@ -89,6 +96,12 @@ public class PaymentService {
 
         Router router = routerRepository.findByToken(req.token())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Router not found"));
+
+        // Enforce SaaS Subscription: block customer payments if tenant subscription is expired or suspended
+        if (subscriptionService != null && !subscriptionService.canTenantAcceptCustomerPayments(router.getTenant().getId())) {
+            throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED,
+                    "Tenant hotspot subscription is inactive or expired. Customer payments are temporarily unavailable.");
+        }
 
         PackagePlan packagePlan = packagePlanRepository.findByIdAndTenantId(req.packageId(), router.getTenant().getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Package not found for router tenant"));
@@ -364,6 +377,10 @@ public class PaymentService {
     @Scheduled(fixedDelayString = "${payment.reconcile.interval-ms:30000}",
                initialDelayString = "${payment.reconcile.initial-delay-ms:60000}")
     public void reconcilePendingCollections() {
+        if (!leaderLockService.executeIfLeader(LeaderLockService.JOB_PAYMENT_RECONCILE, 180, 20, this::doReconcilePendingCollections)) return;
+    }
+
+    public void doReconcilePendingCollections() {
         List<Transaction> pending = transactionRepository
                 .findTop50ByStatusAndCreatedAtBeforeOrderByCreatedAtAsc(
                         STATUS_PENDING, OffsetDateTime.now().minusSeconds(15));

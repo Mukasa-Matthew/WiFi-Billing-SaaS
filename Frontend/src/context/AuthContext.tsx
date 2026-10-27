@@ -1,4 +1,5 @@
 "use client";
+import { resetQueryCache } from "@/lib/queryClient";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -51,6 +52,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   const login = (data: UserSession) => {
+    resetQueryCache();
     localStorage.setItem("wb_token", data.token);
     localStorage.setItem("wb_user", JSON.stringify(data));
     setUser(data);
@@ -73,6 +75,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const logout = () => {
+    resetQueryCache();
     localStorage.removeItem("wb_token");
     localStorage.removeItem("wb_user");
     setUser(null);

@@ -22,13 +22,23 @@ function ConfirmDialog({ req, onClose }: { req: ConfirmRequest; onClose: () => v
   const cancelRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
 
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  const busyRef = useRef(busy);
+  useEffect(() => {
+    busyRef.current = busy;
+  }, [busy]);
+
   useEffect(() => {
     const previousFocus = document.activeElement as HTMLElement | null;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     cancelRef.current?.focus();
     const key = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !busy) onClose();
+      if (e.key === "Escape" && !busyRef.current) onCloseRef.current();
       if (e.key !== "Tab" || !dialogRef.current) return;
       const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>('button:not([disabled]), [tabindex]:not([tabindex="-1"])'));
       if (!focusable.length) return;
@@ -43,7 +53,7 @@ function ConfirmDialog({ req, onClose }: { req: ConfirmRequest; onClose: () => v
       document.body.style.overflow = previousOverflow;
       previousFocus?.focus();
     };
-  }, [busy, onClose]);
+  }, []);
 
   const run = async () => {
     setBusy(true);

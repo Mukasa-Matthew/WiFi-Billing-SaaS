@@ -1,25 +1,21 @@
 package com.wifibilling.controller;
 
+import com.wifibilling.dto.SubscriptionDto;
 import com.wifibilling.model.*;
-import com.wifibilling.repository.SubscriptionPaymentRepository;
-import com.wifibilling.repository.TenantRepository;
-import com.wifibilling.security.TenantPrincipal;
+import com.wifibilling.repository.*;
 import com.wifibilling.service.SubscriptionService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.YearMonth;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
-/**
- * Super-admin subscription management. SaaS fees tenants pay us — completely
- * separate from their customer WiFi revenue and wallets.
- */
 @RestController
 @RequestMapping("/api/admin/subscriptions")
 @PreAuthorize("hasAuthority('ROLE_SUPERADMIN')")
@@ -27,168 +23,190 @@ import java.util.Map;
 public class AdminSubscriptionController {
 
     private final SubscriptionService service;
-    private final TenantRepository tenants;
+    private final SubscriptionPlanRepository plans;
+    private final SubscriptionRepository subscriptions;
+    private final SubscriptionInvoiceRepository invoices;
     private final SubscriptionPaymentRepository payments;
+    private final SubscriptionNotificationRepository notifications;
+    private final TenantRepository tenants;
 
     // ---------- overview ----------
 
     @GetMapping("/overview")
     public Map<String, Object> overview() {
-        LocalDate today = LocalDate.now();
         List<Subscription> all = service.all();
-        all.forEach(s -> service.ensureCurrent(s, today));
-        long active = 0, dueSoon = 0, overdue = 0, suspended = 0, outstanding = 0;
+        all.forEach(service::refreshLifecycle);
+
+        long active = 0, trialing = 0, grace = 0, suspended = 0, expiringSoon = 0;
+        OffsetDateTime now = OffsetDateTime.now();
+        OffsetDateTime soon = now.plusDays(5);
+
         for (Subscription s : all) {
-            String ds = service.displayStatus(s, today);
-            outstanding += service.outstandingFor(s.getId());
-            switch (ds) {
-                case "ACTIVE" -> active++;
-                case "PAYMENT_DUE" -> dueSoon++;
-                case "PAST_DUE" -> overdue++;
-                case "SUSPENDED" -> suspended++;
+            switch (s.getStatus()) {
+                case Subscription.STATUS_ACTIVE -> active++;
+                case Subscription.STATUS_TRIALING -> trialing++;
+                case Subscription.STATUS_GRACE_PERIOD -> grace++;
+                case Subscription.STATUS_SUSPENDED -> suspended++;
                 default -> {}
             }
+            if (s.getExpiresAt() != null && s.getExpiresAt().isAfter(now) && s.getExpiresAt().isBefore(soon)) {
+                expiringSoon++;
+            }
         }
+
         long monthRevenue = payments.sumSince(YearMonth.now().atDay(1).atStartOfDay().atOffset(OffsetDateTime.now().getOffset()));
         return Map.of(
                 "totalTenants", tenants.count(),
                 "subscribed", all.size(),
                 "active", active,
-                "dueSoon", dueSoon,
-                "overdue", overdue,
+                "trialing", trialing,
+                "grace", grace,
                 "suspended", suspended,
+                "expiringSoon", expiringSoon,
                 "monthRevenue", monthRevenue,
-                "outstanding", outstanding,
                 "defaultFee", service.defaultFee()
         );
     }
 
     // ---------- list ----------
 
-    public record SubscriptionRow(Long id, Long tenantId, String businessName, Long monthlyFee,
-                                  LocalDate startDate, LocalDate nextRenewalDate,
-                                  String status, String displayStatus, Long outstanding) {}
+    public record SubscriptionRow(
+            Long id,
+            Long tenantId,
+            String businessName,
+            Long planId,
+            String planName,
+            Long monthlyFee,
+            LocalDate startDate,
+            LocalDate nextRenewalDate,
+            OffsetDateTime expiresAt,
+            OffsetDateTime trialEndsAt,
+            OffsetDateTime graceUntil,
+            String status,
+            String adminNote
+    ) {}
 
     @GetMapping
     public List<SubscriptionRow> list() {
-        LocalDate today = LocalDate.now();
         return service.all().stream().map(s -> {
-            service.ensureCurrent(s, today);
-            return new SubscriptionRow(s.getId(), s.getTenant().getId(), s.getTenant().getName(),
-                    s.getMonthlyFee(), s.getStartDate(), s.getNextRenewalDate(),
-                    s.getStatus(), service.displayStatus(s, today), service.outstandingFor(s.getId()));
+            s = service.refreshLifecycle(s);
+            String planName = s.getPlan() != null ? s.getPlan().getName() : "Custom";
+            Long planId = s.getPlan() != null ? s.getPlan().getId() : null;
+            return new SubscriptionRow(
+                    s.getId(),
+                    s.getTenant().getId(),
+                    s.getTenant().getName(),
+                    planId,
+                    planName,
+                    s.getMonthlyFee(),
+                    s.getStartDate(),
+                    s.getNextRenewalDate(),
+                    s.getExpiresAt(),
+                    s.getTrialEndsAt(),
+                    s.getGraceUntil(),
+                    s.getStatus(),
+                    s.getAdminNote()
+            );
         }).toList();
     }
 
-    /** Tenants with no subscription yet — for the "create" picker. */
-    @GetMapping("/unsubscribed-tenants")
-    public List<Map<String, Object>> unsubscribed() {
-        var existing = service.all().stream().map(s -> s.getTenant().getId()).toList();
-        return tenants.findAll().stream()
-                .filter(t -> !existing.contains(t.getId()))
-                .filter(t -> !"ROLE_SUPERADMIN".equals(t.getRole()))
-                .map(t -> Map.<String, Object>of("id", t.getId(), "name", t.getName()))
+    // ---------- plan management ----------
+
+    @GetMapping("/plans")
+    public List<SubscriptionDto.PlanResponse> listPlans() {
+        return plans.findAllByOrderByDisplayOrderAscPriceAsc().stream()
+                .map(p -> new SubscriptionDto.PlanResponse(
+                        p.getId(), p.getName(), p.getPrice(), p.getDurationUnit(),
+                        p.getDurationValue(), p.getDescription(), p.getActive(), p.getDisplayOrder()))
                 .toList();
     }
 
-    // ---------- mutations ----------
-
-    public record CreateRequest(Long tenantId, Long monthlyFee, LocalDate startDate) {}
-
-    @PostMapping
-    public Map<String, Object> create(@RequestBody CreateRequest req) {
-        if (req == null || req.tenantId() == null) {
-            throw new org.springframework.web.server.ResponseStatusException(
-                    org.springframework.http.HttpStatus.BAD_REQUEST, "tenantId is required");
-        }
-        var sub = service.createOrUpdate(req.tenantId(), req.monthlyFee(), req.startDate());
-        return Map.of("id", sub.getId(), "status", sub.getStatus());
+    @PostMapping("/plans")
+    @ResponseStatus(HttpStatus.CREATED)
+    public SubscriptionDto.PlanResponse createPlan(@Valid @RequestBody SubscriptionDto.CreatePlanRequest req) {
+        SubscriptionPlan plan = SubscriptionPlan.builder()
+                .name(req.name().trim())
+                .price(req.price())
+                .durationUnit(req.durationUnit() != null ? req.durationUnit() : "MONTHS")
+                .durationValue(req.durationValue() != null ? req.durationValue() : 1)
+                .description(req.description())
+                .active(req.active() != null ? req.active() : true)
+                .displayOrder(req.displayOrder() != null ? req.displayOrder() : 0)
+                .build();
+        plan = plans.save(plan);
+        return new SubscriptionDto.PlanResponse(
+                plan.getId(), plan.getName(), plan.getPrice(), plan.getDurationUnit(),
+                plan.getDurationValue(), plan.getDescription(), plan.getActive(), plan.getDisplayOrder());
     }
 
-    public record FeeRequest(Long monthlyFee) {}
-
-    @PutMapping("/{id}/fee")
-    public Map<String, Object> updateFee(@PathVariable Long id, @RequestBody FeeRequest req) {
-        if (req == null || req.monthlyFee() == null) {
-            throw new org.springframework.web.server.ResponseStatusException(
-                    org.springframework.http.HttpStatus.BAD_REQUEST, "monthlyFee is required");
-        }
-        var sub = service.updateFee(id, req.monthlyFee());
-        return Map.of("id", sub.getId(), "monthlyFee", sub.getMonthlyFee());
+    @PutMapping("/plans/{id}")
+    public SubscriptionDto.PlanResponse updatePlan(@PathVariable Long id, @Valid @RequestBody SubscriptionDto.CreatePlanRequest req) {
+        SubscriptionPlan plan = plans.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Plan not found"));
+        plan.setName(req.name().trim());
+        plan.setPrice(req.price());
+        if (req.durationUnit() != null) plan.setDurationUnit(req.durationUnit());
+        if (req.durationValue() != null) plan.setDurationValue(req.durationValue());
+        plan.setDescription(req.description());
+        if (req.active() != null) plan.setActive(req.active());
+        if (req.displayOrder() != null) plan.setDisplayOrder(req.displayOrder());
+        plan = plans.save(plan);
+        return new SubscriptionDto.PlanResponse(
+                plan.getId(), plan.getName(), plan.getPrice(), plan.getDurationUnit(),
+                plan.getDurationValue(), plan.getDescription(), plan.getActive(), plan.getDisplayOrder());
     }
 
-    @PostMapping("/{id}/suspend")
-    public Map<String, String> suspend(@PathVariable Long id) {
-        return Map.of("status", service.suspend(id).getStatus());
+    @PostMapping("/{id}/assign-plan")
+    public SubscriptionRow assignPlan(@PathVariable Long id, @Valid @RequestBody SubscriptionDto.AssignPlanRequest req) {
+        Subscription s = service.assignPlan(id, req.planId());
+        String planName = s.getPlan() != null ? s.getPlan().getName() : "Custom";
+        return new SubscriptionRow(
+                s.getId(), s.getTenant().getId(), s.getTenant().getName(), s.getPlan() != null ? s.getPlan().getId() : null,
+                planName, s.getMonthlyFee(), s.getStartDate(), s.getNextRenewalDate(),
+                s.getExpiresAt(), s.getTrialEndsAt(), s.getGraceUntil(), s.getStatus(), s.getAdminNote()
+        );
     }
 
-    @PostMapping("/{id}/reactivate")
-    public Map<String, String> reactivate(@PathVariable Long id) {
-        return Map.of("status", service.reactivate(id).getStatus());
+    // ---------- manual extension / override ----------
+
+    @PostMapping("/{id}/extend")
+    public Map<String, Object> manualExtension(
+            @PathVariable Long id,
+            @Valid @RequestBody SubscriptionDto.ManualExtensionRequest req) {
+        Subscription sub = service.grantManualExtension(id, req.extensionDays(), req.reason(), Boolean.TRUE.equals(req.complimentary()));
+        return Map.of(
+                "status", sub.getStatus(),
+                "expiresAt", sub.getExpiresAt().toString(),
+                "adminNote", sub.getAdminNote() != null ? sub.getAdminNote() : ""
+        );
     }
 
-    @PostMapping("/{id}/cancel")
-    public Map<String, String> cancel(@PathVariable Long id) {
-        return Map.of("status", service.cancel(id).getStatus());
-    }
+    // ---------- billing details ----------
 
-    public record PaymentRequest(Long invoiceId, Long amount, String method,
-                                 String externalRef, String recordRef, String note,
-                                 String settlementChannel) {}
-
-    @PostMapping("/{id}/payments")
-    public Map<String, Object> recordPayment(@PathVariable Long id,
-                                             @RequestBody PaymentRequest req,
-                                             @AuthenticationPrincipal TenantPrincipal principal) {
-        if (req == null || req.amount() == null) {
-            throw new org.springframework.web.server.ResponseStatusException(
-                    org.springframework.http.HttpStatus.BAD_REQUEST, "amount is required");
-        }
-        var p = service.recordPayment(id, req.invoiceId(), req.amount(), req.method(),
-                req.externalRef(), req.recordRef(), principal.getTenantId(), req.note(),
-                req.settlementChannel());
-        return Map.of("id", p.getId(), "invoiceId", p.getInvoice().getId());
-    }
-
-    // ---------- billing detail ----------
-
-    public record InvoiceRow(Long id, LocalDate periodStart, LocalDate periodEnd,
-                             Long amountDue, String status, String paidAt) {}
-    public record PaymentRow(Long id, Long amount, String method, String externalRef,
-                             String paidAt, String note) {}
-    public record BillingDetail(SubscriptionRow subscription, List<InvoiceRow> invoices,
-                                List<PaymentRow> payments) {}
+    public record InvoiceRow(Long id, LocalDate periodStart, LocalDate periodEnd, Long amountDue, String status, String paidAt) {}
+    public record PaymentRow(Long id, Long amount, String method, String externalRef, String paidAt, String note) {}
+    public record NotificationRow(Long id, String notificationType, String title, String message, String severity, Boolean emailSent, OffsetDateTime createdAt) {}
+    public record BillingDetail(SubscriptionRow subscription, List<InvoiceRow> invoices, List<PaymentRow> payments, List<NotificationRow> notifications) {}
 
     @GetMapping("/{id}/billing")
     public BillingDetail billing(@PathVariable Long id) {
-        LocalDate today = LocalDate.now();
         Subscription s = service.get(id);
-        service.ensureCurrent(s, today);
-        var row = new SubscriptionRow(s.getId(), s.getTenant().getId(), s.getTenant().getName(),
-                s.getMonthlyFee(), s.getStartDate(), s.getNextRenewalDate(),
-                s.getStatus(), service.displayStatus(s, today), service.outstandingFor(s.getId()));
-        var inv = service.billingHistory(id).stream()
-                .map(i -> new InvoiceRow(i.getId(), i.getPeriodStart(), i.getPeriodEnd(),
-                        i.getAmountDue(), i.getStatus(),
-                        i.getPaidAt() != null ? i.getPaidAt().toString() : null))
+        s = service.refreshLifecycle(s);
+        String planName = s.getPlan() != null ? s.getPlan().getName() : "Custom";
+        var row = new SubscriptionRow(
+                s.getId(), s.getTenant().getId(), s.getTenant().getName(), s.getPlan() != null ? s.getPlan().getId() : null,
+                planName, s.getMonthlyFee(), s.getStartDate(), s.getNextRenewalDate(),
+                s.getExpiresAt(), s.getTrialEndsAt(), s.getGraceUntil(), s.getStatus(), s.getAdminNote()
+        );
+        var inv = invoices.findAllBySubscriptionIdOrderByPeriodStartDesc(id).stream()
+                .map(i -> new InvoiceRow(i.getId(), i.getPeriodStart(), i.getPeriodEnd(), i.getAmountDue(), i.getStatus(), i.getPaidAt() != null ? i.getPaidAt().toString() : null))
                 .toList();
-        var pay = service.paymentHistory(id).stream()
-                .map(p -> new PaymentRow(p.getId(), p.getAmount(), p.getMethod(), p.getExternalRef(),
-                        p.getPaidAt().toString(), p.getNote()))
+        var pay = payments.findAllBySubscriptionIdOrderByPaidAtDesc(id).stream()
+                .map(p -> new PaymentRow(p.getId(), p.getAmount(), p.getMethod(), p.getExternalRef(), p.getPaidAt().toString(), p.getNote()))
                 .toList();
-        return new BillingDetail(row, inv, pay);
-    }
-
-    // ---------- default fee ----------
-
-    public record DefaultFeeRequest(Long fee) {}
-
-    @PutMapping("/default-fee")
-    public Map<String, Long> setDefaultFee(@RequestBody DefaultFeeRequest req) {
-        if (req == null || req.fee() == null) {
-            throw new org.springframework.web.server.ResponseStatusException(
-                    org.springframework.http.HttpStatus.BAD_REQUEST, "fee is required");
-        }
-        return Map.of("defaultFee", service.setDefaultFee(req.fee()));
+        var notifs = notifications.findAllBySubscriptionIdOrderByCreatedAtDesc(id).stream()
+                .map(n -> new NotificationRow(n.getId(), n.getNotificationType(), n.getTitle(), n.getMessage(), n.getSeverity(), n.getEmailSent(), n.getCreatedAt()))
+                .toList();
+        return new BillingDetail(row, inv, pay, notifs);
     }
 }

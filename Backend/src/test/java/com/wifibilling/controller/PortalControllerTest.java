@@ -39,13 +39,16 @@ class PortalControllerTest {
     private com.wifibilling.repository.TransactionRepository transactionRepository;
 
     @Mock
+    private com.wifibilling.repository.VoucherRepository voucherRepository;
+
+    @Mock
     private com.wifibilling.repository.PortalFeedbackRepository feedbackRepository;
 
     private PortalController controller;
 
     @BeforeEach
     void setUp() {
-        controller = new PortalController(routerRepository, packagePlanRepository, transactionRepository, feedbackRepository, platformProperties);
+        controller = new PortalController(routerRepository, packagePlanRepository, transactionRepository, voucherRepository, feedbackRepository, platformProperties);
     }
 
     @Test

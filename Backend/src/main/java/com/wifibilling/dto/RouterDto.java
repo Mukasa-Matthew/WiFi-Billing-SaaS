@@ -15,12 +15,17 @@ public class RouterDto {
             @Pattern(regexp = "[\\x20-\\x7E]{1,32}") String wifiSsid) {
     }
 
+    /**
+     * Router as shown in lists and detail views. Deliberately carries no
+     * credentials: the provisioning token, RADIUS secret and WireGuard key
+     * material never leave the server through this record. {@code registered}
+     * only says whether the router has registered its WireGuard key.
+     */
     public record Response(
             Long id,
             String name,
-            String token,
             String wgIp,
-            String wgPublicKey,
+            boolean registered,
             String wanInterface,
             List<String> hotspotInterfaces,
             String wifiSsid,
@@ -34,5 +39,24 @@ public class RouterDto {
             Boolean portalReady,
             OffsetDateTime lastSeen,
             OffsetDateTime createdAt) {
+    }
+
+    /** Which setup a code is for: the full provisioning script or only the management agent. */
+    public record SetupCodeRequest(String purpose) {
+    }
+
+    /**
+     * A freshly issued one-time setup code. The plaintext exists only in this
+     * response; the server keeps a hash. {@code path} is relative to the API origin.
+     */
+    public record SetupCode(Long routerId, String purpose, String path, OffsetDateTime expiresAt) {
+    }
+
+    /**
+     * The router's public portal identifier, for the owner's portal preview.
+     * It is embedded in customer-facing portal pages and authorizes no setup or
+     * credential access.
+     */
+    public record PortalId(Long routerId, String portalId) {
     }
 }
