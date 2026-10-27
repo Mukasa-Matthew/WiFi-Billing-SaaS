@@ -47,6 +47,7 @@ public class SubscriptionServiceTest {
                 notifications, periodHistoryRepository, tenants, settings, marzPay,
                 gatewayConfig, emailService, emailTemplates
         );
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "subscriptionEnforcementEnabled", true);
 
         tenant = Tenant.builder()
                 .id(2L)
@@ -280,5 +281,16 @@ public class SubscriptionServiceTest {
         assertTrue(confirmed, "Duplicate webhook should acknowledge 200 without reprocessing");
         verify(subs, never()).save(any());
         verify(periodHistoryRepository, never()).save(any());
+    }
+
+    @Test
+    void whenEnforcementDisabled_existingTenantsCanManageAndAcceptPaymentsEvenAfterExpiry() {
+        // When enforcement is disabled (default production state)
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "subscriptionEnforcementEnabled", false);
+
+        // Then tenant can still manage operations and accept payments regardless of expiration
+        assertTrue(service.canTenantAcceptCustomerPayments(2L), "Tenant MUST be allowed to accept payments when enforcement is disabled");
+        assertTrue(service.isTenantManagementAllowed(2L), "Tenant MUST be allowed to manage routers/vouchers when enforcement is disabled");
+        assertDoesNotThrow(() -> service.assertTenantManagementAllowed(2L));
     }
 }

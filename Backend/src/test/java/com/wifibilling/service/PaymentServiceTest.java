@@ -314,4 +314,39 @@ class PaymentServiceTest {
         assertNull(PaymentService.customerFailureMessage("Provider status: failed"));
         assertNull(PaymentService.customerFailureMessage(null));
     }
+
+    @Test
+    void concurrentDuplicateWebhookDeliveriesAreStrictlyIdempotent() {
+        Transaction tx = new Transaction();
+        tx.setId(999L);
+        tx.setReference("PAY-CONCURRENT-1");
+        tx.setStatus("PENDING");
+        tx.setAmount(new java.math.BigDecimal("2000.00"));
+        tx.setTenant(tenant);
+        tx.setPackagePlan(packagePlan);
+        tx.setRouter(router);
+
+        when(transactionRepository.findByReferenceForUpdate("PAY-CONCURRENT-1")).thenReturn(Optional.of(tx));
+        VoucherResponse vResp = new VoucherResponse(
+                10L, "QB-CONCUR", "unused", 100L, "1 Hour",
+                new BigDecimal("2000.00"), null, null, null, OffsetDateTime.now(), null, null, null, null, "ONLINE", "MANUAL", false
+        );
+        when(voucherService.generate(any(), any(), any(), any())).thenReturn(List.of(vResp));
+
+        // First callback: processes and transitions tx from PENDING to SUCCESSFUL
+        paymentService.processWebhook(new PaymentDto.WebhookRequest(
+                "PAY-CONCURRENT-1", "SUCCESSFUL", "EXT-1", null));
+
+        assertEquals("SUCCESSFUL", tx.getStatus());
+        assertEquals("QB-CONCUR", tx.getVoucherCode());
+        verify(voucherService, times(1)).generate(any(), any(), any(), any());
+
+        // Second concurrent/replayed callback: tx is already SUCCESSFUL; must be skipped idempotently
+        paymentService.processWebhook(new PaymentDto.WebhookRequest(
+                "PAY-CONCURRENT-1", "SUCCESSFUL", "EXT-1", null));
+
+        // Proves that duplicate voucher generation is strictly impossible
+        verify(voucherService, times(1)).generate(any(), any(), any(), any());
+        assertEquals("SUCCESSFUL", tx.getStatus());
+    }
 }

@@ -66,33 +66,15 @@ public class LeaderLockService {
             this.instanceId = "node-" + UUID.randomUUID().toString().substring(0, 8);
         }
 
-        if (jdbcTemplate != null && !isH2()) {
-            initLeaseSchema();
-        }
+        // Strict DDL Governance: Normal application startup never executes DDL migrations.
+        // The schema is managed strictly via controlled SQL migrations (e.g. V20261026_01__app_job_leases.sql).
     }
 
     public String getInstanceId() {
         return instanceId;
     }
 
-    private void initLeaseSchema() {
-        try {
-            jdbcTemplate.execute("""
-                CREATE TABLE IF NOT EXISTS app_job_leases (
-                    job_name VARCHAR(64) PRIMARY KEY,
-                    owner_id VARCHAR(128) NOT NULL,
-                    fence_token BIGINT NOT NULL DEFAULT 1,
-                    lease_acquired_at TIMESTAMPTZ NOT NULL,
-                    lease_expires_at TIMESTAMPTZ NOT NULL,
-                    last_cycle_start TIMESTAMPTZ NOT NULL,
-                    last_completed_at TIMESTAMPTZ
-                );
-            """);
-            log.info("Initialized app_job_leases coordination table (node: {})", instanceId);
-        } catch (Exception e) {
-            log.warn("Could not verify app_job_leases schema (may already exist or read-only): {}", e.getMessage());
-        }
-    }
+
 
     /**
      * Executes the task only if this instance acquires or holds a valid lease, and ensures
