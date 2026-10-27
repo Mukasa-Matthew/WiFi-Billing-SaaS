@@ -1,4 +1,5 @@
 "use client";
+import { mutateCache } from "@/lib/cacheInvalidation";
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import api from "@/lib/api";
@@ -31,7 +32,8 @@ export default function PackagesPage() {
   const remove = async (plan: Plan) => {
     if (!window.confirm(`Delete "${plan.name}"? It disappears from the portal immediately.`)) return;
     setSaving(plan.id);
-    try { await api.delete(`/api/packages/${plan.id}`); await load(); }
+    try { await api.delete(`/api/packages/${plan.id}`);
+      mutateCache.packageChanged(); await load(); }
     catch { setError("Could not delete this package. Vouchers may still reference it."); }
     finally { setSaving(null); }
   };

@@ -92,6 +92,10 @@ public class WithdrawalService {
         w = withdrawals.save(w);
 
         walletService.reserveForWithdrawal(tenantId, w.getTotalDeduction(), "RES:" + payoutRef, w.getId());
+        if (!requireApproval && livePayoutsEnabled) {
+            dispatchPayout(w);
+            w = withdrawals.save(w);
+        }
         return w;
     }
 

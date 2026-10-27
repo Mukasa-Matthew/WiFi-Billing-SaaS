@@ -39,6 +39,12 @@ public class PlatformEarningsService {
     private final MarzPayClient marzPay;
     private final GatewayConfigService gatewayConfig;
     private final PlatformProperties props;
+    private LeaderLockService leaderLockService = new LeaderLockService();
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setLeaderLockService(LeaderLockService leaderLockService) {
+        this.leaderLockService = leaderLockService;
+    }
 
     @Value("${platform.payouts.enabled:false}")
     private boolean payoutsEnabled;
@@ -144,6 +150,11 @@ public class PlatformEarningsService {
     @Scheduled(fixedDelayString = "${platform.reconcile.interval-ms:300000}") // every 5 min
     @Transactional
     public void scheduledReconcile() {
+        if (!leaderLockService.executeIfLeader(LeaderLockService.JOB_PLATFORM_EARNINGS, 300, 30, this::doScheduledReconcile)) return;
+    }
+
+    @Transactional
+    public void doScheduledReconcile() {
         if (!gatewayConfig.platformConfigured()) return;
         try { reconcile(); } catch (Exception e) {
             log.warn("Scheduled reconciliation failed: {}", e.getMessage());

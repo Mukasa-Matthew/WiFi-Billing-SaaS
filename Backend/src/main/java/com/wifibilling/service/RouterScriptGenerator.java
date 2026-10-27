@@ -65,7 +65,9 @@ public class RouterScriptGenerator {
             String publicBaseUrl,
             Set<String> walledGardenIps,
             Set<String> walledGardenHosts,
-            String tetheringMode
+            String tetheringMode,
+            /** One-time setup code; authorizes only this setup's register/complete callbacks. */
+            String setupCode
     ) {}
 
     /**
@@ -91,7 +93,8 @@ public class RouterScriptGenerator {
     public String generate(ScriptContext c) {
         String iface = q(IFACE_NAME);
         String tag = q(TAG);
-        String registerUrl = c.publicBaseUrl() + "/api/router/provision/" + c.token() + "/register";
+        // Setup callbacks use the one-time setup code, never the public router id.
+        String registerUrl = c.publicBaseUrl() + "/api/router/setup/" + c.setupCode() + "/register";
         String telemetryUrl = c.publicBaseUrl() + "/api/router/telemetry";
 
         StringBuilder s = new StringBuilder(8192);
@@ -409,7 +412,7 @@ public class RouterScriptGenerator {
         s.append(":log info \"wifi-billing: provisioning complete\"\n");
         // Signal the backend that the full script ran end-to-end — the dashboard
         // can then show "provisioned" instead of guessing from telemetry.
-        s.append(tlsFetch(c.publicBaseUrl() + "/api/router/provision/" + c.token() + "/complete",
+        s.append(tlsFetch(c.publicBaseUrl() + "/api/router/setup/" + c.setupCode() + "/complete",
                 " http-method=post output=none", "")).append('\n');
         return s.toString();
     }

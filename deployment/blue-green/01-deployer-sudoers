@@ -1,0 +1,38 @@
+# ==============================================================================
+# Strict Sudoers configuration for deployment automation
+# Install to: /etc/sudoers.d/01-deployer (mode 0440 root:root)
+# Least-privilege: No arbitrary paths or wildcard execution permitted
+# ==============================================================================
+deployer ALL=(ALL) NOPASSWD: \
+    /usr/local/bin/deploy-service-control start backend-blue, \
+    /usr/local/bin/deploy-service-control stop backend-blue, \
+    /usr/local/bin/deploy-service-control restart backend-blue, \
+    /usr/local/bin/deploy-service-control status backend-blue, \
+    /usr/local/bin/deploy-service-control start backend-green, \
+    /usr/local/bin/deploy-service-control stop backend-green, \
+    /usr/local/bin/deploy-service-control restart backend-green, \
+    /usr/local/bin/deploy-service-control status backend-green, \
+    /usr/local/bin/deploy-service-control start frontend-blue, \
+    /usr/local/bin/deploy-service-control stop frontend-blue, \
+    /usr/local/bin/deploy-service-control restart frontend-blue, \
+    /usr/local/bin/deploy-service-control status frontend-blue, \
+    /usr/local/bin/deploy-service-control start frontend-green, \
+    /usr/local/bin/deploy-service-control stop frontend-green, \
+    /usr/local/bin/deploy-service-control restart frontend-green, \
+    /usr/local/bin/deploy-service-control status frontend-green, \
+    /usr/local/bin/deploy-service-control start worker, \
+    /usr/local/bin/deploy-service-control stop worker, \
+    /usr/local/bin/deploy-service-control restart worker, \
+    /usr/local/bin/deploy-service-control status worker, \
+    /usr/local/bin/deploy-service-control start legacy-backend, \
+    /usr/local/bin/deploy-service-control stop legacy-backend, \
+    /usr/local/bin/deploy-service-control restart legacy-backend, \
+    /usr/local/bin/deploy-service-control status legacy-backend, \
+    /usr/local/bin/deploy-service-control start legacy-frontend, \
+    /usr/local/bin/deploy-service-control stop legacy-frontend, \
+    /usr/local/bin/deploy-service-control restart legacy-frontend, \
+    /usr/local/bin/deploy-service-control status legacy-frontend, \
+    /usr/local/bin/deploy-nginx-control switch-slot blue, \
+    /usr/local/bin/deploy-nginx-control switch-slot green, \
+    /usr/local/bin/deploy-nginx-control test, \
+    /usr/local/bin/deploy-nginx-control reload

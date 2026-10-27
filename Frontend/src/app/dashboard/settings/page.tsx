@@ -225,8 +225,10 @@ export default function TenantSettingsPage() {
      HTML customers get on the hotspot. Needs one router for its token. */
   const [routerToken, setRouterToken] = useState<string | null>(null);
   useEffect(() => {
-    api.get<{ token: string }[]>("/api/routers")
-      .then((r) => setRouterToken(r.data[0]?.token ?? null))
+    // The portal preview needs the router's public portal id (it authorizes nothing sensitive).
+    api.get<{ id: number }[]>("/api/routers")
+      .then((r) => r.data[0] ? api.get<{ portalId: string }>(`/api/routers/${r.data[0].id}/portal-id`) : null)
+      .then((p) => setRouterToken(p?.data.portalId ?? null))
       .catch(() => setRouterToken(null));
   }, []);
 

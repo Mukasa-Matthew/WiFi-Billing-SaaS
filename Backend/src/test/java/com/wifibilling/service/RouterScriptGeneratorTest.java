@@ -11,6 +11,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class RouterScriptGeneratorTest {
 
     private final RouterScriptGenerator generator = new RouterScriptGenerator();
+    private static final String SETUP = "su_TESTsetupCodeMarker0000000000000";
+
+    @Test
+    void setupCallbacksUseTheOneTimeCodeNotThePublicRouterId() {
+        String s = render("s3cret");
+        assertTrue(s.contains("/api/router/setup/" + SETUP + "/register"), "register callback uses the setup code");
+        assertTrue(s.contains("/api/router/setup/" + SETUP + "/complete"), "complete callback uses the setup code");
+        assertFalse(s.contains("/api/router/provision/tok_ABC123xyz/register"), "public id must not authorize key registration");
+        assertFalse(s.contains("/api/router/provision/tok_ABC123xyz/complete"));
+        assertFalse(s.contains("/api/router/provision/tok_ABC123xyz\""), "no link back to the retired script route");
+    }
 
     private String render(String secret) {
         return generator.generate(new RouterScriptGenerator.ScriptContext(
@@ -18,7 +29,7 @@ class RouterScriptGeneratorTest {
                 "tok_ABC123xyz", "10.9.0.5", 16,
                 secret, "10.9.0.1",
                 "yoay+E/LyCqRq0xxqsIRJdRoqe8XjRVmkMe3nDx5wEc=", "203.0.113.10", 443, "10.9.0.0/16",
-                "http://203.0.113.10:8080", Set.of("203.0.113.10"), Set.of("momo.mtn.com"), "BLOCK"));
+                "http://203.0.113.10:8080", Set.of("203.0.113.10"), Set.of("momo.mtn.com"), "BLOCK", SETUP));
     }
 
     @Test
@@ -42,7 +53,7 @@ class RouterScriptGeneratorTest {
         assertTrue(s.contains("/ip/hotspot/walled-garden/ip add action=accept dst-address=203.0.113.10"));
         assertTrue(s.contains("/ip/hotspot/walled-garden add action=allow dst-host=\"momo.mtn.com\""));
         assertTrue(s.contains("/system/scheduler add name=\"wb-telemetry\""));
-        assertTrue(s.contains("http://203.0.113.10:8080/api/router/provision/tok_ABC123xyz/register"));
+        assertTrue(s.contains("http://203.0.113.10:8080/api/router/setup/" + SETUP + "/register"));
         assertTrue(s.contains(":local wbPub [/interface/wireguard get [find name=\"wg-billing\"] public-key]"));
         assertTrue(s.contains("http-data=(\"{\\\"publicKey\\\":\\\"\" . $wbPub . \"\\\"}\")"));
         // tethering BLOCK mode emits drop rules
@@ -68,7 +79,7 @@ class RouterScriptGeneratorTest {
                 "evil\n/system reset-configuration", "ether1", List.of("ether2"), "Cafe WiFi",
                 "tok_ABC123xyz", "10.9.0.5", 16,
                 "x", "10.9.0.1", "yoay+E/LyCqRq0xxqsIRJdRoqe8XjRVmkMe3nDx5wEc=", "203.0.113.10", 443,
-                "10.9.0.0/16", "http://203.0.113.10:8080", Set.of(), Set.of(), "OFF"));
+                "10.9.0.0/16", "http://203.0.113.10:8080", Set.of(), Set.of(), "OFF", SETUP));
         assertFalse(s.contains("\n/system reset-configuration"));
     }
 

@@ -7,7 +7,8 @@ import tools.jackson.databind.JsonNode;import tools.jackson.databind.ObjectMappe
 public class RouterManagementController {
  private final RouterManagementService service;private final RouterRepository routers;private final RouterTaskRepository tasks;private final ObjectMapper mapper;
  @GetMapping(value="/api/router/provision/{token}/management.rsc",produces="text/plain") public ResponseEntity<String> script(@PathVariable String token,@RequestParam(defaultValue="0") int wait){return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(service.script(token,wait));}
- @GetMapping(value="/api/router/provision/{token}/install-management.rsc",produces="text/plain") public String install(@PathVariable String token){service.resolve(token);return service.installer(token);}
+ // Retired: the installer now needs a one-time MANAGEMENT setup code (RouterSetupController).
+ @GetMapping(value="/api/router/provision/{token}/install-management.rsc") public ResponseEntity<String> install(@PathVariable String token){return ProvisioningController.gone();}
  @PostMapping("/api/router/provision/{token}/bindings-ack") public void ackBindings(@PathVariable String token,@RequestParam String hash){service.acknowledgeBindings(token,hash);}
  @PostMapping("/api/router/provision/{token}/tasks/{id}/ack") public void ackTask(@PathVariable String token,@PathVariable Long id,@RequestParam boolean success){service.acknowledgeTask(token,id,success);}
  @PostMapping("/api/router/provision/{token}/hosts") @Transactional public void hosts(@PathVariable String token,@RequestBody JsonNode body){

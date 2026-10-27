@@ -1,61 +1,59 @@
-# ==============================================================================
-# WiFi-Billing-SaaS Root .gitignore
-# ==============================================================================
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
 
-# Secrets & Environment Configurations (NEVER COMMIT CREDENTIALS)
-.env
-.env.*
-*.env
-*.env.*
-!.env.example
-!*.env.example
-*.pem
-*.key
-*.p12
-*.jks
-*db.env*
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-models
 
-# Local PostgreSQL Development Data Directory
-.pgdata/
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
 
-# Backend (Java / Spring Boot / Maven)
-Backend/target/
-backend/target/
-Backend/.mvn/wrapper/maven-wrapper.jar
-backend/.mvn/wrapper/maven-wrapper.jar
-*.class
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradler/
+
+### VS Code ###
+.vscode/
+
+### Next.js & Node ###
+node_modules/
+.next/
+out/
+build/
+dist/
 *.log
-*.jar
-*.war
-hs_err_pid*
-replay_pid*
-
-# Frontend (Next.js / React)
-Frontend/.next/
-frontend/.next/
-Frontend/out/
-frontend/out/
-Frontend/node_modules/
-frontend/node_modules/
-Frontend/.turbo/
-frontend/.turbo/
-*.local
 npm-debug.log*
 yarn-debug.log*
-pnpm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
 
-# Server-side artifacts (deploy backups, stale copies, npm strays)
-backups/
-Frontend/src.old-deploy/
-Frontend/next
-Frontend/frontend-app@*
+### Local Environment & Secrets ###
+.env
+.env*.local
+*.pem
+*.key
 
-# IDEs & System
-.idea/
-*.iml
-.vscode/
-.settings/
-.classpath
-.project
+### OS Files ###
 .DS_Store
 Thumbs.db
+
+### Deployment Run / Rehearsal Scratch ###
+deployment/rehearsal-run/
+deployment/final-rehearsal-run/
+*.tar.gz
+*.sha256
+deploy-release-*.sh
+rollback-*.sh

@@ -113,6 +113,7 @@ public class NocService {
         Map<Long, Long> incidentsByRouter = incidents.findAllByResolvedAtIsNullOrderByOpenedAtDesc().stream()
                 .collect(Collectors.groupingBy(i -> i.getRouter().getId(), Collectors.counting()));
         return routers.findAll().stream()
+                .filter(r -> !"DELETED".equalsIgnoreCase(r.getStatus()))
                 .map(r -> toRow(r, openByNas.getOrDefault(nasIp(r), 0L),
                         incidentsByRouter.getOrDefault(r.getId(), 0L)))
                 .sorted(Comparator.comparing(NocDto.RouterRow::tenantName, String.CASE_INSENSITIVE_ORDER)
