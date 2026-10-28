@@ -98,4 +98,7 @@ export {
   ChevronRight as CaretRight,
   Landmark as Bank,
   MessageCircleMore as WhatsappLogo,
+  Info,
+  Funnel,
+  Columns3 as Columns,
 } from "lucide-react";

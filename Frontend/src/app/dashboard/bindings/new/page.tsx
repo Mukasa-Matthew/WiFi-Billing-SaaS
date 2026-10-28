@@ -1,4 +1,6 @@
 "use client";
+import { useSingleFlight } from "@/components/LoadingUI";
+import { notify } from "@/components/ui/Toast";
 import React,{useState} from "react";
 import {useRouter} from "next/navigation";
 import api from "@/lib/api";
@@ -21,7 +23,8 @@ export default function Page(){
  const [hosts,setHosts]=useState<Host[]>([]);const [seen,setSeen]=useState("");
  const [note,setNote]=useState("");const [saving,setSaving]=useState(false);
  const loadHosts=async(id:string)=>{setHosts([]);setSeen("");if(!id)return;try{const res=await api.get<{hosts:Host[];seenAt:string}>(`/api/routers/${id}/hosts`);setHosts(res.data.hosts);setSeen(res.data.seenAt);}catch(e){setNote(message(e));}};
- const save=async(e:React.FormEvent)=>{e.preventDefault();setSaving(true);try{await api.post("/api/bindings",{routerId:Number(router),name,packageId:plan?Number(plan):null,mac,address:address||null,expiresAt:expires?new Date(expires).toISOString():null,recordPayment:paid,amount:paid?Number(amount):null,method:paid?method:null,reference:reference||null});invalidateDashboardData(undefined,["/api/bindings"]);nav.push("/dashboard/bindings");}catch(e){setNote(message(e));}finally{setSaving(false);}};
+ const singleFlight = useSingleFlight();
+ const save = singleFlight(async (e:React.FormEvent) => {e.preventDefault();setSaving(true);try{await api.post("/api/bindings",{routerId:Number(router),name,packageId:plan?Number(plan):null,mac,address:address||null,expiresAt:expires?new Date(expires).toISOString():null,recordPayment:paid,amount:paid?Number(amount):null,method:paid?method:null,reference:reference||null});invalidateDashboardData(undefined,["/api/bindings"]);notify.success("IP binding created. The router applies it at its next management sync.");nav.push("/dashboard/bindings");}catch(e){setNote(message(e));}finally{setSaving(false);}});
 
  const chosenRouter=routers.data.find(r=>String(r.id)===router);
  const chosenPlan=plans.data.find(p=>String(p.id)===plan);

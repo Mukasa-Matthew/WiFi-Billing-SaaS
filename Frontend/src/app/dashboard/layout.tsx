@@ -35,6 +35,7 @@ interface SidebarStats {
   activeVouchers?: number;
   totalRouters?: number;
   onlineRouters?: number;
+  totalCustomers?: number;
 }
 
 export default function TenantDashboardLayout({ children }: { children: React.ReactNode }) {
@@ -66,7 +67,7 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
   const nav: NavItem[] = [
     { name: "Dashboard", href: "/dashboard", icon: SquaresFour, group: "" },
     { name: "Active users", href: "/dashboard/users", icon: Radio, group: "Customers", badge: { value: stats?.activeUsers || 0, tone: "info", label: "online" } },
-    { name: "Customers", href: "/dashboard/customers", icon: Users, group: "Customers" },
+    { name: "Customers", href: "/dashboard/customers", icon: Users, group: "Customers", badge: { value: stats?.totalCustomers || 0, tone: "neutral", label: "customers" } },
     { name: "Expired users", href: "/dashboard/expired", icon: ClockCounterClockwise, group: "Customers" },
     { name: "IP bindings", href: "/dashboard/bindings", icon: LinkSimple, group: "Customers" },
     { name: "Feedback", href: "/dashboard/feedback", icon: ChatCircleText, group: "Customers" },

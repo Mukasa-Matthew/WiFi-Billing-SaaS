@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { NetworkActivity } from "@/components/LoadingUI";
+import { NavigationProgress } from "@/components/LoadingUI";
 import { AuthProvider } from "@/context/AuthContext";
 import { ThemeProvider, themeBootstrapScript } from "@/context/ThemeContext";
 import { ToastProvider } from "@/components/ui/Toast";
@@ -43,7 +43,7 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeBootstrapScript }} />
       </head>
       <body className="bg-[var(--canvas)] text-[var(--fg)] antialiased min-h-screen" suppressHydrationWarning>
-        <QueryProvider><ThemeProvider><AuthProvider><ToastProvider>{children}<NetworkActivity /></ToastProvider></AuthProvider></ThemeProvider></QueryProvider>
+        <QueryProvider><ThemeProvider><AuthProvider><ToastProvider>{children}<NavigationProgress /></ToastProvider></AuthProvider></ThemeProvider></QueryProvider>
       </body>
     </html>
   );

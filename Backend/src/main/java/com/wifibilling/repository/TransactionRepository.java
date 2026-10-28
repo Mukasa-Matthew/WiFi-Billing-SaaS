@@ -78,6 +78,33 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
 
     boolean existsByRouterId(Long routerId);
 
+    List<Transaction> findAllByTenantIdAndVoucherCodeInAndStatusOrderByCreatedAtDesc(
+            Long tenantId, java.util.Collection<String> voucherCodes, String status);
+
+    /**
+     * Paid vouchers not yet linked to a customer, oldest sale first:
+     * (tenant_id, phone, voucher_code, created_at). Walk-in sales recorded
+     * without a number (phone MANUAL) are skipped.
+     */
+    @org.springframework.data.jpa.repository.Query(value = """
+            SELECT t.tenant_id, t.phone, t.voucher_code, t.created_at
+            FROM transactions t
+            JOIN vouchers v ON v.code = t.voucher_code AND v.tenant_id = t.tenant_id
+            WHERE t.status = 'SUCCESSFUL' AND v.customer_id IS NULL AND t.phone <> 'MANUAL'
+            ORDER BY t.created_at
+            """, nativeQuery = true)
+    List<Object[]> paidVouchersWithoutCustomer();
+
+    /** Successful payment totals per customer of a tenant: (customer_id, sum). */
+    @org.springframework.data.jpa.repository.Query(value = """
+            SELECT v.customer_id, COALESCE(SUM(t.amount), 0)
+            FROM transactions t
+            JOIN vouchers v ON v.code = t.voucher_code AND v.tenant_id = t.tenant_id
+            WHERE t.tenant_id = :tenantId AND t.status = 'SUCCESSFUL' AND v.customer_id IS NOT NULL
+            GROUP BY v.customer_id
+            """, nativeQuery = true)
+    List<Object[]> spendByCustomer(@org.springframework.data.repository.query.Param("tenantId") Long tenantId);
+
     /** Revenue + count bucketed per period ('day' or 'month') for the dashboard charts. */
     @org.springframework.data.jpa.repository.Query(value = """
             SELECT date_trunc(:grain, created_at) AS d, COALESCE(SUM(amount), 0), COUNT(*)

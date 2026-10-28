@@ -1,4 +1,5 @@
 "use client";
+import { BusyLabel, useSingleFlight } from "@/components/LoadingUI";
 
 import Link from "next/link";
 import React, { useMemo, useState } from "react";
@@ -101,7 +102,8 @@ function CreateOperatorDialog({ onClose, onCreated }: { onClose: () => void; onC
   const [error, setError] = useState<string | null>(null);
   const close = () => { if (!busy) onClose(); };
 
-  const submit = async (e: React.FormEvent) => {
+  const singleFlight = useSingleFlight();
+  const submit = singleFlight(async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setBusy(true);
@@ -115,7 +117,7 @@ function CreateOperatorDialog({ onClose, onCreated }: { onClose: () => void; onC
     } finally {
       setBusy(false);
     }
-  };
+  });
 
   return (
     <Dialog title="Register hotspot operator" description="Create a secure dashboard account for a new business." onClose={close}>
@@ -132,7 +134,7 @@ function CreateOperatorDialog({ onClose, onCreated }: { onClose: () => void; onC
           <input id="operator-phone" type="tel" required autoComplete="tel" maxLength={30} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="e.g. +256770000000" className={field} /></div>
         <div className="flex flex-col-reverse gap-2 border-t border-[var(--border)] pt-5 sm:flex-row sm:justify-end">
           <button type="button" onClick={close} disabled={busy} className={buttonGhost}>Cancel</button>
-          <button type="submit" disabled={busy} className={button}>{busy ? "Creating account…" : <><UserPlus className="h-4 w-4" />Create operator account</>}</button>
+          <button type="submit" disabled={busy} className={button}><BusyLabel busy={busy} label="Creating account…"><UserPlus className="h-4 w-4" />Create operator account</BusyLabel></button>
         </div>
       </form>
     </Dialog>

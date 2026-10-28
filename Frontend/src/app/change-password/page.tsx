@@ -1,4 +1,5 @@
 "use client";
+import { BusyLabel } from "@/components/LoadingUI";
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -69,7 +70,7 @@ export default function ChangePasswordPage() {
               </label>
             ))}
             <button type="submit" disabled={busy} className="w-full mt-2 py-3 rounded-lg bg-blue-700 hover:bg-blue-600 disabled:opacity-50 text-sm font-semibold text-white">
-              {busy ? "Updating password…" : "Set password and continue"}
+              <BusyLabel busy={busy} label="Updating password…">Set password and continue</BusyLabel>
             </button>
           </form>
         </div>
