@@ -46,6 +46,8 @@ public class VoucherService {
     private final RadReplyRepository radReplyRepository;
     private final VoucherExpirationWorker expirationWorker;
     private final CustomerRepository customerRepository;
+    private final com.wifibilling.repository.RouterRepository routerRepository;
+    private final com.wifibilling.repository.TransactionRepository transactionRepository;
     private final JdbcTemplate jdbcTemplate;
 
     @Transactional
@@ -209,6 +211,25 @@ public class VoucherService {
     @Transactional
     public void recordOnlineSale(Long tenantId, String code) {
         Voucher v = findByCodeAndTenant(code, tenantId); v.setSaleType("ONLINE"); voucherRepository.save(v);
+    }
+
+    /**
+     * Records a walk-in (cash/MoMo-at-counter) sale of an unused inventory
+     * voucher: one SUCCESSFUL transaction and saleType WALK_IN, under a row
+     * lock so the same voucher can't be sold twice. The transaction carries
+     * the voucher's customer phone when it has one.
+     */
+    @Transactional
+    public void sellWalkIn(Long tenantId, String code, Long routerId, java.math.BigDecimal amount, String method, String reference, String notes) {
+        var voucher = voucherRepository.lockForSale(code, tenantId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Voucher not found"));
+        if (!"unused".equals(voucher.getStatus()) || (voucher.getSaleType() != null && !"INVENTORY".equals(voucher.getSaleType())))
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Voucher is already sold, used, or a giveaway");
+        var router = routerRepository.findByIdAndTenantId(routerId, tenantId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Router not found"));
+        transactionRepository.save(com.wifibilling.model.Transaction.builder().tenant(voucher.getTenant()).router(router).packagePlan(voucher.getPackagePlan())
+                .reference("SALE-" + java.util.UUID.randomUUID()).phone(voucher.getCustomer() == null || voucher.getCustomer().getPhone() == null ? "MANUAL" : voucher.getCustomer().getPhone())
+                .amount(amount).network(method).externalReference(reference).notes(notes).voucherCode(code).status("SUCCESSFUL").completedAt(OffsetDateTime.now()).build());
+        voucher.setSaleType("WALK_IN");
+        voucherRepository.save(voucher);
     }
 
     @Transactional
