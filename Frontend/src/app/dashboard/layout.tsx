@@ -2,7 +2,7 @@
 import { prefetchTenantEssential } from "@/lib/dashboardPrefetch";
 
 import Link from "next/link";
-import React, { useEffect } from "react";
+import React, { Suspense, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import AppShell, { type NavItem } from "@/components/AppShell";
@@ -39,6 +39,10 @@ interface SidebarStats {
 }
 
 export default function TenantDashboardLayout({ children }: { children: React.ReactNode }) {
+  return <Suspense><TenantDashboardLayoutInner>{children}</TenantDashboardLayoutInner></Suspense>;
+}
+
+function TenantDashboardLayoutInner({ children }: { children: React.ReactNode }) {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
   const now = useNow(60000);
@@ -92,6 +96,7 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
         { name: "Generate vouchers", href: "/dashboard/vouchers/new", group: "Sales" },
         { name: "New IP binding", href: "/dashboard/bindings/new", group: "Customers" },
         { name: "New customer", href: "/dashboard/customers/new", group: "Customers" },
+        { name: "Router detail", href: "/dashboard/routers/", group: "Network" },
       ]}
       rootHref="/dashboard"
       collapsibleGroups

@@ -94,11 +94,12 @@ public class RouterManagementService {
   });
   return s.toString();
  }
- @Transactional public void enqueueDisconnect(Router router,String username) {
+ /** Queues (or reuses the pending) hotspot removal for this user; the router applies it at its next poll. */
+ @Transactional public RouterTask enqueueDisconnect(Router router,String username) {
   String script="/ip/hotspot/active/remove [find user="+q(username)+"]";
-  boolean pending=tasks.findAllByRouterIdOrderByCreatedAtDesc(router.getId()).stream()
-      .anyMatch(t->"PENDING".equals(t.getStatus())&&script.equals(t.getScript()));
-  if(!pending)tasks.save(RouterTask.builder().router(router).action("DISCONNECT").script(script).build());
+  return tasks.findAllByRouterIdOrderByCreatedAtDesc(router.getId()).stream()
+      .filter(t->"PENDING".equals(t.getStatus())&&script.equals(t.getScript())).findFirst()
+      .orElseGet(()->tasks.save(RouterTask.builder().router(router).action("DISCONNECT").script(script).build()));
  }
  private String timeScript() {
   var now=OffsetDateTime.now(ZoneOffset.UTC);
