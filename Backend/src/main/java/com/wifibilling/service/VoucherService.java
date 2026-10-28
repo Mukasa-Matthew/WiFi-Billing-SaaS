@@ -254,7 +254,7 @@ public class VoucherService {
         }
 
         if (uniqueSet.size() < count) {
-            throw new IllegalStateException("Could not generate enough unique voucher codes. Try increasing code length.");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Could not generate enough unique voucher codes. Try increasing code length.");
         }
 
         // Filter out any codes that already exist in database
@@ -290,7 +290,7 @@ public class VoucherService {
         }
 
         if (candidates.size() < count) {
-            throw new IllegalStateException("Could not generate enough unique voucher codes. Try increasing code length.");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Could not generate enough unique voucher codes. Try increasing code length.");
         }
 
         return candidates.subList(0, count);

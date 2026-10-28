@@ -51,6 +51,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, []);
 
+  // Requests read the token from localStorage while this tab remembers the
+  // user in memory. If another tab signs out or signs in as someone else,
+  // drop this tab's cached data and reload so both agree again. (The storage
+  // event only fires in other tabs, so this never loops.)
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== null && event.key !== "wb_token" && event.key !== "wb_user") return;
+      if (event.key === "wb_user" && event.newValue === event.oldValue) return;
+      resetQueryCache();
+      window.location.reload();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
   const login = (data: UserSession) => {
     resetQueryCache();
     localStorage.setItem("wb_token", data.token);
