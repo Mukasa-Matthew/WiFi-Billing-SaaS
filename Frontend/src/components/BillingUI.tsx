@@ -12,9 +12,27 @@ export const panel = "panel-shadow rounded-xl border border-[var(--border)] bg-[
 export const label = "block text-xs font-semibold text-[var(--fg-muted)]";
 export const hint = "mt-1.5 text-xs text-[var(--fg-muted)]";
 
+/**
+ * User-facing text for a failed request. The backend's `message` (see
+ * GlobalExceptionHandler) is written for users and wins; otherwise explain
+ * the failure class instead of a bare "Request failed".
+ */
 export function message(error: unknown) {
-  const e = error as { response?: { data?: { message?: string; detail?: string } } };
-  return e.response?.data?.message || e.response?.data?.detail || "Request failed. Please retry.";
+  const e = error as { code?: string; response?: { status?: number; data?: { message?: string; detail?: string } } };
+  const data = e?.response?.data;
+  if (data?.message || data?.detail) return (data.message || data.detail) as string;
+  if (!e?.response) {
+    if (e?.code === "ECONNABORTED" || e?.code === "ETIMEDOUT") return "The request took too long. Check your connection and try again.";
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return "You're offline. Check your internet connection and try again.";
+    return "Couldn't reach AirPairy. Check your internet connection and try again.";
+  }
+  const status = e.response.status ?? 0;
+  if (status === 403) return "You don't have permission to do that.";
+  if (status === 404) return "That item could not be found. It may have been removed.";
+  if (status === 429) return "Too many attempts. Wait a moment and try again.";
+  if (status === 502 || status === 503 || status === 504) return "AirPairy is temporarily unavailable. Please try again in a moment.";
+  if (status >= 500) return "Something went wrong on our side. Please try again.";
+  return "Request failed. Please retry.";
 }
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
