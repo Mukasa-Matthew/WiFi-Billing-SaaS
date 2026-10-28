@@ -64,6 +64,17 @@ public class RouterSetupService {
     public Issued issue(com.wifibilling.model.Router router, Purpose purpose) {
         OffsetDateTime now = now();
         codes.revokeOutstanding(router.getId(), now);
+        return persistCode(router, purpose, now);
+    }
+
+    @Transactional
+    public Issued issueWinbox(com.wifibilling.model.Router router) {
+        OffsetDateTime now = now();
+        codes.revokePurpose(router.getId(), Purpose.WINBOX, now);
+        return persistCode(router, Purpose.WINBOX, now);
+    }
+
+    private Issued persistCode(com.wifibilling.model.Router router, Purpose purpose, OffsetDateTime now) {
         byte[] raw = new byte[24];
         RANDOM.nextBytes(raw);
         String code = "su_" + Base64.getUrlEncoder().withoutPadding().encodeToString(raw);

@@ -1,0 +1,1 @@
+airpairy-winbox ALL=(root) NOPASSWD: /usr/local/bin/airpairy-winbox-peers wg0

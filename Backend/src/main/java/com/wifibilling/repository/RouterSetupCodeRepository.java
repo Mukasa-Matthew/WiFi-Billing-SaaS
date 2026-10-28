@@ -28,5 +28,9 @@ public interface RouterSetupCodeRepository extends JpaRepository<RouterSetupCode
     @Query("update RouterSetupCode c set c.revokedAt = :now where c.router.id = :routerId and c.revokedAt is null and c.completedAt is null")
     int revokeOutstanding(@Param("routerId") Long routerId, @Param("now") OffsetDateTime now);
 
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("update RouterSetupCode c set c.revokedAt = :now where c.router.id = :routerId and c.purpose = :purpose and c.revokedAt is null and c.completedAt is null")
+    int revokePurpose(@Param("routerId") Long routerId, @Param("purpose") RouterSetupCode.Purpose purpose, @Param("now") OffsetDateTime now);
+
     void deleteAllByRouterId(Long routerId);
 }

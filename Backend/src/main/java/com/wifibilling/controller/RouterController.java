@@ -39,6 +39,7 @@ public class RouterController {
     private final RouterSetupService setupService;
     private final com.wifibilling.repository.RouterSetupCodeRepository setupCodeRepository;
     private final com.wifibilling.service.SubscriptionService subscriptionService;
+    private final com.wifibilling.service.WinboxAccessService winboxAccess;
 
     @GetMapping
     public List<RouterDto.Response> list(@AuthenticationPrincipal TenantPrincipal principal) {
@@ -138,6 +139,7 @@ public class RouterController {
         Router router = routerRepository.findByIdAndTenantId(id, principal.getTenantId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Router not found"));
 
+        winboxAccess.change(principal, id, "disable", null);
         taskRepository.deleteAllByRouterId(id);
         setupCodeRepository.deleteAllByRouterId(id);
         String publicKey = router.getWgPublicKey();

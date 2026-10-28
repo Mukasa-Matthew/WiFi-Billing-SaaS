@@ -52,6 +52,7 @@ class RouterControllerTest {
     @Mock private RouterSetupService setupService;
     @Mock private RouterSetupCodeRepository setupCodeRepository;
     @Mock private com.wifibilling.service.SubscriptionService subscriptionService;
+    @Mock private com.wifibilling.service.WinboxAccessService winboxAccess;
     @InjectMocks private RouterController controller;
 
     private final JsonMapper json = JsonMapper.builder().build();
