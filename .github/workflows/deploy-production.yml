@@ -247,10 +247,30 @@ jobs:
               artifacts/"frontend-bundle-${COMMIT}"/frontend.sha256 \
               "prod:${REMOTE_TMP}/"
 
+          ACTIVE_BEFORE=$(ssh prod "tr -d ' \n' < /opt/airpairy/deployment/state/active_slot.txt")
           echo "Executing atomic staging and blue-green cutover via /opt/airpairy/deployment..."
+          set +e
           ssh prod \
             "/opt/airpairy/deployment/blue-green/stage-release-artifacts.sh '${COMMIT}' '${REMOTE_TMP}' && \
              /opt/airpairy/deployment/blue-green/blue-green-deploy.sh '${COMMIT}' 60"
+          RC=$?
+          set -e
+          [ "${RC}" -eq 0 ] && exit 0
+
+          # blue-green-deploy.sh records the new active slot only after the
+          # target passed readiness and nginx switched. Its only later exit is
+          # the connection-drain timeout, which deliberately leaves the old slot
+          # running. Treat that as success only if the switch is verifiably live.
+          ACTIVE_AFTER=$(ssh prod "tr -d ' \n' < /opt/airpairy/deployment/state/active_slot.txt")
+          case "${ACTIVE_AFTER}" in blue) PORT=8080 ;; green) PORT=8081 ;; *) PORT="" ;; esac
+          if [ -n "${PORT}" ] && [ "${ACTIVE_AFTER}" != "${ACTIVE_BEFORE}" ] \
+             && ssh prod "grep -q '127.0.0.1:${PORT};' /etc/nginx/conf.d/upstream-active.conf" \
+             && ssh prod "curl -s -m 5 http://127.0.0.1:${PORT}/api/health/version" | grep -q "\"commit\":\"${COMMIT}\""; then
+            echo "::warning::Cutover to ${ACTIVE_AFTER} is live and serving ${COMMIT}, but in-flight connections on ${ACTIVE_BEFORE} did not drain within 60s. ${ACTIVE_BEFORE} was left running as a warm rollback; stop it once traffic is confirmed healthy."
+            exit 0
+          fi
+          echo "Release failed before a verified cutover (active slot: ${ACTIVE_BEFORE} -> ${ACTIVE_AFTER}). Live traffic was not switched to ${COMMIT}." >&2
+          exit "${RC}"
 
       - name: Remove Remote Staging Directory
         if: always() && steps.release.outcome != 'skipped'

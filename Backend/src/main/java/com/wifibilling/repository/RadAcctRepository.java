@@ -36,6 +36,19 @@ public interface RadAcctRepository extends JpaRepository<RadAcct, Long> {
     @Query("SELECT r FROM RadAcct r WHERE r.username = :username ORDER BY r.acctStartTime ASC LIMIT 1")
     Optional<RadAcct> findFirstSessionByUsername(@Param("username") String username);
 
+    /**
+     * Tenant accounting rows whose session time (start, else stop) is at or
+     * after fromTs. Same tenant scoping as the aggregates below; replaces
+     * loading every row for every voucher code the tenant ever issued.
+     */
+    @Query(value = """
+            SELECT * FROM radacct
+            WHERE username IN (SELECT code FROM vouchers WHERE tenant_id = :tenantId)
+              AND COALESCE(acctstarttime, acctstoptime) >= :fromTs
+            """, nativeQuery = true)
+    List<RadAcct> findTenantSessionsSince(@Param("tenantId") Long tenantId,
+                                          @Param("fromTs") java.time.OffsetDateTime fromTs);
+
     /** Distinct users online per period, tenant-scoped via voucher codes. */
     @Query(value = """
             SELECT date_trunc(:grain, COALESCE(acctstarttime, acctstoptime)) AS d, COUNT(DISTINCT username)
