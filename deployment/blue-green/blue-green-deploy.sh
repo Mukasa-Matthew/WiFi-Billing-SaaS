@@ -18,10 +18,11 @@ if [ -z "${COMMIT_SHA}" ]; then
 fi
 
 APP_DIR="/var/www/wifi-billing"
+DEPLOY_DIR="${DEPLOY_DIR:-/opt/airpairy/deployment}"
 RELEASES_DIR="${APP_DIR}/releases"
 CURRENT_RELEASE_DIR="${RELEASES_DIR}/release-${COMMIT_SHA}"
-ACTIVE_SLOT_FILE="${APP_DIR}/deployment/active_slot.txt"
-ROLLBACK_SLOT_FILE="${APP_DIR}/deployment/rollback_slot.txt"
+ACTIVE_SLOT_FILE="${DEPLOY_DIR}/active_slot.txt"
+ROLLBACK_SLOT_FILE="${DEPLOY_DIR}/rollback_slot.txt"
 CHECKSUM_FILE="${CURRENT_RELEASE_DIR}/release.sha256"
 
 CURRENT_ACTIVE_SLOT="legacy"
@@ -95,8 +96,8 @@ if [ ! -f "${CURRENT_RELEASE_DIR}/Backend/target/api-0.0.1-SNAPSHOT.jar" ]; then
 fi
 
 # 3. Configure Target Slot Environment File (Web/API backend never runs schedulers)
-TARGET_ENV_FILE="${APP_DIR}/deployment/slots/${TARGET_SLOT}.env"
-mkdir -p "${APP_DIR}/deployment/slots"
+TARGET_ENV_FILE="${DEPLOY_DIR}/slots/${TARGET_SLOT}.env"
+mkdir -p "${DEPLOY_DIR}/slots"
 
 cat << EOF_SLOT > "${TARGET_ENV_FILE}"
 SERVER_PORT=${TARGET_BACKEND_PORT}
