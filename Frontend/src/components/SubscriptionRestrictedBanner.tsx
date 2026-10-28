@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 import Link from "next/link";
-import api from "@/lib/api";
+import { useApi } from "@/components/BillingUI";
 import { WarningCircle, CreditCard, ArrowRight } from "@/components/icons";
 
 interface SubStatus {
@@ -17,13 +17,9 @@ interface SubStatus {
 }
 
 export default function SubscriptionRestrictedBanner() {
-  const [status, setStatus] = useState<SubStatus | null>(null);
-
-  useEffect(() => {
-    api.get<SubStatus>("/api/subscription")
-      .then((res) => setStatus(res.data))
-      .catch(() => {});
-  }, []);
+  // Shares the cached (and prefetched) subscription query instead of a
+  // separate request on every workspace load.
+  const { data: status } = useApi<SubStatus>("/api/subscription");
 
   if (!status || !status.isExpired) {
     return null;

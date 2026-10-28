@@ -35,6 +35,28 @@ async function handler(
 
     const res = await fetch(url.toString(), fetchOptions);
     const resHeaders = new Headers(res.headers);
+    // fetch() decodes a compressed upstream body, so its encoding and length
+    // no longer describe the bytes we send. Uncompressed upstream responses
+    // keep their Content-Length (router scripts rely on an exact passthrough).
+    if (res.headers.has("content-encoding")) {
+      resHeaders.delete("content-encoding");
+      resHeaders.delete("content-length");
+    }
+
+    // Neither nginx nor Next compresses proxied API responses, and list
+    // endpoints run to ~1 MB of JSON. Gzip JSON only: router scripts are
+    // text/plain long-polls fetched by MikroTik and must pass through as-is.
+    const isJson = (res.headers.get("content-type") || "").includes("application/json");
+    const acceptsGzip = /\bgzip\b/.test(req.headers.get("accept-encoding") || "");
+    if (res.body && isJson && acceptsGzip && req.method !== "HEAD") {
+      resHeaders.delete("content-length");
+      resHeaders.set("content-encoding", "gzip");
+      resHeaders.append("vary", "Accept-Encoding");
+      return new NextResponse(res.body.pipeThrough(new CompressionStream("gzip")), {
+        status: res.status,
+        headers: resHeaders,
+      });
+    }
 
     return new NextResponse(res.body, {
       status: res.status,

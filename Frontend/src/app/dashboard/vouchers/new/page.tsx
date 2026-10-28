@@ -60,6 +60,9 @@ export default function CreateVouchersPage() {
         codeLength: Number(length), codeFormat: format,
         batchReference: batch, giveaway,
       });
+      // The list may still be cached as fresh; without this the new batch
+      // would be missing when the list opens.
+      mutateCache.voucherChanged();
       nav.push("/dashboard/vouchers");
     } catch (err) { setNote(message(err)); }
     finally { setSaving(false); }

@@ -56,8 +56,11 @@ export default function TenantDashboardOverview() {
   const { user } = useAuth();
   const now = useNow(60000);
   const [range, setRange] = useState("7d");
-  const stats = useApi<DashboardStats>(`/api/dashboard/stats?range=${range}`, 20000);
-  const routers = useResource<RouterRec>("/api/routers", true);
+  // Stats is the heaviest aggregate the backend serves, so 30 s rather than
+  // 20 s; keepPrevious keeps the page on screen while another range loads.
+  const stats = useApi<DashboardStats>(`/api/dashboard/stats?range=${range}`, 30000, { keepPrevious: true });
+  // Routers report every 2 minutes; polling faster than 30 s finds nothing new.
+  const routers = useResource<RouterRec>("/api/routers", 30000);
   // Only the newest rows are needed here; the Payments page loads full history.
   const payments = useApi<Payment[]>("/api/finance/payments?limit=6", 60000);
   const wallet = useApi<WalletView>("/api/wallet", 60000);
@@ -88,7 +91,7 @@ export default function TenantDashboardOverview() {
   if (stats.loading && !s && !stats.error) return <DashboardLoading />;
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
+    <div className={`mx-auto max-w-7xl space-y-6 transition-opacity ${stats.placeholder ? "opacity-60" : ""}`} aria-busy={stats.placeholder}>
       {/* Greeting and quick actions */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">

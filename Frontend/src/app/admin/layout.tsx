@@ -2,11 +2,11 @@
 import { prefetchSuperAdminEssential } from "@/lib/dashboardPrefetch";
 
 import Link from "next/link";
-import React, { Suspense, useEffect, useState } from "react";
+import React, { Suspense, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import AppShell, { type NavItem } from "@/components/AppShell";
-import api from "@/lib/api";
+import { useApi } from "@/components/BillingUI";
 import {
   CellTower as RouterIcon,
   HardDrives,
@@ -28,23 +28,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   );
 }
 
-/** Open NOC incidents, refreshed once a minute while the tab is visible. */
+/**
+ * Open NOC incidents, refreshed once a minute while the tab is visible.
+ * Shares the cached overview query with the prefetch and the network page.
+ */
 function useOpenIncidents(enabled: boolean) {
-  const [count, setCount] = useState<number | null>(null);
-  useEffect(() => {
-    if (!enabled) return;
-    const load = () => {
-      if (document.visibilityState !== "visible") return;
-      api.get<{ openIncidents: number }>("/api/admin/noc/overview")
-        .then((r) => setCount(r.data.openIncidents ?? 0))
-        .catch(() => {});
-    };
-    load();
-    const timer = window.setInterval(load, 60000);
-    document.addEventListener("visibilitychange", load);
-    return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", load); };
-  }, [enabled]);
-  return count;
+  const { data } = useApi<{ openIncidents: number }>(enabled ? "/api/admin/noc/overview" : null, 60000);
+  return data ? data.openIncidents ?? 0 : null;
 }
 
 function AdminLayoutInner({ children }: { children: React.ReactNode }) {
