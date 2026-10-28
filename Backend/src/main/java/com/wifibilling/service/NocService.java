@@ -146,7 +146,11 @@ public class NocService {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("reachable", res.reachable());
         out.put("source", res.reachable() ? "LIVE" : "UNAVAILABLE");
-        out.put("probedAt", OffsetDateTime.now().toString());
+        // When the router actually answered (results are cached up to 30 s), not "now".
+        java.time.Instant at = liveProbe.probedAt(r.getId());
+        out.put("probedAt", (at != null ? at.atOffset(java.time.ZoneOffset.UTC) : OffsetDateTime.now()).toString());
+        // Who the router reports as connected right now — live, unlike accounting rows.
+        out.put("hotspotUsers", res.hotspotHosts());
         if (res.resource() != null) {
             Object up = res.resource().get("uptime");
             Object cpu = res.resource().get("cpu-load");
@@ -339,7 +343,7 @@ public class NocService {
                 fresh ? null : "Check the router is powered on and can reach the internet; verify the wb-telemetry scheduler exists"));
 
         // Readiness flags — inferred
-        List<Boolean> flags = List.of(r.getHotspotReady(), r.getRadiusReady(), r.getPortalReady());
+        List<Boolean> flags = java.util.Arrays.asList(r.getHotspotReady(), r.getRadiusReady(), r.getPortalReady());
         boolean allTrue = flags.stream().allMatch(Boolean.TRUE::equals);
         boolean anyFalse = flags.stream().anyMatch(Boolean.FALSE::equals);
         checks.add(new NocDto.DiagnosticCheck("services", "Hotspot / RADIUS / portal readiness",

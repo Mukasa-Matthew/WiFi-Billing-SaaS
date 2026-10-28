@@ -1,7 +1,7 @@
 export const instant = false;
 
-import RouterDetailClient from "./detail-client";
+import RouterDetail from "@/components/router/RouterDetail";
 
 export default function Page() {
-  return <RouterDetailClient />;
+  return <RouterDetail scope="admin" />;
 }
