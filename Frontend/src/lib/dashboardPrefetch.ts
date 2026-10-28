@@ -10,7 +10,6 @@ import api from "@/lib/api";
  * - When Business Admin logs in / lands on dashboard:
  *   preload essential dashboard items:
  *   - /api/dashboard/stats?range=7d
- *   - /api/dashboard/stats
  *   - /api/routers
  *   - /api/packages
  *   - /api/subscription
@@ -39,9 +38,9 @@ export function prefetchTenantEssential(tenantId: number) {
     return res.data;
   };
 
-  // Prefetch with staleTime so queries consider it fresh
+  // Prefetch with staleTime so queries consider it fresh. Stats default to 7d,
+  // so the range-less URL is the same (expensive) aggregate; fetch it once.
   qc.prefetchQuery({ queryKey: [scope, "/api/dashboard/stats?range=7d"], queryFn: fetcher("/api/dashboard/stats?range=7d") });
-  qc.prefetchQuery({ queryKey: [scope, "/api/dashboard/stats"], queryFn: fetcher("/api/dashboard/stats") });
   qc.prefetchQuery({ queryKey: [scope, "/api/routers"], queryFn: fetcher("/api/routers") });
   qc.prefetchQuery({ queryKey: [scope, "/api/packages"], queryFn: fetcher("/api/packages") });
   qc.prefetchQuery({ queryKey: [scope, "/api/subscription"], queryFn: fetcher("/api/subscription") });

@@ -1,5 +1,5 @@
 "use client";
-import React, { useCallback, useEffect, useState, useRef } from "react";
+import React, { useCallback, useDeferredValue, useEffect, useMemo, useState, useRef } from "react";
 import api from "@/lib/api";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, CaretLeft, CaretRight, MagnifyingGlass, Tray } from "@/components/icons";
@@ -17,7 +17,20 @@ export function message(error: unknown) {
   return e.response?.data?.message || e.response?.data?.detail || "Request failed. Please retry.";
 }
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/context/AuthContext";
+
+/**
+ * Cache scope for the signed-in identity, read during render so a page's
+ * first render already targets its cached data. (Resolving it in an effect
+ * left every mount's first render disabled and empty, which flashed
+ * "No records found" even when the data was cached.)
+ */
+function useCacheScope() {
+  const { user } = useAuth();
+  if (!user) return "anon";
+  return user.role === "ROLE_SUPERADMIN" ? "superadmin" : `tenant-${user.tenantId || 0}`;
+}
 
 /**
  * Tenant-scoped shared cache hook for list-shaped endpoints.
@@ -27,20 +40,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
  * - Background auto-refresh paused when window/tab is hidden.
  */
 export function useResource<T>(url: string, refresh: boolean | number = false) {
-  const queryClient = useQueryClient();
-  const [userScope, setUserScope] = useState<string>("anon");
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem("wb_user");
-      if (raw) {
-        const u = JSON.parse(raw);
-        setUserScope(u.role === "ROLE_SUPERADMIN" ? "superadmin" : `tenant-${u.tenantId || 0}`);
-      }
-    } catch {
-      setUserScope("anon");
-    }
-  }, []);
+  const userScope = useCacheScope();
 
   const refreshInterval = typeof refresh === "number" ? refresh : (refresh ? 20000 : false);
 
@@ -75,21 +75,12 @@ export function useResource<T>(url: string, refresh: boolean | number = false) {
  * Tenant-scoped shared cache hook for object-shaped endpoints (DTOs, stats, details).
  * - SWR experience: renders cached record immediately, quiet background revalidation.
  * - Intelligent refresh: defaults to ~20s if enabled, pauses when inactive/hidden.
+ * - keepPrevious: while a new URL loads (e.g. a different date range), keep
+ *   showing the previous response instead of dropping to the loading state.
+ *   Only for variants of the same view; never across different records.
  */
-export function useApi<T>(url: string | null, refreshMs = 0) {
-  const [userScope, setUserScope] = useState<string>("anon");
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem("wb_user");
-      if (raw) {
-        const u = JSON.parse(raw);
-        setUserScope(u.role === "ROLE_SUPERADMIN" ? "superadmin" : `tenant-${u.tenantId || 0}`);
-      }
-    } catch {
-      setUserScope("anon");
-    }
-  }, []);
+export function useApi<T>(url: string | null, refreshMs = 0, opts: { keepPrevious?: boolean } = {}) {
+  const userScope = useCacheScope();
 
   const queryKey = [userScope, url || ""];
 
@@ -104,6 +95,7 @@ export function useApi<T>(url: string | null, refreshMs = 0) {
     refetchInterval: refreshMs > 0 ? refreshMs : false,
     refetchIntervalInBackground: false,
     staleTime: 15000,
+    placeholderData: opts.keepPrevious ? keepPreviousData : undefined,
   });
 
   const load = useCallback(async () => {
@@ -115,6 +107,8 @@ export function useApi<T>(url: string | null, refreshMs = 0) {
     data: query.data ?? null,
     loading: query.isLoading,
     refreshing: query.isFetching && !query.isLoading,
+    /** True while `data` is the previous URL's response (keepPrevious). */
+    placeholder: query.isPlaceholderData,
     error: query.error ? message(query.error) : "",
     updatedAt: query.dataUpdatedAt || null,
     load,
@@ -326,7 +320,13 @@ export function Table<T>({ rows, columns, loading = false, emptyTitle = "No reco
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(10);
-  const filtered = searchable && search ? rows.filter(r => JSON.stringify(r).toLowerCase().includes(search.toLowerCase())) : rows;
+  // While searching, serialise rows once per data change rather than per
+  // keystroke, and filter against a deferred query so typing stays responsive.
+  // Nothing is serialised when the box is empty.
+  const query = useDeferredValue(search).toLowerCase();
+  const searching = searchable && query !== "";
+  const haystack = useMemo(() => searching ? rows.map(r => JSON.stringify(r).toLowerCase()) : null, [rows, searching]);
+  const filtered = useMemo(() => haystack ? rows.filter((_, i) => haystack[i].includes(query)) : rows, [rows, haystack, query]);
   const pages = paginated ? Math.max(1, Math.ceil(filtered.length / size)) : 1;
   const current = Math.min(page, pages);
   const visible = paginated ? filtered.slice((current - 1) * size, current * size) : filtered;

@@ -2,14 +2,13 @@
 import { prefetchTenantEssential } from "@/lib/dashboardPrefetch";
 
 import Link from "next/link";
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import AppShell, { type NavItem } from "@/components/AppShell";
 import SubscriptionRestrictedBanner from "@/components/SubscriptionRestrictedBanner";
-import api from "@/lib/api";
 import { routerState } from "@/lib/routerState";
-import { useNow } from "@/components/BillingUI";
+import { useApi, useNow, useResource } from "@/components/BillingUI";
 import {
   SquaresFour,
   CellTower as RouterIcon,
@@ -41,20 +40,16 @@ interface SidebarStats {
 export default function TenantDashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
-  const [stats, setStats] = useState<SidebarStats | null>(null);
   const now = useNow(60000);
-  const [routers, setRouters] = useState<{ status: string; lastSeen: string | null }[] | null>(null);
+  // Badges read the same cached queries as the dashboard page (the counts are
+  // range-independent, and 7d is the backend default), so neither the stats
+  // aggregate nor the router list is fetched a second time.
+  const { data: stats } = useApi<SidebarStats>("/api/dashboard/stats?range=7d");
+  // Router badge uses the same stale rule as every router view (src/lib/routerState).
+  const { data: routers } = useResource<{ status: string; lastSeen: string | null }>("/api/routers");
 
   useEffect(() => {
-    if (!user) return;
-    if (user.tenantId) prefetchTenantEssential(user.tenantId);
-    api.get<SidebarStats>("/api/dashboard/stats")
-      .then((r) => setStats(r.data))
-      .catch(() => {});
-    // Router badge uses the same stale rule as every router view (src/lib/routerState).
-    api.get<{ status: string; lastSeen: string | null }[]>("/api/routers")
-      .then((r) => setRouters(r.data))
-      .catch(() => {});
+    if (user?.tenantId) prefetchTenantEssential(user.tenantId);
   }, [user]);
 
   useEffect(() => {
@@ -66,9 +61,7 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
 
   const ready = !loading && !!user && !user.mustChangePassword;
   const isSuperadmin = user?.role === "ROLE_SUPERADMIN";
-  const offlineRouters = routers
-    ? routers.filter((r) => { const st = routerState(r, now).state; return st === "offline" || st === "stale"; }).length
-    : 0;
+  const offlineRouters = routers.filter((r) => { const st = routerState(r, now).state; return st === "offline" || st === "stale"; }).length;
 
   const nav: NavItem[] = [
     { name: "Dashboard", href: "/dashboard", icon: SquaresFour, group: "" },
