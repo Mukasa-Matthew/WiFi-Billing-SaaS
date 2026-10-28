@@ -184,7 +184,7 @@ export default function TenantDashboardOverview() {
         <StatCard label="Customers" href="/dashboard/customers" icon={<Users />} value={s ? s.totalCustomers.toLocaleString() : "—"} hintText={s ? `+${s.newCustomersThisWeek} this week` : undefined} />
         <StatCard label="Routers online" href="/dashboard/routers" icon={<CellTower />} tone={down.length ? "red" : degraded.length ? "amber" : "default"}
           value={routers.error ? "—" : <>{online}<span className="text-[var(--fg-faint)]">/{fleet.length}</span></>}
-          hintText={!fleet.length ? (routers.loading ? "Checking…" : "No router linked yet") : down.length ? `${down.length} not reporting` : degraded.length ? `${degraded.length} need attention` : "All reporting"} />
+          hintText={!fleet.length ? (routers.error ? "Router status unavailable" : routers.loading ? "Checking…" : "No router linked yet") : down.length ? `${down.length} not reporting` : degraded.length ? `${degraded.length} need attention` : "All reporting"} />
         <StatCard label="Vouchers left" href="/dashboard/vouchers" icon={<Ticket />} value={s ? s.totalVouchers.toLocaleString() : "—"} hintText={s ? `${s.activeVouchers.toLocaleString()} in use now` : undefined} />
       </div>
 

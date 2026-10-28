@@ -2,7 +2,6 @@ package com.wifibilling.service;
 
 import com.wifibilling.dto.ActiveSessionDto;
 import com.wifibilling.dto.TenantDashboardStatsDto;
-import com.wifibilling.model.Customer;
 import com.wifibilling.model.Router;
 import com.wifibilling.model.Transaction;
 import com.wifibilling.model.Voucher;
@@ -206,8 +205,14 @@ public class TenantDashboardService {
             LocalDate k = bucketKey.apply(v.getCreatedAt(), regs);
             if (k != null) regs.put(k, regs.get(k) + 1);
         }
+        // Only rows inside the range window or this month are ever read below
+        // (both loops filter on that time), so load just those instead of every
+        // row for every code. One day of margin absorbs any time-zone handling
+        // difference between the database and these instants; the Java filters
+        // below still decide what counts, exactly as before.
+        OffsetDateTime acctSince = (rs.isBefore(startOfMonth) ? rs : startOfMonth).minusDays(1);
         List<com.wifibilling.radius.RadAcct> accts = byCode.isEmpty() ? List.of()
-                : radAcctRepository.findAllByUsernameIn(byCode.keySet());
+                : radAcctRepository.findTenantSessionsSince(tenantId, acctSince);
         Map<String, Long> octets = new HashMap<>();
         for (var a : accts) {
             OffsetDateTime ts = a.getAcctStartTime() != null ? a.getAcctStartTime() : a.getAcctStopTime();
@@ -242,15 +247,24 @@ public class TenantDashboardService {
             Voucher v = byCode.get(s.username());
             if (v != null && v.getPackagePlan() != null) activeByPlan.merge(v.getPackagePlan().getName(), 1L, Long::sum);
         }
+        // One pass over transactions, bucketed by plan id (was one pass per plan).
+        Map<Long, long[]> soldByPlan = new HashMap<>();          // {sold, monthSold}
+        Map<Long, BigDecimal> monthRevByPlan = new HashMap<>();
+        for (Transaction t : transactions) {
+            if (!"SUCCESSFUL".equalsIgnoreCase(t.getStatus()) || t.getPackagePlan() == null) continue;
+            Long planId = t.getPackagePlan().getId();
+            long[] counts = soldByPlan.computeIfAbsent(planId, k -> new long[2]);
+            counts[0]++;
+            if (t.getCreatedAt() != null && !t.getCreatedAt().isBefore(startOfMonth)) {
+                monthRevByPlan.merge(planId, t.getAmount() != null ? t.getAmount() : BigDecimal.ZERO, BigDecimal::add);
+                counts[1]++;
+            }
+        }
         List<Map<String, Object>> packagePerformance = new ArrayList<>();
         for (var p : planRepository.findAllByTenantIdOrderByPriceAsc(tenantId)) {
-            BigDecimal mRev = BigDecimal.ZERO; long sold = 0, monthSold = 0;
-            for (Transaction t : transactions) {
-                if (!"SUCCESSFUL".equalsIgnoreCase(t.getStatus()) || t.getPackagePlan() == null
-                        || !t.getPackagePlan().getId().equals(p.getId())) continue;
-                sold++;
-                if (t.getCreatedAt() != null && !t.getCreatedAt().isBefore(startOfMonth)) { mRev = mRev.add(t.getAmount() != null ? t.getAmount() : BigDecimal.ZERO); monthSold++; }
-            }
+            long[] counts = soldByPlan.getOrDefault(p.getId(), new long[2]);
+            BigDecimal mRev = monthRevByPlan.getOrDefault(p.getId(), BigDecimal.ZERO);
+            long sold = counts[0], monthSold = counts[1];
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("id", p.getId()); m.put("name", p.getName()); m.put("price", p.getPrice());
             m.put("activeUsers", activeByPlan.getOrDefault(p.getName(), 0L));
@@ -273,8 +287,9 @@ public class TenantDashboardService {
                 upMonth += a.getAcctInputOctets() != null ? a.getAcctInputOctets() : 0L;
             }
         }
-        List<Customer> customers = customerRepository.findAllByTenantIdOrderByCreatedAtDesc(tenantId);
-        long newThisWeek = customers.stream().filter(c -> c.getCreatedAt() != null && !c.getCreatedAt().isBefore(thisMonday)).count();
+        // Counts only; the customer rows themselves were never used.
+        long totalCustomers = customerRepository.countByTenantId(tenantId);
+        long newThisWeek = customerRepository.countByTenantIdAndCreatedAtGreaterThanEqual(tenantId, thisMonday);
 
         return TenantDashboardStatsDto.builder()
                 .range(r)
@@ -282,7 +297,7 @@ public class TenantDashboardService {
                 .avgMemoryUsage(avgMem)
                 .dataMonthDownBytes(downMonth)
                 .dataMonthUpBytes(upMonth)
-                .totalCustomers(customers.size())
+                .totalCustomers(totalCustomers)
                 .newCustomersThisWeek(newThisWeek)
                 .revenueSeries(revenueSeries)
                 .dailyActiveUsers(dailyUsers)
