@@ -22,10 +22,15 @@ concurrency:
   group: production-deploy
   cancel-in-progress: false
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   verify-and-deploy:
-    name: Verify Tested Artifacts, Transfer & Trigger Blue-Green Release
+    name: Verify Tested Artifacts, Tailscale Connect & Trigger Blue-Green Release
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - name: Verify Explicit Approval Confirmation
         run: |
@@ -60,6 +65,20 @@ jobs:
             exit 1
           fi
           echo "Branch verification successful: Commit is on main."
+
+      - name: Verify Stale Commit Protection (Candidate Must Be at or Ancestor of Head)
+        env:
+          COMMIT: ${{ steps.parse_sha.outputs.commit }}
+        run: |
+          HEAD_SHA=$(git rev-parse origin/main)
+          echo "Current origin/main HEAD: ${HEAD_SHA}"
+          echo "Target Release Commit   : ${COMMIT}"
+
+          # Ensure the candidate commit is an approved commit on main
+          if ! git merge-base --is-ancestor "${COMMIT}" origin/main; then
+            echo "SECURITY ERROR: Release candidate is not in main ancestry!"
+            exit 1
+          fi
 
       - name: Verify Successful CI Build for Target Commit
         env:
@@ -98,6 +117,28 @@ jobs:
           echo "Inspecting downloaded artifacts:"
           ls -la artifacts/*
 
+      - name: Connect to Tailscale Private Network
+        uses: tailscale/github-action@v3
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+          tags: tag:ci-deployer
+
+      - name: Configure Known Hosts with Pinned SSH Key
+        env:
+          APP_HOST: ${{ secrets.PROD_APP_HOST }}
+          PINNED_HOST_KEY: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          if [ -n "${PINNED_HOST_KEY}" ]; then
+            echo "${PINNED_HOST_KEY}" >> ~/.ssh/known_hosts
+            echo "Using repository-pinned SSH host key."
+          else
+            echo "WARNING: PROD_SSH_KNOWN_HOSTS not configured. Falling back to dynamic keyscan over Tailscale."
+            ssh-keyscan -H "${APP_HOST}" >> ~/.ssh/known_hosts 2>/dev/null || true
+          fi
+          chmod 600 ~/.ssh/known_hosts
+
       - name: Set up SSH Key for Deployment
         uses: webfactory/ssh-agent@v0.9.0
         with:
@@ -111,7 +152,7 @@ jobs:
           echo "Transferring verified immutable artifacts to ${APP_HOST}..."
           REMOTE_TMP="/home/matthew/.deploy-staging-${COMMIT}"
           
-          ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new "${APP_HOST}" "mkdir -p ${REMOTE_TMP}"
+          ssh -o BatchMode=yes "${APP_HOST}" "mkdir -p ${REMOTE_TMP}"
           
           # Transfer backend and frontend artifacts
           scp -o BatchMode=yes artifacts/backend-jar-*/api-0.0.1-SNAPSHOT.jar "${APP_HOST}:${REMOTE_TMP}/"

@@ -208,48 +208,12 @@ if [ "${DRAINED_SUCCESSFULLY}" != "true" ]; then
     echo "==================================================================" >&2
     exit 1
 fi
-# 10. Background Worker Handover Sequence
-# ONLY AFTER observation & draining do we stop the old release and start the worker
-if [ "${IS_FIRST_MIGRATION}" = "true" ]; then
-    echo "=== First Migration Handover: Stopping legacy services & starting dedicated worker ==="
-    # Handover Safety: Failure to stop the legacy backend cannot be silently ignored.
-    # The dedicated worker cannot start while legacy schedulers remain active.
-    echo "Stopping legacy-backend to terminate embedded schedulers..."
-    if ! sudo /usr/local/bin/deploy-service-control stop legacy-backend; then
-        echo "ERROR: Failed to stop legacy-backend! Aborting worker startup to prevent duplicate schedulers." >&2
-        exit 1
-    fi
-    sudo /usr/local/bin/deploy-service-control stop legacy-frontend || true
-
-    # Explicitly verify legacy backend has completely stopped (port 8080 must be inactive)
-    echo "Verifying legacy backend process has terminated..."
-    LEGACY_STOPPED=false
-    for i in $(seq 1 15); do
-        if ! ss -tln | grep -q ":${PREVIOUS_BACKEND_PORT} "; then
-            LEGACY_STOPPED=true
-            echo " Legacy backend on :${PREVIOUS_BACKEND_PORT} successfully confirmed STOPPED."
-            break
-        fi
-        sleep 1
-    done
-
-    if [ "${LEGACY_STOPPED}" != "true" ]; then
-        echo "CRITICAL: Legacy backend is still listening or running on :${PREVIOUS_BACKEND_PORT}!" >&2
-        echo "ABORTING dedicated worker start to prevent dual scheduler execution." >&2
-        exit 1
-    fi
-
-    ln -sfn "${CURRENT_RELEASE_DIR}" "${APP_DIR}/current"
-    if ! sudo /usr/local/bin/deploy-service-control restart worker; then
-        echo "ERROR: Failed to start dedicated worker service!" >&2
-        exit 1
-    fi
-    echo " Dedicated background worker (wifi-worker) is now ACTIVE and verified."
-else
-    echo "=== Updating dedicated worker to release ${COMMIT_SHA} ==="
-    ln -sfn "${CURRENT_RELEASE_DIR}" "${APP_DIR}/current"
-    sudo /usr/local/bin/deploy-service-control restart worker
-fi
+# 10. Dedicated Background Worker Decoupling Protection
+# Ordinary web application releases MUST NOT restart or re-point the independently versioned worker.
+# Dedicated worker upgrades are managed independently via ./upgrade-worker.sh.
+echo "=== Dedicated Worker Decoupling: Preserving independently versioned worker ==="
+echo " Worker service status: $(systemctl is-active wifi-worker.service 2>/dev/null || echo unknown)"
+echo " Worker release remains isolated and untouched."
 
 echo "=================================================================="
 echo " Deployment of release ${COMMIT_SHA} to ${TARGET_SLOT} successfully finalized!"
