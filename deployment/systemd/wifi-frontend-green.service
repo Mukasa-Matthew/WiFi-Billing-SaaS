@@ -6,7 +6,7 @@ After=network.target
 User=matthew
 WorkingDirectory=/var/www/wifi-billing/slots/green/Frontend
 Environment=NODE_ENV=production
-EnvironmentFile=/var/www/wifi-billing/deployment/slots/green.env
+EnvironmentFile=/opt/airpairy/deployment/slots/green.env
 ExecStart=/usr/bin/node .next/standalone/server.js
 Restart=always
 RestartSec=5
