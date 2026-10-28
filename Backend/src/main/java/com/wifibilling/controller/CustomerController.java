@@ -14,11 +14,27 @@ import java.util.*;
 @RestController @RequestMapping("/api/customers") @RequiredArgsConstructor
 public class CustomerController {
  private final CustomerRepository customers; private final TenantRepository tenants; private final com.wifibilling.service.CustomerService customerService;
+ private final com.wifibilling.service.SubscriptionService subscriptionService;
  public record Request(@NotBlank @Size(max=120) String name,@Size(max=32) String phone,@Size(max=500) String notes) {}
  public record Response(Long id,String name,String phone,String notes) {}
  private Response dto(Customer c){return new Response(c.getId(),c.getName(),c.getPhone(),c.getNotes());}
- /** Every customer with their current voucher, usage and spend; buyers are added automatically. */
- @GetMapping public List<com.wifibilling.service.CustomerService.Row> list(@AuthenticationPrincipal TenantPrincipal p){return customerService.list(p.getTenantId());}
+ /**
+  * Every customer with their current voucher, usage and spend. Paid vouchers
+  * not yet linked to a buyer are linked first, so the list is complete even
+  * when the recording step after a payment didn't run.
+  */
+ @GetMapping public List<com.wifibilling.service.CustomerService.Row> list(@AuthenticationPrincipal TenantPrincipal p){
+  customerService.catchUp(p.getTenantId());
+  return customerService.list(p.getTenantId());
+ }
+ public record OnboardRequest(@Size(max=120) String name,@NotBlank @Size(max=32) String phone,@Size(max=500) String notes,
+  Long packageId,Long routerId,@DecimalMin("0.01") java.math.BigDecimal amount,@Pattern(regexp="CASH|MTN|AIRTEL|BANK|OTHER") String method) {}
+ /** New customer form: the customer plus, optionally, one voucher of a package and its walk-in payment, atomically. */
+ @PostMapping("/onboard") @ResponseStatus(HttpStatus.CREATED)
+ public com.wifibilling.service.CustomerService.Onboarded onboard(@AuthenticationPrincipal TenantPrincipal p,@Valid @RequestBody OnboardRequest r){
+  if(r.packageId()!=null&&subscriptionService!=null) subscriptionService.assertTenantManagementAllowed(p.getTenantId());
+  return customerService.onboard(p.getTenantId(),r.name(),r.phone(),r.notes(),r.packageId(),r.routerId(),r.amount(),r.method());
+ }
  @GetMapping("/{id}/history") public com.wifibilling.service.CustomerService.History history(@AuthenticationPrincipal TenantPrincipal p,@PathVariable Long id){
   return customerService.history(p.getTenantId(),id).orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND));
  }
