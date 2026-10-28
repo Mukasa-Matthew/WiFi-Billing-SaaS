@@ -1,13 +1,13 @@
 [Unit]
-Description=WiFi Billing Next.js Frontend (Blue Slot)
+Description=WiFi Billing Next.js Frontend (blue Slot)
 After=network.target
 
 [Service]
 User=matthew
-WorkingDirectory=/var/www/wifi-billing/slots/blue/Frontend
+WorkingDirectory=/var/www/wifi-billing/slots/blue/Frontend/.next/standalone
 Environment=NODE_ENV=production
 EnvironmentFile=/var/www/wifi-billing/deployment/slots/blue.env
-ExecStart=/usr/bin/node .next/standalone/server.js
+ExecStart=/usr/bin/node server.js
 Restart=always
 RestartSec=5
 TimeoutStopSec=10
