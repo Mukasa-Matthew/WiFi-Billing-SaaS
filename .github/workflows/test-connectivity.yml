@@ -2,11 +2,6 @@ name: Test Deployment Host Connectivity (Safe Preflight)
 
 on:
   workflow_dispatch:
-    inputs:
-      target_host:
-        description: 'Target Host IP or Name (default from PROD_APP_HOST secret)'
-        required: false
-        default: ''
 
 permissions:
   contents: read
@@ -25,17 +20,17 @@ jobs:
 
       - name: Configure Known Hosts
         env:
-          APP_HOST: ${{ github.event.inputs.target_host || secrets.PROD_APP_HOST }}
           PINNED_HOST_KEY: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
         run: |
+          if [ -z "${PINNED_HOST_KEY}" ]; then
+            echo "CRITICAL SECURITY ERROR: PROD_SSH_KNOWN_HOSTS secret is missing! Failing closed." >&2
+            exit 1
+          fi
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          if [ -n "${PINNED_HOST_KEY}" ]; then
-            echo "${PINNED_HOST_KEY}" >> ~/.ssh/known_hosts
-          else
-            ssh-keyscan -H "${APP_HOST}" >> ~/.ssh/known_hosts 2>/dev/null || true
-          fi
+          echo "${PINNED_HOST_KEY}" >> ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
+          echo "Verified and installed repository-pinned SSH host key."
 
       - name: Set up SSH Key
         uses: webfactory/ssh-agent@v0.9.0
@@ -44,8 +39,13 @@ jobs:
 
       - name: Harmless Ping & Version Probe
         env:
-          APP_HOST: ${{ github.event.inputs.target_host || secrets.PROD_APP_HOST }}
+          APP_HOST: ${{ secrets.PROD_APP_HOST }}
+          DEPLOY_USER: "matthew"
         run: |
-          echo "Executing harmless read-only command on ${APP_HOST}..."
-          ssh -o BatchMode=yes "${APP_HOST}" "hostname && uptime && free -h"
+          if [ -z "${APP_HOST}" ]; then
+            echo "CRITICAL ERROR: PROD_APP_HOST secret is not configured!" >&2
+            exit 1
+          fi
+          echo "Executing harmless read-only command on ${DEPLOY_USER}@${APP_HOST}..."
+          ssh -o BatchMode=yes "${DEPLOY_USER}@${APP_HOST}" "hostname && uptime && free -h"
           echo "Connectivity test SUCCESSFUL: Tailscale and SSH keys verified."

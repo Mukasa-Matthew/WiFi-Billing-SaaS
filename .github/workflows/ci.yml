@@ -2,7 +2,7 @@ name: Continuous Integration
 
 on:
   push:
-    branches: [ main, 'feature/**' ]
+    branches: [ main, 'feature/**', 'fix/**' ]
   pull_request:
     branches: [ main ]
 
@@ -34,7 +34,8 @@ jobs:
         run: |
           cd Backend
           mvn package -DskipTests --batch-mode
-          sha256sum target/api-0.0.1-SNAPSHOT.jar > target/backend.sha256
+          # Compute sha256 with basename for clean artifact verification
+          ( cd target && sha256sum api-0.0.1-SNAPSHOT.jar > backend.sha256 )
           cat target/backend.sha256
 
       - name: Upload Backend Build Artifact
@@ -74,9 +75,27 @@ jobs:
 
       - name: Package Standalone Next.js Bundle
         run: |
-          cd Frontend/.next/standalone
-          tar -czf ../../../frontend-standalone.tar.gz .
-          cd ../../..
+          cd Frontend
+          # Package standalone root preserving .next/standalone structure, static assets and public
+          mkdir -p package-staging/Frontend/.next/standalone
+          cp -r .next/standalone/. package-staging/Frontend/.next/standalone/
+          if [ -d .next/static ]; then
+            mkdir -p package-staging/Frontend/.next/static
+            cp -r .next/static/. package-staging/Frontend/.next/static/
+            # Ensure standalone server also has .next/static
+            mkdir -p package-staging/Frontend/.next/standalone/.next/static
+            cp -r .next/static/. package-staging/Frontend/.next/standalone/.next/static/
+          fi
+          if [ -d public ]; then
+            mkdir -p package-staging/Frontend/public
+            cp -r public/. package-staging/Frontend/public/
+            mkdir -p package-staging/Frontend/.next/standalone/public
+            cp -r public/. package-staging/Frontend/.next/standalone/public/
+          fi
+          cd package-staging/Frontend
+          tar -czf ../../frontend-standalone.tar.gz .
+          cd ../..
+          rm -rf package-staging
           sha256sum frontend-standalone.tar.gz > frontend.sha256
           cat frontend.sha256
 
@@ -85,6 +104,6 @@ jobs:
         with:
           name: frontend-bundle-${{ github.sha }}
           path: |
-            frontend-standalone.tar.gz
-            frontend.sha256
+            Frontend/frontend-standalone.tar.gz
+            Frontend/frontend.sha256
           retention-days: 7

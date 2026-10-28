@@ -57,16 +57,31 @@ cp "${TAR_FILE}" "${TEMP_STAGE_DIR}/frontend-standalone.tar.gz"
 echo "Extracting standalone frontend bundle..."
 tar -xzf "${TEMP_STAGE_DIR}/frontend-standalone.tar.gz" -C "${TEMP_STAGE_DIR}/Frontend"
 
+# Ensure runtime paths expected by standalone Next.js server are satisfied
+# Standalone server runs from Frontend/.next/standalone/server.js
 if [ ! -f "${TEMP_STAGE_DIR}/Frontend/.next/standalone/server.js" ]; then
     echo "ERROR: Extracted bundle does not contain .next/standalone/server.js!" >&2
     rm -rf "${TEMP_STAGE_DIR}"
     exit 1
 fi
 
-# Write combined release manifest
+# Ensure .next/static and public exist inside standalone server root
+if [ -d "${TEMP_STAGE_DIR}/Frontend/.next/static" ] && [ ! -d "${TEMP_STAGE_DIR}/Frontend/.next/standalone/.next/static" ]; then
+    mkdir -p "${TEMP_STAGE_DIR}/Frontend/.next/standalone/.next"
+    cp -r "${TEMP_STAGE_DIR}/Frontend/.next/static" "${TEMP_STAGE_DIR}/Frontend/.next/standalone/.next/"
+fi
+
+if [ -d "${TEMP_STAGE_DIR}/Frontend/public" ] && [ ! -d "${TEMP_STAGE_DIR}/Frontend/.next/standalone/public" ]; then
+    cp -r "${TEMP_STAGE_DIR}/Frontend/public" "${TEMP_STAGE_DIR}/Frontend/.next/standalone/"
+fi
+
+# Write combined internal release manifest reflecting internal relative paths
+BACKEND_HASH=$(awk '{print $1}' "${BACKEND_SHA}")
+FRONTEND_HASH=$(awk '{print $1}' "${FRONTEND_SHA}")
+
 cat << EOF_MANIFEST > "${TEMP_STAGE_DIR}/release.sha256"
-$(cat "${BACKEND_SHA}")
-$(cat "${FRONTEND_SHA}")
+${BACKEND_HASH}  Backend/target/api-0.0.1-SNAPSHOT.jar
+${FRONTEND_HASH}  frontend-standalone.tar.gz
 EOF_MANIFEST
 echo "${COMMIT_SHA}" > "${TEMP_STAGE_DIR}/commit.txt"
 
