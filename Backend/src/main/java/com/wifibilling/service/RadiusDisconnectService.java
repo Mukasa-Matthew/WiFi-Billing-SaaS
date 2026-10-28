@@ -50,53 +50,93 @@ public class RadiusDisconnectService {
      * @return true if datagram sent successfully, false otherwise
      */
     public boolean sendDisconnect(String nasIp, int port, String sharedSecret, String username, String framedIpAddress) {
+        // Fire-and-forget, as before: bulk callers (expiry) must not wait on replies.
+        return send(nasIp, port, sharedSecret, username, framedIpAddress, false) != Result.ERROR;
+    }
+
+    /** Outcome of one Disconnect-Request. NO_REPLY is common when this host has no route back from the tunnel. */
+    public enum Result { ACK, NAK, NO_REPLY, ERROR }
+
+    public static final byte CODE_DISCONNECT_ACK = 41;
+    public static final byte CODE_DISCONNECT_NAK = 42;
+    static final int REPLY_TIMEOUT_MS = 3000;
+
+    /**
+     * Sends a Disconnect-Request and waits briefly for the NAS's answer. A
+     * reply only counts when its identifier matches and its Response
+     * Authenticator verifies against the shared secret (RFC 5176 §3.5).
+     */
+    public Result disconnect(String nasIp, int port, String sharedSecret, String username, String framedIpAddress) {
+        return send(nasIp, port, sharedSecret, username, framedIpAddress, true);
+    }
+
+    private Result send(String nasIp, int port, String sharedSecret, String username, String framedIpAddress, boolean awaitReply) {
         if (nasIp == null || nasIp.isBlank() || sharedSecret == null || username == null) {
             log.warn("Missing parameters for Disconnect-Request: nasIp={}, user={}", nasIp, username);
-            return false;
+            return Result.ERROR;
         }
-
         try {
             byte identifier = (byte) RANDOM.nextInt(256);
             byte[] attributes = buildAttributes(username, framedIpAddress);
             int totalLength = 1 + 1 + 2 + 16 + attributes.length;
-
             if (totalLength > 4096) {
                 log.error("Disconnect packet size exceeds limit: {}", totalLength);
-                return false;
+                return Result.ERROR;
             }
-
             byte[] packet = new byte[totalLength];
             packet[0] = CODE_DISCONNECT_REQUEST;
             packet[1] = identifier;
             packet[2] = (byte) ((totalLength >> 8) & 0xFF);
             packet[3] = (byte) (totalLength & 0xFF);
-
             // 16 octets of zeroes for the authenticator calculation (RFC 5176 Section 3.3)
             Arrays.fill(packet, 4, 20, (byte) 0);
             System.arraycopy(attributes, 0, packet, 20, attributes.length);
-
             // Authenticator = MD5(Code + Identifier + Length + 16 zero octets + Attributes + Secret)
             byte[] secretBytes = sharedSecret.getBytes(StandardCharsets.UTF_8);
             MessageDigest md5 = MessageDigest.getInstance("MD5");
             md5.update(packet);
             md5.update(secretBytes);
             byte[] authenticator = md5.digest();
-
-            // Insert calculated authenticator into packet bytes [4..19]
             System.arraycopy(authenticator, 0, packet, 4, 16);
 
             InetAddress targetAddr = InetAddress.getByName(nasIp);
             try (DatagramSocket socket = new DatagramSocket()) {
-                socket.setSoTimeout(3000);
-                DatagramPacket datagram = new DatagramPacket(packet, packet.length, targetAddr, port);
-                socket.send(datagram);
+                socket.setSoTimeout(REPLY_TIMEOUT_MS);
+                socket.send(new DatagramPacket(packet, packet.length, targetAddr, port));
                 log.info("Sent Disconnect-Request (RFC 5176) to {}:{} for user '{}' (ident: {})", nasIp, port, username, identifier & 0xFF);
-                return true;
+                if (!awaitReply) return Result.NO_REPLY;
+                byte[] buf = new byte[4096];
+                DatagramPacket reply = new DatagramPacket(buf, buf.length);
+                try {
+                    socket.receive(reply);
+                } catch (java.net.SocketTimeoutException e) {
+                    return Result.NO_REPLY;
+                }
+                return verifyReply(buf, reply.getLength(), identifier, authenticator, secretBytes);
             }
         } catch (NoSuchAlgorithmException | IOException e) {
             log.error("Failed to send Disconnect-Request to {}:{}: {}", nasIp, port, e.getMessage());
-            return false;
+            return Result.ERROR;
         }
+    }
+
+    /** ACK/NAK only for a well-formed reply to this request; anything else is treated as no reply. */
+    static Result verifyReply(byte[] buf, int len, byte identifier, byte[] requestAuthenticator, byte[] secret) {
+        if (len < 20 || buf[1] != identifier) return Result.NO_REPLY;
+        int declared = ((buf[2] & 0xFF) << 8) | (buf[3] & 0xFF);
+        if (declared < 20 || declared > len) return Result.NO_REPLY;
+        try {
+            MessageDigest md5 = MessageDigest.getInstance("MD5");
+            md5.update(buf, 0, 4);
+            md5.update(requestAuthenticator);
+            md5.update(buf, 20, declared - 20);
+            md5.update(secret);
+            byte[] expected = md5.digest();
+            if (!MessageDigest.isEqual(expected, Arrays.copyOfRange(buf, 4, 20))) return Result.NO_REPLY;
+        } catch (NoSuchAlgorithmException e) {
+            return Result.NO_REPLY;
+        }
+        return buf[0] == CODE_DISCONNECT_ACK ? Result.ACK : buf[0] == CODE_DISCONNECT_NAK ? Result.NAK : Result.NO_REPLY;
     }
 
     private byte[] buildAttributes(String username, String framedIpAddress) throws IOException {

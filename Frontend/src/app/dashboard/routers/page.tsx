@@ -2,18 +2,20 @@
 import { mutateCache } from "@/lib/cacheInvalidation";
 import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import api from "@/lib/api";
 import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { notify, useToast } from "@/components/ui/Toast";
 import { useBusyAction } from "@/components/LoadingUI";
 import { ActionMenu, ActionMenuItem } from "@/components/ui/ActionMenu";
 import { useResource, Table, Badge, Notice, FilterTabs, button, date, message, panel } from "@/components/BillingUI";
-import { Eye, ArrowClockwise, FileArrowDown, Clock, Terminal, Trash } from "@/components/icons";
+import { Eye, ArrowClockwise, FileArrowDown, Clock, Terminal, Trash, Activity } from "@/components/icons";
 
 interface RouterRec { id: number; name: string; wgIp: string; registered: boolean; cpuLoad: number; memoryUsage: number; status: string; lastSeen: string | null; uptime: string | null; hotspotReady: boolean | null; radiusReady: boolean | null; portalReady: boolean | null }
 interface Task { id: number; action: string; status: string; createdAt: string }
 
 export default function Page() {
+  const nav = useRouter();
   const { data, loading, error, load } = useResource<RouterRec>("/api/routers", true);
   const [tab, setTab] = useState("ALL");
   const [selected, setSelected] = useState<RouterRec | null>(null);
@@ -114,7 +116,7 @@ export default function Page() {
         loading={loading}
         rows={data.filter(r => tab === "ALL" || (tab === "ONLINE" && r.status === "online") || (tab === "OFFLINE" && r.status !== "online"))}
         columns={[
-          { label: "Router", render: r => <span className="font-semibold text-[var(--fg)]">{r.name}</span> },
+          { label: "Router", render: r => <Link href={`/dashboard/routers/${r.id}`} className="font-semibold text-[var(--fg)] hover:underline">{r.name}</Link> },
           { label: "Provisioning", render: r => <Badge tone={r.status === "online" ? "green" : r.status === "degraded" ? "red" : "amber"}>{r.status === "online" ? "Verified" : r.status === "degraded" ? "Needs attention" : r.status === "provisioned" ? "Awaiting checks" : r.registered ? "Registered" : "Awaiting router"}</Badge> },
           { label: "CPU", render: r => r.lastSeen ? `${r.cpuLoad || 0}%` : "—" },
           { label: "Memory", render: r => r.lastSeen ? `${r.memoryUsage || 0}%` : "—" },
@@ -134,6 +136,7 @@ export default function Page() {
           {
             label: "", render: r => (
               <ActionMenu ariaLabel={`Actions for ${r.name}`}>
+                <ActionMenuItem icon={<Activity size={14} />} label="Monitor live" onClick={() => nav.push(`/dashboard/routers/${r.id}`)} />
                 <ActionMenuItem icon={<Eye size={14} />} label="View / manage" onClick={() => open(r)} />
                 <ActionMenuItem icon={<Terminal size={14} />} label="Reprovision command" onClick={() => showCommand(r)} />
                 <ActionMenuItem icon={<FileArrowDown size={14} />} label="Sync hotspot files" onClick={() => action(r, "SYNC_PORTAL")} />

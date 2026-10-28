@@ -1,9 +1,11 @@
 "use client";
 import { ListSkeleton, BusyLabel } from "@/components/LoadingUI";
+import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { notify } from "@/components/ui/Toast";
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import api from "@/lib/api";
 import {
   ArrowClockwise, CellTower as RouterIcon, CheckCircle, MagnifyingGlass,
@@ -39,10 +41,11 @@ interface Event { at: string; type: string; severity: string; title: string; det
 interface Incident { id: number; type: string; severity: string; title: string; detail: string | null; openedAt: string; resolvedAt: string | null }
 interface Check { key: string; label: string; status: string; source: string; detail: string | null; recommendation: string | null }
 interface UsagePoint { day: string; uploadBytes: number; downloadBytes: number; users: number }
-interface Live { reachable: boolean; source: string; probedAt: string; uptime?: string; cpuLoad?: number; memoryUsagePct?: number; boardName?: string; routerOsVersion?: string; hotspotActive?: number | null; wgHandshakeSecondsAgo?: number | null; error?: string | null }
+interface LiveUser { user: string | null; address: string | null; macAddress: string | null; uptimeSeconds: number | null; bytesIn: number | null; bytesOut: number | null; loginBy: string | null }
+interface Live { reachable: boolean; source: string; probedAt: string; hotspotUsers?: LiveUser[] | null; uptime?: string; cpuLoad?: number; memoryUsagePct?: number; boardName?: string; routerOsVersion?: string; hotspotActive?: number | null; wgHandshakeSecondsAgo?: number | null; error?: string | null }
 interface Host { [k: string]: unknown }
 
-const TABS = ["Overview", "Sessions", "Accounting", "Auth events", "Devices", "Provisioning", "Events", "Diagnostics"] as const;
+const TABS = ["Overview", "Live now", "Sessions", "Accounting", "Auth events", "Devices", "Provisioning", "Events", "Diagnostics"] as const;
 type Tab = typeof TABS[number];
 
 const checkTone = (s: string) => s === "HEALTHY" ? "green" : s === "WARNING" ? "amber" : s === "CRITICAL" ? "red" : "slate";
@@ -82,13 +85,28 @@ function SearchInput({ value, onChange, placeholder }: { value: string; onChange
   );
 }
 
-export default function RouterDetailClient() {
-  return <Suspense><RouterDetailInner /></Suspense>;
+/**
+ * One router's monitoring page, shared by the platform NOC (scope "admin",
+ * any tenant's router) and a business's own Routers section (scope "tenant",
+ * /api/routers/{id}/monitor, which the backend restricts to the owner).
+ */
+type Scope = { base: string; tenant: boolean };
+const RouterScope = createContext<Scope>({ base: "", tenant: false });
+
+export default function RouterDetail({ scope }: { scope: "admin" | "tenant" }) {
+  return <Suspense fallback={<ListSkeleton rows={4} avatar={false} />}><ScopedRouterDetail scope={scope} /></Suspense>;
+}
+
+function ScopedRouterDetail({ scope }: { scope: "admin" | "tenant" }) {
+  const { id } = useParams<{ id: string }>();
+  const value = useMemo<Scope>(() => scope === "admin"
+    ? { base: `/api/admin/noc/routers/${Number(id)}`, tenant: false }
+    : { base: `/api/routers/${Number(id)}/monitor`, tenant: true }, [id, scope]);
+  return <RouterScope.Provider value={value}><Suspense><RouterDetailInner key={value.base} /></Suspense></RouterScope.Provider>;
 }
 
 function RouterDetailInner() {
-  const { id } = useParams<{ id: string }>();
-  const routerId = Number(id);
+  const { base, tenant } = useContext(RouterScope);
   const now = useNow();
   const [tab, setTab] = useState<Tab>("Overview");
   const [detail, setDetail] = useState<Detail | null>(null);
@@ -97,10 +115,10 @@ function RouterDetailInner() {
   const [liveBusy, setLiveBusy] = useState(false);
 
   const load = useCallback(() => {
-    api.get<Detail>(`/api/admin/noc/routers/${routerId}`)
+    api.get<Detail>(`${base}`)
       .then((r) => { setDetail(r.data); setError(""); })
       .catch((e) => setError(message(e) === "Router not found" ? "This router doesn't exist or was removed." : `Couldn't load this router: ${message(e)}`));
-  }, [routerId]);
+  }, [base]);
   useEffect(() => {
     const first = window.setTimeout(load, 0);
     const timer = window.setInterval(() => { if (document.visibilityState === "visible") load(); }, 60000);
@@ -110,7 +128,7 @@ function RouterDetailInner() {
   // Read-only REST query over the WireGuard tunnel; it changes nothing on the router.
   const runProbe = () => {
     setLiveBusy(true);
-    api.get<Live>(`/api/admin/noc/routers/${routerId}/live`)
+    api.get<Live>(`${base}/live`, { timeout: 30000 })
       .then((r) => setLive(r.data))
       .catch((e) => setLive({ reachable: false, source: "UNAVAILABLE", probedAt: "", error: message(e) }))
       .finally(() => setLiveBusy(false));
@@ -123,7 +141,7 @@ function RouterDetailInner() {
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <div>
-        <BackLink href="/admin/routers">Router fleet</BackLink>
+        {tenant ? <BackLink href="/dashboard/routers">MikroTik routers</BackLink> : <BackLink href="/admin/routers">Router fleet</BackLink>}
         <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex min-w-0 items-start gap-3.5">
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--fill)] text-[var(--fg-muted)]"><RouterIcon className="h-5 w-5" /></span>
@@ -134,7 +152,7 @@ function RouterDetailInner() {
               </h1>
               {r && (
                 <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-[var(--fg-muted)]">
-                  <Link href={`/admin/tenants/${r.tenantId}`} className="font-medium text-[var(--fg-body)] hover:underline">{r.tenantName}</Link>
+                  {tenant ? <span className="font-medium text-[var(--fg-body)]">{r.tenantName}</span> : <Link href={`/admin/tenants/${r.tenantId}`} className="font-medium text-[var(--fg-body)] hover:underline">{r.tenantName}</Link>}
                   <span aria-hidden>·</span><span className="font-mono text-xs">{r.wgIp || "No tunnel IP"}</span>
                   <span aria-hidden>·</span><span>{r.provisioningState}</span>
                 </p>
@@ -185,30 +203,32 @@ function RouterDetailInner() {
       <Tabs label="Router sections" tabs={TABS} value={tab} onChange={setTab} />
 
       {tab === "Overview" && detail && <OverviewTab detail={detail} now={now} />}
-      {tab === "Sessions" && <SessionsTab routerId={routerId} now={now} />}
-      {tab === "Accounting" && <AccountingTab routerId={routerId} />}
-      {tab === "Auth events" && <AuthTab routerId={routerId} />}
-      {tab === "Devices" && <DevicesTab routerId={routerId} now={now} />}
-      {tab === "Provisioning" && detail && <ProvisioningTab routerId={routerId} detail={detail} />}
-      {tab === "Events" && <EventsTab routerId={routerId} />}
-      {tab === "Diagnostics" && <DiagnosticsTab routerId={routerId} />}
+      {tab === "Live now" && <LiveNowTab now={now} />}
+      {tab === "Sessions" && <SessionsTab now={now} />}
+      {tab === "Accounting" && <AccountingTab />}
+      {tab === "Auth events" && <AuthTab />}
+      {tab === "Devices" && <DevicesTab now={now} />}
+      {tab === "Provisioning" && detail && <ProvisioningTab detail={detail} />}
+      {tab === "Events" && <EventsTab />}
+      {tab === "Diagnostics" && <DiagnosticsTab />}
     </div>
   );
 }
 
 /* ---------------- Overview ---------------- */
 function OverviewTab({ detail, now }: { detail: Detail; now: number }) {
+  const { base } = useContext(RouterScope);
   const r = detail.router;
   const [usage, setUsage] = useState<UsagePoint[] | null>(null);
   const [usageErr, setUsageErr] = useState("");
   const [incidents, setIncidents] = useState<Incident[] | null>(null);
   const [incErr, setIncErr] = useState("");
   useEffect(() => {
-    api.get<UsagePoint[]>(`/api/admin/noc/routers/${r.id}/usage`, { params: { days: 14 } })
+    api.get<UsagePoint[]>(`${base}/usage`, { params: { days: 14 } })
       .then((x) => setUsage(x.data)).catch((e) => setUsageErr(message(e)));
-    api.get<Incident[]>(`/api/admin/noc/routers/${r.id}/incidents`)
+    api.get<Incident[]>(`${base}/incidents`)
       .then((x) => setIncidents(x.data)).catch((e) => setIncErr(message(e)));
-  }, [r.id]);
+  }, [base]);
   const open = (incidents ?? []).filter((i) => !i.resolvedAt);
   const recentResolved = (incidents ?? []).filter((i) => i.resolvedAt).slice(0, 3);
   const svc = servicesState([r.hotspotReady, r.radiusReady, r.portalReady]);
@@ -274,12 +294,100 @@ function OverviewTab({ detail, now }: { detail: Detail; now: number }) {
 }
 
 /* ---------------- Sessions ---------------- */
-function SessionsTab({ routerId, now }: { routerId: number; now: number }) {
+/**
+ * Who the router itself reports as connected right now (RouterOS
+ * /ip/hotspot/active over the tunnel, cached up to 30 s server-side). This is
+ * live state, not RADIUS accounting; the Sessions tab holds the records.
+ */
+function LiveNowTab({ now }: { now: number }) {
+  const { base } = useContext(RouterScope);
+  const [live, setLive] = useState<Live | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [busyUser, setBusyUser] = useState<string | null>(null);
+  const { confirm, dialog } = useConfirmDialog();
+  const mounted = useRef(false);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    api.get<Live>(`${base}/live`, { timeout: 30000 })
+      .then((r) => setLive(r.data))
+      .catch((e) => setLive({ reachable: false, source: "UNAVAILABLE", probedAt: "", error: message(e) }))
+      .finally(() => setLoading(false));
+  }, [base]);
+  useEffect(() => { const t = window.setTimeout(load, 0); return () => window.clearTimeout(t); }, [load]);
+
+  // Checks the outcome instead of assuming it: the session closing, or the router applying the task.
+  const verify = async (username: string, taskId: number | null) => {
+    for (let i = 0; i < 8; i++) {
+      await new Promise((r) => window.setTimeout(r, 3000));
+      if (!mounted.current) return;
+      try {
+        const st = (await api.get<{ verified: boolean; message: string; taskStatus: string }>(`${base}/disconnect-status`, { params: { username, taskId } })).data;
+        if (!mounted.current) return;
+        if (st.verified) { notify.success(st.message); load(); return; }
+        if (["FAILED", "TIMED_OUT", "UNKNOWN"].includes(st.taskStatus)) { notify.error(st.message); return; }
+      } catch (e) { notify.error(message(e)); return; }
+    }
+    notify.info(`${username} isn't confirmed disconnected yet. The router applies it at its next check-in.`);
+  };
+
+  const disconnect = (u: LiveUser) => confirm({
+    title: `Disconnect ${u.user}?`,
+    body: `Request a disconnect for ${u.user}. It may wait for the router's next check-in; we will verify the result. This does not cancel their voucher or pause its expiry, and they may log in again.`,
+    confirmLabel: "Disconnect user",
+    onConfirm: async () => {
+      setBusyUser(u.user);
+      try {
+        const res = (await api.post<{ taskId: number | null; radiusReply: string; message: string }>(`${base}/disconnect`, { username: u.user })).data;
+        notify.info(res.message);
+        void verify(u.user!, res.taskId).finally(() => { if (mounted.current) setBusyUser(null); });
+      } catch (e) { notify.error(message(e)); setBusyUser(null); }
+    },
+  });
+
+  const users = live?.hotspotUsers ?? [];
+  return (
+    <Card title="Connected right now" description={live?.reachable
+      ? `Router snapshot (cached up to 30s) · checked ${live.probedAt ? date(live.probedAt) : "at an unavailable time"} · ${live.probedAt ? relativeTime(live.probedAt, now) : ""}`
+      : "Live data comes straight from the router over its private tunnel"}
+      action={<button type="button" onClick={load} disabled={loading} className={`${buttonGhost} !h-9 !px-3 !text-xs`}><BusyLabel busy={loading} label="Checking…"><ArrowClockwise className="h-3.5 w-3.5" />Refresh</BusyLabel></button>}
+      bodyClassName="">
+      {dialog}
+      {loading && !live ? <ListSkeleton rows={3} avatar={false} />
+        : !live?.reachable ? (
+          <p className="px-5 py-10 text-center text-sm text-[var(--fg-muted)]">
+            The router didn&apos;t answer{live?.error ? ` (${live.error})` : ""}. The Sessions tab shows RADIUS accounting records, which can be a few minutes behind.
+          </p>
+        ) : live.hotspotUsers == null ? (
+          <p className="px-5 py-10 text-center text-sm text-[var(--fg-muted)]">The router answered, but its connected-user list is unavailable. This does not mean nobody is connected.</p>
+        ) : (
+          <Table bare searchable={users.length > 10} rows={users} rowKey={(u) => `${u.user}-${u.macAddress}`} emptyTitle="Nobody is connected right now"
+            columns={[
+              { label: "User", render: (u) => <span className="font-mono text-[13px] font-medium text-[var(--fg)]">{u.user || "—"}</span> },
+              { label: "Device", render: (u) => <span className="font-mono text-xs">{u.address || "—"}<br /><span className="text-[var(--fg-faint)]">{u.macAddress || "—"}</span></span> },
+              { label: "Connected for", render: (u) => duration(u.uptimeSeconds), align: "right", hideBelow: "sm" },
+              // RouterOS counts from the hotspot's side: bytes-out goes to the customer.
+              { label: "Download / upload", render: (u) => <span className="text-xs">{u.bytesOut == null ? "—" : bytes(u.bytesOut)} / {u.bytesIn == null ? "—" : bytes(u.bytesIn)}</span>, align: "right", hideBelow: "md" },
+              { label: "Login", render: (u) => <span className="text-xs text-[var(--fg-muted)]">{u.loginBy || "—"}</span>, hideBelow: "lg" },
+              { label: "", align: "right", render: (u) => u.user ? (
+                <button type="button" disabled={busyUser !== null} onClick={() => disconnect(u)} className="min-h-9 rounded-lg px-2.5 text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-40">
+                  <BusyLabel busy={busyUser === u.user} label="Disconnecting…">Disconnect</BusyLabel>
+                </button>
+              ) : null },
+            ]} />
+        )}
+    </Card>
+  );
+}
+
+function SessionsTab({ now }: { now: number }) {
+  const { base } = useContext(RouterScope);
   const [username, setUsername] = useState("");
   const q = useDebounced(username);
   const [state, setState] = useState<"OPEN" | "LIVE" | "OPEN_STALE" | "ALL">("OPEN");
   const [page, setPage] = useState(0);
-  const { data, error, loading, reload } = usePaged<SessionRow>(`/api/admin/noc/routers/${routerId}/sessions`, {
+  const { data, error, loading, reload } = usePaged<SessionRow>(`${base}/sessions`, {
     openOnly: state !== "ALL", state: state === "OPEN" || state === "ALL" ? "" : state, username: q, page, size: 25,
   });
 
@@ -313,12 +421,13 @@ function SessionsTab({ routerId, now }: { routerId: number; now: number }) {
 }
 
 /* ---------------- Accounting ---------------- */
-function AccountingTab({ routerId }: { routerId: number }) {
+function AccountingTab() {
+  const { base } = useContext(RouterScope);
   const [username, setUsername] = useState("");
   const q = useDebounced(username);
   const [cause, setCause] = useState("");
   const [page, setPage] = useState(0);
-  const { data, error, loading } = usePaged<SessionRow>(`/api/admin/noc/routers/${routerId}/accounting`, { username: q, cause, page, size: 25 });
+  const { data, error, loading } = usePaged<SessionRow>(`${base}/accounting`, { username: q, cause, page, size: 25 });
   const causes = useMemo(() => [...new Set((data?.content ?? []).map((s) => s.terminateCause).filter((c): c is string => !!c))], [data]);
 
   return (
@@ -348,12 +457,13 @@ function AccountingTab({ routerId }: { routerId: number }) {
 }
 
 /* ---------------- Auth events ---------------- */
-function AuthTab({ routerId }: { routerId: number }) {
+function AuthTab() {
+  const { base } = useContext(RouterScope);
   const [reply, setReply] = useState<"" | "Access-Accept" | "Access-Reject">("");
   const [username, setUsername] = useState("");
   const q = useDebounced(username);
   const [page, setPage] = useState(0);
-  const { data, error, loading } = usePaged<AuthEvent>(`/api/admin/noc/routers/${routerId}/auth-events`, { reply, username: q, page, size: 25 });
+  const { data, error, loading } = usePaged<AuthEvent>(`${base}/auth-events`, { reply, username: q, page, size: 25 });
 
   return (
     <Card bodyClassName="">
@@ -380,13 +490,14 @@ function AuthTab({ routerId }: { routerId: number }) {
 }
 
 /* ---------------- Devices (hotspot hosts) ---------------- */
-function DevicesTab({ routerId, now }: { routerId: number; now: number }) {
+function DevicesTab({ now }: { now: number }) {
+  const { base } = useContext(RouterScope);
   const [data, setData] = useState<{ hosts: Host[]; seenAt: string } | null>(null);
   const [err, setErr] = useState("");
   useEffect(() => {
-    api.get<{ hosts: Host[]; seenAt: string }>(`/api/admin/noc/routers/${routerId}/hosts`)
+    api.get<{ hosts: Host[]; seenAt: string }>(`${base}/hosts`)
       .then((r) => setData(r.data)).catch((e) => setErr(message(e)));
-  }, [routerId]);
+  }, [base]);
   const str = (v: unknown) => (v == null || v === "" ? "—" : String(v));
   return (
     <Card title="Hotspot host list" description={data?.seenAt ? `Pushed by the router ${relativeTime(data.seenAt, now)}` : "Not reported yet"} bodyClassName="">
@@ -405,13 +516,14 @@ function DevicesTab({ routerId, now }: { routerId: number; now: number }) {
 }
 
 /* ---------------- Provisioning ---------------- */
-function ProvisioningTab({ routerId, detail }: { routerId: number; detail: Detail }) {
+function ProvisioningTab({ detail }: { detail: Detail }) {
+  const { base } = useContext(RouterScope);
   const [tasks, setTasks] = useState<Task[] | null>(null);
   const [err, setErr] = useState("");
   useEffect(() => {
-    api.get<Task[]>(`/api/admin/noc/routers/${routerId}/tasks`)
+    api.get<Task[]>(`${base}/tasks`)
       .then((r) => setTasks(r.data)).catch((e) => setErr(message(e)));
-  }, [routerId]);
+  }, [base]);
   const r = detail.router;
   return (
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
@@ -441,14 +553,15 @@ function ProvisioningTab({ routerId, detail }: { routerId: number; detail: Detai
 }
 
 /* ---------------- Events timeline ---------------- */
-function EventsTab({ routerId }: { routerId: number }) {
+function EventsTab() {
+  const { base } = useContext(RouterScope);
   const [events, setEvents] = useState<Event[] | null>(null);
   const [filter, setFilter] = useState("ALL");
   const [err, setErr] = useState("");
   useEffect(() => {
-    api.get<Event[]>(`/api/admin/noc/routers/${routerId}/events`)
+    api.get<Event[]>(`${base}/events`)
       .then((r) => setEvents(r.data)).catch((e) => setErr(message(e)));
-  }, [routerId]);
+  }, [base]);
   const types = useMemo(() => ["ALL", ...new Set((events ?? []).map((e) => e.type))], [events]);
   const rows = (events ?? []).filter((e) => filter === "ALL" || e.type === filter);
   return (
@@ -474,13 +587,14 @@ function EventsTab({ routerId }: { routerId: number }) {
 }
 
 /* ---------------- Diagnostics ---------------- */
-function DiagnosticsTab({ routerId }: { routerId: number }) {
+function DiagnosticsTab() {
+  const { base } = useContext(RouterScope);
   const [diag, setDiag] = useState<{ checks: Check[] } | null>(null);
   const [err, setErr] = useState("");
   useEffect(() => {
-    api.get<{ checks: Check[] }>(`/api/admin/noc/routers/${routerId}/diagnostics`)
+    api.get<{ checks: Check[] }>(`${base}/diagnostics`)
       .then((r) => setDiag(r.data)).catch((e) => setErr(message(e)));
-  }, [routerId]);
+  }, [base]);
   return (
     <Card title="Diagnostics" description="Live checks query the router now (read-only); inferred checks come from stored telemetry and RADIUS data. No end-to-end customer internet test is claimed.">
       {err && <ErrorNotice text={`Couldn't run diagnostics: ${err}`} />}
