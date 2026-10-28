@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Suspense, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import api from "@/lib/api";
+import WinboxAccessDialog from "@/components/router/WinboxAccessDialog";
 import {
   ArrowClockwise, CellTower as RouterIcon, CheckCircle, MagnifyingGlass,
 } from "@/components/icons";
@@ -113,6 +114,7 @@ function RouterDetailInner() {
   const [error, setError] = useState("");
   const [live, setLive] = useState<Live | null>(null);
   const [liveBusy, setLiveBusy] = useState(false);
+  const [winboxOpen, setWinboxOpen] = useState(false);
 
   const load = useCallback(() => {
     api.get<Detail>(`${base}`)
@@ -166,6 +168,8 @@ function RouterDetailInner() {
       </div>
 
       <ErrorNotice text={error} />
+      <div className="flex justify-end"><button type="button" disabled={!r} className={buttonGhost} onClick={() => setWinboxOpen(true)}>Remote WinBox Access</button></div>
+      {winboxOpen && <WinboxAccessDialog base={tenant ? base.replace(/\/monitor$/, "") : base} onClose={() => setWinboxOpen(false)} />}
 
       {r && s && (
         <section className="panel-shadow grid grid-cols-2 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] lg:grid-cols-5">

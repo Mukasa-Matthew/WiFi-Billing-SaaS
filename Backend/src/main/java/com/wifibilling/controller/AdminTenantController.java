@@ -33,6 +33,7 @@ public class AdminTenantController {
     private final EmailService emailService;
     private final EmailTemplates emailTemplates;
     private final com.wifibilling.service.SubscriptionService subscriptionService;
+    private final com.wifibilling.service.WinboxAccessService winboxAccess;
 
     @Value("${app.public-base-url:http://localhost:3000}")
     private String publicBaseUrl;
@@ -179,6 +180,7 @@ public class AdminTenantController {
      * Activates, suspends, or disables a tenant account.
      */
     @PutMapping("/tenants/{id}/status")
+    @org.springframework.transaction.annotation.Transactional
     public AdminTenantDto.SummaryResponse updateTenantStatus(
             @PathVariable Long id,
             @Valid @RequestBody AdminTenantDto.UpdateStatusRequest req) {
@@ -194,6 +196,7 @@ public class AdminTenantController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid status: " + newStatus);
         }
 
+        if (!"ACTIVE".equals(newStatus)) winboxAccess.revokeTenant(id);
         tenant.setStatus(newStatus);
         tenant = tenantRepository.save(tenant);
 

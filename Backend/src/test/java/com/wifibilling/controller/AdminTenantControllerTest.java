@@ -59,7 +59,8 @@ class AdminTenantControllerTest {
                 passwordEncoder,
                 emailService,
                 emailTemplates,
-                subscriptionService
+                subscriptionService,
+                mock(com.wifibilling.service.WinboxAccessService.class)
         );
     }
 

@@ -1,0 +1,19 @@
+#!/usr/bin/python3
+import re
+import subprocess
+import sys
+
+if len(sys.argv) != 2 or not re.fullmatch(r"[A-Za-z0-9_.-]{1,32}", sys.argv[1]):
+    raise SystemExit(64)
+interface = sys.argv[1]
+
+def read(field):
+    return subprocess.run(["/usr/bin/wg", "show", interface, field], check=True,
+                          capture_output=True, timeout=2).stdout.decode().splitlines()
+
+handshakes = dict(line.split() for line in read("latest-handshakes"))
+for line in read("allowed-ips"):
+    key, values = line.split(None, 1)
+    for address in values.replace(",", " ").split():
+        if address.endswith("/32"):
+            print(key, address, handshakes.get(key, "0"))
