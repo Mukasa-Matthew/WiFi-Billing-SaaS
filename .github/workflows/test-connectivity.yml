@@ -11,6 +11,7 @@ jobs:
     name: Verify Tailscale & SSH Connectivity (Read-Only)
     runs-on: ubuntu-latest
     environment: production
+    timeout-minutes: 10
     steps:
       - name: Connect to Tailscale Network
         uses: tailscale/github-action@v3
@@ -47,5 +48,11 @@ jobs:
             exit 1
           fi
           echo "Executing harmless read-only command on ${DEPLOY_USER}@${APP_HOST}..."
-          ssh -o BatchMode=yes "${DEPLOY_USER}@${APP_HOST}" "hostname && uptime && free -h"
+          # Fail fast instead of hanging if the host demands interactive auth
+          # (e.g. a Tailscale SSH "check" prompt, which a CI runner cannot complete).
+          timeout 60 ssh \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            "${DEPLOY_USER}@${APP_HOST}" "hostname && uptime && free -h"
           echo "Connectivity test SUCCESSFUL: Tailscale and SSH keys verified."
