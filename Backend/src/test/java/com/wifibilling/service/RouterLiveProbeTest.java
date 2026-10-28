@@ -37,11 +37,12 @@ class RouterLiveProbeTest {
 
     @Test
     void unreachableOutputNeverEchoesTheCommandOrCredentials() {
-        String out = "curl: (7) Failed to connect; command was curl -u 'wb-api:RADIUS_SECRET_MARKER' http://10.9.0.4" + SEP + "" + SEP + "";
+        String marker = java.util.UUID.randomUUID().toString();
+        String out = "curl: (7) Failed to connect; command was curl -u '%s:%s' http://10.9.0.4".formatted("wb-api", marker) + SEP + SEP;
         var r = probe.parse(out);
         assertThat(r.reachable()).isFalse();
         assertThat(r.error()).isEqualTo("router REST unreachable or unauthorised");
-        assertThat(r.toString()).doesNotContain("RADIUS_SECRET_MARKER").doesNotContain("wb-api");
+        assertThat(r.toString()).doesNotContain(marker).doesNotContain("wb-api");
     }
 
     @Test
