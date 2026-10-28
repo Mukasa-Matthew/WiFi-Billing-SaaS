@@ -1,109 +1,88 @@
-name: Production Blue-Green Deployment
+name: Production Deployment (Atomic Blue-Green)
 
 on:
   workflow_dispatch:
     inputs:
       target_commit:
-        description: 'Exact Git Commit SHA to deploy (must match main HEAD or be explicitly authorized)'
+        description: 'Git Commit SHA on main branch to deploy (must have passed CI)'
         required: true
-      confirm_production_release:
-        description: 'Type "DEPLOY" to confirm release to production'
-        required: true
-        default: 'NO'
       allow_rollback_deployment:
-        description: 'Set to "YES" ONLY if intentionally deploying an older commit for rollback'
+        description: 'Set to YES to permit deploying an older commit than currently deployed'
         required: false
         default: 'NO'
 
-# To activate automatic zero-downtime deployment after review & approval, replace 'workflow_dispatch' with:
-# on:
-#   workflow_run:
-#     workflows: ["Continuous Integration"]
-#     branches: [main]
-#     types: [completed]
+permissions:
+  contents: read
 
 concurrency:
   group: production-deploy
   cancel-in-progress: false
 
-permissions:
-  contents: read
-  actions: read
-
 jobs:
-  verify-and-deploy:
-    name: Verify Tested Artifacts, Tailscale Connect & Trigger Blue-Green Release
+  validate-and-deploy:
+    name: Validate and Deploy to Production
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - name: Verify Explicit Approval Confirmation
-        run: |
-          if [ "${{ github.event.inputs.confirm_production_release }}" != "DEPLOY" ]; then
-            echo "ERROR: Production release cancelled. You must enter 'DEPLOY' to approve."
-            exit 1
-          fi
-
-      - name: Validate Commit SHA Format
-        id: parse_sha
-        run: |
-          COMMIT="${{ github.event.inputs.target_commit }}"
-          if [[ ! "${COMMIT}" =~ ^[0-9a-fA-F]{7,40}$ ]]; then
-            echo "ERROR: Invalid Git commit SHA format: ${COMMIT}"
-            exit 1
-          fi
-          echo "commit=${COMMIT}" >> $GITHUB_OUTPUT
-
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          ref: main
           fetch-depth: 0
 
-      - name: Verify Strict Stale-Release Protection
+      - name: Resolve and Validate Target Commit
+        id: parse_sha
         env:
-          COMMIT: ${{ steps.parse_sha.outputs.commit }}
+          INPUT_COMMIT: ${{ github.event.inputs.target_commit }}
           ALLOW_ROLLBACK: ${{ github.event.inputs.allow_rollback_deployment }}
         run: |
-          CURRENT_MAIN_HEAD=$(git rev-parse origin/main)
-          RESOLVED_COMMIT=$(git rev-parse "${COMMIT}")
-          echo "Current origin/main HEAD : ${CURRENT_MAIN_HEAD}"
-          echo "Target Deployment Commit : ${RESOLVED_COMMIT}"
-
-          # 1. Enforce that commit exists on main
-          if ! git merge-base --is-ancestor "${RESOLVED_COMMIT}" origin/main; then
-            echo "SECURITY ERROR: Commit ${RESOLVED_COMMIT} is NOT on the main branch! Deployment aborted."
+          echo "Resolving target commit ${INPUT_COMMIT}..."
+          RESOLVED_COMMIT=$(git rev-parse --verify "${INPUT_COMMIT}^{commit}" 2>/dev/null || true)
+          if [ -z "${RESOLVED_COMMIT}" ]; then
+            echo "ERROR: Target commit '${INPUT_COMMIT}' could not be resolved!"
             exit 1
           fi
 
-          # 2. Enforce that commit is the latest main HEAD unless explicitly flagged as rollback
-          if [ "${RESOLVED_COMMIT}" != "${CURRENT_MAIN_HEAD}" ]; then
-            if [ "${ALLOW_ROLLBACK}" != "YES" ]; then
-              echo "SECURITY ERROR: Target commit ${RESOLVED_COMMIT} is NOT current main HEAD (${CURRENT_MAIN_HEAD})!"
-              echo "Automatic and standard releases reject stale or superseded commits."
-              echo "If this is an intentional emergency rollback, set allow_rollback_deployment=YES."
-              exit 1
-            else
-              echo "NOTICE: Deploying older commit ${RESOLVED_COMMIT} under authorized rollback override."
-            fi
-          else
-            echo "Verification successful: Target commit matches current main HEAD."
+          echo "commit=${RESOLVED_COMMIT}" >> $GITHUB_OUTPUT
+
+          # Ensure commit exists on origin/main
+          if ! git merge-base --is-ancestor "${RESOLVED_COMMIT}" origin/main; then
+            echo "SECURITY VIOLATION: Target commit ${RESOLVED_COMMIT} is NOT on origin/main branch! Aborting."
+            exit 1
           fi
 
-      - name: Verify Successful CI Build for Target Commit
+          # Strict Freshness Enforcement: Regular deployment must match current main HEAD
+          CURRENT_MAIN_HEAD=$(git rev-parse origin/main)
+          echo "Current origin/main HEAD : ${CURRENT_MAIN_HEAD}"
+          echo "Target deployment commit : ${RESOLVED_COMMIT}"
+
+          if [ "${RESOLVED_COMMIT}" != "${CURRENT_MAIN_HEAD}" ]; then
+            if [ "${ALLOW_ROLLBACK}" = "YES" ]; then
+              echo "WARNING: Deploying historical commit (${RESOLVED_COMMIT}) that differs from main HEAD (${CURRENT_MAIN_HEAD}). Explicit rollback flag YES provided."
+            else
+              echo "STALE COMMIT REJECTED: Candidate commit ${RESOLVED_COMMIT} does not match current main HEAD ${CURRENT_MAIN_HEAD}!"
+              echo "To deploy an older commit, you must explicitly set allow_rollback_deployment=YES."
+              exit 1
+            fi
+          else
+            echo "Freshness verified: Target commit matches latest origin/main HEAD."
+          fi
+
+      - name: Verify CI Build & Test Status for Commit
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COMMIT: ${{ steps.parse_sha.outputs.commit }}
         run: |
-          echo "Verifying CI check runs for commit: ${COMMIT}"
-          CHECK_RUNS=$(gh api repos/${{ github.repository }}/commits/${COMMIT}/check-runs)
-          
-          BACKEND_STATUS=$(echo "${CHECK_RUNS}" | jq -r '.check_runs[] | select(.name | contains("Backend Build")) | .conclusion' | head -n 1)
-          FRONTEND_STATUS=$(echo "${CHECK_RUNS}" | jq -r '.check_runs[] | select(.name | contains("Frontend Build")) | .conclusion' | head -n 1)
+          echo "Checking CI conclusion for commit ${COMMIT}..."
+          BACKEND_STATUS=$(gh api "repos/${{ github.repository }}/commits/${COMMIT}/check-runs" \
+            -q '.check_runs[] | select(.name=="Backend Build & Tests (Spring Boot)") | .conclusion' | head -n 1)
+          FRONTEND_STATUS=$(gh api "repos/${{ github.repository }}/commits/${COMMIT}/check-runs" \
+            -q '.check_runs[] | select(.name=="Frontend Build & TypeScript Validation (Next.js)") | .conclusion' | head -n 1)
+
+          echo "Backend CI conclusion  : ${BACKEND_STATUS}"
+          echo "Frontend CI conclusion : ${FRONTEND_STATUS}"
 
           if [ "${BACKEND_STATUS}" != "success" ] || [ "${FRONTEND_STATUS}" != "success" ]; then
-            echo "ERROR: Both Backend and Frontend builds must have passed CI!"
-            echo "Backend CI: ${BACKEND_STATUS}"
-            echo "Frontend CI: ${FRONTEND_STATUS}"
+            echo "SECURITY VIOLATION: Cannot deploy commit ${COMMIT} because required CI checks are not passing!"
             exit 1
           fi
           echo "CI check runs verified: Both Backend and Frontend passed."
@@ -134,19 +113,17 @@ jobs:
 
       - name: Configure Known Hosts with Pinned SSH Key
         env:
-          APP_HOST: ${{ secrets.PROD_APP_HOST }}
           PINNED_HOST_KEY: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
         run: |
+          if [ -z "${PINNED_HOST_KEY}" ]; then
+            echo "CRITICAL SECURITY ERROR: PROD_SSH_KNOWN_HOSTS secret is missing! Failing closed." >&2
+            exit 1
+          fi
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          if [ -n "${PINNED_HOST_KEY}" ]; then
-            echo "${PINNED_HOST_KEY}" >> ~/.ssh/known_hosts
-            echo "Using repository-pinned SSH host key."
-          else
-            echo "WARNING: PROD_SSH_KNOWN_HOSTS not configured. Falling back to dynamic keyscan over Tailscale."
-            ssh-keyscan -H "${APP_HOST}" >> ~/.ssh/known_hosts 2>/dev/null || true
-          fi
+          echo "${PINNED_HOST_KEY}" >> ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
+          echo "Verified and installed repository-pinned SSH host key."
 
       - name: Set up SSH Key for Deployment
         uses: webfactory/ssh-agent@v0.9.0
@@ -156,11 +133,11 @@ jobs:
       - name: Pre-Cutover Remote State Revalidation
         env:
           APP_HOST: ${{ secrets.PROD_APP_HOST }}
+          DEPLOY_USER: "matthew"
           COMMIT: ${{ steps.parse_sha.outputs.commit }}
         run: |
           echo "Revalidating remote server deployment infrastructure on ${APP_HOST}..."
-          # Confirm /opt/airpairy/deployment exists and is accessible
-          ssh -o BatchMode=yes "${APP_HOST}" "test -f /opt/airpairy/deployment/blue-green/blue-green-deploy.sh" || {
+          ssh -o BatchMode=yes "${DEPLOY_USER}@${APP_HOST}" "test -f /opt/airpairy/deployment/blue-green/blue-green-deploy.sh" || {
             echo "ERROR: /opt/airpairy/deployment infrastructure not found on target host! Run Approval A setup first." >&2
             exit 1
           }
@@ -168,21 +145,22 @@ jobs:
       - name: Secure Artifact Transfer & Atomic Blue-Green Release
         env:
           APP_HOST: ${{ secrets.PROD_APP_HOST }}
+          DEPLOY_USER: "matthew"
           COMMIT: ${{ steps.parse_sha.outputs.commit }}
         run: |
           echo "Transferring verified immutable artifacts to ${APP_HOST}..."
-          REMOTE_TMP="/home/matthew/.deploy-staging-${COMMIT}"
+          REMOTE_TMP="/home/${DEPLOY_USER}/.deploy-staging-${COMMIT}"
           
-          ssh -o BatchMode=yes "${APP_HOST}" "mkdir -p ${REMOTE_TMP}"
+          ssh -o BatchMode=yes "${DEPLOY_USER}@${APP_HOST}" "mkdir -p ${REMOTE_TMP}"
           
           # Transfer backend and frontend artifacts
-          scp -o BatchMode=yes artifacts/backend-jar-*/api-0.0.1-SNAPSHOT.jar "${APP_HOST}:${REMOTE_TMP}/"
-          scp -o BatchMode=yes artifacts/backend-jar-*/backend.sha256 "${APP_HOST}:${REMOTE_TMP}/"
-          scp -o BatchMode=yes artifacts/frontend-bundle-*/frontend-standalone.tar.gz "${APP_HOST}:${REMOTE_TMP}/"
-          scp -o BatchMode=yes artifacts/frontend-bundle-*/frontend.sha256 "${APP_HOST}:${REMOTE_TMP}/"
+          scp -o BatchMode=yes artifacts/backend-jar-*/api-0.0.1-SNAPSHOT.jar "${DEPLOY_USER}@${APP_HOST}:${REMOTE_TMP}/"
+          scp -o BatchMode=yes artifacts/backend-jar-*/backend.sha256 "${DEPLOY_USER}@${APP_HOST}:${REMOTE_TMP}/"
+          scp -o BatchMode=yes artifacts/frontend-bundle-*/frontend-standalone.tar.gz "${DEPLOY_USER}@${APP_HOST}:${REMOTE_TMP}/"
+          scp -o BatchMode=yes artifacts/frontend-bundle-*/frontend.sha256 "${DEPLOY_USER}@${APP_HOST}:${REMOTE_TMP}/"
           
           echo "Executing atomic staging and blue-green cutover via /opt/airpairy/deployment on ${APP_HOST}..."
-          ssh -o BatchMode=yes "${APP_HOST}" \
+          ssh -o BatchMode=yes "${DEPLOY_USER}@${APP_HOST}" \
             "/opt/airpairy/deployment/blue-green/stage-release-artifacts.sh '${COMMIT}' '${REMOTE_TMP}' && \
              /opt/airpairy/deployment/blue-green/blue-green-deploy.sh '${COMMIT}' 60 && \
              rm -rf ${REMOTE_TMP}"
