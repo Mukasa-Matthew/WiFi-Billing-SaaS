@@ -14,8 +14,8 @@ set -euo pipefail
 
 MODE="${1:-warm}" # default: warm
 APP_DIR="/var/www/wifi-billing"
-ACTIVE_SLOT_FILE="${APP_DIR}/deployment/active_slot.txt"
-ROLLBACK_SLOT_FILE="${APP_DIR}/deployment/rollback_slot.txt"
+ACTIVE_SLOT_FILE="${DEPLOY_DIR:-/opt/airpairy/deployment}/active_slot.txt"
+ROLLBACK_SLOT_FILE="${DEPLOY_DIR:-/opt/airpairy/deployment}/rollback_slot.txt"
 
 if [ ! -f "${ROLLBACK_SLOT_FILE}" ]; then
     echo "ERROR: Rollback slot record '${ROLLBACK_SLOT_FILE}' not found!" >&2

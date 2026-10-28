@@ -4,11 +4,15 @@ on:
   workflow_dispatch:
     inputs:
       target_commit:
-        description: 'Exact Git Commit SHA to deploy (must have passed CI on main branch)'
+        description: 'Exact Git Commit SHA to deploy (must match main HEAD or be explicitly authorized)'
         required: true
       confirm_production_release:
         description: 'Type "DEPLOY" to confirm release to production'
         required: true
+        default: 'NO'
+      allow_rollback_deployment:
+        description: 'Set to "YES" ONLY if intentionally deploying an older commit for rollback'
+        required: false
         default: 'NO'
 
 # To activate automatic zero-downtime deployment after review & approval, replace 'workflow_dispatch' with:
@@ -55,29 +59,34 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      - name: Verify Commit Exists on Main Branch
+      - name: Verify Strict Stale-Release Protection
         env:
           COMMIT: ${{ steps.parse_sha.outputs.commit }}
+          ALLOW_ROLLBACK: ${{ github.event.inputs.allow_rollback_deployment }}
         run: |
-          echo "Verifying that commit ${COMMIT} is merged into main branch..."
-          if ! git merge-base --is-ancestor "${COMMIT}" origin/main; then
-            echo "SECURITY ERROR: Commit ${COMMIT} is NOT on the main branch! Deployment aborted."
+          CURRENT_MAIN_HEAD=$(git rev-parse origin/main)
+          RESOLVED_COMMIT=$(git rev-parse "${COMMIT}")
+          echo "Current origin/main HEAD : ${CURRENT_MAIN_HEAD}"
+          echo "Target Deployment Commit : ${RESOLVED_COMMIT}"
+
+          # 1. Enforce that commit exists on main
+          if ! git merge-base --is-ancestor "${RESOLVED_COMMIT}" origin/main; then
+            echo "SECURITY ERROR: Commit ${RESOLVED_COMMIT} is NOT on the main branch! Deployment aborted."
             exit 1
           fi
-          echo "Branch verification successful: Commit is on main."
 
-      - name: Verify Stale Commit Protection (Candidate Must Be at or Ancestor of Head)
-        env:
-          COMMIT: ${{ steps.parse_sha.outputs.commit }}
-        run: |
-          HEAD_SHA=$(git rev-parse origin/main)
-          echo "Current origin/main HEAD: ${HEAD_SHA}"
-          echo "Target Release Commit   : ${COMMIT}"
-
-          # Ensure the candidate commit is an approved commit on main
-          if ! git merge-base --is-ancestor "${COMMIT}" origin/main; then
-            echo "SECURITY ERROR: Release candidate is not in main ancestry!"
-            exit 1
+          # 2. Enforce that commit is the latest main HEAD unless explicitly flagged as rollback
+          if [ "${RESOLVED_COMMIT}" != "${CURRENT_MAIN_HEAD}" ]; then
+            if [ "${ALLOW_ROLLBACK}" != "YES" ]; then
+              echo "SECURITY ERROR: Target commit ${RESOLVED_COMMIT} is NOT current main HEAD (${CURRENT_MAIN_HEAD})!"
+              echo "Automatic and standard releases reject stale or superseded commits."
+              echo "If this is an intentional emergency rollback, set allow_rollback_deployment=YES."
+              exit 1
+            else
+              echo "NOTICE: Deploying older commit ${RESOLVED_COMMIT} under authorized rollback override."
+            fi
+          else
+            echo "Verification successful: Target commit matches current main HEAD."
           fi
 
       - name: Verify Successful CI Build for Target Commit
@@ -144,6 +153,18 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.PROD_DEPLOY_SSH_KEY }}
 
+      - name: Pre-Cutover Remote State Revalidation
+        env:
+          APP_HOST: ${{ secrets.PROD_APP_HOST }}
+          COMMIT: ${{ steps.parse_sha.outputs.commit }}
+        run: |
+          echo "Revalidating remote server deployment infrastructure on ${APP_HOST}..."
+          # Confirm /opt/airpairy/deployment exists and is accessible
+          ssh -o BatchMode=yes "${APP_HOST}" "test -f /opt/airpairy/deployment/blue-green/blue-green-deploy.sh" || {
+            echo "ERROR: /opt/airpairy/deployment infrastructure not found on target host! Run Approval A setup first." >&2
+            exit 1
+          }
+
       - name: Secure Artifact Transfer & Atomic Blue-Green Release
         env:
           APP_HOST: ${{ secrets.PROD_APP_HOST }}
@@ -160,8 +181,8 @@ jobs:
           scp -o BatchMode=yes artifacts/frontend-bundle-*/frontend-standalone.tar.gz "${APP_HOST}:${REMOTE_TMP}/"
           scp -o BatchMode=yes artifacts/frontend-bundle-*/frontend.sha256 "${APP_HOST}:${REMOTE_TMP}/"
           
-          echo "Executing atomic staging and blue-green cutover on ${APP_HOST}..."
+          echo "Executing atomic staging and blue-green cutover via /opt/airpairy/deployment on ${APP_HOST}..."
           ssh -o BatchMode=yes "${APP_HOST}" \
-            "/var/www/wifi-billing/deployment/blue-green/stage-release-artifacts.sh '${COMMIT}' '${REMOTE_TMP}' && \
-             /var/www/wifi-billing/deployment/blue-green/blue-green-deploy.sh '${COMMIT}' 60 && \
+            "/opt/airpairy/deployment/blue-green/stage-release-artifacts.sh '${COMMIT}' '${REMOTE_TMP}' && \
+             /opt/airpairy/deployment/blue-green/blue-green-deploy.sh '${COMMIT}' 60 && \
              rm -rf ${REMOTE_TMP}"
