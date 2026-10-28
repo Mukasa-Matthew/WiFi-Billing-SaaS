@@ -17,6 +17,9 @@ public interface RadAcctRepository extends JpaRepository<RadAcct, Long> {
     /** Find all active (open) accounting sessions for a username. */
     List<RadAcct> findAllByUsernameAndAcctStopTimeIsNull(String username);
 
+    /** Open sessions for one user on one NAS (router tunnel IP). */
+    List<RadAcct> findAllByUsernameAndNasIpAddressAndAcctStopTimeIsNull(String username, String nasIpAddress);
+
     /** Find all active (open) accounting sessions across the platform. */
     List<RadAcct> findAllByAcctStopTimeIsNullOrderByAcctStartTimeDesc();
 

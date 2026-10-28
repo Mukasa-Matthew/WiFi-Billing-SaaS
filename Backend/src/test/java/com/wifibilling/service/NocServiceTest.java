@@ -169,4 +169,44 @@ class NocServiceTest {
         assertEquals("CRITICAL", radius.status());
         assertNotNull(radius.recommendation());
     }
+
+    @Test
+    void diagnosticsHandleReadinessNotYetReported() {
+        router.setHotspotReady(null);
+        router.setRadiusReady(null);
+        router.setPortalReady(null);
+        when(routers.findById(24L)).thenReturn(Optional.of(router));
+        when(liveProbe.probe(router)).thenReturn(new RouterLiveProbe.LiveResult(false, null, null, null, null, "unavailable"));
+        var result = noc.diagnostics(24L);
+        assertEquals("UNKNOWN", result.checks().stream().filter(c -> c.key().equals("services")).findFirst().orElseThrow().status());
+    }
+
+    @Test
+    void unavailableHotspotListIsNotReportedAsZeroUsers() {
+        when(routers.findById(24L)).thenReturn(Optional.of(router));
+        when(liveProbe.probe(router)).thenReturn(new RouterLiveProbe.LiveResult(true,
+                java.util.Map.of("uptime", "1d"), null, null, null, null));
+        var live = noc.live(24L);
+        assertNull(live.get("hotspotUsers"));
+        assertNull(live.get("hotspotActive"));
+    }
+
+    @Test
+    void liveReturnsTheRoutersConnectedUsersAndNeverItsSecrets() {
+        router.setRadiusSecret("RADIUS_SECRET_MARKER");
+        when(routers.findById(24L)).thenReturn(Optional.of(router));
+        java.util.Map<String, Object> host = new java.util.LinkedHashMap<>();
+        host.put("user", "ABC123"); host.put("address", "10.5.50.9"); host.put("macAddress", "AA:BB:CC:DD:EE:FF");
+        when(liveProbe.probe(router)).thenReturn(new RouterLiveProbe.LiveResult(true,
+                java.util.Map.of("uptime", "1d", "cpu-load", 12, "free-memory", 50, "total-memory", 100), 1, 30L, List.of(host), null));
+        when(liveProbe.probedAt(24L)).thenReturn(java.time.Instant.parse("2026-10-28T12:00:00Z"));
+
+        var live = noc.live(24L);
+
+        assertEquals("LIVE", live.get("source"));
+        assertEquals("2026-10-28T12:00Z", live.get("probedAt"));
+        assertEquals(List.of(host), live.get("hotspotUsers"));
+        assertEquals(50L, live.get("memoryUsagePct"));
+        org.assertj.core.api.Assertions.assertThat(live.toString()).doesNotContain("RADIUS_SECRET_MARKER").doesNotContain("tok_x");
+    }
 }
