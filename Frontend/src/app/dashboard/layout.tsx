@@ -91,6 +91,7 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
         { name: "New package", href: "/dashboard/packages/new", group: "Sales" },
         { name: "Generate vouchers", href: "/dashboard/vouchers/new", group: "Sales" },
         { name: "New IP binding", href: "/dashboard/bindings/new", group: "Customers" },
+        { name: "New customer", href: "/dashboard/customers/new", group: "Customers" },
       ]}
       rootHref="/dashboard"
       collapsibleGroups

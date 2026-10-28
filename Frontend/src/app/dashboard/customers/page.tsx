@@ -3,6 +3,7 @@ import { BusyLabel, useSingleFlight } from "@/components/LoadingUI";
 import { mutateCache } from "@/lib/cacheInvalidation";
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import api from "@/lib/api";
+import Link from "next/link";
 import { useResource, useApi, Table, ErrorNotice, FilterTabs, Segmented, Badge, field, button, buttonGhost, message, PageContainer, PageHeader, EmptyState, label, bytes, relativeTime, useNow, type Column } from "@/components/BillingUI";
 import { Dialog } from "@/components/ui/Dialog";
 import { useToast } from "@/components/ui/Toast";
@@ -47,7 +48,7 @@ const NO_FILTERS: Filters = { pkg: "", connection: "any", name: "any", joined: "
 const filterCount = (f: Filters) => [f.pkg !== "", f.connection !== "any", f.name !== "any", f.joined !== "any"].filter(Boolean).length;
 
 /* Optional columns; the choice is a per-device preference. */
-const OPTIONAL = ["Phone", "Voucher", "Access", "Data used", "Spent", "Last online"] as const;
+const OPTIONAL = ["Phone", "Voucher", "Package", "Session start", "Session end", "Data used", "Spent", "Last online"] as const;
 type Optional = (typeof OPTIONAL)[number];
 const COLS_KEY = "wb_customer_columns_hidden";
 const columnStore = {
@@ -219,7 +220,6 @@ export default function Page() {
   const picked = useMemo(() => rows.filter((c) => selected.has(c.id)), [rows, selected]);
   const changeTab = (t: string) => { setTab(t); setSelected(new Set()); };
 
-  const openCreate = () => { setNote(""); setEdit({ name: "", phone: "", notes: "" }); };
   const openEdit = (customer: Customer) => { setNote(""); setView(null); setEdit({ ...customer, name: hasName(customer) ? customer.name : "" }); };
 
   const singleFlight = useSingleFlight();
@@ -283,21 +283,22 @@ export default function Page() {
     },
     { key: "Phone", label: "Phone", hideBelow: "sm", render: (c) => c.phone ? <span className="num whitespace-nowrap">{c.phone}</span> : <span className="text-[var(--fg-faint)]">—</span> },
     {
-      key: "Voucher", label: "Voucher", hideBelow: "sm", render: (c) => c.voucher ? (
-        <span className="block whitespace-nowrap">
-          <span className="font-mono text-xs font-semibold text-[var(--fg)]">{c.voucher}</span>
-          {c.packageName && <span className="block text-[11px] text-[var(--fg-muted)]">{c.packageName}</span>}
-        </span>
-      ) : <span className="text-[var(--fg-faint)]">—</span>,
+      key: "Voucher", label: "Voucher", hideBelow: "sm", render: (c) => c.voucher
+        ? <span className="whitespace-nowrap font-mono text-xs font-semibold text-[var(--fg)]">{c.voucher}</span>
+        : <span className="text-[var(--fg-faint)]">—</span>,
     },
+    { key: "Package", label: "Package", hideBelow: "md", render: (c) => c.packageName ? <Badge tone="blue">{c.packageName}</Badge> : <span className="text-[var(--fg-faint)]">—</span> },
     { key: "Status", label: "Status", render: (c) => <Badge tone={STATUS[c.status].tone}>{STATUS[c.status].label}</Badge> },
     {
-      key: "Access", label: "Access", hideBelow: "lg", render: (c) => c.sessionStart || c.sessionEnd ? (
-        <span className="num block whitespace-nowrap text-[13px]">
-          <span className="block text-[var(--fg-body)]">{shortDateTime(c.sessionStart) ?? "Not started"}</span>
-          <span className="block text-xs text-[var(--fg-muted)]">{c.sessionEnd ? `${c.status === "expired" || c.status === "suspended" ? "Ended" : "Ends"} ${shortDateTime(c.sessionEnd)}` : "—"}</span>
-        </span>
-      ) : <span className="text-[13px] text-[var(--fg-faint)]">{c.status === "ready" ? "Not started" : "—"}</span>,
+      key: "Session start", label: "Session start", hideBelow: "lg", render: (c) => c.sessionStart
+        ? <span className="num whitespace-nowrap text-[13px] text-[var(--fg-body)]">{shortDateTime(c.sessionStart)}</span>
+        : <span className="text-[13px] text-[var(--fg-faint)]">{c.status === "ready" ? "Not started" : "—"}</span>,
+    },
+    {
+      // Ends in the future for active access; the time access ended otherwise.
+      key: "Session end", label: "Session end", hideBelow: "lg", render: (c) => c.sessionEnd
+        ? <span className={`num whitespace-nowrap text-[13px] ${c.status === "active" ? "text-emerald-700" : "text-[var(--fg-muted)]"}`}>{shortDateTime(c.sessionEnd)}</span>
+        : <span className="text-[13px] text-[var(--fg-faint)]">{c.status === "ready" ? "Starts on first login" : "—"}</span>,
     },
     { key: "Data used", label: "Data used", align: "right", hideBelow: "md", render: (c) => <span className="num whitespace-nowrap">{bytes(c.dataBytes)}</span> },
     { key: "Spent", label: "Spent", align: "right", hideBelow: "lg", render: (c) => <span className="num whitespace-nowrap">{ugx(c.totalSpent)}</span> },
@@ -386,7 +387,7 @@ export default function Page() {
           <span aria-hidden className="text-[var(--fg-faint)]">·</span>
           <span className="num inline-flex items-center gap-1.5"><span className={`h-1.5 w-1.5 rounded-full ${online ? "bg-emerald-500" : "bg-[var(--fg-faint)]"}`} />{online.toLocaleString()} online now</span>
         </> : undefined}
-        action={<button onClick={openCreate} className={button}><UserPlus className="h-4 w-4" />Add customer</button>}
+        action={<Link href="/dashboard/customers/new" className={button}><UserPlus className="h-4 w-4" />New customer</Link>}
       />
       <ErrorNotice text={error || note} />
 
@@ -396,7 +397,7 @@ export default function Page() {
             icon={<Users className="h-8 w-8 text-slate-300" />}
             title="No customers yet"
             description="Customers appear here automatically when someone pays with mobile money. You can also add walk-in buyers yourself."
-            action={<button onClick={openCreate} className={`${button} mt-3`}><UserPlus className="h-4 w-4" />Add a customer</button>}
+            action={<Link href="/dashboard/customers/new" className={`${button} mt-3`}><UserPlus className="h-4 w-4" />Add a customer</Link>}
           />
         </section>
       ) : (

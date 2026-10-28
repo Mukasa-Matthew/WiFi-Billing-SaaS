@@ -95,6 +95,16 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             """, nativeQuery = true)
     List<Object[]> paidVouchersWithoutCustomer();
 
+    /** Same as paidVouchersWithoutCustomer, for one tenant (the Customers page catch-up). */
+    @org.springframework.data.jpa.repository.Query(value = """
+            SELECT t.tenant_id, t.phone, t.voucher_code, t.created_at
+            FROM transactions t
+            JOIN vouchers v ON v.code = t.voucher_code AND v.tenant_id = t.tenant_id
+            WHERE t.tenant_id = :tenantId AND t.status = 'SUCCESSFUL' AND v.customer_id IS NULL AND t.phone <> 'MANUAL'
+            ORDER BY t.created_at
+            """, nativeQuery = true)
+    List<Object[]> paidVouchersWithoutCustomer(@org.springframework.data.repository.query.Param("tenantId") Long tenantId);
+
     /** Successful payment totals per customer of a tenant: (customer_id, sum). */
     @org.springframework.data.jpa.repository.Query(value = """
             SELECT v.customer_id, COALESCE(SUM(t.amount), 0)

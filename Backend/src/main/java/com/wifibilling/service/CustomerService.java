@@ -45,6 +45,7 @@ public class CustomerService {
     private final PlatformTransactionManager txManager;
     private final LeaderLockService leaderLockService;
     private final RadAcctRepository accounting;
+    private final VoucherService voucherService;
 
     /**
      * One customer-directory row. {@code status}: active (access in use),
@@ -225,6 +226,64 @@ public class CustomerService {
             }
             if (linked > 0) log.info("Customer backfill linked {} paid vouchers to customers", linked);
         });
+    }
+
+    /**
+     * Links this tenant's paid vouchers that still have no customer. Runs on
+     * every Customers page load because the startup backfill only runs where
+     * scheduling is enabled (the worker, which may be an older release), and
+     * payments confirmed there never record a buyer. After the first pass this
+     * is one query that returns nothing.
+     */
+    public int catchUp(Long tenantId) {
+        int linked = 0;
+        for (Object[] row : transactions.paidVouchersWithoutCustomer(tenantId)) {
+            try {
+                if (recordBuyer(tenantId, (String) row[1], (String) row[2], AccessState.toUtc(row[3])).isPresent()) linked++;
+            } catch (RuntimeException e) {
+                log.warn("Customer catch-up skipped voucher {}: {}", row[2], e.getMessage());
+            }
+        }
+        if (linked > 0) log.info("Customer catch-up linked {} paid vouchers for tenant {}", linked, tenantId);
+        return linked;
+    }
+
+    public record Onboarded(Long customerId, String voucher) {}
+
+    /**
+     * Adds a customer from the New customer form and, optionally, issues them
+     * one voucher of a package and records its walk-in payment, all in one
+     * transaction: a failure leaves nothing half-created. A phone number that
+     * already belongs to a customer is rejected rather than duplicated. Callers
+     * check the subscription allows management before issuing a voucher.
+     */
+    @Transactional
+    public Onboarded onboard(Long tenantId, String name, String phone, String notes, Long packageId,
+                             Long routerId, BigDecimal amount, String method) {
+        String local = localPhone(phone);
+        String storedPhone = local != null ? local : phone == null || phone.isBlank() ? null : phone.trim();
+        if (local != null) {
+            customers.findFirstByTenantIdAndPhoneInOrderByIdAsc(tenantId, phoneVariants(local)).ifPresent(existing -> {
+                throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT,
+                        "A customer with phone " + local + " already exists (" + existing.getName() + ").");
+            });
+        }
+        String displayName = name == null || name.isBlank() ? storedPhone : name.trim();
+        if (displayName == null) {
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "Enter a name or a phone number.");
+        }
+        Customer customer = customers.save(Customer.builder().tenant(tenants.getReferenceById(tenantId))
+                .name(displayName).phone(storedPhone).notes(notes == null || notes.isBlank() ? null : notes.trim()).build());
+        String code = null;
+        if (packageId != null) {
+            code = voucherService.generate(tenantId, new com.wifibilling.dto.GenerateVouchersRequest(packageId, 1)).get(0).code();
+            voucherService.assign(tenantId, List.of(code), customer.getId());
+            if (amount != null) {
+                if (routerId == null) throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "Choose the router where the payment was received.");
+                voucherService.sellWalkIn(tenantId, code, routerId, amount, method == null ? "CASH" : method, null, "Recorded when the customer was added");
+            }
+        }
+        return new Onboarded(customer.getId(), code);
     }
 
     /** Ugandan numbers in local form (0772270145); null for MANUAL and other non-numbers. */

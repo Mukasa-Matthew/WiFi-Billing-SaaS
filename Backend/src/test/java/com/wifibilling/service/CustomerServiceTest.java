@@ -38,8 +38,9 @@ class CustomerServiceTest {
     VoucherRepository vouchers = mock(VoucherRepository.class);
     TransactionRepository transactions = mock(TransactionRepository.class);
     RadAcctRepository accounting = mock(RadAcctRepository.class);
+    VoucherService voucherService = mock(VoucherService.class);
     CustomerService service = new CustomerService(customers, tenants, vouchers, transactions,
-            mock(JdbcTemplate.class), mock(PlatformTransactionManager.class), mock(LeaderLockService.class), accounting);
+            mock(JdbcTemplate.class), mock(PlatformTransactionManager.class), mock(LeaderLockService.class), accounting, voucherService);
 
     PackagePlan daily = PackagePlan.builder().id(1L).name("Daily").sessionTimeout(86400).build();
 
@@ -159,5 +160,61 @@ class CustomerServiceTest {
         });
         assertThat(h.payments()).extracting(CustomerService.PaymentEntry::reference).containsExactly("PAY-1");
         assertThat(service.history(TENANT, 99L)).isEmpty();
+    }
+
+    @Test
+    void catchUpLinksEveryPaidVoucherWithoutACustomerAndSkipsFailures() {
+        when(transactions.paidVouchersWithoutCustomer(TENANT)).thenReturn(List.of(
+                new Object[]{TENANT, "256772270145", "AAA", OffsetDateTime.now()},
+                new Object[]{TENANT, "0700000001", "BBB", OffsetDateTime.now()}));
+        when(customers.findFirstByTenantIdAndPhoneInOrderByIdAsc(eq(TENANT), anyCollection())).thenReturn(Optional.empty());
+        when(tenants.getReferenceById(TENANT)).thenReturn(Tenant.builder().id(TENANT).build());
+        when(customers.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(vouchers.findByCodeAndTenantId("AAA", TENANT)).thenReturn(Optional.of(Voucher.builder().code("AAA").build()));
+        when(vouchers.findByCodeAndTenantId("BBB", TENANT)).thenThrow(new IllegalStateException("db hiccup"));
+
+        assertThat(service.catchUp(TENANT)).isEqualTo(1);
+        verify(vouchers).save(org.mockito.ArgumentMatchers.argThat(v -> "AAA".equals(v.getCode()) && v.getCustomer() != null));
+    }
+
+    @Test
+    void onboardRejectsAPhoneThatAlreadyBelongsToACustomer() {
+        when(customers.findFirstByTenantIdAndPhoneInOrderByIdAsc(eq(TENANT), anyCollection()))
+                .thenReturn(Optional.of(Customer.builder().id(3L).name("Sarah").phone("0772270145").build()));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.onboard(TENANT, "Sam", "+256 772 270 145", null, null, null, null, null))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
+                .hasMessageContaining("already exists");
+        verify(customers, never()).save(any());
+    }
+
+    @Test
+    void onboardWithPackageAndPaymentIssuesAssignsAndSellsOneVoucher() {
+        when(customers.findFirstByTenantIdAndPhoneInOrderByIdAsc(eq(TENANT), anyCollection())).thenReturn(Optional.empty());
+        when(tenants.getReferenceById(TENANT)).thenReturn(Tenant.builder().id(TENANT).build());
+        when(customers.save(any())).thenAnswer(i -> { Customer c = i.getArgument(0); c.setId(9L); return c; });
+        com.wifibilling.dto.VoucherResponse issued = mock(com.wifibilling.dto.VoucherResponse.class);
+        when(issued.code()).thenReturn("NEW1");
+        when(voucherService.generate(eq(TENANT), any(com.wifibilling.dto.GenerateVouchersRequest.class))).thenReturn(List.of(issued));
+
+        CustomerService.Onboarded out = service.onboard(TENANT, "", "0772270145", " ", 1L, 5L, BigDecimal.valueOf(1000), "CASH");
+
+        assertThat(out).isEqualTo(new CustomerService.Onboarded(9L, "NEW1"));
+        verify(customers).save(org.mockito.ArgumentMatchers.argThat(c -> "0772270145".equals(c.getName()) && "0772270145".equals(c.getPhone()) && c.getNotes() == null));
+        verify(voucherService).assign(TENANT, List.of("NEW1"), 9L);
+        verify(voucherService).sellWalkIn(eq(TENANT), eq("NEW1"), eq(5L), eq(BigDecimal.valueOf(1000)), eq("CASH"), any(), anyString());
+    }
+
+    @Test
+    void onboardWithoutPaymentNeverRecordsASale() {
+        when(customers.findFirstByTenantIdAndPhoneInOrderByIdAsc(eq(TENANT), anyCollection())).thenReturn(Optional.empty());
+        when(tenants.getReferenceById(TENANT)).thenReturn(Tenant.builder().id(TENANT).build());
+        when(customers.save(any())).thenAnswer(i -> { Customer c = i.getArgument(0); c.setId(4L); return c; });
+
+        CustomerService.Onboarded out = service.onboard(TENANT, "Grace", "0772270145", null, null, null, null, null);
+
+        assertThat(out.voucher()).isNull();
+        verify(voucherService, never()).generate(any(), any(com.wifibilling.dto.GenerateVouchersRequest.class));
+        verify(voucherService, never()).sellWalkIn(any(), any(), any(), any(), any(), any(), any());
     }
 }
