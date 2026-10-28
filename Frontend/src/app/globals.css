@@ -155,8 +155,10 @@ button, a { touch-action: manipulation; }
 .num { font-variant-numeric: tabular-nums; }
 @keyframes menu-enter { from { opacity: 0; transform: translate3d(0, -4px, 0) scale(.98); } to { opacity: 1; transform: none; } }
 .menu-enter { animation: menu-enter 140ms var(--ease-out) both; transform-origin: top right; }
-.request-progress { animation: request-progress 1.2s ease-in-out infinite; }
-@keyframes request-progress { from { transform: translateX(-100%); } to { transform: translateX(400%); } }
+/* Top navigation bar: eases toward 85% while pending, then completes and fades. */
+.nav-progress-run { width: 85%; animation: nav-progress-run 8s cubic-bezier(.1, .7, .2, 1) both; }
+.nav-progress-done { width: 100%; opacity: 0; transition: width 200ms ease-out, opacity 250ms ease-in 120ms; }
+@keyframes nav-progress-run { from { width: 0; } to { width: 85%; } }
 @keyframes ui-enter { from { opacity: 0; transform: translate3d(0, 6px, 0); } to { opacity: 1; transform: none; } }
 @keyframes dialog-enter { from { opacity: 0; transform: translate3d(0, 10px, 0) scale(.985); } to { opacity: 1; transform: none; } }
 @keyframes toast-enter { from { opacity: 0; transform: translate3d(12px, 0, 0); } to { opacity: 1; transform: none; } }
@@ -165,7 +167,7 @@ button, a { touch-action: manipulation; }
 .toast-enter { animation: toast-enter 180ms var(--ease-out) both; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
-  .request-progress { animation: none; width: 100%; }
+  .nav-progress-run { animation: none; width: 85%; }
 }
 
 /* ---------------------------------------------------------------------------

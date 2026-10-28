@@ -1,4 +1,5 @@
 "use client";
+import { BusyLabel, useSingleFlight } from "@/components/LoadingUI";
 import React, { useCallback, useEffect, useState } from "react";
 import api from "@/lib/api";
 import { useResource, Table, Badge, ErrorNotice, date, field, button, buttonGhost, panel, label, hint, message, PageHeader } from "@/components/BillingUI";
@@ -64,16 +65,17 @@ export default function WalletPage() {
   useEffect(() => { const initial = window.setTimeout(loadSummary, 0); const timer = window.setInterval(loadSummary, 30000); return () => { window.clearTimeout(initial); window.clearInterval(timer); }; }, [loadSummary]);
   const refreshAll = () => { void loadSummary(); loadActivity(); loadWithdrawals(); };
 
-  const sendOtp = async () => {
+  const singleFlight = useSingleFlight();
+  const sendOtp = singleFlight(async () => {
     setOtpBusy(true); setFormError("");
     try {
       await api.post("/api/wallet/withdrawals/otp");
       setOtpSent(true);
     } catch (err) { setFormError(message(err)); }
     finally { setOtpBusy(false); }
-  };
+  });
 
-  const submit = async (e: React.FormEvent) => {
+  const submit = singleFlight(async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true); setFormError("");
     try {
@@ -83,7 +85,7 @@ export default function WalletPage() {
       refreshAll();
     } catch (err) { setFormError(message(err)); }
     finally { setBusy(false); }
-  };
+  });
 
   const cancel = (id: number) => confirm({
     title: "Cancel withdrawal request?",
@@ -232,7 +234,7 @@ export default function WalletPage() {
                   placeholder={otpSent ? "6-digit code" : "Request a code first"} required />
                 <button type="button" className={`${buttonGhost} shrink-0`} disabled={otpBusy || busy}
                   onClick={() => void sendOtp()}>
-                  {otpBusy ? "Sending…" : otpSent ? "Resend" : "Send code"}
+                  <BusyLabel busy={otpBusy} label="Sending…">{otpSent ? "Resend" : "Send code"}</BusyLabel>
                 </button>
               </div>
               <p className={hint}>
@@ -249,7 +251,7 @@ export default function WalletPage() {
             <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <button type="button" className={buttonGhost} disabled={busy} onClick={() => setOpen(false)}>Cancel</button>
               <button type="submit" className={button} disabled={busy || otpBusy || otp.length !== 6}>
-                {busy ? "Submitting…" : "Request withdrawal"}
+                <BusyLabel busy={busy} label="Submitting…">Request withdrawal</BusyLabel>
               </button>
             </div>
           </form>

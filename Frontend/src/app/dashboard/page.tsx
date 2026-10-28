@@ -2,9 +2,9 @@
 import Link from "next/link";
 import { useMemo, useState, useSyncExternalStore } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { DashboardLoading } from "@/components/LoadingUI";
+import { DashboardLoading, ListSkeleton } from "@/components/LoadingUI";
 import {
-  ArrowClockwise, ArrowDown, ArrowRight, CellTower, Eye, EyeSlash, Plus, Radio, Stack, Ticket, Users, Wallet, WarningCircle,
+  ArrowClockwise, ArrowDown, ArrowRight, CellTower, Eye, EyeSlash, Plus, Radio, Stack, Ticket, Users, WarningCircle,
 } from "@/components/icons";
 import {
   Badge, Card, CardLink, ErrorNotice, Segmented, StatCard, StatusDot, button, buttonGhost,
@@ -30,13 +30,18 @@ interface DashboardStats {
 // Tenant router list. The response also carries provisioning secrets; only these fields are read.
 interface RouterRec { id: number; name: string; status: string; lastSeen: string | null; cpuLoad: number | null; memoryUsage: number | null; hotspotReady: boolean | null; radiusReady: boolean | null; portalReady: boolean | null }
 interface Payment { id: number; reference: string; method: string; amount: number; status: string; phone: string | null; voucher: string | null; packageName: string | null; router: string | null; createdAt: string }
-interface WalletView { available: number; pending: number; reserved: number; currency: string }
+interface UsageBucket { start: string; label: string; downBytes: number; upBytes: number; future: boolean }
+interface DataUsage { period: string; downBytes: number; upBytes: number; users: number; previousBytes: number; buckets: UsageBucket[] }
 
 const RANGES = [
   { key: "today", label: "Today" }, { key: "7d", label: "7 days" }, { key: "week", label: "This week" }, { key: "lastweek", label: "Last week" },
   { key: "month", label: "This month" }, { key: "lastmonth", label: "Last month" }, { key: "year", label: "This year" }, { key: "lastyear", label: "Last year" },
 ];
 const MOBILE_MONEY = ["MTN", "AIRTEL"];
+const USAGE_PERIODS = [{ key: "today", label: "Today" }, { key: "week", label: "Week" }, { key: "month", label: "Month" }] as const;
+type UsagePeriod = (typeof USAGE_PERIODS)[number]["key"];
+// Upload is a lighter tint of the same hue, so the pair reads as one measure.
+const UPLOAD_FILL = "color-mix(in srgb, var(--chart-1) 38%, transparent)";
 
 /* Revenue visibility is a per-device preference, so it lives in localStorage. */
 const HIDE_KEY = "wb_hide_revenue";
@@ -63,7 +68,8 @@ export default function TenantDashboardOverview() {
   const routers = useResource<RouterRec>("/api/routers", 30000);
   // Only the newest rows are needed here; the Payments page loads full history.
   const payments = useApi<Payment[]>("/api/finance/payments?limit=6", 60000);
-  const wallet = useApi<WalletView>("/api/wallet", 60000);
+  const [usagePeriod, setUsagePeriod] = useState<UsagePeriod>("today");
+  const usage = useApi<DataUsage>(`/api/dashboard/data-usage?period=${usagePeriod}`, 60000, { keepPrevious: true });
   const hidden = useSyncExternalStore(hideStore.subscribe, hideStore.get, () => false);
 
   const s = stats.data;
@@ -99,7 +105,7 @@ export default function TenantDashboardOverview() {
           <h1 className="mt-0.5 truncate text-[1.45rem] font-semibold leading-tight tracking-tight text-[var(--fg)]">{greeting(now)}, {user?.name?.split(" ")[0] || "there"}</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button onClick={() => { stats.load(); routers.load(); payments.load(); wallet.load(); }} disabled={stats.refreshing} className={`${buttonGhost} !px-3`} aria-label="Refresh dashboard" title="Refresh dashboard">
+          <button onClick={() => { stats.load(); routers.load(); payments.load(); usage.load(); }} disabled={stats.refreshing} className={`${buttonGhost} !px-3`} aria-label="Refresh dashboard" title="Refresh dashboard">
             <ArrowClockwise className={`h-4 w-4 ${stats.refreshing ? "animate-spin" : ""}`} />
           </button>
           <button onClick={() => hideStore.set(!hidden)} className={`${buttonGhost} !px-3`} aria-pressed={hidden} aria-label={hidden ? "Show revenue" : "Hide revenue"} title={hidden ? "Show revenue" : "Hide revenue"}>
@@ -128,8 +134,8 @@ export default function TenantDashboardOverview() {
 
       {/* Revenue: the number owners open the app for. */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-        <section className="panel-shadow min-w-0 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] lg:col-span-2">
-          <div className="grid gap-6 p-5 sm:grid-cols-[1fr_minmax(0,15rem)] sm:p-6">
+        <section className="panel-shadow flex min-w-0 flex-col overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] lg:col-span-2">
+          <div className="grid flex-1 gap-6 p-5 sm:grid-cols-[1fr_minmax(0,15rem)] sm:p-6">
             <div className="min-w-0">
               <p className="text-[13px] font-medium text-[var(--fg-muted)]">Today&apos;s revenue</p>
               <p className="mt-2 truncate text-[2.4rem] font-semibold leading-none tracking-tight text-[var(--fg)]">{s ? money(s.revenueToday) : "—"}</p>
@@ -167,21 +173,13 @@ export default function TenantDashboardOverview() {
           </dl>
         </section>
 
-        <section className="panel-shadow flex min-w-0 flex-col rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-6">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-[13px] font-medium text-[var(--fg-muted)]">Ready to withdraw</p>
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700"><Wallet className="h-4 w-4" /></span>
-          </div>
-          <p className="mt-1 truncate text-[1.7rem] font-semibold leading-tight tracking-tight text-[var(--fg)]">{wallet.data ? money(wallet.data.available) : wallet.error ? "—" : "…"}</p>
-          <p className="mt-1.5 text-xs text-[var(--fg-muted)]">{wallet.data ? `${money(wallet.data.pending)} still settling from mobile money` : wallet.error ? "Wallet unavailable right now" : "Mobile money collected for you"}</p>
-          <div className="mt-auto pt-5"><Link href="/dashboard/wallet" className={`${buttonGhost} w-full`}>Open wallet<ArrowRight className="h-4 w-4" /></Link></div>
-        </section>
+        <DataUsageCard usage={usage} period={usagePeriod} onPeriod={setUsagePeriod} />
       </div>
 
       {/* Live operational figures */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <StatCard label="Online now" href="/dashboard/users" icon={<Radio />} tone="green" value={s ? s.activeUsers.toLocaleString() : "—"} hintText="Customers connected right now" />
-        <StatCard label="Customers" href="/dashboard/customers" icon={<Users />} value={s ? s.totalCustomers.toLocaleString() : "—"} hintText={s ? `+${s.newCustomersThisWeek} this week` : undefined} />
+        <StatCard label="Customers" href="/dashboard/customers" icon={<Users />} value={s ? s.totalCustomers.toLocaleString() : "—"} hintText={s ? `+${s.newCustomersThisWeek.toLocaleString()} new this week` : undefined} />
         <StatCard label="Routers online" href="/dashboard/routers" icon={<CellTower />} tone={down.length ? "red" : degraded.length ? "amber" : "default"}
           value={routers.error ? "—" : <>{online}<span className="text-[var(--fg-faint)]">/{fleet.length}</span></>}
           hintText={!fleet.length ? (routers.error ? "Router status unavailable" : routers.loading ? "Checking…" : "No router linked yet") : down.length ? `${down.length} not reporting` : degraded.length ? `${degraded.length} need attention` : "All reporting"} />
@@ -383,6 +381,105 @@ export default function TenantDashboardOverview() {
   );
 }
 
+const COMPARE_LABEL: Record<UsagePeriod, string> = { today: "vs this time yesterday", week: "vs last week so far", month: "vs last month so far" };
+const EMPTY_LABEL: Record<UsagePeriod, string> = { today: "No data used yet today", week: "No data used yet this week", month: "No data used yet this month" };
+
+/** Download/upload for the tenant's customers, with its own period switch. */
+function DataUsageCard({ usage, period, onPeriod }: {
+  usage: ReturnType<typeof useApi<DataUsage>>; period: UsagePeriod; onPeriod: (p: UsagePeriod) => void;
+}) {
+  const [hover, setHover] = useState<number | null>(null);
+  const d = usage.data;
+  const total = d ? d.downBytes + d.upBytes : 0;
+  const change = d && d.previousBytes > 0 ? ((total - d.previousBytes) / d.previousBytes) * 100 : null;
+  const buckets = d?.buckets ?? [];
+  const max = Math.max(1, ...buckets.map((b) => b.downBytes + b.upBytes));
+  const hourly = d?.period === "today";
+  const hovered = hover != null ? buckets[hover] : null;
+  const when = (b: UsageBucket) => {
+    const t = new Date(b.start);
+    return hourly
+      ? `${t.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })} – ${new Date(t.getTime() + 3600000).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`
+      : t.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+  };
+  // Hours and month days are too dense to label every bar.
+  const showTick = (i: number) => (hourly ? i % 6 === 0 : d?.period === "month" ? i % 7 === 0 : true);
+  const tick = (b: UsageBucket) => hourly ? new Date(b.start).toLocaleTimeString(undefined, { hour: "numeric" }) : b.label;
+
+  return (
+    <section aria-label="Data usage" className={`panel-shadow flex min-w-0 flex-col overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] transition-opacity ${usage.placeholder ? "opacity-60" : ""}`} aria-busy={usage.placeholder}>
+      <div className="flex flex-1 flex-col p-5 sm:p-6">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-[13px] font-medium text-[var(--fg-muted)]">Data usage</p>
+          <Segmented label="Data usage period" value={period} onChange={onPeriod} options={[...USAGE_PERIODS]} />
+        </div>
+        <p className="num mt-2 truncate text-[2rem] font-semibold leading-none tracking-tight text-[var(--fg)]">{d ? bytes(total) : usage.error ? "—" : "…"}</p>
+        <p className="mt-2.5 min-h-[1.25rem] text-[13px] text-[var(--fg-muted)]">
+          {usage.error && !d ? "Usage unavailable right now"
+            : !d ? " "
+            : total === 0 ? EMPTY_LABEL[period]
+            : change != null ? (
+              <span title="Compared over the same length of time" className="inline-flex items-center gap-1">
+                <span className="inline-flex items-center gap-0.5 font-medium text-[var(--fg-body)]">
+                  <ArrowDown className={`h-3.5 w-3.5 ${change >= 0 ? "rotate-180" : ""}`} aria-hidden />{Math.abs(change).toFixed(0)}%
+                </span>
+                {COMPARE_LABEL[period]}
+              </span>
+            ) : "Download and upload combined"}
+        </p>
+
+        {buckets.length > 0 && (
+          <div className="relative mt-auto pt-5">
+            <div className="flex h-14 items-end gap-[3px]" role="img" aria-label={`Data used per ${hourly ? "hour" : "day"}`}>
+              {buckets.map((b, i) => {
+                const sum = b.downBytes + b.upBytes;
+                const h = b.future ? 0 : Math.max(sum > 0 ? 6 : 0, (sum / max) * 100);
+                return (
+                  <button key={b.start} type="button" aria-label={`${when(b)}: ${bytes(sum)}`}
+                    onPointerEnter={() => setHover(i)} onPointerLeave={() => setHover(null)} onFocus={() => setHover(i)} onBlur={() => setHover(null)}
+                    className="relative flex h-full min-w-0 flex-1 cursor-default flex-col justify-end outline-none">
+                    {/* Baseline keeps empty and upcoming slots visible as the scale of the period. */}
+                    <span className="absolute inset-x-0 bottom-0 h-[2px] rounded-full bg-[var(--chart-grid)]" />
+                    <span className="relative flex w-full flex-col overflow-hidden rounded-t-[3px] transition-opacity" style={{ height: `${h}%`, opacity: hover == null || hover === i ? 1 : 0.55 }}>
+                      <span style={{ flexGrow: b.upBytes, background: UPLOAD_FILL }} />
+                      <span style={{ flexGrow: b.downBytes, background: "var(--chart-1)" }} />
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-1.5 flex gap-[3px] text-[10.5px] text-[var(--fg-faint)]">
+              {buckets.map((b, i) => <span key={b.start} className="min-w-0 flex-1 overflow-visible whitespace-nowrap">{showTick(i) ? tick(b) : ""}</span>)}
+            </div>
+            {hovered && hover != null && (
+              <div role="presentation" className="pointer-events-none absolute bottom-full z-10 -mb-3 -translate-x-1/2 whitespace-nowrap rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 shadow-[var(--shadow-overlay)]"
+                style={{ left: `${Math.min(85, Math.max(15, ((hover + 0.5) / buckets.length) * 100))}%` }}>
+                <p className="text-[11px] text-[var(--fg-muted)]">{when(hovered)}</p>
+                <p className="num text-[13px] font-semibold text-[var(--fg)]">{hovered.future ? "Not yet" : bytes(hovered.downBytes + hovered.upBytes)}</p>
+                {!hovered.future && <p className="num text-[11px] text-[var(--fg-muted)]">↓ {bytes(hovered.downBytes)} · ↑ {bytes(hovered.upBytes)}</p>}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      <dl className="grid grid-cols-3 divide-x divide-[var(--border)] border-t border-[var(--border)] bg-[var(--subtle)]">
+        {[
+          { label: "Download", value: d ? bytes(d.downBytes) : "—", swatch: "var(--chart-1)" },
+          { label: "Upload", value: d ? bytes(d.upBytes) : "—", swatch: UPLOAD_FILL },
+          { label: "Customers", value: d ? d.users.toLocaleString() : "—" },
+        ].map((m) => (
+          <div key={m.label} className="min-w-0 px-4 py-3 sm:py-3.5">
+            <dt className="flex items-center gap-1.5 text-xs text-[var(--fg-muted)]">
+              {m.swatch && <span aria-hidden className="h-2 w-2 shrink-0 rounded-[2px]" style={{ background: m.swatch }} />}{m.label}
+            </dt>
+            <dd className="num mt-0.5 truncate text-[14px] font-semibold text-[var(--fg)]">{m.value}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
 function PackageTable({ rows, money }: { rows: PackagePerf[]; money: (v: number) => string }) {
   const best = Math.max(1, ...rows.map((p) => Number(p.monthlyRevenue)));
   return (
@@ -416,19 +513,5 @@ function PackageTable({ rows, money }: { rows: PackagePerf[]; money: (v: number)
         </tbody>
       </table>
     </div>
-  );
-}
-
-function ListSkeleton({ rows }: { rows: number }) {
-  return (
-    <ul aria-hidden className="divide-y divide-[var(--border-soft)]">
-      {Array.from({ length: rows }, (_, i) => (
-        <li key={i} className="flex animate-pulse items-center gap-3 px-5 py-3.5 motion-reduce:animate-none">
-          <span className="h-9 w-9 rounded-full bg-[var(--fill)]" />
-          <span className="flex-1 space-y-2"><span className="block h-3 w-2/5 rounded bg-[var(--fill)]" /><span className="block h-2.5 w-3/5 rounded bg-[var(--fill)]" /></span>
-          <span className="h-3 w-16 rounded bg-[var(--fill)]" />
-        </li>
-      ))}
-    </ul>
   );
 }

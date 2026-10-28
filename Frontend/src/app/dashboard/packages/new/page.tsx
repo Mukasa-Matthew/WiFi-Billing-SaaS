@@ -1,4 +1,6 @@
 "use client";
+import { useSingleFlight } from "@/components/LoadingUI";
+import { notify } from "@/components/ui/Toast";
 import { mutateCache } from "@/lib/cacheInvalidation";
 
 import React, { Suspense, useEffect, useState } from "react";
@@ -76,7 +78,8 @@ function PackageFormPage() {
   const n = Number(duration) || 0;
   const validity = `${n} ${UNITS[unit] || "day"}${n === 1 ? "" : "s"}`;
 
-  const save = async (e: React.FormEvent) => {
+  const singleFlight = useSingleFlight();
+  const save = singleFlight(async (e: React.FormEvent) => {
     e.preventDefault(); setError("");
     const seconds = Number(duration) * Number(unit);
     if (!Number.isSafeInteger(seconds) || seconds < 60 || seconds > 2147483647) {
@@ -92,10 +95,11 @@ function PackageFormPage() {
       if (editId) await api.put(`/api/packages/${editId}`, body);
       else await api.post("/api/packages", body);
       mutateCache.packageChanged();
+      notify.success(editId ? "Package updated." : "Package created.");
       nav.push("/dashboard/packages");
     } catch { setError("Could not save the package. Check your entries and try again."); }
     finally { setSaving(false); }
-  };
+  });
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">

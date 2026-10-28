@@ -1,6 +1,7 @@
 package com.wifibilling.service;
 
 import com.wifibilling.dto.ActiveSessionDto;
+import com.wifibilling.dto.DataUsageDto;
 import com.wifibilling.dto.TenantDashboardStatsDto;
 import com.wifibilling.model.Router;
 import com.wifibilling.model.Transaction;
@@ -13,9 +14,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.TextStyle;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 @Service
@@ -318,6 +326,75 @@ public class TenantDashboardService {
                 .routerRevenue(routerRevenue)
                 .topConsumers(topConsumers)
                 .build();
+    }
+
+    /**
+     * Download/upload for today (by hour), this week (Mon-Sun) or this month
+     * (by day), in the reporting zone. Two small aggregate queries instead of
+     * the full stats load, so the card can switch periods cheaply.
+     */
+    @Transactional(readOnly = true)
+    public DataUsageDto getDataUsage(Long tenantId, String period) {
+        String p = List.of("today", "week", "month").contains(period) ? period : "today";
+        ZoneId zone = clock.zone();
+        OffsetDateTime now = clock.now();
+        LocalDate today = clock.today();
+        boolean hourly = p.equals("today");
+        LocalDate first = switch (p) {
+            case "week" -> today.with(DayOfWeek.MONDAY);
+            case "month" -> today.withDayOfMonth(1);
+            default -> today;
+        };
+        LocalDate next = switch (p) {
+            case "week" -> first.plusWeeks(1);
+            case "month" -> first.plusMonths(1);
+            default -> first.plusDays(1);
+        };
+        OffsetDateTime start = clock.startOf(first);
+        OffsetDateTime end = clock.startOf(next);
+
+        // Bucket starts in local time; ZonedDateTime arithmetic keeps DST days right.
+        Map<LocalDateTime, long[]> sums = new LinkedHashMap<>();
+        for (ZonedDateTime t = first.atStartOfDay(zone); t.toOffsetDateTime().isBefore(end);
+             t = hourly ? t.plusHours(1) : t.plusDays(1)) {
+            sums.put(t.toLocalDateTime(), new long[2]);
+        }
+        long down = 0, up = 0;
+        for (Object[] row : radAcctRepository.dataPerSlot(tenantId, start, end)) {
+            LocalDateTime local = Instant.ofEpochSecond(((Number) row[0]).longValue() * 900).atZone(zone).toLocalDateTime();
+            LocalDateTime key = hourly ? local.truncatedTo(ChronoUnit.HOURS) : local.toLocalDate().atStartOfDay();
+            long d = ((Number) row[1]).longValue(), u = ((Number) row[2]).longValue();
+            down += d;
+            up += u;
+            long[] b = sums.get(key);
+            if (b != null) { b[0] += d; b[1] += u; }
+        }
+
+        List<Object[]> totals = radAcctRepository.dataTotalBetween(tenantId, start, end);
+        long users = totals.isEmpty() ? 0 : ((Number) totals.get(0)[1]).longValue();
+
+        // Same elapsed stretch of the previous period, capped at its own end.
+        LocalDate prevFirst = switch (p) {
+            case "week" -> first.minusWeeks(1);
+            case "month" -> first.minusMonths(1);
+            default -> first.minusDays(1);
+        };
+        OffsetDateTime prevStart = clock.startOf(prevFirst);
+        OffsetDateTime prevEnd = prevStart.plus(Duration.between(start, now));
+        if (prevEnd.isAfter(start)) prevEnd = start;
+        List<Object[]> prev = radAcctRepository.dataTotalBetween(tenantId, prevStart, prevEnd);
+        long previous = prev.isEmpty() ? 0 : ((Number) prev.get(0)[0]).longValue();
+
+        List<DataUsageDto.Bucket> buckets = new ArrayList<>();
+        for (Map.Entry<LocalDateTime, long[]> e : sums.entrySet()) {
+            LocalDateTime t = e.getKey();
+            String label = hourly ? String.format("%02d:00", t.getHour())
+                    : p.equals("week") ? t.getDayOfWeek().getDisplayName(TextStyle.SHORT, Locale.ENGLISH)
+                    : String.valueOf(t.getDayOfMonth());
+            boolean future = t.atZone(zone).toOffsetDateTime().isAfter(now);
+            buckets.add(new DataUsageDto.Bucket(t.toString(), label, e.getValue()[0], e.getValue()[1], future));
+        }
+        return new DataUsageDto(p, start, end, down, up, users, previous, buckets);
     }
 
     private static LocalDate toLocalDate(Object v) {

@@ -2,6 +2,7 @@
 import React, { useCallback, useDeferredValue, useEffect, useMemo, useState, useRef } from "react";
 import api from "@/lib/api";
 import Link from "next/link";
+import { BusyLabel, NavigationPending, TableSkeletonRows } from "@/components/LoadingUI";
 import { ArrowLeft, ArrowRight, CaretLeft, CaretRight, MagnifyingGlass, Tray } from "@/components/icons";
 
 /* ---------- design tokens ---------- */
@@ -204,9 +205,11 @@ export function PageHeader({ title, description, action, meta }: { title: React.
  * neutral ink; `href` turns the whole card into a drill-down; `children` hosts
  * a meter or breakdown under the figure.
  */
-export function StatCard({ label, value, icon, hintText, hint, tone, href, children }: {
+export function StatCard({ label, value, icon, hintText, hint, tone, href, children, loading = false }: {
   label: string; value: React.ReactNode; icon?: React.ReactNode; hintText?: string; hint?: React.ReactNode;
   tone?: "default" | "green" | "amber" | "red"; href?: string; children?: React.ReactNode;
+  /** First load only: a placeholder in the value's line box, so nothing shifts when it arrives. */
+  loading?: boolean;
 }) {
   const iconColor =
     tone === "green" ? "bg-emerald-50 text-emerald-700" :
@@ -219,13 +222,16 @@ export function StatCard({ label, value, icon, hintText, hint, tone, href, child
         <p className="text-[13px] font-medium text-[var(--fg-muted)]">{label}</p>
         {icon && <span className={`-mr-1 -mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg [&_svg]:h-4 [&_svg]:w-4 ${iconColor}`} aria-hidden>{icon}</span>}
       </div>
-      <p className="mt-1.5 truncate text-[1.7rem] font-semibold leading-tight tracking-tight text-[var(--fg)]">{value}</p>
+      <p className="mt-1.5 truncate text-[1.7rem] font-semibold leading-tight tracking-tight text-[var(--fg)]">
+        {loading ? <span aria-hidden className="inline-block h-[0.8em] w-24 animate-pulse rounded bg-[var(--fill)] align-middle motion-reduce:animate-none" /> : value}
+        {loading && <span className="sr-only">Loading</span>}
+      </p>
       {(hint || hintText) && <div className="mt-1.5 text-xs leading-relaxed text-[var(--fg-muted)]">{hint || hintText}</div>}
       {children && <div className="mt-4">{children}</div>}
     </>
   );
   return href ? (
-    <Link href={href} className={`${panel} group block p-5 transition-colors hover:border-[var(--border-strong)]`}>{body}</Link>
+    <Link href={href} className={`${panel} group block p-5 transition-colors hover:border-[var(--border-strong)]`}>{body}<NavigationPending /></Link>
   ) : (
     <section className={`${panel} p-5`}>{body}</section>
   );
@@ -257,6 +263,7 @@ export function CardLink({ href, children }: { href: string; children: React.Rea
   return (
     <Link href={href} className="group inline-flex items-center gap-1 text-xs font-medium text-[var(--accent-text)] hover:underline">
       {children}<ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden />
+      <NavigationPending />
     </Link>
   );
 }
@@ -296,7 +303,8 @@ export function EmptyState({ title, description, action, icon }: { title: string
   );
 }
 
-export function FilterTabs({ options, value, onChange }: { options: { key: string; label: string; count?: number }[]; value: string; onChange: (k: string) => void }) {
+/** `loading` hides counts until the first load, so "0" never stands in for "not loaded yet". */
+export function FilterTabs({ options, value, onChange, loading = false }: { options: { key: string; label: string; count?: number }[]; value: string; onChange: (k: string) => void; loading?: boolean }) {
   return (
     <div className="flex flex-wrap gap-1 rounded-lg border border-[var(--border)] bg-[var(--subtle)] p-1" role="tablist">
       {options.map((o) => (
@@ -307,7 +315,7 @@ export function FilterTabs({ options, value, onChange }: { options: { key: strin
           onClick={() => onChange(o.key)}
           className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${value === o.key ? "bg-[var(--surface)] text-[var(--fg)] shadow-sm" : "text-[var(--fg-muted)] hover:text-[var(--fg)]"}`}
         >
-          {o.label}{o.count !== undefined && <span className="num ml-1.5 text-[var(--fg-muted)]">{o.count}</span>}
+          {o.label}{!loading && o.count !== undefined && <span className="num ml-1.5 text-[var(--fg-muted)]">{o.count}</span>}
         </button>
       ))}
     </div>
@@ -331,9 +339,11 @@ const hideClass = { sm: "hidden sm:table-cell", md: "hidden md:table-cell", lg: 
  * server-paged data pass `searchable={false} paginated={false}` and render a
  * <Pager>; pass `bare` when the table sits inside another card.
  */
-export function Table<T>({ rows, columns, loading = false, emptyTitle = "No records found.", emptyDescription, emptyIcon, searchable = true, paginated = true, bare = false, toolbar, rowKey, searchPlaceholder = "Search…" }: {
+export function Table<T>({ rows, columns, loading = false, emptyTitle = "No records found.", emptyDescription, emptyIcon, searchable = true, paginated = true, bare = false, toolbar, rowKey, searchPlaceholder = "Search…", selection }: {
   emptyTitle?: string; emptyDescription?: string; emptyIcon?: React.ReactNode; rows: T[]; columns: Column<T>[]; loading?: boolean;
   searchable?: boolean; paginated?: boolean; bare?: boolean; toolbar?: React.ReactNode; rowKey?: (row: T) => React.Key; searchPlaceholder?: string;
+  /** Leading checkboxes (needs rowKey). The header box selects every row matching the search. */
+  selection?: { selected: ReadonlySet<React.Key>; onChange: (next: Set<React.Key>) => void };
 }) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -349,6 +359,22 @@ export function Table<T>({ rows, columns, loading = false, emptyTitle = "No reco
   const current = Math.min(page, pages);
   const visible = paginated ? filtered.slice((current - 1) * size, current * size) : filtered;
   const cell = (c: Column<T>) => `${c.hideBelow ? hideClass[c.hideBelow] : ""} ${c.className || ""}`;
+  const keyOf = (r: T, i: number) => rowKey ? rowKey(r) : i;
+  const picked = selection ? filtered.filter((r, i) => selection.selected.has(keyOf(r, i))).length : 0;
+  const toggleAll = () => {
+    if (!selection) return;
+    const next = new Set(selection.selected);
+    filtered.forEach((r, i) => picked === filtered.length ? next.delete(keyOf(r, i)) : next.add(keyOf(r, i)));
+    selection.onChange(next);
+  };
+  const toggleRow = (k: React.Key) => {
+    if (!selection) return;
+    const next = new Set(selection.selected);
+    if (next.has(k)) next.delete(k); else next.add(k);
+    selection.onChange(next);
+  };
+  const checkbox = "h-4 w-4 cursor-pointer rounded border-[var(--border-strong)] accent-[var(--accent-text)]";
+  const spanAll = columns.length + (selection ? 1 : 0);
   return (
     <section className={bare ? "min-w-0" : `${panel} overflow-hidden`} aria-busy={loading}>
       {(searchable || toolbar) && (
@@ -367,21 +393,32 @@ export function Table<T>({ rows, columns, loading = false, emptyTitle = "No reco
       <div className="overflow-x-auto">
         <table className="w-full whitespace-nowrap text-left text-sm">
           <thead className="border-b border-[var(--border)] bg-[var(--subtle)] text-xs text-[var(--fg-muted)]">
-            <tr>{columns.map((c, i) => <th key={i} scope="col" className={`px-4 py-2.5 font-medium ${c.align === "right" ? "text-right" : ""} ${cell(c)}`}>{c.label}</th>)}</tr>
+            <tr>
+              {selection && (
+                <th scope="col" className="w-10 py-2.5 pl-4 pr-0">
+                  <input type="checkbox" aria-label="Select all matching rows" className={checkbox} disabled={!filtered.length}
+                    checked={filtered.length > 0 && picked === filtered.length}
+                    ref={(el) => { if (el) el.indeterminate = picked > 0 && picked < filtered.length; }}
+                    onChange={toggleAll} />
+                </th>
+              )}
+              {columns.map((c, i) => <th key={i} scope="col" className={`px-4 py-2.5 font-medium ${c.align === "right" ? "text-right" : ""} ${cell(c)}`}>{c.label}</th>)}
+            </tr>
           </thead>
           <tbody className="divide-y divide-[var(--border-soft)]">
-            {loading && !rows.length && Array.from({ length: 6 }, (_, row) => (
-              <tr key={`skeleton-${row}`} aria-hidden="true">
-                {columns.map((c, column) => <td key={column} className={`px-4 py-3.5 ${cell(c)}`}><span className="block h-3.5 max-w-36 animate-pulse rounded bg-[var(--fill)] motion-reduce:animate-none" style={{ width: `${58 + ((row + column) % 4) * 11}%` }} /></td>)}
-              </tr>
-            ))}
+            {loading && !rows.length && <TableSkeletonRows columns={spanAll} cellClassName={(i) => selection ? (i === 0 ? "" : cell(columns[i - 1])) : cell(columns[i])} />}
             {!(loading && !rows.length) && visible.map((r, i) => (
-              <tr key={rowKey ? rowKey(r) : i} className="transition-colors hover:bg-[var(--subtle)]">
+              <tr key={keyOf(r, i)} className={`transition-colors hover:bg-[var(--subtle)] ${selection?.selected.has(keyOf(r, i)) ? "bg-[var(--chart-1-wash)]" : ""}`}>
+                {selection && (
+                  <td className="w-10 py-3 pl-4 pr-0">
+                    <input type="checkbox" aria-label="Select row" className={checkbox} checked={selection.selected.has(keyOf(r, i))} onChange={() => toggleRow(keyOf(r, i))} />
+                  </td>
+                )}
                 {columns.map((c, j) => <td key={j} className={`px-4 py-3 text-[var(--fg-body)] ${c.align === "right" ? "num text-right" : ""} ${cell(c)}`}>{c.render(r)}</td>)}
               </tr>
             ))}
             {!loading && !filtered.length && (
-              <tr><td colSpan={columns.length} className="py-12 text-center text-sm text-[var(--fg-muted)]"><EmptyState icon={emptyIcon} title={search ? "No matching records" : emptyTitle} description={search ? "Try a different search." : emptyDescription} /></td></tr>
+              <tr><td colSpan={spanAll} className="py-12 text-center text-sm text-[var(--fg-muted)]"><EmptyState icon={emptyIcon} title={search ? "No matching records" : emptyTitle} description={search ? "Try a different search." : emptyDescription} /></td></tr>
             )}
           </tbody>
         </table>
@@ -533,7 +570,7 @@ export function FormActions({ busy, busyLabel, submitLabel, cancelHref }: {
     <div className="flex flex-col-reverse gap-3 pb-2 sm:flex-row sm:items-center sm:justify-end">
       <Link href={cancelHref} className={`${buttonGhost} min-h-[44px] justify-center py-3 sm:min-h-0 sm:py-2.5`}>Cancel</Link>
       <button type="submit" disabled={busy} className={`${button} min-h-[44px] justify-center py-3 sm:min-h-0 sm:py-2.5`}>
-        {busy ? busyLabel : submitLabel}
+        <BusyLabel busy={!!busy} label={busyLabel}>{submitLabel}</BusyLabel>
       </button>
     </div>
   );

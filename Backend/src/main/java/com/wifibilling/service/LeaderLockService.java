@@ -49,6 +49,7 @@ public class LeaderLockService {
     public static final String JOB_TELEMETRY_SWEEP      = "TELEMETRY_SWEEP";
     public static final String JOB_NOC_INCIDENT         = "NOC_INCIDENT";
     public static final String JOB_WIREGUARD_SYNC       = "WIREGUARD_SYNC";
+    public static final String JOB_CUSTOMER_BACKFILL    = "CUSTOMER_BACKFILL";
 
     public LeaderLockService() {
         this.jdbcTemplate = null;

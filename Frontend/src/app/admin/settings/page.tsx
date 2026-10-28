@@ -29,6 +29,7 @@ import {
   Clock,
   Building2
 } from "@/components/icons";
+import { FormSkeleton, BusyLabel } from "@/components/LoadingUI";
 
 interface Profile {
   id: number;
@@ -476,9 +477,9 @@ export default function SuperAdminSettingsPage() {
       </div>
 
       {loading ? (
-        <div className="py-20 text-center text-[var(--fg-muted)]">
-          <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
-          <p className="mt-2 text-xs">Loading administrative settings...</p>
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6" aria-busy="true">
+          <span className="sr-only" role="status">Loading administrative settings…</span>
+          <FormSkeleton fields={4} />
         </div>
       ) : (
         <>
@@ -527,7 +528,7 @@ export default function SuperAdminSettingsPage() {
                       disabled={nameSaving || editName.trim() === profile.name}
                       className="px-4 py-2 rounded-xl bg-blue-700 hover:bg-blue-600 disabled:opacity-40 text-white text-xs font-semibold shadow-sm transition cursor-pointer"
                     >
-                      {nameSaving ? "Saving..." : "Save Changes"}
+                      <BusyLabel busy={nameSaving} label="Saving…">Save Changes</BusyLabel>
                     </button>
                   </div>
                 </form>
@@ -816,7 +817,7 @@ export default function SuperAdminSettingsPage() {
                 disabled={platformSaving}
                 className="px-5 py-2.5 rounded-xl bg-blue-700 hover:bg-blue-600 text-white text-xs font-semibold shadow-sm transition cursor-pointer"
               >
-                {platformSaving ? "Saving Configuration..." : "Save Platform Settings"}
+                <BusyLabel busy={platformSaving} label="Saving Configuration…">Save Platform Settings</BusyLabel>
               </button>
             </form>
           )}
@@ -968,7 +969,7 @@ export default function SuperAdminSettingsPage() {
                   disabled={emailBusy}
                   className="px-4 py-2 rounded-xl bg-blue-700 hover:bg-blue-600 text-white text-xs font-semibold"
                 >
-                  {emailBusy ? "Sending verification..." : "Dispatch Verification Codes"}
+                  <BusyLabel busy={emailBusy} label="Sending verification…">Dispatch Verification Codes</BusyLabel>
                 </button>
               </div>
             </form>
@@ -1017,7 +1018,7 @@ export default function SuperAdminSettingsPage() {
                   disabled={emailBusy}
                   className="px-4 py-2 rounded-xl bg-blue-700 hover:bg-blue-600 text-white text-xs font-semibold"
                 >
-                  {emailBusy ? "Verifying..." : "Confirm & Update Email"}
+                  <BusyLabel busy={emailBusy} label="Verifying…">Confirm & Update Email</BusyLabel>
                 </button>
               </div>
             </form>
@@ -1071,7 +1072,7 @@ export default function SuperAdminSettingsPage() {
                   disabled={phoneBusy}
                   className="px-4 py-2 rounded-xl bg-blue-700 hover:bg-blue-600 text-white text-xs font-semibold"
                 >
-                  {phoneBusy ? "Sending code..." : "Send Verification Code"}
+                  <BusyLabel busy={phoneBusy} label="Sending code…">Send Verification Code</BusyLabel>
                 </button>
               </div>
             </form>
@@ -1107,7 +1108,7 @@ export default function SuperAdminSettingsPage() {
                   disabled={phoneBusy}
                   className="px-4 py-2 rounded-xl bg-blue-700 hover:bg-blue-600 text-white text-xs font-semibold"
                 >
-                  {phoneBusy ? "Verifying..." : "Confirm & Update Phone"}
+                  <BusyLabel busy={phoneBusy} label="Verifying…">Confirm & Update Phone</BusyLabel>
                 </button>
               </div>
             </form>
@@ -1185,7 +1186,7 @@ export default function SuperAdminSettingsPage() {
                 disabled={passwordBusy}
                 className="px-4 py-2 rounded-xl bg-blue-700 hover:bg-blue-600 text-white text-xs font-semibold"
               >
-                {passwordBusy ? "Updating..." : "Update Password"}
+                <BusyLabel busy={passwordBusy} label="Updating…">Update Password</BusyLabel>
               </button>
             </div>
           </form>
@@ -1314,7 +1315,7 @@ export default function SuperAdminSettingsPage() {
                   disabled={totpBusy || totpVerifyCode.trim().length !== 6 || !totpCurrentPassword}
                   className="px-4 py-2 rounded-xl bg-blue-700 hover:bg-blue-600 disabled:opacity-50 text-white text-xs font-semibold shadow-sm"
                 >
-                  {totpBusy ? "Activating..." : "Verify & Activate 2FA"}
+                  <BusyLabel busy={totpBusy} label="Activating…">Verify & Activate 2FA</BusyLabel>
                 </button>
               </div>
             </form>
@@ -1367,7 +1368,7 @@ export default function SuperAdminSettingsPage() {
                 disabled={disableBusy}
                 className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-semibold shadow-sm"
               >
-                {disableBusy ? "Disabling..." : "Confirm & Disable 2FA"}
+                <BusyLabel busy={disableBusy} label="Disabling…">Confirm & Disable 2FA</BusyLabel>
               </button>
             </div>
           </form>

@@ -1,4 +1,5 @@
 "use client";
+import { BusyLabel, useSingleFlight } from "@/components/LoadingUI";
 import React, { useCallback, useEffect, useState } from "react";
 import api from "@/lib/api";
 import { Table, Badge, ErrorNotice, date, panel, button, buttonGhost, field, label, hint, message, PageHeader } from "@/components/BillingUI";
@@ -85,7 +86,8 @@ export default function AdminFinancePage() {
     finally { setReconBusy(false); }
   };
 
-  const requestPayout = async (e: React.FormEvent) => {
+  const singleFlight = useSingleFlight();
+  const requestPayout = singleFlight(async (e: React.FormEvent) => {
     e.preventDefault();
     setWdBusy(true); setWdErr("");
     try {
@@ -97,7 +99,7 @@ export default function AdminFinancePage() {
       await load();
     } catch (err) { setWdErr(message(err)); }
     finally { setWdBusy(false); }
-  };
+  });
 
   const act = (row: WithdrawalRow, action: "approve" | "fail") => confirm({
     title: action === "approve" ? "Approve withdrawal?" : "Reject withdrawal?",
@@ -326,7 +328,7 @@ export default function AdminFinancePage() {
             <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <button type="button" className={buttonGhost} disabled={wdBusy} onClick={() => setWdOpen(false)}>Cancel</button>
               <button type="submit" className={button} disabled={wdBusy}>
-                {wdBusy ? "Processing…" : "Withdraw"}
+                <BusyLabel busy={wdBusy} label="Processing…">Withdraw</BusyLabel>
               </button>
             </div>
           </form>

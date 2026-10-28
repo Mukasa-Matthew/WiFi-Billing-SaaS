@@ -1,5 +1,6 @@
 package com.wifibilling.service;
 
+import com.wifibilling.dto.DataUsageDto;
 import com.wifibilling.dto.TenantDashboardStatsDto;
 import com.wifibilling.model.PackagePlan;
 import com.wifibilling.model.Router;
@@ -120,5 +121,57 @@ class TenantDashboardServiceTest {
 
         assertThat(since.getAllValues().get(0)).isEqualTo(monthStart.minusDays(1));
         assertThat(since.getAllValues().get(1)).isEqualTo(yearStart.minusDays(1));
+    }
+
+    static long slot(String instant) { return Instant.parse(instant).getEpochSecond() / 900; }
+
+    @Test
+    void dataUsageTodayFoldsSlotsIntoKampalaHours() {
+        // NOW is 15:00 in Kampala; the local day began at 21:00 UTC the day before.
+        OffsetDateTime dayStart = OffsetDateTime.parse("2026-10-27T21:00:00Z");
+        when(accounting.dataPerSlot(TENANT, dayStart, dayStart.plusDays(1))).thenReturn(List.<Object[]>of(
+                new Object[]{slot("2026-10-27T21:05:00Z"), 100L, 10L},   // 00:00 local
+                new Object[]{slot("2026-10-28T09:00:00Z"), 200L, 20L},   // 12:00 local
+                new Object[]{slot("2026-10-28T09:45:00Z"), 300L, 30L})); // 12:00 local
+        ArgumentCaptor<OffsetDateTime> prevFrom = ArgumentCaptor.forClass(OffsetDateTime.class);
+        ArgumentCaptor<OffsetDateTime> prevTo = ArgumentCaptor.forClass(OffsetDateTime.class);
+        when(accounting.dataTotalBetween(eq(TENANT), prevFrom.capture(), prevTo.capture())).thenReturn(List.<Object[]>of(new Object[]{500L, 3L}));
+        // The current window is stubbed last so it overrides the catch-all above.
+        when(accounting.dataTotalBetween(TENANT, dayStart, dayStart.plusDays(1))).thenReturn(List.<Object[]>of(new Object[]{660L, 4L}));
+
+        DataUsageDto d = service.getDataUsage(TENANT, "today");
+
+        assertThat(d.downBytes()).isEqualTo(600);
+        assertThat(d.upBytes()).isEqualTo(60);
+        assertThat(d.users()).isEqualTo(4);
+        assertThat(d.previousBytes()).isEqualTo(500);
+        assertThat(d.buckets()).hasSize(24);
+        assertThat(d.buckets().get(0).downBytes()).isEqualTo(100);
+        assertThat(d.buckets().get(12).label()).isEqualTo("12:00");
+        assertThat(d.buckets().get(12).downBytes()).isEqualTo(500);
+        assertThat(d.buckets().get(12).upBytes()).isEqualTo(50);
+        assertThat(d.buckets().get(15).future()).isFalse();
+        assertThat(d.buckets().get(16).future()).isTrue();
+        // Yesterday from midnight until 15:00, not the whole of yesterday.
+        assertThat(prevFrom.getValue()).isEqualTo(dayStart.minusDays(1));
+        assertThat(prevTo.getValue()).isEqualTo(OffsetDateTime.parse("2026-10-27T12:00:00Z"));
+    }
+
+    @Test
+    void dataUsageWeekAndMonthUseLocalCalendarDays() {
+        when(accounting.dataPerSlot(eq(TENANT), any(), any())).thenReturn(List.of());
+        when(accounting.dataTotalBetween(eq(TENANT), any(), any())).thenReturn(List.<Object[]>of(new Object[]{0L, 0L}));
+
+        DataUsageDto week = service.getDataUsage(TENANT, "week");
+        assertThat(week.from()).isEqualTo(OffsetDateTime.parse("2026-10-25T21:00:00Z")); // Monday 26th, local
+        assertThat(week.buckets()).extracting(DataUsageDto.Bucket::label).containsExactly("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun");
+        assertThat(week.buckets().get(2).future()).isFalse();
+        assertThat(week.buckets().get(3).future()).isTrue();
+
+        DataUsageDto month = service.getDataUsage(TENANT, "month");
+        assertThat(month.buckets()).hasSize(31);
+        assertThat(month.buckets().get(0).start()).isEqualTo("2026-10-01T00:00");
+
+        assertThat(service.getDataUsage(TENANT, "bogus").period()).isEqualTo("today");
     }
 }

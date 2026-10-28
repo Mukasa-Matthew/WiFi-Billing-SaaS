@@ -17,6 +17,10 @@ public interface VoucherRepository extends JpaRepository<Voucher, Long> {
             @org.springframework.data.repository.query.Param("tenantId") Long tenantId);
 
     Optional<Voucher> findByCode(String code);
+    Optional<Voucher> findByCodeAndTenantId(String code, Long tenantId);
+    /** Vouchers linked to a customer: the customer directory's rows. */
+    List<Voucher> findAllByTenantIdAndCustomerIsNotNullOrderByCreatedAtDesc(Long tenantId);
+    List<Voucher> findAllByTenantIdAndCustomerIdOrderByCreatedAtDesc(Long tenantId, Long customerId);
 
     boolean existsByCode(String code);
 

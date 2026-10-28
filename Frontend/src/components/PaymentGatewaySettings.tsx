@@ -1,4 +1,5 @@
 "use client";
+import { BusyLabel } from "@/components/LoadingUI";
 import React, { useCallback, useEffect, useState } from "react";
 import api from "@/lib/api";
 import { Badge, Notice, field, button, buttonGhost, label, hint, message } from "@/components/BillingUI";
@@ -96,7 +97,7 @@ export default function PaymentGatewaySettings() {
           </ul>
           {gw.mode !== "PLATFORM" && (
             <button className={`${buttonGhost} mt-4 w-full`} disabled={busy === "mode"} onClick={() => selectMode("PLATFORM")}>
-              {busy === "mode" ? "Switching…" : "Switch to platform gateway"}
+              <BusyLabel busy={busy === "mode"} label="Switching…">Switch to platform gateway</BusyLabel>
             </button>
           )}
         </div>
@@ -174,17 +175,17 @@ export default function PaymentGatewaySettings() {
           </div>
           <div className="md:col-span-2 flex flex-wrap items-center gap-3">
             <button type="submit" className={button} disabled={busy === "save"}>
-              {busy === "save" ? "Saving…" : gw.hasSecret ? "Update credentials" : "Save credentials"}
+              <BusyLabel busy={busy === "save"} label="Saving…">{gw.hasSecret ? "Update credentials" : "Save credentials"}</BusyLabel>
             </button>
             {gw.hasSecret && (
               <>
                 <button type="button" className={buttonGhost} disabled={busy === "test"}
                   onClick={() => act("test", () => api.post("/api/settings/gateway/test"), busy === "test" ? "" : "Connection check finished.")}>
-                  <Plugs size={14} /> {busy === "test" ? "Testing…" : "Test connection"}
+                  <Plugs size={14} /> <BusyLabel busy={busy === "test"} label="Testing…">Test connection</BusyLabel>
                 </button>
                 <button type="button" className="min-h-10 rounded-lg px-2 text-xs font-semibold text-red-600 transition hover:bg-red-50" disabled={busy === "disconnect"}
                   onClick={() => confirm({ title: "Disconnect payment gateway?", body: "Your saved gateway credentials will be deleted and new payments will return to the platform gateway after server confirmation.", confirmLabel: "Disconnect gateway", onConfirm: async () => { await act("disconnect", () => api.post("/api/settings/gateway/disconnect"), "Gateway disconnected."); } })}>
-                  {busy === "disconnect" ? "Disconnecting…" : "Disconnect gateway"}
+                  <BusyLabel busy={busy === "disconnect"} label="Disconnecting…">Disconnect gateway</BusyLabel>
                 </button>
               </>
             )}

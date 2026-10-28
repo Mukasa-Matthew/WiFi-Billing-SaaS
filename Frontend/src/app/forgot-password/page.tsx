@@ -1,4 +1,5 @@
 "use client";
+import { BusyLabel } from "@/components/LoadingUI";
 
 import React, { useState } from "react";
 import Link from "next/link";
@@ -123,7 +124,7 @@ export default function ForgotPasswordPage() {
               </div>
               <button type="submit" disabled={busy || code.length !== 6}
                 className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-lg bg-blue-700 hover:bg-blue-600 disabled:opacity-50 text-sm font-semibold text-white shadow-sm transition-all cursor-pointer">
-                {busy ? "Resetting…" : "Reset password"}
+                <BusyLabel busy={busy} label="Resetting…">Reset password</BusyLabel>
               </button>
               <button type="button" onClick={() => void sendCode()} disabled={busy}
                 className="w-full text-xs font-semibold text-[var(--accent-text)] hover:underline">
