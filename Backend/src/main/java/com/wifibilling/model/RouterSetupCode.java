@@ -19,7 +19,7 @@ import java.time.OffsetDateTime;
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class RouterSetupCode {
 
-    public enum Purpose { FULL, MANAGEMENT }
+    public enum Purpose { FULL, MANAGEMENT, WINBOX }
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
