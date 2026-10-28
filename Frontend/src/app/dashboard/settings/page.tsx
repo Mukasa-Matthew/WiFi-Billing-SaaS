@@ -7,6 +7,8 @@ import {
   Bell, Ticket, CloudArrowDown, Trash, CreditCard, ArrowSquareOut,
 } from "@/components/icons";
 import PaymentGatewaySettings from "@/components/PaymentGatewaySettings";
+import { panel } from "@/components/BillingUI";
+import { FormSkeleton, BusyLabel, useSingleFlight } from "@/components/LoadingUI";
 
 interface TenantSettings {
   name: string;
@@ -113,7 +115,8 @@ function EmailChange({ currentEmail, onChanged }: { currentEmail: string; onChan
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
-  const sendCode = async () => {
+  const singleFlight = useSingleFlight();
+  const sendCode = singleFlight(async () => {
     setBusy(true); setMsg(null);
     try {
       const r = await api.post<{ devCode?: string }>("/api/settings/email/otp", { newEmail });
@@ -125,9 +128,9 @@ function EmailChange({ currentEmail, onChanged }: { currentEmail: string; onChan
     } finally {
       setBusy(false);
     }
-  };
+  });
 
-  const confirm = async () => {
+  const confirm = singleFlight(async () => {
     setBusy(true); setMsg(null);
     try {
       const r = await api.post<{ email: string }>("/api/settings/email", { newEmail, otp });
@@ -139,7 +142,7 @@ function EmailChange({ currentEmail, onChanged }: { currentEmail: string; onChan
     } finally {
       setBusy(false);
     }
-  };
+  });
 
   return (
     <div className="sm:col-span-2">
@@ -177,13 +180,13 @@ function EmailChange({ currentEmail, onChanged }: { currentEmail: string; onChan
             {!sent ? (
               <button type="button" disabled={busy || !newEmail} onClick={sendCode}
                 className="rounded-lg bg-blue-700 px-3.5 py-2 text-xs font-semibold text-white hover:bg-blue-600 disabled:opacity-50">
-                {busy ? "Sending…" : `Send code to ${currentEmail}`}
+                <BusyLabel busy={busy} label="Sending…">{`Send code to ${currentEmail}`}</BusyLabel>
               </button>
             ) : (
               <>
                 <button type="button" disabled={busy || otp.length !== 6} onClick={confirm}
                   className="rounded-lg bg-blue-700 px-3.5 py-2 text-xs font-semibold text-white hover:bg-blue-600 disabled:opacity-50">
-                  {busy ? "Confirming…" : "Confirm change"}
+                  <BusyLabel busy={busy} label="Confirming…">Confirm change</BusyLabel>
                 </button>
                 <button type="button" disabled={busy} onClick={sendCode}
                   className="rounded-lg px-3 py-2 text-xs font-semibold text-[var(--accent-text)] hover:underline disabled:opacity-50">
@@ -245,7 +248,9 @@ export default function TenantSettingsPage() {
   const set = <K extends keyof TenantSettings>(key: K, value: TenantSettings[K]) =>
     setForm((f) => (f ? { ...f, [key]: value } : f));
 
-  const save = async (e?: React.FormEvent) => {
+  const singleFlight = useSingleFlight();
+
+  const save = singleFlight(async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!form) return;
     setSaving(true);
@@ -262,7 +267,7 @@ export default function TenantSettingsPage() {
     } finally {
       setSaving(false);
     }
-  };
+  });
 
   const uploadAsset = async (kind: "logo" | "background", file: File) => {
     setUploading(kind);
@@ -293,8 +298,10 @@ export default function TenantSettingsPage() {
 
   if (!form) {
     return (
-      <div className="mx-auto max-w-3xl p-8 text-sm text-[var(--fg-muted)]">
-        {error ?? "Loading settings…"}
+      <div className="mx-auto max-w-3xl space-y-5" aria-busy={!error}>
+        {error
+          ? <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</p>
+          : <><span className="sr-only" role="status">Loading settings…</span><div className={`${panel} p-6`}><FormSkeleton fields={5} /></div></>}
       </div>
     );
   }
@@ -575,7 +582,7 @@ export default function TenantSettingsPage() {
         <div className="flex items-center gap-4">
           <button disabled={saving} className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50">
             {saving ? <CircleNotch size={16} className="animate-spin" /> : <FloppyDisk size={16} />}
-            {saving ? "Saving…" : "Save settings"}
+            <BusyLabel busy={saving} label="Saving…">Save settings</BusyLabel>
           </button>
           {saved && <span className="flex items-center gap-1.5 text-sm text-emerald-700"><CheckCircle size={15} />Saved</span>}
         </div>

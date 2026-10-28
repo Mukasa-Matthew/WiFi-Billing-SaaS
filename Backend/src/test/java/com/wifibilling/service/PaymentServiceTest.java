@@ -185,6 +185,25 @@ class PaymentServiceTest {
         verify(transactionRepository).save(tx);
     }
 
+    @Test
+    void successfulPaymentRecordsTheBuyerAsACustomer() {
+        CustomerService customers = mock(CustomerService.class);
+        paymentService.setCustomerService(customers);
+        Transaction tx = Transaction.builder().id(51L).tenant(tenant).packagePlan(packagePlan).router(router)
+                .reference("PAY-CUST1").phone("256771234567").amount(new BigDecimal("1000.00"))
+                .status(PaymentService.STATUS_PENDING).build();
+        when(transactionRepository.findByReferenceForUpdate("PAY-CUST1")).thenReturn(Optional.of(tx));
+        VoucherResponse vResp = new VoucherResponse(
+                1L, "VOUCH777", "unused", 100L, "1 Hour",
+                new BigDecimal("1000.00"), null, null, null, OffsetDateTime.now(), null, null, null, null, "ONLINE", "MANUAL", false
+        );
+        when(voucherService.generate(eq(1L), any(GenerateVouchersRequest.class), isNull(), isNull())).thenReturn(List.of(vResp));
+
+        paymentService.processWebhook(new PaymentDto.WebhookRequest("PAY-CUST1", "SUCCESSFUL", null, null));
+
+        verify(customers).recordBuyerAfterCommit(1L, "256771234567", "VOUCH777", tx.getCreatedAt());
+    }
+
     private Transaction pendingCheckoutTx(String checkoutRef) {
         return Transaction.builder()
                 .id(60L).tenant(tenant).packagePlan(packagePlan).router(router)

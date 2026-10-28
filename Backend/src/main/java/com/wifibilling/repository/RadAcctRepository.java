@@ -86,6 +86,36 @@ public interface RadAcctRepository extends JpaRepository<RadAcct, Long> {
     List<Object[]> dataSince(@Param("tenantId") Long tenantId,
                              @Param("fromTs") java.time.OffsetDateTime fromTs);
 
+    /**
+     * Download (output) and upload (input) octets per 15-minute slot in a
+     * window, tenant-scoped. Slots are epoch-aligned so the caller can fold
+     * them into reporting-zone hours/days for any zone offset.
+     */
+    @Query(value = """
+            SELECT FLOOR(EXTRACT(EPOCH FROM COALESCE(acctstarttime, acctstoptime)) / 900)::bigint AS slot,
+                   COALESCE(SUM(acctoutputoctets), 0), COALESCE(SUM(acctinputoctets), 0)
+            FROM radacct
+            WHERE username IN (SELECT code FROM vouchers WHERE tenant_id = :tenantId)
+              AND COALESCE(acctstarttime, acctstoptime) >= :fromTs
+              AND COALESCE(acctstarttime, acctstoptime) < :toTs
+            GROUP BY 1
+            """, nativeQuery = true)
+    List<Object[]> dataPerSlot(@Param("tenantId") Long tenantId,
+                               @Param("fromTs") java.time.OffsetDateTime fromTs,
+                               @Param("toTs") java.time.OffsetDateTime toTs);
+
+    /** Total octets (download + upload) and distinct users in a window, tenant-scoped. */
+    @Query(value = """
+            SELECT COALESCE(SUM(acctoutputoctets + acctinputoctets), 0), COUNT(DISTINCT username)
+            FROM radacct
+            WHERE username IN (SELECT code FROM vouchers WHERE tenant_id = :tenantId)
+              AND COALESCE(acctstarttime, acctstoptime) >= :fromTs
+              AND COALESCE(acctstarttime, acctstoptime) < :toTs
+            """, nativeQuery = true)
+    List<Object[]> dataTotalBetween(@Param("tenantId") Long tenantId,
+                                    @Param("fromTs") java.time.OffsetDateTime fromTs,
+                                    @Param("toTs") java.time.OffsetDateTime toTs);
+
     /** Per-username aggregates for the user directory: first login, total octets, live device count. */
     @Query(value = """
             SELECT username, MIN(acctstarttime),
@@ -184,6 +214,25 @@ public interface RadAcctRepository extends JpaRepository<RadAcct, Long> {
             """, nativeQuery = true)
     List<Object[]> nasDailyUsage(@Param("nasIp") String nasIp,
                                  @Param("fromTs") OffsetDateTime fromTs);
+
+    /**
+     * Per-voucher usage for vouchers linked to a customer: username, total
+     * octets, last seen (stop, else last interim update, else start), and live
+     * session count.
+     */
+    @Query(value = """
+            SELECT username,
+                   COALESCE(SUM(COALESCE(acctinputoctets, 0) + COALESCE(acctoutputoctets, 0)), 0),
+                   MAX(COALESCE(acctstoptime, acctupdatetime, acctstarttime)),
+                   COUNT(*) FILTER (WHERE acctstoptime IS NULL
+                                    AND COALESCE(acctupdatetime, acctstarttime) >= :cut),
+                   MIN(acctstarttime)
+            FROM radacct
+            WHERE username IN (SELECT code FROM vouchers WHERE tenant_id = :tenantId AND customer_id IS NOT NULL)
+            GROUP BY username
+            """, nativeQuery = true)
+    List<Object[]> customerVoucherUsage(@Param("tenantId") Long tenantId,
+                                        @Param("cut") java.time.OffsetDateTime cut);
 
     /** Latest session row per username (ip, mac, nas) for the user directory. */
     @Query(value = """

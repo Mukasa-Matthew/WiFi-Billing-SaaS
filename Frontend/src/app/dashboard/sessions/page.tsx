@@ -1,4 +1,5 @@
 "use client";
+import { BusyLabel } from "@/components/LoadingUI";
 import { useResource } from "@/components/BillingUI";
 
 import React, { useCallback, useEffect, useState, useMemo } from "react";
@@ -327,7 +328,7 @@ export default function TenantActiveSessionsPage() {
                 disabled={disconnecting}
                 className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-semibold shadow-red-600/25 transition disabled:opacity-50"
               >
-                {disconnecting ? "Disconnecting..." : "Terminate Session"}
+                <BusyLabel busy={disconnecting} label="Disconnecting…">Terminate Session</BusyLabel>
               </button>
             </div>
           </div>

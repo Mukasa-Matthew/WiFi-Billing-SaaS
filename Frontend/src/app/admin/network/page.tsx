@@ -1,4 +1,5 @@
 "use client";
+import { ListSkeleton } from "@/components/LoadingUI";
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
@@ -145,7 +146,7 @@ export default function NetworkOperationsPage() {
           bodyClassName=""
         >
           {!ov ? (
-            <p className="px-5 py-14 text-center text-sm text-[var(--fg-muted)]">{overview.loading ? "Loading incidents…" : "Incidents are unavailable right now."}</p>
+            (overview.loading ? <ListSkeleton rows={3} avatar={false} /> : <p className="px-5 py-14 text-center text-sm text-[var(--fg-muted)]">Incidents are unavailable right now.</p>)
           ) : shownIncidents.length === 0 ? (
             <div className="flex flex-col items-center gap-2 px-5 py-14 text-center">
               <span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-700"><CheckCircle className="h-5 w-5" /></span>
@@ -174,7 +175,7 @@ export default function NetworkOperationsPage() {
 
         <Card title="Tenant network health" description="Businesses with routers, most affected first" bodyClassName="" action={<CardLink href="/admin/tenants">Tenants</CardLink>}>
           {fleet.loading && !fleet.data.length ? (
-            <p className="px-5 py-10 text-center text-sm text-[var(--fg-muted)]">Loading…</p>
+            <ListSkeleton rows={4} />
           ) : tenantHealth.length === 0 ? (
             <p className="px-5 py-10 text-center text-sm text-[var(--fg-muted)]">{fleet.error ? "Unavailable." : "No tenant has linked a router yet."}</p>
           ) : (

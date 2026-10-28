@@ -4,7 +4,8 @@ import React, { useState } from "react";
 import Link from "next/link";
 import api from "@/lib/api";
 import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { useToast } from "@/components/ui/Toast";
+import { notify, useToast } from "@/components/ui/Toast";
+import { useBusyAction } from "@/components/LoadingUI";
 import { ActionMenu, ActionMenuItem } from "@/components/ui/ActionMenu";
 import { useResource, Table, Badge, Notice, FilterTabs, button, date, message, panel } from "@/components/BillingUI";
 import { Eye, ArrowClockwise, FileArrowDown, Clock, Terminal, Trash } from "@/components/icons";
@@ -26,12 +27,19 @@ export default function Page() {
     try { setTasks((await api.get<Task[]>(`/api/routers/${r.id}/tasks`)).data); }
     catch (e) { setNote(message(e)); }
   };
-  const action = async (r: RouterRec, actionName: string) => {
+  // One router action at a time: a second click while one is in flight is dropped.
+  const { run } = useBusyAction<number>();
+  const action = (r: RouterRec, actionName: string) => run(r.id, async () => {
+    setNote("");
+    const label = actionName.replace("_", " ").toLowerCase();
     try {
-      setNote("");
-      await api.post(`/api/routers/${r.id}/tasks`, { action: actionName });
+      await notify.promise(api.post(`/api/routers/${r.id}/tasks`, { action: actionName }), {
+        loading: `Sending ${label} to ${r.name}…`,
+        success: `Requested. ${r.name} will apply it at its next check-in.`,
+      });
+    } catch { return; } // the toast already shows why
+    try {
       mutateCache.routerChanged();
-      toast("info", `Action requested. Applying to ${r.name}...`);
       await open(r);
 
       // Auto-poll tasks for immediate acknowledgment update
@@ -53,7 +61,7 @@ export default function Page() {
         }
       }, 1500);
     } catch (e) { setNote(message(e)); }
-  };
+  });
   const toast = useToast();
   const { confirm, dialog } = useConfirmDialog();
   const remove = (r: RouterRec) => confirm({
@@ -73,7 +81,7 @@ export default function Page() {
     },
   });
   // Each command carries a fresh one-time setup code from the owner-only endpoint.
-  const showCommand = async (r: RouterRec, install = false) => {
+  const showCommand = (r: RouterRec, install = false) => run(r.id, async () => {
     try {
       const p = (await api.post<{ path: string; expiresAt: string }>(`/api/routers/${r.id}/setup-code`, { purpose: install ? "MANAGEMENT" : "FULL" })).data;
       const url = `${window.location.origin}${p.path}`;
@@ -83,7 +91,7 @@ export default function Page() {
       // The downloaded script holds the router's RADIUS secret: delete it from flash either way.
       setCommand(`:do { /tool fetch url="${url}" dst-path=wb-setup.rsc; /import wb-setup.rsc; /file remove wb-setup.rsc } on-error={ :do { /file remove wb-setup.rsc } on-error={}; :put "Setup failed. Check router logs." }`);
     } catch (e) { setNote(message(e)); }
-  };
+  });
 
   const tabs = [
     { key: "ALL", label: "All", count: data.length },
@@ -101,7 +109,7 @@ export default function Page() {
         <Link href="/dashboard/routers/new" className={button}>Link a MikroTik</Link>
       </div>
       <Notice text={error || note} />
-      <FilterTabs options={tabs} value={tab} onChange={setTab} />
+      <FilterTabs loading={loading} options={tabs} value={tab} onChange={setTab} />
       <Table
         loading={loading}
         rows={data.filter(r => tab === "ALL" || (tab === "ONLINE" && r.status === "online") || (tab === "OFFLINE" && r.status !== "online"))}

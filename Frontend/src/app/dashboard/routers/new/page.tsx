@@ -1,4 +1,6 @@
 "use client";
+import { notify } from "@/components/ui/Toast";
+import { BusyLabel, useSingleFlight } from "@/components/LoadingUI";
 import { mutateCache } from "@/lib/cacheInvalidation";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -97,7 +99,8 @@ export default function AddRouterPage() {
     return () => window.clearTimeout(timer);
   }, [step, router, connected, attempt]);
 
-  const createRouter = async (event: React.FormEvent) => {
+  const singleFlight = useSingleFlight();
+  const createRouter = singleFlight(async (event: React.FormEvent) => {
     event.preventDefault();
     if (!identity.trim()) return;
     if (router) { setStep(2); return; }
@@ -112,6 +115,7 @@ export default function AddRouterPage() {
       });
       setRouter(response.data);
       mutateCache.routerChanged();
+      notify.success("Router registered. Run the setup command on it next.");
       setAttempt(0);
       setStep(2);
     } catch (requestError: unknown) {
@@ -122,7 +126,7 @@ export default function AddRouterPage() {
     } finally {
       setCreating(false);
     }
-  };
+  });
 
   const copyCommand = async () => {
     try {
@@ -236,7 +240,7 @@ export default function AddRouterPage() {
               <div className="flex justify-between border-t border-[var(--border)] pt-5">
                 <button type="button" onClick={() => navigation.push("/dashboard/routers")} className="rounded-lg border border-[var(--border-strong)] px-4 py-2 text-sm text-[var(--fg-body)] hover:bg-[var(--fill)]">Cancel</button>
                 <button disabled={creating} className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50">
-                  {creating ? "Creating..." : "Next"}
+                  <BusyLabel busy={creating} label="Creating…">Next</BusyLabel>
                 </button>
               </div>
             </form>

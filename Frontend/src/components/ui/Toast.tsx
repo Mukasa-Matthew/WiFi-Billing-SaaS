@@ -1,45 +1,76 @@
 "use client";
-import React, { createContext, useCallback, useContext, useRef, useState } from "react";
-import { CheckCircle, Warning, XCircle, X } from "@/components/icons";
+import React from "react";
+import { Toaster, toast as sonner } from "sonner";
+import { CheckCircle, CircleNotch, Info, Warning, XCircle } from "@/components/icons";
+import { message } from "@/components/BillingUI";
+import { useTheme } from "@/context/ThemeContext";
 
-type ToastKind = "success" | "error" | "info";
-interface Toast { id: number; kind: ToastKind; text: string }
+/**
+ * App-wide notifications, backed by Sonner.
+ *
+ * `useToast()(kind, text)` is the original API and every existing call site
+ * keeps working. The same kind + text is shown once (Sonner updates the toast
+ * with a matching id instead of stacking a duplicate). `notify.promise` shows
+ * a loading toast that only turns into success once the request resolves.
+ */
+type ToastKind = "success" | "error" | "warning" | "info";
 
-const ToastContext = createContext<(kind: ToastKind, text: string) => void>(() => {});
-export const useToast = () => useContext(ToastContext);
+const DURATION: Record<ToastKind, number> = { success: 4000, info: 4000, warning: 6000, error: 6000 };
+
+function show(kind: ToastKind, text: string) {
+  sonner[kind](text, { id: `${kind}:${text}`, duration: DURATION[kind] });
+}
+
+export const notify = {
+  success: (text: string) => show("success", text),
+  error: (text: string) => show("error", text),
+  warning: (text: string) => show("warning", text),
+  info: (text: string) => show("info", text),
+  /**
+   * Loading → success/error for one request. Errors default to the
+   * user-facing text from message(); the original promise is returned so
+   * callers can still await it and handle failures.
+   */
+  promise<T>(promise: Promise<T>, text: { loading: string; success: string | ((value: T) => string); error?: string | ((error: unknown) => string) }) {
+    sonner.promise(promise, {
+      loading: text.loading,
+      success: text.success,
+      error: (err: unknown) => (typeof text.error === "function" ? text.error(err) : text.error ?? message(err)),
+    });
+    return promise;
+  },
+};
+
+export const useToast = () => show;
+
+const icons = {
+  success: <CheckCircle className="h-4 w-4 text-emerald-600" />,
+  error: <XCircle className="h-4 w-4 text-red-600" />,
+  warning: <Warning className="h-4 w-4 text-amber-600" />,
+  info: <Info className="h-4 w-4 text-blue-600" />,
+  loading: <CircleNotch className="h-4 w-4 animate-spin text-[var(--fg-muted)] motion-reduce:animate-none" />,
+};
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
-  const [toasts, setToasts] = useState<Toast[]>([]);
-  const nextId = useRef(1);
-
-  const push = useCallback((kind: ToastKind, text: string) => {
-    const id = nextId.current++;
-    setToasts((t) => [...t.slice(-4), { id, kind, text }]);
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), kind === "error" ? 6000 : 4000);
-  }, []);
-
-  const icons = {
-    success: <CheckCircle className="h-4 w-4 shrink-0 text-emerald-600" />,
-    error: <XCircle className="h-4 w-4 shrink-0 text-red-600" />,
-    info: <Warning className="h-4 w-4 shrink-0 text-amber-600" />,
-  };
-
+  const { resolved } = useTheme();
   return (
-    <ToastContext.Provider value={push}>
+    <>
       {children}
-      <div aria-live="polite" aria-atomic="false" className="pointer-events-none fixed inset-x-4 bottom-4 z-[90] flex flex-col gap-2 sm:left-auto sm:w-80">
-        {toasts.map((t) => (
-          <div key={t.id} role={t.kind === "error" ? "alert" : "status"}
-            className="toast-enter pointer-events-auto flex items-start gap-2.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-3 shadow-[var(--shadow-overlay)]">
-            {icons[t.kind]}
-            <p className="flex-1 text-xs font-medium leading-5 text-[var(--fg)]">{t.text}</p>
-            <button aria-label="Dismiss" onClick={() => setToasts((x) => x.filter((y) => y.id !== t.id))}
-              className="-m-2 flex min-h-10 min-w-10 items-center justify-center rounded-lg text-[var(--fg-faint)] transition hover:bg-[var(--fill)] hover:text-[var(--fg-body)]">
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        ))}
-      </div>
-    </ToastContext.Provider>
+      <Toaster
+        position="bottom-right"
+        theme={resolved}
+        closeButton
+        visibleToasts={4}
+        icons={icons}
+        style={{
+          fontFamily: "inherit",
+          "--normal-bg": "var(--surface)",
+          "--normal-border": "var(--border)",
+          "--normal-text": "var(--fg)",
+          "--border-radius": "0.5rem",
+        } as React.CSSProperties}
+        toastOptions={{ classNames: { toast: "shadow-[var(--shadow-overlay)]!", title: "text-xs! font-medium! leading-5!", closeButton: "bg-[var(--surface)]! border-[var(--border)]! text-[var(--fg-muted)]!" } }}
+      />
+    </>
   );
 }

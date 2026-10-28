@@ -1,4 +1,5 @@
 "use client";
+import { BusyLabel } from "@/components/LoadingUI";
 import React, { useEffect, useRef, useState } from "react";
 import { Warning } from "@/components/icons";
 import { buttonGhost } from "@/components/BillingUI";
@@ -56,9 +57,13 @@ function ConfirmDialog({ req, onClose }: { req: ConfirmRequest; onClose: () => v
   }, []);
 
   const run = async () => {
+    // busyRef syncs from state after render; a second click can land first,
+    // so claim the slot synchronously before awaiting.
+    if (busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     try { await req.onConfirm(); onClose(); }
-    finally { setBusy(false); }
+    finally { busyRef.current = false; setBusy(false); }
   };
 
   return (
@@ -85,7 +90,7 @@ function ConfirmDialog({ req, onClose }: { req: ConfirmRequest; onClose: () => v
           <button ref={cancelRef} onClick={onClose} disabled={busy} className={buttonGhost}>Cancel</button>
           <button onClick={run} disabled={busy}
             className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-red-500 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100">
-            {busy ? `${req.confirmLabel}…` : req.confirmLabel}
+            <BusyLabel busy={busy} label={`${req.confirmLabel}…`}>{req.confirmLabel}</BusyLabel>
           </button>
         </div>
       </div>

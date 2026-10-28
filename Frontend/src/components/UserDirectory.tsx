@@ -1,4 +1,5 @@
 "use client";
+import { BusyLabel } from "@/components/LoadingUI";
 import React, { useState } from "react";
 import { Users, WifiHigh, WifiSlash, Archive, Plugs, Eye, X, ClockCountdown, Prohibit, CalendarX, Package, DeviceMobile, Globe, User as UserIcon } from "@/components/icons";
 import api from "@/lib/api";
@@ -53,7 +54,7 @@ export default function UserDirectory({expired=false}:{expired?:boolean}) {
  });
  const actionColumn={label:"Actions",render:(u:User)=><span className="inline-flex items-center gap-3">
   <button aria-label={`View ${u.voucher}`} onClick={()=>setView(u)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--accent-text)]"><Eye size={14}/>View</button>
-  <button disabled={pending!==null||(!expired&&!u.online)} onClick={()=>action(u)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-700 disabled:opacity-40">{expired?<Archive size={14}/>:<Plugs size={14}/ >}{pending===u.id?"Processing…":expired?"Archive":"Disconnect"}</button>
+  <button disabled={pending!==null||(!expired&&!u.online)} onClick={()=>action(u)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-700 disabled:opacity-40"><BusyLabel busy={pending===u.id} label="Processing…">{expired?<Archive size={14}/>:<Plugs size={14}/ >}{expired?"Archive":"Disconnect"}</BusyLabel></button>
  </span>};
  return <PageContainer>
   {dialog}
@@ -66,7 +67,7 @@ export default function UserDirectory({expired=false}:{expired?:boolean}) {
    <StatCard label="Total inactive" value={loading?"—":expiredRows.length} icon={<Users size={20}/>} hintText="All expired and revoked records"/>
   </div>:<>
    <div className="grid gap-4 sm:grid-cols-3"><StatCard label="All active" value={loading?"—":active.length} icon={<Users size={20}/>} hintText="Vouchers within their validity period"/><StatCard label="Online now" value={loading?"—":online.length} icon={<WifiHigh size={20}/>} tone="green" hintText="Recent accounting received within 6 minutes"/><StatCard label="Offline" value={loading?"—":offline.length} icon={<WifiSlash size={20}/>} hintText="Valid access with no recent connection"/></div>
-   <div className="flex sm:justify-end"><FilterTabs value={tab} onChange={setTab} options={[{key:"ONLINE",label:"Online now",count:online.length},{key:"OFFLINE",label:"Offline",count:offline.length},{key:"ALL",label:"All active",count:active.length}]}/></div>
+   <div className="flex sm:justify-end"><FilterTabs loading={loading} value={tab} onChange={setTab} options={[{key:"ONLINE",label:"Online now",count:online.length},{key:"OFFLINE",label:"Offline",count:offline.length},{key:"ALL",label:"All active",count:active.length}]}/></div>
   </>}
   <Table key={expired?"expired":tab} rows={rows} loading={loading} emptyTitle={expired?"No expired users":tab==="ONLINE"?"No users online":tab==="OFFLINE"?"No offline users":"No active users"} emptyDescription={expired?"Expired and revoked vouchers will appear here.":tab==="ONLINE"?"Connected users appear when recent router accounting is received.":"Users appear here after activating a voucher."} columns={expired?[
    {label:"Username",render:u=><span className="font-mono text-xs font-semibold">{u.customerId?`C${u.customerId}`:u.voucher}</span>},

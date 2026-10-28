@@ -29,7 +29,7 @@ export default function Page(){
   <PageHeader title="IP bindings" description="Manage device bypass access and automatic expiry." action={<Link href="/dashboard/bindings/new" className={button}><LinkSimple size={14}/>Bind IP</Link>}/>
   <Notice text={error||note}/>
   <div className="flex sm:justify-end">
-   <FilterTabs value={tab} onChange={setTab} options={[{key:"ACTIVE",label:"Active"},{key:"EXPIRED",label:"Expired"},{key:"ALL",label:"All"}].map(t=>({...t,count:data.filter(b=>t.key==="ALL"||b.status===t.key).length}))}/>
+   <FilterTabs loading={loading} value={tab} onChange={setTab} options={[{key:"ACTIVE",label:"Active"},{key:"EXPIRED",label:"Expired"},{key:"ALL",label:"All"}].map(t=>({...t,count:data.filter(b=>t.key==="ALL"||b.status===t.key).length}))}/>
   </div>
   <Table key={tab} emptyTitle="No IP bindings" emptyDescription="Bindings for the selected status will appear here." rows={data.filter(b=>tab==="ALL"||b.status===tab)} loading={loading} columns={[
    {label:"Name",render:b=><span className="font-medium">{b.name}</span>},

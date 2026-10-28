@@ -1,4 +1,5 @@
 "use client";
+import { BusyLabel, useSingleFlight } from "@/components/LoadingUI";
 import { mutateCache } from "@/lib/cacheInvalidation";
 
 import React, { useMemo, useState } from "react";
@@ -35,7 +36,8 @@ export default function VouchersPage() {
   const toast = useToast();
   const { confirm, dialog } = useConfirmDialog();
 
-  const sell = async (event: React.FormEvent) => {
+  const singleFlight = useSingleFlight();
+  const sell = singleFlight(async (event: React.FormEvent) => {
     event.preventDefault();
     if (selected.length !== 1 || busy) return;
     setBusy("sale"); setNote("");
@@ -44,7 +46,7 @@ export default function VouchersPage() {
       setSale(false); setSelected([]); toast("success", "Walk-in payment recorded."); await load();
     } catch (err) { setNote(message(err)); }
     finally { setBusy(""); }
-  };
+  });
 
   const revoke = (voucher: Voucher) => confirm({
     title: "Revoke voucher?",
@@ -60,13 +62,13 @@ export default function VouchersPage() {
     onConfirm: async () => { try { await api.post(`/api/vouchers/${voucher.code}/archive`); setSelected((codes) => codes.filter((code) => code !== voucher.code)); toast("success", `Voucher ${voucher.code} archived.`); mutateCache.voucherChanged(); await load(); } catch (err) { toast("error", message(err)); } },
   });
 
-  const assign = async () => {
+  const assign = singleFlight(async () => {
     if (!selected.length || !customer || busy) return;
     setBusy("assign"); setNote("");
     try { await api.post("/api/vouchers/assign", { codes: selected, customerId: Number(customer) }); setSelected([]); toast("success", "Vouchers assigned to customer."); mutateCache.voucherChanged(); await load(); }
     catch (err) { setNote(message(err)); }
     finally { setBusy(""); }
-  };
+  });
 
   const exportCsv = () => {
     const rows = data.filter((voucher) => selected.includes(voucher.code));
@@ -115,13 +117,13 @@ export default function VouchersPage() {
     <ErrorNotice text={error || note} />
 
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      <StatCard label="Available inventory" value={loading ? "—" : totals.available.toLocaleString()} icon={<Ticket />} hintText="Ready to sell or assign" tone="green" />
-      <StatCard label="Currently in use" value={loading ? "—" : totals.inUse.toLocaleString()} icon={<Clock />} hintText="Activated hotspot sessions" />
-      <StatCard label="Sold vouchers" value={loading ? "—" : totals.sold.toLocaleString()} icon={<CheckCircle />} hintText="Online and walk-in sales" />
-      <StatCard label="Available value" value={loading ? "—" : ugx(totals.value)} icon={<Money />} hintText="Face value of unsold inventory" />
+      <StatCard label="Available inventory" loading={loading} value={totals.available.toLocaleString()} icon={<Ticket />} hintText="Ready to sell or assign" tone="green" />
+      <StatCard label="Currently in use" loading={loading} value={totals.inUse.toLocaleString()} icon={<Clock />} hintText="Activated hotspot sessions" />
+      <StatCard label="Sold vouchers" loading={loading} value={totals.sold.toLocaleString()} icon={<CheckCircle />} hintText="Online and walk-in sales" />
+      <StatCard label="Available value" loading={loading} value={ugx(totals.value)} icon={<Money />} hintText="Face value of unsold inventory" />
     </div>
 
-    <div className="overflow-x-auto pb-1"><FilterTabs value={tab} onChange={(next) => { setTab(next); setSelected([]); setSelectedPackage("ALL"); }} options={tabs.map((key) => ({ key, label: key === "WALK_IN" ? "Walk-in" : humanize(key), count: data.filter((voucher) => matches(voucher, key)).length }))} /></div>
+    <div className="overflow-x-auto pb-1"><FilterTabs loading={loading} value={tab} onChange={(next) => { setTab(next); setSelected([]); setSelectedPackage("ALL"); }} options={tabs.map((key) => ({ key, label: key === "WALK_IN" ? "Walk-in" : humanize(key), count: data.filter((voucher) => matches(voucher, key)).length }))} /></div>
 
     {packageOptions.length > 0 && (
       <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-2">
@@ -159,7 +161,7 @@ export default function VouchersPage() {
     {selected.length > 0 && <section className="panel-shadow flex flex-col gap-3 rounded-xl border border-blue-200 bg-blue-50/60 p-4 lg:flex-row lg:items-center">
       <div className="min-w-28"><p className="text-xs font-semibold text-blue-900">{selected.length} selected</p><button onClick={() => setSelected([])} className="mt-0.5 text-[11px] text-blue-700 hover:underline">Clear selection</button></div>
       <select aria-label="Customer for voucher assignment" value={customer} onChange={(event) => setCustomer(event.target.value)} className={`${field} !mt-0 bg-white lg:max-w-xs`}><option value="">Choose customer to assign</option>{customers.data.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
-      <button disabled={!customer || !!busy} onClick={() => void assign()} className={button}>{busy === "assign" ? "Assigning…" : "Assign selected"}</button>
+      <button disabled={!customer || !!busy} onClick={() => void assign()} className={button}><BusyLabel busy={busy === "assign"} label="Assigning…">Assign selected</BusyLabel></button>
       <button disabled={!!busy} onClick={exportCsv} className={buttonGhost}><DownloadSimple size={15} aria-hidden="true" /> Export CSV</button>
       {selected.length === 1 && selectedVoucher?.status === "unused" && selectedVoucher.saleType === "INVENTORY" && <button onClick={() => { setAmount(String(selectedVoucher.price || "")); setSale(true); }} className={`${buttonGhost} lg:ml-auto`}>Record walk-in sale</button>}
     </section>}
@@ -181,7 +183,7 @@ export default function VouchersPage() {
         <div><label className={label}>Router</label><select required value={router} onChange={(event) => setRouter(event.target.value)} className={field}><option value="">Select router</option>{routers.data.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
         <div><label className={label}>Amount received (UGX)</label><input type="number" required min="0.01" step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} className={field} /></div>
         <div><label className={label}>Payment method</label><select value={method} onChange={(event) => setMethod(event.target.value)} className={field}>{["CASH", "MTN", "AIRTEL", "BANK", "OTHER"].map((item) => <option key={item}>{item}</option>)}</select></div>
-        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"><button type="button" disabled={!!busy} onClick={() => setSale(false)} className={buttonGhost}>Cancel</button><button disabled={!!busy} className={button}>{busy === "sale" ? "Recording…" : "Record payment"}</button></div>
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"><button type="button" disabled={!!busy} onClick={() => setSale(false)} className={buttonGhost}>Cancel</button><button disabled={!!busy} className={button}><BusyLabel busy={busy === "sale"} label="Recording…">Record payment</BusyLabel></button></div>
       </form>
     </Dialog>}
   </div>;

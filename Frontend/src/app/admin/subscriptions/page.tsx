@@ -5,7 +5,7 @@ import api from "@/lib/api";
 import { Table, Badge, Notice, panel, button, buttonGhost, field, label, hint, message, PageHeader } from "@/components/BillingUI";
 import { Dialog } from "@/components/ui/Dialog";
 import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { LoadingIndicator } from "@/components/LoadingUI";
+import { DashboardLoading, BusyLabel } from "@/components/LoadingUI";
 import { Plus, CheckCircle, WarningCircle, ClockCountdown, CalendarCheck, Money, Users, ShieldCheck, X } from "@/components/icons";
 
 interface Overview {
@@ -283,9 +283,7 @@ export default function AdminSubscriptionsPage() {
 
   if (loading) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <LoadingIndicator />
-      </div>
+      <DashboardLoading label="Loading subscriptions…" />
     );
   }
 
@@ -570,7 +568,7 @@ export default function AdminSubscriptionsPage() {
                 Cancel
               </button>
               <button type="submit" disabled={busy} className={`${button} bg-blue-600 text-white`}>
-                {busy ? "Saving..." : "Save Plan"}
+                <BusyLabel busy={busy} label="Saving…">Save Plan</BusyLabel>
               </button>
             </div>
           </form>
@@ -628,7 +626,7 @@ export default function AdminSubscriptionsPage() {
                 Cancel
               </button>
               <button type="submit" disabled={busy} className={`${button} bg-blue-600 text-white`}>
-                {busy ? "Applying..." : "Grant Extension"}
+                <BusyLabel busy={busy} label="Applying…">Grant Extension</BusyLabel>
               </button>
             </div>
           </form>
@@ -660,7 +658,7 @@ export default function AdminSubscriptionsPage() {
                 Cancel
               </button>
               <button type="submit" disabled={busy} className={`${button} bg-blue-600 text-white`}>
-                {busy ? "Saving..." : "Assign Plan"}
+                <BusyLabel busy={busy} label="Saving…">Assign Plan</BusyLabel>
               </button>
             </div>
           </form>
