@@ -1,0 +1,51 @@
+name: Test Deployment Host Connectivity (Safe Preflight)
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_host:
+        description: 'Target Host IP or Name (default from PROD_APP_HOST secret)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  test-connectivity:
+    name: Verify Tailscale & SSH Connectivity (Read-Only)
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Connect to Tailscale Network
+        uses: tailscale/github-action@v3
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+          tags: tag:ci-deployer
+
+      - name: Configure Known Hosts
+        env:
+          APP_HOST: ${{ github.event.inputs.target_host || secrets.PROD_APP_HOST }}
+          PINNED_HOST_KEY: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          if [ -n "${PINNED_HOST_KEY}" ]; then
+            echo "${PINNED_HOST_KEY}" >> ~/.ssh/known_hosts
+          else
+            ssh-keyscan -H "${APP_HOST}" >> ~/.ssh/known_hosts 2>/dev/null || true
+          fi
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Set up SSH Key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PROD_DEPLOY_SSH_KEY }}
+
+      - name: Harmless Ping & Version Probe
+        env:
+          APP_HOST: ${{ github.event.inputs.target_host || secrets.PROD_APP_HOST }}
+        run: |
+          echo "Executing harmless read-only command on ${APP_HOST}..."
+          ssh -o BatchMode=yes "${APP_HOST}" "hostname && uptime && free -h"
+          echo "Connectivity test SUCCESSFUL: Tailscale and SSH keys verified."
