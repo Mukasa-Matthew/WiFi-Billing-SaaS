@@ -8,6 +8,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.sql.Connection;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -119,7 +120,16 @@ public class LeaderLockService {
 
         int rows = 0;
         try {
-            rows = jdbcTemplate.update(sqlClaim, jobName, instanceId, now, expiresAt, now, now, minNextRun);
+            rows = jdbcTemplate.update(
+                sqlClaim,
+                jobName,
+                instanceId,
+                Timestamp.from(now),
+                Timestamp.from(expiresAt),
+                Timestamp.from(now),
+                Timestamp.from(now),
+                Timestamp.from(minNextRun)
+            );
         } catch (Exception e) {
             log.warn("Failed attempting to claim lease for {}: {}", jobName, e.getMessage());
             return false;
@@ -139,12 +149,13 @@ public class LeaderLockService {
             // Release lease early upon completion so subsequent cycles don't have to wait for TTL,
             // while preserving last_cycle_start to prevent immediate duplicate execution by peer nodes.
             try {
+                Instant completionTime = Instant.now();
                 jdbcTemplate.update("""
                     UPDATE app_job_leases
                     SET lease_expires_at = ?,
                         last_completed_at = ?
                     WHERE job_name = ? AND owner_id = ?;
-                """, Instant.now(), Instant.now(), jobName, instanceId);
+                """, Timestamp.from(completionTime), Timestamp.from(completionTime), jobName, instanceId);
             } catch (Exception e) {
                 log.warn("Failed updating completion timestamp for {}: {}", jobName, e.getMessage());
             }
