@@ -5,4 +5,6 @@ import java.util.*;
 public interface CustomerRepository extends JpaRepository<Customer,Long> {
  List<Customer> findAllByTenantIdOrderByCreatedAtDesc(Long tenantId);
  Optional<Customer> findByIdAndTenantId(Long id,Long tenantId);
+ long countByTenantId(Long tenantId);
+ long countByTenantIdAndCreatedAtGreaterThanEqual(Long tenantId,java.time.OffsetDateTime since);
 }
