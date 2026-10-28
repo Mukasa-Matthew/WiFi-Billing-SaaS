@@ -62,9 +62,17 @@ async function handler(
       status: res.status,
       headers: resHeaders,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    // The raw cause (e.g. "fetch failed", internal host/port) stays in the
+    // server log; the client only gets a message fit for users.
+    console.error(`[api proxy] ${req.method} /api/${path.join("/")} failed:`, err);
     return NextResponse.json(
-      { error: "Backend connection failed", message: err.message },
+      {
+        status: 502,
+        error: "Backend connection failed",
+        message: "AirPairy is temporarily unavailable. Please try again in a moment.",
+        path: `/api/${path.join("/")}`,
+      },
       { status: 502 }
     );
   }
