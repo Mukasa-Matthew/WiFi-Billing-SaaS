@@ -68,10 +68,10 @@ export default function PaymentsPage() {
       />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Online revenue today" value={loading ? "—" : money(metrics.todayOnline)} icon={<CreditCard />} hintText="Successful MTN and Airtel payments" tone="green" />
-        <StatCard label="Walk-in revenue today" value={loading ? "—" : money(metrics.todayWalkIn)} icon={<Wallet />} hintText="Cash, bank, and manually recorded sales" />
-        <StatCard label="Last 7 days" value={loading ? "—" : money(metrics.week)} icon={<CalendarBlank />} hintText="Successful revenue in the rolling week" />
-        <StatCard label="This month" value={loading ? "—" : money(metrics.month)} icon={<Money />} hintText="Successful revenue since month start" />
+        <StatCard label="Online revenue today" loading={loading} value={money(metrics.todayOnline)} icon={<CreditCard />} hintText="Successful MTN and Airtel payments" tone="green" />
+        <StatCard label="Walk-in revenue today" loading={loading} value={money(metrics.todayWalkIn)} icon={<Wallet />} hintText="Cash, bank, and manually recorded sales" />
+        <StatCard label="Last 7 days" loading={loading} value={money(metrics.week)} icon={<CalendarBlank />} hintText="Successful revenue in the rolling week" />
+        <StatCard label="This month" loading={loading} value={money(metrics.month)} icon={<Money />} hintText="Successful revenue since month start" />
       </div>
 
       <ErrorNotice text={error} />
@@ -79,7 +79,7 @@ export default function PaymentsPage() {
       <Table rows={visible} loading={loading} rowKey={(payment) => payment.id || payment.reference}
         searchPlaceholder="Search reference, phone, voucher or package…" emptyIcon={<CreditCard />}
         emptyTitle="No transactions in this view" emptyDescription={data.length ? "Choose another status or adjust your search." : "Payments will appear here as customers buy access or staff record walk-in sales."}
-        toolbar={<FilterTabs options={(["ALL", "SUCCESSFUL", "PENDING", "FAILED"] as PaymentFilter[]).map((key) => ({ key, label: key === "ALL" ? "All" : humanize(key), count: counts[key] }))} value={filter} onChange={(key) => setFilter(key as PaymentFilter)} />}
+        toolbar={<FilterTabs loading={loading} options={(["ALL", "SUCCESSFUL", "PENDING", "FAILED"] as PaymentFilter[]).map((key) => ({ key, label: key === "ALL" ? "All" : humanize(key), count: counts[key] }))} value={filter} onChange={(key) => setFilter(key as PaymentFilter)} />}
         columns={[
           { label: "Transaction", render: (payment) => <span className="block min-w-44"><span className="num block font-medium text-[var(--fg)]">{payment.reference}</span><span className="block text-[11px] text-[var(--fg-muted)]">{date(payment.createdAt)}</span></span> },
           { label: "Customer", render: (payment) => <span>{payment.phone ? <span className="num inline-flex items-center gap-1.5"><Phone className="h-3.5 w-3.5 text-[var(--fg-faint)]" />{payment.phone}</span> : <span className="text-[var(--fg-faint)]">Not captured</span>}{payment.voucher && <span className="num mt-1 block text-[11px] text-[var(--fg-muted)]">Voucher {payment.voucher}</span>}</span> },

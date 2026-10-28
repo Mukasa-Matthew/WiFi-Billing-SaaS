@@ -4,7 +4,7 @@ import React, { useEffect, useState, useMemo } from "react";
 import api from "@/lib/api";
 import { Table, Badge, Notice, panel, button, buttonGhost, field, label, hint, message } from "@/components/BillingUI";
 import { Dialog } from "@/components/ui/Dialog";
-import { LoadingIndicator } from "@/components/LoadingUI";
+import { BusyLabel, DashboardLoading } from "@/components/LoadingUI";
 import {
   CalendarCheck,
   CreditCard,
@@ -276,9 +276,7 @@ export default function SubscriptionHubPage() {
 
   if (loading) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <LoadingIndicator />
-      </div>
+      <DashboardLoading label="Loading your subscription…" />
     );
   }
 
@@ -777,7 +775,7 @@ export default function SubscriptionHubPage() {
                 className={`${button} bg-blue-600 hover:bg-blue-500 text-white font-bold`}
                 disabled={checkoutBusy}
               >
-                {checkoutBusy ? "Initiating Prompt..." : `Pay ${money(selectedPlan?.price)} via MoMo`}
+                <BusyLabel busy={checkoutBusy} label="Sending prompt…">{`Pay ${money(selectedPlan?.price)} via MoMo`}</BusyLabel>
               </button>
             </div>
           </form>

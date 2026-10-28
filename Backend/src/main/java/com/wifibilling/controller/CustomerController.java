@@ -13,11 +13,15 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.*;
 @RestController @RequestMapping("/api/customers") @RequiredArgsConstructor
 public class CustomerController {
- private final CustomerRepository customers; private final TenantRepository tenants;
+ private final CustomerRepository customers; private final TenantRepository tenants; private final com.wifibilling.service.CustomerService customerService;
  public record Request(@NotBlank @Size(max=120) String name,@Size(max=32) String phone,@Size(max=500) String notes) {}
  public record Response(Long id,String name,String phone,String notes) {}
  private Response dto(Customer c){return new Response(c.getId(),c.getName(),c.getPhone(),c.getNotes());}
- @GetMapping @Transactional(readOnly=true) public List<Response> list(@AuthenticationPrincipal TenantPrincipal p){return customers.findAllByTenantIdOrderByCreatedAtDesc(p.getTenantId()).stream().map(this::dto).toList();}
+ /** Every customer with their current voucher, usage and spend; buyers are added automatically. */
+ @GetMapping public List<com.wifibilling.service.CustomerService.Row> list(@AuthenticationPrincipal TenantPrincipal p){return customerService.list(p.getTenantId());}
+ @GetMapping("/{id}/history") public com.wifibilling.service.CustomerService.History history(@AuthenticationPrincipal TenantPrincipal p,@PathVariable Long id){
+  return customerService.history(p.getTenantId(),id).orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND));
+ }
  @PostMapping @ResponseStatus(HttpStatus.CREATED) @Transactional public Response create(@AuthenticationPrincipal TenantPrincipal p,@Valid @RequestBody Request r){
   return dto(customers.save(Customer.builder().tenant(tenants.findById(p.getTenantId()).orElseThrow()).name(r.name().trim()).phone(r.phone()).notes(r.notes()).build()));
  }

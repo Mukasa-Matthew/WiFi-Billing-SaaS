@@ -64,6 +64,13 @@ public class PaymentService {
         this.leaderLockService = leaderLockService;
     }
 
+    private CustomerService customerService;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setCustomerService(CustomerService customerService) {
+        this.customerService = customerService;
+    }
+
     // Lazy self-injection so internal calls still go through the tx proxy.
     // Defaults to the raw instance so plain unit tests (no proxy) still work.
     private PaymentService self = this;
@@ -482,6 +489,10 @@ public class PaymentService {
                 String voucherCode = vouchers.get(0).code();
                 tx.setVoucherCode(voucherCode);
                 voucherService.recordOnlineSale(tx.getTenant().getId(), voucherCode);
+                // The paying number becomes (or matches) a customer once this commits.
+                if (customerService != null) {
+                    customerService.recordBuyerAfterCommit(tx.getTenant().getId(), tx.getPhone(), voucherCode, tx.getCreatedAt());
+                }
                 log.info("Payment SUCCESSFUL for ref {}. Provisioned voucher: {}", tx.getReference(), voucherCode);
             } else {
                 log.error("Failed to generate voucher for successful transaction ref {}", tx.getReference());

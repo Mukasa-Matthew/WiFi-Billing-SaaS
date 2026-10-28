@@ -1,4 +1,5 @@
 "use client";
+import { ListSkeleton, BusyLabel } from "@/components/LoadingUI";
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -128,7 +129,7 @@ function RouterDetailInner() {
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--fill)] text-[var(--fg-muted)]"><RouterIcon className="h-5 w-5" /></span>
             <div className="min-w-0">
               <h1 className="flex flex-wrap items-center gap-2.5 text-[1.45rem] font-semibold leading-tight tracking-tight text-[var(--fg)]">
-                {r?.name ?? (error ? "Router" : "Loading…")}
+                {r?.name ?? (error ? "Router" : <><span aria-hidden className="inline-block h-[0.8em] w-40 max-w-full animate-pulse rounded bg-[var(--fill)] align-middle motion-reduce:animate-none" /><span className="sr-only">Loading router</span></>)}
                 {s && <span title={s.detail}><Badge tone={s.tone} dot>{s.label}</Badge></span>}
               </h1>
               {r && (
@@ -141,7 +142,7 @@ function RouterDetailInner() {
             </div>
           </div>
           <button onClick={runProbe} disabled={liveBusy || !r} className={buttonGhost} title="Reads system resources over the tunnel. Makes no changes.">
-            <ArrowClockwise className={`h-4 w-4 ${liveBusy ? "animate-spin motion-reduce:animate-none" : ""}`} />{liveBusy ? "Probing…" : "Run live probe"}
+            <ArrowClockwise className={`h-4 w-4 ${liveBusy ? "animate-spin motion-reduce:animate-none" : ""}`} /><BusyLabel busy={liveBusy} label="Probing…">Run live probe</BusyLabel>
           </button>
         </div>
       </div>
@@ -217,7 +218,7 @@ function OverviewTab({ detail, now }: { detail: Detail; now: number }) {
       <div className="min-w-0 space-y-5 lg:col-span-2">
         <Card title="Open incidents" description="Evaluated every minute from stored telemetry and task results" bodyClassName="">
           {incErr ? <p className="px-5 py-8 text-sm text-[var(--fg-muted)]">Incidents unavailable: {incErr}</p>
-            : !incidents ? <p className="px-5 py-8 text-sm text-[var(--fg-muted)]">Loading…</p>
+            : !incidents ? <ListSkeleton rows={2} avatar={false} />
             : open.length === 0 ? (
               <div className="flex items-center gap-3 px-5 py-5">
                 <CheckCircle className="h-5 w-5 text-emerald-600" />
@@ -238,7 +239,7 @@ function OverviewTab({ detail, now }: { detail: Detail; now: number }) {
         </Card>
         <Card title="Daily data usage" description="Download + upload from RADIUS accounting, last 14 days with data">
           {usageErr ? <p className="py-10 text-center text-sm text-[var(--fg-muted)]">Usage unavailable: {usageErr}</p>
-            : !usage ? <p className="py-10 text-center text-sm text-[var(--fg-muted)]">Loading…</p>
+            : !usage ? <div aria-hidden className="h-40 animate-pulse rounded-lg bg-[var(--fill)] motion-reduce:animate-none" />
             : usage.length === 0 ? <p className="py-10 text-center text-sm text-[var(--fg-muted)]">No accounting data in the last 14 days.</p>
             : <BarChart height={220} label="Daily data usage" format={(v) => bytes(v)} tickFormat={bytesTick}
                 data={usage.map((u) => {
@@ -454,7 +455,7 @@ function EventsTab({ routerId }: { routerId: number }) {
     <Card title="Event timeline" description="Sessions, tasks and incidents for this router, newest first"
       action={types.length > 2 && <Segmented label="Event type" value={filter} onChange={setFilter} options={types.map((t) => ({ key: t, label: t === "ALL" ? "All" : humanize(t) }))} />}>
       {err && <ErrorNotice text={`Couldn't load events: ${err}`} />}
-      {!events && !err && <p className="text-sm text-[var(--fg-muted)]">Loading…</p>}
+      {!events && !err && <ListSkeleton rows={4} avatar={false} inset={false} />}
       {events && rows.length === 0 && <p className="py-8 text-center text-sm text-[var(--fg-muted)]">No events recorded yet.</p>}
       <ol className="relative ml-1 space-y-4 border-l border-[var(--border)] pl-5">
         {rows.map((e, i) => (

@@ -1,4 +1,6 @@
 "use client";
+import { useSingleFlight } from "@/components/LoadingUI";
+import { notify } from "@/components/ui/Toast";
 import { mutateCache } from "@/lib/cacheInvalidation";
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -51,7 +53,8 @@ export default function CreateVouchersPage() {
 
   const selected = data.find((p) => String(p.id) === plan);
 
-  const save = async (e: React.FormEvent) => {
+  const singleFlight = useSingleFlight();
+  const save = singleFlight(async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
@@ -63,10 +66,11 @@ export default function CreateVouchersPage() {
       // The list may still be cached as fresh; without this the new batch
       // would be missing when the list opens.
       mutateCache.voucherChanged();
+      notify.success(`${Number(count).toLocaleString()} voucher${Number(count) === 1 ? "" : "s"} created.`);
       nav.push("/dashboard/vouchers");
     } catch (err) { setNote(message(err)); }
     finally { setSaving(false); }
-  };
+  });
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">

@@ -3,6 +3,7 @@ import com.wifibilling.repository.*;
 import com.wifibilling.model.*;
 import com.wifibilling.radius.RadAcct;
 import com.wifibilling.security.TenantPrincipal;
+import com.wifibilling.util.AccessState;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -25,7 +26,7 @@ public class UserDirectoryController {
   record Agg(OffsetDateTime first,long data,long devices) {}
   var stats=new HashMap<String,Agg>();
   for(Object[] row:accounting.userStats(p.getTenantId(),now.minusMinutes(6)))
-   stats.put((String)row[0],new Agg(toUtc(row[1]),((Number)row[2]).longValue(),((Number)row[3]).longValue()));
+   stats.put((String)row[0],new Agg(AccessState.toUtc(row[1]),((Number)row[2]).longValue(),((Number)row[3]).longValue()));
   // Latest session per user — one DISTINCT ON query
   var latestBy=new HashMap<String,Object[]>();
   for(Object[] row:accounting.latestSessions(p.getTenantId())) latestBy.put((String)row[0],row);
@@ -35,19 +36,11 @@ public class UserDirectoryController {
    var latest=latestBy.get(v.getCode());
    long devices=agg==null?0:agg.devices();
    OffsetDateTime first=v.getFirstLogin()!=null?v.getFirstLogin():(agg==null?null:agg.first());
-   OffsetDateTime expiry=v.getExpiresAt();if(expiry==null&&first!=null)expiry=first.plusSeconds(v.getPackagePlan().getSessionTimeout());
-   String status= "revoked".equals(v.getStatus())?"revoked":expiry!=null&&!expiry.isAfter(now)?"expired":first!=null?"active":v.getStatus();
+   OffsetDateTime expiry=AccessState.expiry(v,first);
+   String status=AccessState.status(v,first,expiry,now);
    Router router=latest==null?null:rs.get((String)latest[3]);
    long data=agg==null?0:agg.data();
    return new User(v.getId(),v.getCustomer()==null?null:v.getCustomer().getId(),v.getCustomer()==null?null:v.getCustomer().getName(),v.getCustomer()==null?null:v.getCustomer().getPhone(),v.getCode(),v.getPackagePlan().getName(),status,devices>0,latest==null?null:(String)latest[1],latest==null?v.getClaimedMac():(String)latest[2],router==null?null:router.getName(),v.getPackagePlan().getSharedUsers(),devices,first,expiry,data,expiry==null?null:Math.max(0,java.time.Duration.between(now,expiry).getSeconds()));
   }).toList();
- }
- private static OffsetDateTime toUtc(Object v){
-  return v==null?null
-    :v instanceof OffsetDateTime o?o
-    :v instanceof java.time.Instant i?i.atOffset(java.time.ZoneOffset.UTC)
-    :v instanceof java.sql.Timestamp ts?ts.toLocalDateTime().atOffset(java.time.ZoneOffset.UTC)
-    :v instanceof java.sql.Date d?d.toLocalDate().atStartOfDay().atOffset(java.time.ZoneOffset.UTC)
-    :null;
  }
 }

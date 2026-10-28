@@ -1,4 +1,5 @@
 "use client";
+import { ListSkeleton } from "@/components/LoadingUI";
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -181,7 +182,7 @@ function TenantDetail() {
               <ProblemsCard incidents={incidents} routers={routers} now={now} loading={overview.loading && !overview.data} />
               <Card title="Routers" description="Latest reported state for each location" action={routers.length > 0 && <button onClick={() => setTab("Routers")} className="text-xs font-medium text-[var(--accent-text)] hover:underline">Details</button>} bodyClassName="">
                 {routers.length === 0 ? (
-                  <p className="px-5 py-10 text-center text-sm text-[var(--fg-muted)]">{fleet.loading ? "Loading…" : "This business hasn't linked a MikroTik router yet."}</p>
+                  (fleet.loading ? <ListSkeleton rows={2} /> : <p className="px-5 py-10 text-center text-sm text-[var(--fg-muted)]">{"This business hasn't linked a MikroTik router yet."}</p>)
                 ) : (
                   <ul className="divide-y divide-[var(--border-soft)]">
                     {routers.map((r) => (
@@ -204,7 +205,7 @@ function TenantDetail() {
             <div className="min-w-0 space-y-5">
               <Card title="Subscription" description="What this business pays AirPairy" bodyClassName="px-5 py-1" action={sub && <Badge tone={subscriptionTone(sub.displayStatus)} dot>{humanize(sub.displayStatus)}</Badge>}>
                 {subs.error ? <p className="py-4 text-sm text-[var(--fg-muted)]">Unavailable.</p>
-                  : !sub ? <p className="py-4 text-sm text-[var(--fg-muted)]">{subs.loading ? "Loading…" : "No subscription set up."} {!subs.loading && <Link href="/admin/subscriptions" className="text-[var(--accent-text)] hover:underline">Subscriptions</Link>}</p>
+                  : !sub ? (subs.loading ? <ListSkeleton rows={2} avatar={false} inset={false} /> : <p className="py-4 text-sm text-[var(--fg-muted)]">No subscription set up. <Link href="/admin/subscriptions" className="text-[var(--accent-text)] hover:underline">Subscriptions</Link></p>)
                   : <dl className="divide-y divide-[var(--border-soft)]">
                       <Field label="Monthly fee"><span className="num">{ugx(sub.monthlyFee)}</span></Field>
                       <Field label="Next renewal">{shortDate(sub.nextRenewalDate)}</Field>
@@ -213,7 +214,7 @@ function TenantDetail() {
               </Card>
               <Card title="Customer collections" description="WiFi payments AirPairy holds for this business. Not platform revenue." bodyClassName="px-5 py-1">
                 {wallets.error ? <p className="py-4 text-sm text-[var(--fg-muted)]">Unavailable.</p>
-                  : !wallet ? <p className="py-4 text-sm text-[var(--fg-muted)]">{wallets.loading ? "Loading…" : "No wallet yet. No customer payments collected."}</p>
+                  : !wallet ? (wallets.loading ? <ListSkeleton rows={2} avatar={false} inset={false} /> : <p className="py-4 text-sm text-[var(--fg-muted)]">No wallet yet. No customer payments collected.</p>)
                   : <dl className="divide-y divide-[var(--border-soft)]">
                       <Field label="Available to withdraw"><span className="num">{ugx(wallet.available)}</span></Field>
                       <Field label="Pending settlement"><span className="num">{ugx(wallet.pending)}</span></Field>
@@ -261,7 +262,7 @@ function ProblemsCard({ incidents, routers, now, loading }: { incidents: Inciden
   const total = incidents.length + extra.length;
   return (
     <Card title="Needs attention" description="Open incidents and router issues for this business" bodyClassName="">
-      {loading ? <p className="px-5 py-8 text-sm text-[var(--fg-muted)]">Loading…</p>
+      {loading ? <ListSkeleton rows={2} avatar={false} />
         : total === 0 ? (
           <div className="flex items-center gap-3 px-5 py-5">
             <CheckCircle className="h-5 w-5 text-emerald-600" />
@@ -386,7 +387,7 @@ function AuthTab({ routers }: { routers: Routed[] }) {
 function BillingTab({ sub, subsLoading, wallet }: { sub: Subscription | null; subsLoading: boolean; wallet: Wallet | null }) {
   const billing = useApi<Billing>(sub ? `/api/admin/subscriptions/${sub.id}/billing` : null);
   if (!sub) {
-    return <Card><p className="py-8 text-center text-sm text-[var(--fg-muted)]">{subsLoading ? "Loading…" : "This business has no subscription. Create one from Subscriptions."}</p>{!subsLoading && <div className="pb-4 text-center"><CardLink href="/admin/subscriptions">Subscriptions</CardLink></div>}</Card>;
+    return <Card>{subsLoading ? <ListSkeleton rows={3} avatar={false} inset={false} /> : <><p className="py-8 text-center text-sm text-[var(--fg-muted)]">This business has no subscription. Create one from Subscriptions.</p><div className="pb-4 text-center"><CardLink href="/admin/subscriptions">Subscriptions</CardLink></div></>}</Card>;
   }
   return (
     <div className="min-w-0 space-y-5">

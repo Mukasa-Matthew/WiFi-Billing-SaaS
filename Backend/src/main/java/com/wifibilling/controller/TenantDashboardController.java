@@ -1,5 +1,6 @@
 package com.wifibilling.controller;
 
+import com.wifibilling.dto.DataUsageDto;
 import com.wifibilling.dto.TenantDashboardStatsDto;
 import com.wifibilling.security.TenantPrincipal;
 import com.wifibilling.service.TenantDashboardService;
@@ -20,5 +21,11 @@ public class TenantDashboardController {
     public TenantDashboardStatsDto getStats(@AuthenticationPrincipal TenantPrincipal principal,
             @org.springframework.web.bind.annotation.RequestParam(defaultValue = "7d") String range) {
         return dashboardService.getStats(principal.getTenantId(), principal.getRole(), range);
+    }
+
+    @GetMapping("/data-usage")
+    public DataUsageDto getDataUsage(@AuthenticationPrincipal TenantPrincipal principal,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "today") String period) {
+        return dashboardService.getDataUsage(principal.getTenantId(), period);
     }
 }
