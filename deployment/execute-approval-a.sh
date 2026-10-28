@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # AirPairy — Administrator Interactive Approval A Installation Script
-# Location: /opt/airpairy/install/execute-approval-a.sh
+# Location on AppServer: /opt/airpairy/install/deployment/execute-approval-a.sh
 # Run with interactive sudo:
-#   sudo /opt/airpairy/install/execute-approval-a.sh
+#   sudo /opt/airpairy/install/deployment/execute-approval-a.sh
 # ==============================================================================
 set -euo pipefail
 
@@ -13,19 +13,25 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TARGET_COMMIT="66433b2cfe6960592b2317ce4107f4e59358a275"
 OPT_DEPLOY="/opt/airpairy/deployment"
 BLUE_GREEN_DIR="${OPT_DEPLOY}/blue-green"
 SLOTS_DIR="${OPT_DEPLOY}/slots"
 STATE_DIR="${OPT_DEPLOY}/state"
 SYSTEMD_TARGET_DIR="/etc/systemd/system"
+DEPLOY_USER="matthew"
 
 echo "=================================================================="
 echo " AirPairy — Approval A: Root-Controlled Infrastructure Setup"
-echo " Target Commit : ${TARGET_COMMIT}"
+echo " Installer Dir : ${SCRIPT_DIR}"
 echo " Timestamp     : $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 echo " Running as    : $(whoami)"
 echo "=================================================================="
+
+# 0. Verify installer directory is strictly root-owned and not world-writable
+if [ "$(stat -c '%u:%g' "${SCRIPT_DIR}")" != "0:0" ]; then
+    echo "SECURITY ERROR: Installer directory ${SCRIPT_DIR} is not owned by root:root! Aborting." >&2
+    exit 1
+fi
 
 # 1. Assert preflight production health
 echo "[1/7] Checking live production services..."
@@ -56,13 +62,13 @@ chmod 755 "${OPT_DEPLOY}"
 chmod 755 "${BLUE_GREEN_DIR}"
 
 # Writable state and slot config directories owned by matthew:matthew (770)
-chown matthew:matthew "${SLOTS_DIR}" "${STATE_DIR}"
+chown "${DEPLOY_USER}:${DEPLOY_USER}" "${SLOTS_DIR}" "${STATE_DIR}"
 chmod 770 "${SLOTS_DIR}" "${STATE_DIR}"
 
 # Initialize active_slot.txt tracking file to 'green' if absent
 if [ ! -f "${STATE_DIR}/active_slot.txt" ]; then
     echo "green" > "${STATE_DIR}/active_slot.txt"
-    chown matthew:matthew "${STATE_DIR}/active_slot.txt"
+    chown "${DEPLOY_USER}:${DEPLOY_USER}" "${STATE_DIR}/active_slot.txt"
     chmod 660 "${STATE_DIR}/active_slot.txt"
 fi
 
@@ -75,14 +81,27 @@ cp "${SCRIPT_DIR}/blue-green/upgrade-worker.sh" "${BLUE_GREEN_DIR}/"
 chown root:root "${BLUE_GREEN_DIR}"/*.sh
 chmod 755 "${BLUE_GREEN_DIR}"/*.sh
 
-# Install restricted root helpers to /usr/local/bin
-cp "${SCRIPT_DIR}/blue-green/deploy-nginx-control.sh" "/usr/local/bin/deploy-nginx-control"
-chown root:root "/usr/local/bin/deploy-nginx-control"
-chmod 755 "/usr/local/bin/deploy-nginx-control"
-
-cp "${SCRIPT_DIR}/blue-green/deploy-service-control.sh" "/usr/local/bin/deploy-service-control"
-chown root:root "/usr/local/bin/deploy-service-control"
-chmod 755 "/usr/local/bin/deploy-service-control"
+# Verify existing privileged helpers in /usr/local/bin; preserve them if identical
+echo "Checking privileged root helpers in /usr/local/bin..."
+for helper in deploy-nginx-control deploy-service-control; do
+    SOURCE_HELPER="${SCRIPT_DIR}/blue-green/${helper}.sh"
+    DEST_HELPER="/usr/local/bin/${helper}"
+    if [ -f "${DEST_HELPER}" ]; then
+        if cmp -s "${SOURCE_HELPER}" "${DEST_HELPER}"; then
+            echo "  Helper ${DEST_HELPER} is already up-to-date and identical. Preserving."
+        else
+            echo "  Updating helper ${DEST_HELPER}..."
+            cp "${SOURCE_HELPER}" "${DEST_HELPER}"
+            chown root:root "${DEST_HELPER}"
+            chmod 755 "${DEST_HELPER}"
+        fi
+    else
+        echo "  Installing helper ${DEST_HELPER}..."
+        cp "${SOURCE_HELPER}" "${DEST_HELPER}"
+        chown root:root "${DEST_HELPER}"
+        chmod 755 "${DEST_HELPER}"
+    fi
+done
 
 # 5. Install Blue systemd unit files to /etc/systemd/system/
 echo "[5/7] Installing Blue systemd service definitions (root:root, 644)..."
@@ -97,7 +116,7 @@ systemctl daemon-reload
 # 6. Service enablement management (prevent reboot port collision)
 echo "[6/7] Managing systemd unit startup enablement..."
 # Disable legacy autostart so ports 8080/3000 never collide on reboot
-systemctl disable wifi-backend.service wifi-frontend.service
+systemctl disable wifi-backend.service wifi-frontend.service 2>/dev/null || true
 
 # Ensure Green services and dedicated worker persist across reboots
 systemctl enable wifi-frontend-green.service wifi-backend-green.service wifi-worker.service

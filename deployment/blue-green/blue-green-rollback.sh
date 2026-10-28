@@ -14,8 +14,10 @@ set -euo pipefail
 
 MODE="${1:-warm}" # default: warm
 APP_DIR="/var/www/wifi-billing"
-ACTIVE_SLOT_FILE="${DEPLOY_DIR:-/opt/airpairy/deployment}/active_slot.txt"
-ROLLBACK_SLOT_FILE="${DEPLOY_DIR:-/opt/airpairy/deployment}/rollback_slot.txt"
+DEPLOY_DIR="${DEPLOY_DIR:-/opt/airpairy/deployment}"
+STATE_DIR="${DEPLOY_DIR}/state"
+ACTIVE_SLOT_FILE="${STATE_DIR}/active_slot.txt"
+ROLLBACK_SLOT_FILE="${STATE_DIR}/rollback_slot.txt"
 
 if [ ! -f "${ROLLBACK_SLOT_FILE}" ]; then
     echo "ERROR: Rollback slot record '${ROLLBACK_SLOT_FILE}' not found!" >&2
@@ -56,9 +58,6 @@ if [ "${ROLLBACK_SLOT}" = "legacy" ]; then
             exit 1
         fi
     fi
-
-    # Stop dedicated worker to prevent dual scheduling with legacy backend
-    sudo /usr/local/bin/deploy-service-control stop worker || true
 
     # Switch Nginx to legacy upstream (slot blue pointing to 8080/3000)
     sudo /usr/local/bin/deploy-nginx-control switch-slot blue
