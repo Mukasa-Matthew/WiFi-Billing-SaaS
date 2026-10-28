@@ -11,8 +11,11 @@ on:
         required: false
         default: 'NO'
 
+# contents: checkout; checks: commit check-run query; actions: CI run lookup + artifact download
 permissions:
   contents: read
+  checks: read
+  actions: read
 
 concurrency:
   group: production-deploy
@@ -23,6 +26,9 @@ jobs:
     name: Validate and Deploy to Production
     runs-on: ubuntu-latest
     environment: production
+    timeout-minutes: 45
+    env:
+      REMOTE_TMP: /home/matthew/.deploy-staging-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -68,6 +74,8 @@ jobs:
           fi
 
       - name: Verify CI Build & Test Status for Commit
+        id: ci_run
+        timeout-minutes: 5
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COMMIT: ${{ steps.parse_sha.outputs.commit }}
@@ -87,20 +95,46 @@ jobs:
           fi
           echo "CI check runs verified: Both Backend and Frontend passed."
 
+          # Pin the exact CI run: ci.yml, push to main, successful, head_sha == target commit.
+          RUN_ID=$(gh api "repos/${{ github.repository }}/actions/workflows/ci.yml/runs?head_sha=${COMMIT}&branch=main&event=push&status=success&per_page=20" \
+            -q "[.workflow_runs[] | select(.head_sha==\"${COMMIT}\" and .path==\".github/workflows/ci.yml\" and .conclusion==\"success\")] | sort_by(.run_number) | last | .id // empty")
+          if [ -z "${RUN_ID}" ]; then
+            echo "ERROR: No successful ci.yml push run on main found for commit ${COMMIT}!" >&2
+            exit 1
+          fi
+
+          # Both build jobs inside that specific run must have succeeded.
+          JOBS_OK=$(gh api "repos/${{ github.repository }}/actions/runs/${RUN_ID}/jobs" \
+            -q '[.jobs[] | select((.name=="Backend Build & Tests (Spring Boot)" or .name=="Frontend Build & TypeScript Validation (Next.js)") and .conclusion=="success")] | length')
+          if [ "${JOBS_OK}" != "2" ]; then
+            echo "ERROR: CI run ${RUN_ID} does not contain two successful build jobs for ${COMMIT}!" >&2
+            exit 1
+          fi
+          echo "Pinned CI run ${RUN_ID} for commit ${COMMIT}."
+          echo "run_id=${RUN_ID}" >> "$GITHUB_OUTPUT"
+
       - name: Download Immutable Build Artifacts
+        timeout-minutes: 10
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COMMIT: ${{ steps.parse_sha.outputs.commit }}
+          RUN_ID: ${{ steps.ci_run.outputs.run_id }}
         run: |
           mkdir -p artifacts
-          echo "Finding CI run for commit ${COMMIT}..."
-          RUN_ID=$(gh run list --commit "${COMMIT}" --workflow "Continuous Integration" --json databaseId,conclusion -q '.[] | select(.conclusion=="success") | .databaseId' | head -n 1)
-          if [ -z "${RUN_ID}" ]; then
-            echo "ERROR: Could not locate successful Continuous Integration run for commit ${COMMIT}!"
-            exit 1
-          fi
-          echo "Downloading artifacts from CI Run ID: ${RUN_ID}..."
-          gh run download "${RUN_ID}" --dir artifacts/
+          echo "Downloading artifacts for ${COMMIT} from CI Run ID: ${RUN_ID}..."
+          # Only the artifacts named for this exact commit; fails if expired or missing.
+          gh run download "${RUN_ID}" \
+            -n "backend-jar-${COMMIT}" -n "frontend-bundle-${COMMIT}" --dir artifacts/
+
+          BACKEND_DIR="artifacts/backend-jar-${COMMIT}"
+          FRONTEND_DIR="artifacts/frontend-bundle-${COMMIT}"
+          for f in "${BACKEND_DIR}/api-0.0.1-SNAPSHOT.jar" "${BACKEND_DIR}/backend.sha256" \
+                   "${FRONTEND_DIR}/frontend-standalone.tar.gz" "${FRONTEND_DIR}/frontend.sha256"; do
+            [ -f "${f}" ] || { echo "ERROR: Missing artifact file ${f}" >&2; exit 1; }
+          done
+          # Verify checksums on the runner before anything touches production.
+          ( cd "${BACKEND_DIR}" && sha256sum -c backend.sha256 )
+          ( cd "${FRONTEND_DIR}" && sha256sum -c frontend.sha256 )
 
           echo "Inspecting downloaded artifacts:"
           ls -la artifacts/*
@@ -121,8 +155,9 @@ jobs:
           fi
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          echo "${PINNED_HOST_KEY}" >> ~/.ssh/known_hosts
-          chmod 600 ~/.ssh/known_hosts
+          # Dedicated file: only the pinned production key is trusted for the prod host.
+          printf '%s\n' "${PINNED_HOST_KEY}" > ~/.ssh/known_hosts_prod
+          chmod 600 ~/.ssh/known_hosts_prod
           echo "Verified and installed repository-pinned SSH host key."
 
       - name: Set up SSH Key for Deployment
@@ -130,37 +165,98 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.PROD_DEPLOY_SSH_KEY }}
 
-      - name: Pre-Cutover Remote State Revalidation
+      - name: Configure Strict SSH Client for Production
         env:
           APP_HOST: ${{ secrets.PROD_APP_HOST }}
-          DEPLOY_USER: "matthew"
-          COMMIT: ${{ steps.parse_sha.outputs.commit }}
         run: |
-          echo "Revalidating remote server deployment infrastructure on ${APP_HOST}..."
-          ssh -o BatchMode=yes "${DEPLOY_USER}@${APP_HOST}" "test -f /opt/airpairy/deployment/blue-green/blue-green-deploy.sh" || {
-            echo "ERROR: /opt/airpairy/deployment infrastructure not found on target host! Run Approval A setup first." >&2
+          if [ -z "${APP_HOST}" ]; then
+            echo "CRITICAL ERROR: PROD_APP_HOST secret is not configured!" >&2
             exit 1
-          }
+          fi
+          # Every ssh/scp below uses "Host prod", so the safeguards apply uniformly.
+          cat >> ~/.ssh/config <<EOF
+          Host prod
+              HostName ${APP_HOST}
+              User matthew
+              BatchMode yes
+              StrictHostKeyChecking yes
+              UserKnownHostsFile ~/.ssh/known_hosts_prod
+              ConnectTimeout 15
+              ServerAliveInterval 15
+              ServerAliveCountMax 4
+          EOF
+          chmod 600 ~/.ssh/config
+
+      - name: Read-Only Production Preflight
+        timeout-minutes: 3
+        run: |
+          echo "Running read-only preflight on production host (no mutations)..."
+          ssh prod 'bash -s' <<'EOF_PREFLIGHT'
+          set -u
+          FAIL=0
+          fail() { echo "PREFLIGHT FAIL: $*" >&2; FAIL=1; }
+          D=/opt/airpairy/deployment
+          APP=/var/www/wifi-billing
+
+          for f in "$D/blue-green/stage-release-artifacts.sh" "$D/blue-green/blue-green-deploy.sh" \
+                   /usr/local/bin/deploy-service-control /usr/local/bin/deploy-nginx-control; do
+            [ -x "$f" ] || fail "missing or not executable: $f"
+          done
+
+          ACTIVE=$(tr -d ' \n' < "$D/state/active_slot.txt" 2>/dev/null || echo legacy)
+          # Same slot selection as blue-green-deploy.sh
+          case "$ACTIVE" in
+            legacy|blue) TARGET=green ;;
+            green) TARGET=blue ;;
+            *) fail "unexpected active slot '$ACTIVE'"; TARGET=none ;;
+          esac
+          echo "Active slot: $ACTIVE -> target slot: $TARGET"
+
+          for d in "$D/state" "$D/slots" "$APP" "$APP/slots" "$APP/shared-static"; do
+            [ -d "$d" ] && [ -w "$d" ] || fail "directory not writable by $(id -un): $d"
+          done
+          [ ! -e "$APP/releases" ] || [ -w "$APP/releases" ] || fail "not writable: $APP/releases"
+
+          # sudo -n -l only checks the rule; it executes nothing.
+          for c in "deploy-service-control restart backend-$TARGET" "deploy-service-control restart frontend-$TARGET" \
+                   "deploy-service-control stop backend-$TARGET" "deploy-service-control stop frontend-$TARGET" \
+                   "deploy-nginx-control switch-slot $TARGET"; do
+            sudo -n -l /usr/local/bin/$c >/dev/null 2>&1 || fail "no passwordless sudo rule for: $c"
+          done
+          sudo -n /usr/local/bin/deploy-nginx-control test >/dev/null 2>&1 || fail "nginx configuration test failed"
+
+          AVAIL_KB=$(df -Pk "$APP" | awk 'NR==2 {print $4}')
+          [ "${AVAIL_KB:-0}" -ge 2097152 ] || fail "less than 2 GiB free on $APP"
+
+          [ "$FAIL" -eq 0 ] || { echo "Preflight failed; production was not modified." >&2; exit 1; }
+          echo "Preflight passed."
+          EOF_PREFLIGHT
 
       - name: Secure Artifact Transfer & Atomic Blue-Green Release
+        id: release
+        timeout-minutes: 20
         env:
-          APP_HOST: ${{ secrets.PROD_APP_HOST }}
-          DEPLOY_USER: "matthew"
           COMMIT: ${{ steps.parse_sha.outputs.commit }}
         run: |
-          echo "Transferring verified immutable artifacts to ${APP_HOST}..."
-          REMOTE_TMP="/home/${DEPLOY_USER}/.deploy-staging-${COMMIT}"
-          
-          ssh -o BatchMode=yes "${DEPLOY_USER}@${APP_HOST}" "mkdir -p ${REMOTE_TMP}"
-          
-          # Transfer backend and frontend artifacts
-          scp -o BatchMode=yes artifacts/backend-jar-*/api-0.0.1-SNAPSHOT.jar "${DEPLOY_USER}@${APP_HOST}:${REMOTE_TMP}/"
-          scp -o BatchMode=yes artifacts/backend-jar-*/backend.sha256 "${DEPLOY_USER}@${APP_HOST}:${REMOTE_TMP}/"
-          scp -o BatchMode=yes artifacts/frontend-bundle-*/frontend-standalone.tar.gz "${DEPLOY_USER}@${APP_HOST}:${REMOTE_TMP}/"
-          scp -o BatchMode=yes artifacts/frontend-bundle-*/frontend.sha256 "${DEPLOY_USER}@${APP_HOST}:${REMOTE_TMP}/"
-          
-          echo "Executing atomic staging and blue-green cutover via /opt/airpairy/deployment on ${APP_HOST}..."
-          ssh -o BatchMode=yes "${DEPLOY_USER}@${APP_HOST}" \
+          echo "Transferring verified immutable artifacts to production..."
+          ssh prod "mkdir -p '${REMOTE_TMP}'"
+
+          scp artifacts/"backend-jar-${COMMIT}"/api-0.0.1-SNAPSHOT.jar \
+              artifacts/"backend-jar-${COMMIT}"/backend.sha256 \
+              artifacts/"frontend-bundle-${COMMIT}"/frontend-standalone.tar.gz \
+              artifacts/"frontend-bundle-${COMMIT}"/frontend.sha256 \
+              "prod:${REMOTE_TMP}/"
+
+          echo "Executing atomic staging and blue-green cutover via /opt/airpairy/deployment..."
+          ssh prod \
             "/opt/airpairy/deployment/blue-green/stage-release-artifacts.sh '${COMMIT}' '${REMOTE_TMP}' && \
-             /opt/airpairy/deployment/blue-green/blue-green-deploy.sh '${COMMIT}' 60 && \
-             rm -rf ${REMOTE_TMP}"
+             /opt/airpairy/deployment/blue-green/blue-green-deploy.sh '${COMMIT}' 60"
+
+      - name: Remove Remote Staging Directory
+        if: always() && steps.release.outcome != 'skipped'
+        timeout-minutes: 2
+        run: |
+          case "${REMOTE_TMP}" in
+            /home/matthew/.deploy-staging-*) ssh prod "rm -rf -- '${REMOTE_TMP}'" || echo "WARNING: could not remove ${REMOTE_TMP}" ;;
+            *) echo "Refusing to remove unexpected path ${REMOTE_TMP}" ;;
+          esac
