@@ -91,6 +91,7 @@ function PackageFormPage() {
       };
       if (editId) await api.put(`/api/packages/${editId}`, body);
       else await api.post("/api/packages", body);
+      mutateCache.packageChanged();
       nav.push("/dashboard/packages");
     } catch { setError("Could not save the package. Check your entries and try again."); }
     finally { setSaving(false); }

@@ -26,7 +26,9 @@ function OnlineDot({online}:{online:boolean}) {
 }
 
 export default function UserDirectory({expired=false}:{expired?:boolean}) {
- const {data,loading,error,load}=useResource<User>("/api/users",true);
+ // Every voucher with its accounting aggregates (~1 MB for busy tenants):
+ // refresh once a minute, not every 20 s.
+ const {data,loading,error,load}=useResource<User>("/api/users",60000);
  const [tab,setTab]=useState("ONLINE"), [note,setNote]=useState(""), [actionError,setActionError]=useState("");
  const [pending,setPending]=useState<number|null>(null);
  const [view,setView]=useState<User|null>(null);

@@ -40,7 +40,8 @@ export const mutateCache = {
     invalidateDashboardData(tenantId, ["/api/packages", "/api/dashboard/stats"]);
   },
   voucherChanged: (tenantId?: number) => {
-    invalidateDashboardData(tenantId, ["/api/vouchers", "/api/dashboard/stats", "/api/sessions/active"]);
+    // /api/users is built from vouchers (Active/Expired users pages).
+    invalidateDashboardData(tenantId, ["/api/vouchers", "/api/dashboard/stats", "/api/sessions/active", "/api/users"]);
   },
   routerChanged: (tenantId?: number) => {
     invalidateDashboardData(tenantId, ["/api/routers", "/api/dashboard/stats", "/api/admin/noc/routers", "/api/admin/noc/overview"]);
