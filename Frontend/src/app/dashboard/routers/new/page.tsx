@@ -111,6 +111,7 @@ export default function AddRouterPage() {
         wifiSsid: hasWireless ? identity.trim().replace(/[^\x20-\x7E]/g, "").slice(0, 32) : "WiFi Hotspot",
       });
       setRouter(response.data);
+      mutateCache.routerChanged();
       setAttempt(0);
       setStep(2);
     } catch (requestError: unknown) {
