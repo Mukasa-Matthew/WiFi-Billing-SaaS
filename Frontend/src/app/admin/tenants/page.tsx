@@ -20,6 +20,10 @@ interface TenantSummary {
   routerCount: number; voucherCount: number; createdAt: string;
 }
 interface FleetRouter { tenantId: number; status: string; lastSeen: string | null }
+interface WalletRow {
+  tenantId: number; businessName: string; available: number; pending: number;
+  reserved: number; totalCollected: number; totalWithdrawn: number;
+}
 interface Subscription { id: number; tenantId: number; monthlyFee: number; nextRenewalDate: string; status: string; displayStatus: string; outstanding: number }
 
 type StatusFilter = "ALL" | "ACTIVE" | "SUSPENDED" | "DISABLED";
@@ -28,6 +32,7 @@ export default function AdminTenantsPage() {
   const tenants = useResource<TenantSummary>("/api/admin/tenants");
   const network = useResource<FleetRouter>("/api/admin/noc/routers");
   const subs = useResource<Subscription>("/api/admin/subscriptions");
+  const wallets = useResource<WalletRow>("/api/admin/finance/wallets");
   const actions = useTenantActions(tenants.load);
   const now = useNow();
   const [filter, setFilter] = useState<StatusFilter>("ALL");
@@ -39,6 +44,7 @@ export default function AdminTenantsPage() {
     return new Map([...groups].map(([id, rs]) => [id, summarizeRouters(rs, now)]));
   }, [network.data, now]);
   const subBy = useMemo(() => new Map(subs.data.map((s) => [s.tenantId, s])), [subs.data]);
+  const walletBy = useMemo(() => new Map(wallets.data.map((w) => [w.tenantId, w])), [wallets.data]);
   const sorted = useMemo(() => [...tenants.data].sort((a, b) => a.name.localeCompare(b.name)), [tenants.data]);
   const isDisabled = (t: TenantSummary) => t.status !== "ACTIVE" && t.status !== "SUSPENDED";
   const rows = sorted.filter((t) => filter === "ALL" || (filter === "DISABLED" ? isDisabled(t) : t.status === filter));
@@ -54,7 +60,7 @@ export default function AdminTenantsPage() {
       />
       {actions.noticeBanner}
       {tenants.error && <ErrorNotice text={`Couldn't load tenants: ${tenants.error}`} />}
-      {!tenants.error && (network.error || subs.error) && <ErrorNotice text={`Some columns are unavailable: ${[network.error && "router health", subs.error && "subscriptions"].filter(Boolean).join(" and ")} failed to load.`} />}
+      {!tenants.error && (network.error || subs.error || wallets.error) && <ErrorNotice text={`Some columns are unavailable: ${[network.error && "router health", subs.error && "subscriptions", wallets.error && "wallet balances"].filter(Boolean).join(" and ")} failed to load.`} />}
 
       <Table
         rows={rows} loading={tenants.loading} rowKey={(t) => t.id}
@@ -81,6 +87,21 @@ export default function AdminTenantsPage() {
             const n = netBy.get(t.id);
             if (!n) return <span className="num text-[13px]">{network.loading ? "…" : t.routerCount}</span>;
             return <span className="flex flex-col gap-0.5"><StatusDot tone={n.tone}><span className="num">{n.label}</span></StatusDot>{n.tone !== "green" && n.detail && <span className="pl-4 text-[11.5px] text-[var(--fg-muted)]">{n.detail}</span>}</span>;
+          } },
+          { label: "Wallet balance", hideBelow: "sm", render: (t) => {
+            const w = walletBy.get(t.id);
+            if (wallets.error) return <span className="text-xs text-[var(--fg-faint)]">—</span>;
+            if (!w) return <span className="num text-xs text-[var(--fg-muted)]">{wallets.loading ? "…" : ugx(0)}</span>;
+            return (
+              <span className="flex flex-col items-start gap-0.5">
+                <span className="num font-semibold text-[13px] text-[var(--fg)]">{ugx(w.available)}</span>
+                {(w.pending > 0 || w.reserved > 0) && (
+                  <span className="num text-[11px] text-[var(--fg-muted)]">
+                    {w.pending > 0 ? `${ugx(w.pending)} pend` : ""}{w.pending > 0 && w.reserved > 0 ? " · " : ""}{w.reserved > 0 ? `${ugx(w.reserved)} res` : ""}
+                  </span>
+                )}
+              </span>
+            );
           } },
           { label: "Active vouchers", render: (t) => t.voucherCount.toLocaleString(), align: "right", hideBelow: "md" },
           { label: "Joined", render: (t) => <span className="text-xs text-[var(--fg-muted)]" title={new Date(t.createdAt).toLocaleString()}>{relativeTime(t.createdAt, now)}</span>, align: "right", hideBelow: "sm" },

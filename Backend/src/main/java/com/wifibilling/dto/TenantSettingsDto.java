@@ -16,6 +16,7 @@ public record TenantSettingsDto(
         Boolean portalShowPackages,
         @Size(max = 500) String notifyEmails,
         @Size(max = 255) String notifyPhones,
+        Boolean notifyRouterOffline,
         @Pattern(regexp = "[a-z0-9-]{1,40}") String portalTemplate,
         @Pattern(regexp = "OFF|LOG|BLOCK") String tetheringProtection,
         @Size(max = 60) String supportPhone2,

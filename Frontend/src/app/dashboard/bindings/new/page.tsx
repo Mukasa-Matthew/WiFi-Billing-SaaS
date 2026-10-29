@@ -5,7 +5,7 @@ import React,{useState} from "react";
 import {useRouter} from "next/navigation";
 import api from "@/lib/api";
 import {invalidateDashboardData} from "@/lib/cacheInvalidation";
-import {useResource,Notice,field,message,label,hint,FormHeader,FormSection,FormActions,FormLayout,SummaryCard} from "@/components/BillingUI";
+import {useResource,Notice,field,message,label,hint,FormHeader,FormSection,FormActions,FormLayout,SummaryCard,date} from "@/components/BillingUI";
 import { Money, CellTower } from "@/components/icons";
 
 interface RouterRec{id:number;name:string}
@@ -40,7 +40,7 @@ export default function Page(){
      {label:"Device",value:name||<span className="font-normal text-[var(--fg-muted)]">Unnamed</span>},
      {label:"MAC",value:<span className="font-mono text-xs">{mac||"—"}</span>},
      {label:"Access",value:chosenPlan?chosenPlan.name:"Free bypass"},
-     {label:"Expires",value:expires?new Date(expires).toLocaleString():"Never"},
+     {label:"Expires",value:expires?date(expires):"Never"},
     ]} footer="A bound device connects without entering a voucher code."/>
    }>
    <FormSection icon={<CellTower size={18} aria-hidden/>} title="Device and access"
@@ -72,7 +72,7 @@ export default function Page(){
       {hosts.map((h,i)=><option key={i} value={i}>{h.address} · {h["mac-address"]} {h["host-name"]}</option>)}
      </select>
      <button type="button" disabled={!router} onClick={()=>loadHosts(router)} className="mt-2 text-xs font-medium text-[var(--accent-text)] hover:underline disabled:opacity-40">Refresh reported hosts</button>
-     <p className={hint}>{seen?`Last report: ${new Date(seen).toLocaleString()}`:"No host report yet. Enter the IP and MAC manually."}</p>
+     <p className={hint}>{seen?`Last report: ${date(seen)}`:"No host report yet. Enter the IP and MAC manually."}</p>
     </div>
     <div>
      <label className={label}>Address{plan&&req}</label>

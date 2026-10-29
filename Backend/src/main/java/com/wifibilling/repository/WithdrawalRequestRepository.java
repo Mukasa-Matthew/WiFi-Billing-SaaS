@@ -10,6 +10,7 @@ public interface WithdrawalRequestRepository extends JpaRepository<WithdrawalReq
     Optional<WithdrawalRequest> findByIdAndTenantId(Long id, Long tenantId);
     Optional<WithdrawalRequest> findByPayoutRef(String payoutRef);
     Optional<WithdrawalRequest> findByProviderUuid(String providerUuid);
+    List<WithdrawalRequest> findAllByOrderByCreatedAtDesc();
     List<WithdrawalRequest> findAllByStatusIn(List<String> statuses);
     long countByTenantIdAndStatusIn(Long tenantId, List<String> statuses);
 }

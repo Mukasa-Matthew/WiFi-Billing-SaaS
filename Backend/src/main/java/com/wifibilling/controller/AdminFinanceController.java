@@ -92,13 +92,22 @@ public class AdminFinanceController {
                                      String failureReason, String createdAt) {}
 
     @GetMapping("/withdrawals")
-    public List<AdminWithdrawalRow> withdrawals(@RequestParam(defaultValue = "") String status) {
+    public List<AdminWithdrawalRow> withdrawals(@RequestParam(defaultValue = "") String status,
+                                               @RequestParam(required = false) Long tenantId) {
         List<String> statuses = status.isBlank()
                 ? List.of(WithdrawalRequest.PENDING_APPROVAL, WithdrawalRequest.REQUESTED,
                           WithdrawalRequest.PROCESSING, WithdrawalRequest.COMPLETED,
                           WithdrawalRequest.FAILED, WithdrawalRequest.CANCELLED)
                 : List.of(status.split(","));
-        return withdrawalService.adminList(statuses).stream().map(w -> {
+        var stream = (tenantId != null
+                ? withdrawalService.list(tenantId)
+                : withdrawalService.adminList(statuses)).stream();
+
+        if (tenantId != null && !status.isBlank()) {
+            stream = stream.filter(w -> statuses.contains(w.getStatus()));
+        }
+
+        return stream.map(w -> {
             var t = w.getTenant();
             return new AdminWithdrawalRow(w.getId(), t.getId(), t.getName(), w.getAmount(), w.getFee(),
                     w.getTotalDeduction(), w.getPhone(), w.getStatus(), w.getFailureReason(),

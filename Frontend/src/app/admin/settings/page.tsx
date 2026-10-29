@@ -30,6 +30,7 @@ import {
   Building2
 } from "@/components/icons";
 import { FormSkeleton, BusyLabel } from "@/components/LoadingUI";
+import { date } from "@/components/BillingUI";
 
 interface Profile {
   id: number;
@@ -718,7 +719,7 @@ export default function SuperAdminSettingsPage() {
                           </p>
                           <span className="text-[10px] text-[var(--fg-muted)] flex items-center gap-1 mt-1">
                             <Clock className="w-3 h-3" />
-                            Last active: {new Date(sess.lastActiveAt).toLocaleString()}
+                            Last active: {date(sess.lastActiveAt)}
                           </span>
                         </div>
                       </div>
@@ -910,7 +911,7 @@ export default function SuperAdminSettingsPage() {
                             {log.ipAddress || "—"}
                           </td>
                           <td className="py-3 px-4 text-[var(--fg-muted)]">
-                            {new Date(log.createdAt).toLocaleString()}
+                            {date(log.createdAt)}
                           </td>
                         </tr>
                       ))

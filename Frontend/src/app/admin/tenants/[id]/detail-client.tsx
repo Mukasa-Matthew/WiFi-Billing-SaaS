@@ -27,6 +27,11 @@ interface RouterRow {
 interface Incident { id: number; routerId: number; routerName: string; severity: string; title: string; detail: string | null; openedAt: string }
 interface Overview { incidents: Incident[] }
 interface Subscription { id: number; tenantId: number; monthlyFee: number; startDate: string; nextRenewalDate: string; status: string; displayStatus: string; outstanding: number }
+interface WithdrawalRow {
+  id: number; tenantId: number; businessName: string; amount: number; fee: number;
+  totalDeduction: number; phone: string; status: string;
+  failureReason: string | null; createdAt: string;
+}
 interface Wallet { tenantId: number; available: number; pending: number; reserved: number; totalCollected: number; totalWithdrawn: number }
 interface Billing {
   invoices: { id: number; periodStart: string; periodEnd: string; amountDue: number; status: string; paidAt: string | null }[];
@@ -37,6 +42,15 @@ interface SessionRow {
   sessionSeconds: number | null; uploadOctets: number | null; downloadOctets: number | null; state: string; packageName: string | null; remainingSeconds: number | null;
 }
 interface AuthEvent { id: number; at: string; username: string; reply: string; mac: string | null; description: string }
+
+const WITHDRAWAL_STATUS_TONE: Record<string, "green" | "blue" | "amber" | "red" | "slate"> = {
+  COMPLETED: "green",
+  PROCESSING: "blue",
+  PENDING_APPROVAL: "amber",
+  REQUESTED: "amber",
+  FAILED: "red",
+  CANCELLED: "slate",
+};
 interface Paged<T> { content: T[]; totalElements: number }
 
 const TABS = ["Overview", "Routers", "Live sessions", "Auth failures", "Billing"] as const;
@@ -232,7 +246,7 @@ function TenantDetail() {
       {tab === "Routers" && <RoutersTab routers={routers} now={now} loading={fleet.loading} />}
       {tab === "Live sessions" && <SessionsTab routers={reachable} now={now} />}
       {tab === "Auth failures" && <AuthTab routers={reachable} />}
-      {tab === "Billing" && <BillingTab sub={sub ?? null} subsLoading={subs.loading} wallet={wallet ?? null} />}
+      {tab === "Billing" && <BillingTab tenantId={tenantId} sub={sub ?? null} subsLoading={subs.loading} wallet={wallet ?? null} />}
     </div>
   );
 }
@@ -384,7 +398,8 @@ function AuthTab({ routers }: { routers: Routed[] }) {
   );
 }
 
-function BillingTab({ sub, subsLoading, wallet }: { sub: Subscription | null; subsLoading: boolean; wallet: Wallet | null }) {
+function BillingTab({ tenantId, sub, subsLoading, wallet }: { tenantId: number; sub: Subscription | null; subsLoading: boolean; wallet: Wallet | null }) {
+  const withdrawalsRes = useResource<WithdrawalRow>(`/api/admin/finance/withdrawals?tenantId=${tenantId}`);
   const billing = useApi<Billing>(sub ? `/api/admin/subscriptions/${sub.id}/billing` : null);
   if (!sub) {
     return <Card>{subsLoading ? <ListSkeleton rows={3} avatar={false} inset={false} /> : <><p className="py-8 text-center text-sm text-[var(--fg-muted)]">This business has no subscription. Create one from Subscriptions.</p><div className="pb-4 text-center"><CardLink href="/admin/subscriptions">Subscriptions</CardLink></div></>}</Card>;
@@ -432,6 +447,25 @@ function BillingTab({ sub, subsLoading, wallet }: { sub: Subscription | null; su
             ]} />
         </Card>
       </div>
+            <Card title="Withdrawal history" description="All mobile money payouts and withdrawal requests for this tenant." bodyClassName="">
+        {withdrawalsRes.error && <div className="px-5 pt-3"><ErrorNotice text={`Couldn't load withdrawals: ${withdrawalsRes.error}`} /></div>}
+        <Table bare searchable={false} paginated={(withdrawalsRes.data.length ?? 0) > 10} rows={withdrawalsRes.data ?? []} loading={withdrawalsRes.loading} rowKey={(w) => w.id}
+          emptyTitle="No withdrawals recorded"
+          emptyDescription="This tenant has not made any withdrawal requests yet."
+          columns={[
+            { label: "Date", render: (w) => <span className="text-xs text-[var(--fg-muted)]">{w.createdAt ? date(w.createdAt) : "—"}</span> },
+            { label: "Phone", render: (w) => <span className="font-mono text-xs font-medium">{w.phone}</span> },
+            { label: "Amount", render: (w) => <span className="num font-semibold">{ugx(w.amount)}</span>, align: "right" },
+            { label: "Fee", render: (w) => <span className="num text-xs text-[var(--fg-muted)]">{ugx(w.fee)}</span>, align: "right", hideBelow: "sm" },
+            { label: "Total debited", render: (w) => <span className="num text-xs font-medium">{ugx(w.totalDeduction)}</span>, align: "right", hideBelow: "md" },
+            { label: "Status", render: (w) => (
+              <span>
+                <Badge tone={WITHDRAWAL_STATUS_TONE[w.status] || "slate"} dot>{humanize(w.status)}</Badge>
+                {w.failureReason && <span className="mt-0.5 block text-[11px] text-red-500">{w.failureReason}</span>}
+              </span>
+            ) },
+          ]} />
+      </Card>
       <p className="text-xs text-[var(--fg-muted)]">To record a payment or change the fee, use <Link href="/admin/subscriptions" className="text-[var(--accent-text)] hover:underline">Subscriptions</Link>.</p>
     </div>
   );

@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useState, useMemo } from "react";
 import api from "@/lib/api";
+import { date } from "@/components/BillingUI";
 import {
   FileText,
   MagnifyingGlass,
@@ -67,22 +68,7 @@ export default function TenantSessionLogsPage() {
     return `${remainderSecs}s`;
   };
 
-  const formatDateTime = (dtStr: string | null) => {
-    if (!dtStr) return "—";
-    try {
-      const d = new Date(dtStr);
-      if (isNaN(d.getTime())) return "—";
-      const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-      const day = String(d.getDate()).padStart(2, "0");
-      const mon = months[d.getMonth()];
-      const yr = d.getFullYear();
-      const hr = String(d.getHours()).padStart(2, "0");
-      const min = String(d.getMinutes()).padStart(2, "0");
-      return `${day} ${mon} ${yr}, ${hr}:${min}`;
-    } catch {
-      return dtStr;
-    }
-  };
+  const formatDateTime = date;
 
   const filteredLogs = useMemo(() => {
     return logs.filter((log) => {

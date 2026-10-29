@@ -6,7 +6,7 @@ import { Table, Badge, ErrorNotice, date, panel, button, buttonGhost, field, lab
 import { Dialog } from "@/components/ui/Dialog";
 import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
-import { ArrowDown, WarningCircle, ArrowsClockwise } from "@/components/icons";
+import { ArrowDown, WarningCircle, ArrowsClockwise, DownloadSimple } from "@/components/icons";
 
 interface Overview {
   walletCount: number; tenantLiabilities: number; reservedFunds: number;
@@ -100,6 +100,33 @@ export default function AdminFinancePage() {
     } catch (err) { setWdErr(message(err)); }
     finally { setWdBusy(false); }
   });
+
+  const exportCsv = () => {
+    if (!withdrawals.length) return;
+    const header = ["ID", "Date", "Tenant", "Phone", "Amount (UGX)", "Fee (UGX)", "Total Deduction (UGX)", "Status", "Failure Reason"];
+    const rows = withdrawals.map((w) => [
+      String(w.id),
+      w.createdAt ? new Date(w.createdAt).toLocaleString() : "",
+      w.businessName || "",
+      w.phone || "",
+      String(w.amount),
+      String(w.fee),
+      String(w.totalDeduction),
+      w.status,
+      w.failureReason || ""
+    ]);
+    const csv = [header, ...rows]
+      .map((row) => row.map((val) => `"${String(val).replace(/"/g, '""').replace(/^[=+@-]/, "'")}"`).join(","))
+      .join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `withdrawals-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast("success", `${withdrawals.length} withdrawal record${withdrawals.length === 1 ? "" : "s"} exported.`);
+  };
 
   const act = (row: WithdrawalRow, action: "approve" | "fail") => confirm({
     title: action === "approve" ? "Approve withdrawal?" : "Reject withdrawal?",
@@ -244,14 +271,25 @@ export default function AdminFinancePage() {
       <div className={panel}>
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-soft)] px-5 py-4">
           <h2 className="text-sm font-bold text-[var(--fg)]">Withdrawal requests</h2>
-          <select value={filter} onChange={(e) => setFilter(e.target.value)}
-            className="rounded-lg border border-[var(--border-strong)] px-3 py-1.5 text-xs">
-            <option value="">All</option>
-            <option value="PENDING_APPROVAL,REQUESTED">Awaiting approval</option>
-            <option value="PROCESSING">Processing</option>
-            <option value="COMPLETED">Completed</option>
-            <option value="FAILED,CANCELLED">Failed / cancelled</option>
-          </select>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={!withdrawals.length}
+              onClick={exportCsv}
+              className={`${buttonGhost} !h-8 !px-3 !text-xs`}
+              title="Export withdrawal records to CSV"
+            >
+              <DownloadSimple className="h-3.5 w-3.5" /> Export CSV
+            </button>
+            <select value={filter} onChange={(e) => setFilter(e.target.value)}
+              className="rounded-lg border border-[var(--border-strong)] px-3 py-1.5 text-xs">
+              <option value="">All</option>
+              <option value="PENDING_APPROVAL,REQUESTED">Awaiting approval</option>
+              <option value="PROCESSING">Processing</option>
+              <option value="COMPLETED">Completed</option>
+              <option value="FAILED,CANCELLED">Failed / cancelled</option>
+            </select>
+          </div>
         </div>
         <Table
           rows={withdrawals}

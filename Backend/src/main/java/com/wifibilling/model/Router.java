@@ -70,6 +70,9 @@ public class Router {
     @Column(name = "last_seen")
     private OffsetDateTime lastSeen;
 
+    @Column(name = "offline_notified_at")
+    private OffsetDateTime offlineNotifiedAt;
+
     @Column(name = "hotspot_ready")
     private Boolean hotspotReady;
     @Column(name = "radius_ready")
@@ -85,4 +88,6 @@ public class Router {
     @Column(name = "created_at")
     @Builder.Default
     private OffsetDateTime createdAt = OffsetDateTime.now();
+    public OffsetDateTime getOfflineNotifiedAt() { return offlineNotifiedAt; }
+    public void setOfflineNotifiedAt(OffsetDateTime offlineNotifiedAt) { this.offlineNotifiedAt = offlineNotifiedAt; }
 }

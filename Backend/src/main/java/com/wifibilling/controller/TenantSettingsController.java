@@ -99,6 +99,7 @@ public class TenantSettingsController {
         if (req.portalShowPackages() != null) tenant.setPortalShowPackages(req.portalShowPackages());
         tenant.setNotifyEmails(req.notifyEmails());
         tenant.setNotifyPhones(req.notifyPhones());
+        if (req.notifyRouterOffline() != null) tenant.setNotifyRouterOffline(req.notifyRouterOffline());
         if (req.portalTemplate() != null) tenant.setPortalTemplate(req.portalTemplate());
         if (req.tetheringProtection() != null) tenant.setTetheringProtection(req.tetheringProtection());
         tenant.setSupportPhone2(req.supportPhone2());
@@ -169,6 +170,7 @@ public class TenantSettingsController {
                 t.getVoucherCodeFormat() != null ? t.getVoucherCodeFormat() : "ALPHANUMERIC",
                 Boolean.TRUE.equals(t.getPortalShowPackages()),
                 t.getNotifyEmails(), t.getNotifyPhones(),
+                Boolean.TRUE.equals(t.getNotifyRouterOffline()),
                 t.getPortalTemplate() != null ? t.getPortalTemplate() : "midnight",
                 t.getTetheringProtection() != null ? t.getTetheringProtection() : "OFF",
                 t.getSupportPhone2(), t.getWhatsappPhone(),

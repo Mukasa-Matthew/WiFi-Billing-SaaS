@@ -73,7 +73,7 @@ export default function UserDirectory({expired=false}:{expired?:boolean}) {
    {label:"Username",render:u=><span className="font-mono text-xs font-semibold">{u.customerId?`C${u.customerId}`:u.voucher}</span>},
    {label:"Full name",render:u=><span className="font-medium">{u.customerName||"Walk-in customer"}</span>},{label:"Phone",render:u=>u.phone||"—"},
    {label:"Status",render:u=><Badge tone="red">{u.status}</Badge>},{label:"Package",render:u=>u.packageName},
-   {label:"Expiry date",render:u=><span className="text-red-700">{date(u.expiresAt)}</span>},
+   {label:"Expiry date",render:u=><span className="tabular-nums whitespace-nowrap text-[13px] text-red-700">{date(u.expiresAt)}</span>},
    {label:"Expired",render:u=>u.expiresAt?<Badge tone="red">{expiredAgo(u.expiresAt)}</Badge>:"—"},actionColumn
   ]:[
    {label:"Customer",render:u=><div><span className="font-medium">{u.customerName||"Unassigned"}</span>{u.phone&&<span className="block text-xs text-[var(--fg-muted)]">{u.phone}</span>}</div>},
@@ -83,7 +83,7 @@ export default function UserDirectory({expired=false}:{expired?:boolean}) {
    {label:"IP",render:u=>u.ip?<span className="font-mono text-xs">{u.ip}</span>:"—"},
    {label:"MAC",render:u=>u.mac?<span className="font-mono text-xs">{u.mac}</span>:"—"},
    {label:"Devices",render:u=><span className="tabular-nums">{u.devices}/{u.deviceLimit}</span>},
-   {label:"Router",render:u=>u.router||"—"},{label:"First activation",render:u=>u.firstLogin?<Badge tone="blue">{date(u.firstLogin)}</Badge>:<span className="text-[var(--fg-muted)]">—</span>},{label:"Access expires",render:u=>u.expiresAt?<Badge tone="green">{date(u.expiresAt)}</Badge>:<span className="text-[var(--fg-muted)]">—</span>},
+   {label:"Router",render:u=>u.router||"—"},{label:"First activation",render:u=>u.firstLogin?<span className="tabular-nums whitespace-nowrap text-[13px] text-[var(--fg-body)]">{date(u.firstLogin)}</span>:<span className="text-[13px] text-[var(--fg-faint)]">—</span>},{label:"Access expires",render:u=>u.expiresAt?<span className="tabular-nums whitespace-nowrap text-[13px] text-emerald-700">{date(u.expiresAt)}</span>:<span className="text-[13px] text-[var(--fg-faint)]">—</span>},
    {label:"Data usage",render:u=>bytes(u.dataBytes)},{label:"Time left",render:u=><Badge tone={(u.timeLeftSeconds??0)<3600?"amber":"green"}>{remaining(u.timeLeftSeconds)}</Badge>},actionColumn
   ]}/>
  {view&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" onClick={()=>setView(null)}>
