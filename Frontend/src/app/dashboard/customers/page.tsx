@@ -58,7 +58,18 @@ const columnStore = {
 };
 
 const customerId = (n: number) => `C-${String(n).padStart(4, "0")}`;
-const shortDateTime = (v: string | null) => v ? new Date(v).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }) : null;
+const MONTH_LIST = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const shortDateTime = (v: string | null) => {
+  if (!v) return null;
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return null;
+  const day = String(d.getDate()).padStart(2, "0");
+  const mon = MONTH_LIST[d.getMonth()];
+  const yr = d.getFullYear();
+  const hr = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  return `${day} ${mon} ${yr}, ${hr}:${min}`;
+};
 const ugx = (v: number) => `UGX ${Number(v || 0).toLocaleString()}`;
 // Buyers recorded from a payment carry their number as a placeholder name.
 const hasName = (c: Customer) => c.name.trim() !== "" && c.name !== c.phone;

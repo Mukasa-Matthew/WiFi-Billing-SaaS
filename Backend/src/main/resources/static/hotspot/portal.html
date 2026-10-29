@@ -433,8 +433,13 @@ function formatDate(isoStr) {
     try {
         var d = new Date(isoStr);
         if (isNaN(d.getTime())) return isoStr;
-        return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' +
-               d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+        var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        var day = (d.getDate() < 10 ? '0' : '') + d.getDate();
+        var mon = months[d.getMonth()];
+        var yr = d.getFullYear();
+        var hr = (d.getHours() < 10 ? '0' : '') + d.getHours();
+        var min = (d.getMinutes() < 10 ? '0' : '') + d.getMinutes();
+        return day + ' ' + mon + ' ' + yr + ', ' + hr + ':' + min;
     } catch(e) { return isoStr; }
 }
 

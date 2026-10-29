@@ -83,7 +83,7 @@ export default function UserDirectory({expired=false}:{expired?:boolean}) {
    {label:"IP",render:u=>u.ip?<span className="font-mono text-xs">{u.ip}</span>:"—"},
    {label:"MAC",render:u=>u.mac?<span className="font-mono text-xs">{u.mac}</span>:"—"},
    {label:"Devices",render:u=><span className="tabular-nums">{u.devices}/{u.deviceLimit}</span>},
-   {label:"Router",render:u=>u.router||"—"},{label:"First activation",render:u=><span className="text-[var(--fg-muted)]">{date(u.firstLogin)}</span>},{label:"Access expires",render:u=><span className="text-[var(--fg-muted)]">{date(u.expiresAt)}</span>},
+   {label:"Router",render:u=>u.router||"—"},{label:"First activation",render:u=>u.firstLogin?<Badge tone="blue">{date(u.firstLogin)}</Badge>:<span className="text-[var(--fg-muted)]">—</span>},{label:"Access expires",render:u=>u.expiresAt?<Badge tone="green">{date(u.expiresAt)}</Badge>:<span className="text-[var(--fg-muted)]">—</span>},
    {label:"Data usage",render:u=>bytes(u.dataBytes)},{label:"Time left",render:u=><Badge tone={(u.timeLeftSeconds??0)<3600?"amber":"green"}>{remaining(u.timeLeftSeconds)}</Badge>},actionColumn
   ]}/>
  {view&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" onClick={()=>setView(null)}>

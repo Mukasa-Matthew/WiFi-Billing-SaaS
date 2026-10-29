@@ -71,12 +71,14 @@ export default function TenantSessionLogsPage() {
     if (!dtStr) return "—";
     try {
       const d = new Date(dtStr);
-      return d.toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "short",
-        hour: "2-digit",
-        minute: "2-digit"
-      });
+      if (isNaN(d.getTime())) return "—";
+      const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      const day = String(d.getDate()).padStart(2, "0");
+      const mon = months[d.getMonth()];
+      const yr = d.getFullYear();
+      const hr = String(d.getHours()).padStart(2, "0");
+      const min = String(d.getMinutes()).padStart(2, "0");
+      return `${day} ${mon} ${yr}, ${hr}:${min}`;
     } catch {
       return dtStr;
     }
