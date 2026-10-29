@@ -29,7 +29,7 @@ class TelemetryServiceTest {
     void setUp() {
         service = new TelemetryService(routers, properties, emailService, emailTemplates);
         router = Router.builder().token("tok_valid123456").build();
-        when(routers.findByToken("tok_valid123456")).thenReturn(Optional.of(router));
+        org.mockito.Mockito.lenient().when(routers.findByToken("tok_valid123456")).thenReturn(Optional.of(router));
     }
 
     @Test
@@ -85,7 +85,7 @@ class TelemetryServiceTest {
         router.setTenant(tenant);
         router.setStatus(TelemetryService.STATUS_ONLINE);
 
-        when(properties.getOfflineAfterMinutes()).thenReturn(6);
+        when(properties.getOfflineAfterMinutes()).thenReturn(6L);
         when(routers.findStaleRouters(org.mockito.ArgumentMatchers.any())).thenReturn(java.util.List.of(router));
         when(routers.markOfflineSeenBefore(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any())).thenReturn(1);
         when(emailTemplates.shell(org.mockito.ArgumentMatchers.anyString(),
