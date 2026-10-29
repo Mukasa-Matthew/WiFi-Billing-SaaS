@@ -48,6 +48,7 @@ public class ProvisioningService {
     private final RouterScriptGenerator scriptGenerator;
     private final PlatformProperties props;
     private final RouterSetupService setupService;
+    private final WinboxAccessService winboxAccessService;
 
     /**
      * Redeems a FULL setup code and builds its script in one transaction: if
@@ -93,6 +94,13 @@ public class ProvisioningService {
         routerRepository.save(router);
         upsertNas(router);
 
+        String winboxInstaller = null;
+        try {
+            winboxInstaller = winboxAccessService.autoEnroll(router);
+        } catch (Exception e) {
+            log.warn("Failed to auto-enroll router {} for WinBox remote access: {}", router.getId(), e.getMessage());
+        }
+
         return scriptGenerator.generate(new RouterScriptGenerator.ScriptContext(
                 router.getName(),
                 defaultValue(router.getWanInterface(), "ether1"),
@@ -113,7 +121,8 @@ public class ProvisioningService {
                 walledGardenIps(),
                 walledGardenHosts(),
                 defaultValue(router.getTenant().getTetheringProtection(), "OFF"),
-                setupCode));
+                setupCode,
+                winboxInstaller));
     }
 
     /**
@@ -139,6 +148,11 @@ public class ProvisioningService {
         router.setBindingsHash(null);
         router.setStatus(STATUS_REGISTERED);
         routerRepository.save(router);
+        try {
+            winboxAccessService.updatePeerKey(routerId, publicKey);
+        } catch (Exception e) {
+            log.warn("Failed to update WinBox peer key for router {}: {}", routerId, e.getMessage());
+        }
 
         boolean applied = peerService.replacePeer(previousKey, publicKey, wgIp);
         log.info("Router {} registered WireGuard key (hub peer configured: {})", router.getId(), applied);

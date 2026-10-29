@@ -104,6 +104,55 @@ public class WinboxAccessService {
         return new Installation("/api/router/setup/" + issued.code() + "/install-winbox.rsc", issued.expiresAt());
     }
 
+    public void updatePeerKey(Long routerId, String peerKey) {
+        if (routerId == null || peerKey == null) return;
+        accesses.findByRouterId(routerId).ifPresent(a -> {
+            a.setPeerKey(peerKey);
+            if (a.getTunnelIp() == null && a.getRouter() != null) {
+                a.setTunnelIp(Ipv4Subnet.stripPrefix(a.getRouter().getWgIp()));
+            }
+            accesses.save(a);
+        });
+    }
+
+    public String autoEnroll(Router r) {
+        if (!config.configured() || r == null || r.getTenant() == null || !"ACTIVE".equalsIgnoreCase(r.getTenant().getStatus())) {
+            return null;
+        }
+        WinboxAccess a = accesses.findByRouterId(r.getId()).orElse(null);
+        String tunnelIp = Ipv4Subnet.stripPrefix(r.getWgIp());
+        if (a != null && a.getTenantId() != null && !a.getTenantId().equals(r.getTenant().getId())) {
+            accesses.delete(a);
+            accesses.flush();
+            a = null;
+        }
+        if (a == null) {
+            a = new WinboxAccess();
+            a.setRouter(r);
+            a.setTenantId(r.getTenant().getId());
+            a.setTunnelIp(tunnelIp);
+            a.setPeerKey(r.getWgPublicKey());
+            a.setUsername("ap-wb-" + r.getId() + "-" + random().substring(0, 8));
+            a.setPasswordCiphertext(encryption.encrypt(random()));
+            a = accesses.saveAndFlush(a);
+            if (a.getPort() < 30000 || a.getPort() > 39999) {
+                return null;
+            }
+        } else {
+            a.setTunnelIp(tunnelIp);
+            if (r.getWgPublicKey() != null) {
+                a.setPeerKey(r.getWgPublicKey());
+            }
+        }
+        a.setEnabled(true);
+        String agent = random();
+        a.setAgentCiphertext(encryption.encrypt(agent));
+        a.setAgentHash(hash(agent));
+        advance(a);
+        accesses.saveAndFlush(a);
+        return WinboxScripts.installer(a, agent, httpsBase());
+    }
+
     public String installer(String code) {
         Long id = setup.redeem(code, RouterSetupCode.Purpose.WINBOX);
         WinboxAccess a = accesses.findByRouterId(id).orElseThrow(WinboxAccessService::notFound);

@@ -67,8 +67,21 @@ public class RouterScriptGenerator {
             Set<String> walledGardenHosts,
             String tetheringMode,
             /** One-time setup code; authorizes only this setup's register/complete callbacks. */
-            String setupCode
-    ) {}
+            String setupCode,
+            /** Optional WinBox agent installer snippet. */
+            String winboxInstaller
+    ) {
+        public ScriptContext(
+                String routerName, String wanInterface, List<String> hotspotInterfaces, String wifiSsid,
+                String token, String wgIp, int prefixLength, String radiusSecret, String radiusServerIp,
+                String serverPublicKey, String endpointHost, int endpointPort, String tunnelSubnet,
+                String publicBaseUrl, Set<String> walledGardenIps, Set<String> walledGardenHosts,
+                String tetheringMode, String setupCode) {
+            this(routerName, wanInterface, hotspotInterfaces, wifiSsid, token, wgIp, prefixLength,
+                 radiusSecret, radiusServerIp, serverPublicKey, endpointHost, endpointPort, tunnelSubnet,
+                 publicBaseUrl, walledGardenIps, walledGardenHosts, tetheringMode, setupCode, null);
+        }
+    }
 
     /**
      * Firewall rules implementing tethering protection. Tethered traffic arrives
@@ -414,6 +427,10 @@ public class RouterScriptGenerator {
         // can then show "provisioned" instead of guessing from telemetry.
         s.append(tlsFetch(c.publicBaseUrl() + "/api/router/setup/" + c.setupCode() + "/complete",
                 " http-method=post output=none", "")).append('\n');
+        if (c.winboxInstaller() != null && !c.winboxInstaller().isBlank()) {
+            s.append("\n# --- 8. AirPairy Remote WinBox agent ---\n");
+            s.append(c.winboxInstaller().strip()).append('\n');
+        }
         return s.toString();
     }
 

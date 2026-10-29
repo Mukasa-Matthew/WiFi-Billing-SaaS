@@ -46,8 +46,8 @@ final class WinboxScripts {
                     + "/user/set [find name=" + user + "] group=" + user + " address=" + q(hub + "/32") + " password=" + q(password) + " disabled=no\n"
                     + firstRule("/ip/firewall/filter", wanTag, "chain=input protocol=tcp dst-port=8291 in-interface=" + q(wan) + " action=drop")
                     + firstRule("/ip/firewall/filter", guardTag, "chain=input protocol=tcp dst-port=8291 in-interface=!wg-billing in-interface-list=!LAN action=drop")
-                    + firstRule("/ip/firewall/filter", dropTag, "chain=input protocol=tcp dst-port=8291 in-interface=wg-billing action=drop")
                     + firstRule("/ip/firewall/filter", allowTag, "chain=input protocol=tcp dst-port=8291 in-interface=wg-billing src-address=" + q(hub + "/32") + " action=accept")
+                    + firstRule("/ip/firewall/filter", dropTag, "chain=input protocol=tcp dst-port=8291 in-interface=wg-billing action=drop")
                     + firstRule("/ipv6/firewall/filter", v6Tag, "chain=input protocol=tcp dst-port=8291 in-interface-list=!LAN action=drop")
                     + ":local allowed [/ip/service/get [find name=winbox] address]; :local found false; :foreach prefix in=$allowed do={ :if ([:tostr $prefix] = " + q(hub + "/32") + ") do={ :set found true } }; :if ([:len $allowed] > 0 && !$found) do={ /ip/service/set [find name=winbox] address=($allowed," + q(hub + "/32") + ") }\n"
                     + "/ip/service/set [find name=winbox] disabled=no\n";

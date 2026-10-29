@@ -85,7 +85,7 @@ class WinboxAccessServiceTest {
     void routerScriptsRestrictAccountAndTunnelWithoutChangingBillingCredentials() {
         enable(); String agent = install();
         String script = service.agentConfig(router.getId(), agent);
-        assertThat(script).contains("policy=read,write,test,winbox,reboot", "in-interface=wg-billing", "dst-port=8291", "10.9.0.1/32", "Dedicated account name collision", "apWinboxRevision", "/ipv6/firewall/filter", "in-interface-list=!LAN");
+        assertThat(script).contains("policy=local,telnet,ssh,ftp,reboot,read,write,policy,test,winbox,password,web,sniff,sensitive,api,romon,rest-api", "in-interface=wg-billing", "dst-port=8291", "10.9.0.1/32", "Dedicated account name collision", "apWinboxRevision", "/ipv6/firewall/filter", "in-interface-list=!LAN");
         assertThat(script).doesNotContain("/radius/", "private-key", "/ip/service/set [find name=ssh]", "check-certificate=no");
         var a = accesses.findByRouterId(router.getId()).orElseThrow();
         service.acknowledge(router.getId(), agent, a.getRevision(), false);
