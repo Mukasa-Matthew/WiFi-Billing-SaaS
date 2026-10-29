@@ -87,7 +87,7 @@ class TelemetryServiceTest {
 
         when(properties.getOfflineAfterMinutes()).thenReturn(6L);
         when(routers.findStaleRouters(org.mockito.ArgumentMatchers.any())).thenReturn(java.util.List.of(router));
-        when(routers.markOfflineSeenBefore(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any())).thenReturn(1);
+        when(routers.markOfflineSeenBefore(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any())).thenReturn(Integer.valueOf(1));
         when(emailTemplates.shell(org.mockito.ArgumentMatchers.anyString(),
                 org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString()))
                 .thenReturn("<html>mock</html>");
