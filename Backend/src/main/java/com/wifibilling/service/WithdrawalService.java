@@ -222,6 +222,9 @@ public class WithdrawalService {
     }
 
     public List<WithdrawalRequest> adminList(List<String> statuses) {
+        if (statuses == null || statuses.isEmpty()) {
+            return withdrawals.findAllByOrderByCreatedAtDesc();
+        }
         return withdrawals.findAllByStatusIn(statuses);
     }
 

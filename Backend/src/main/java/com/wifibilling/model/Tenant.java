@@ -99,6 +99,10 @@ public class Tenant {
     @Column(name = "notify_emails", length = 500)
     private String notifyEmails;
 
+    @Column(name = "notify_router_offline")
+    @Builder.Default
+    private Boolean notifyRouterOffline = true;
+
     @Column(name = "notify_phones", length = 255)
     private String notifyPhones;
 
@@ -166,4 +170,6 @@ public class Tenant {
     @Column(name = "created_at")
     @Builder.Default
     private OffsetDateTime createdAt = OffsetDateTime.now();
+    public Boolean getNotifyRouterOffline() { return notifyRouterOffline == null || notifyRouterOffline; }
+    public void setNotifyRouterOffline(Boolean notifyRouterOffline) { this.notifyRouterOffline = notifyRouterOffline; }
 }

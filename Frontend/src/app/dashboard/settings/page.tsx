@@ -25,6 +25,7 @@ interface TenantSettings {
   portalShowPackages: boolean;
   notifyEmails: string | null;
   notifyPhones: string | null;
+  notifyRouterOffline: boolean;
   portalTemplate: string;
   tetheringProtection: string;
   portalFont: string | null;
@@ -561,17 +562,28 @@ export default function TenantSettingsPage() {
 
         {tab === "notifications" && (
           <section className={card}>
-            <h2 className="mb-5 text-sm font-semibold text-[var(--fg)]">Notifications</h2>
-            <div className="grid gap-5 sm:grid-cols-2">
-              <div>
-                <label className={label}>Alert emails</label>
-                <input maxLength={500} value={form.notifyEmails ?? ""} onChange={(e) => set("notifyEmails", e.target.value || null)} className={field} placeholder="ops@yourbusiness.com, you@gmail.com" />
-                <p className={hint}>Comma-separated — router offline alerts and system notifications.</p>
+            <h2 className="mb-5 text-sm font-semibold text-[var(--fg)]">Notifications & Router Alerts</h2>
+            <div className="space-y-6">
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)] p-4">
+                <Toggle
+                  on={form.notifyRouterOffline ?? true}
+                  onChange={(v) => set("notifyRouterOffline", v)}
+                  title="MikroTik Router Connectivity & Power Alerts"
+                  desc="Receive automatic email alerts when your router loses power or Internet connectivity, and a recovery confirmation when it comes back online."
+                />
               </div>
-              <div>
-                <label className={label}>Alert phone numbers</label>
-                <input maxLength={255} value={form.notifyPhones ?? ""} onChange={(e) => set("notifyPhones", e.target.value || null)} className={field} placeholder="+2567XXXXXXXX" />
-                <p className={hint}>For SMS alerts once messaging is enabled.</p>
+
+              <div className="grid gap-5 sm:grid-cols-2">
+                <div>
+                  <label className={label}>Alert emails</label>
+                  <input maxLength={500} value={form.notifyEmails ?? ""} onChange={(e) => set("notifyEmails", e.target.value || null)} className={field} placeholder="ops@yourbusiness.com, you@gmail.com" />
+                  <p className={hint}>Comma-separated additional recipients. Account owner email always receives alerts by default.</p>
+                </div>
+                <div>
+                  <label className={label}>Alert phone numbers</label>
+                  <input maxLength={255} value={form.notifyPhones ?? ""} onChange={(e) => set("notifyPhones", e.target.value || null)} className={field} placeholder="+2567XXXXXXXX" />
+                  <p className={hint}>For SMS alerts once messaging is enabled.</p>
+                </div>
               </div>
             </div>
           </section>

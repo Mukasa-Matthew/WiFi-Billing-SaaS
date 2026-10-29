@@ -486,25 +486,16 @@ export function Field({ label, children, mono = false }: { label: string; childr
 }
 
 /* ---------- formatters ---------- */
-const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-export function formatDateTime(value: string | null, withYear = true): string {
+/** Compact 24h timestamp, e.g. "Oct 29, 21:42"; the year shows only when it isn't the current one. */
+export function date(value: string | null) {
   if (!value) return "—";
-  try {
-    const d = new Date(value);
-    if (isNaN(d.getTime())) return "—";
-    const day = String(d.getDate()).padStart(2, "0");
-    const mon = MONTH_NAMES[d.getMonth()];
-    const yr = d.getFullYear();
-    const hr = String(d.getHours()).padStart(2, "0");
-    const min = String(d.getMinutes()).padStart(2, "0");
-    return withYear ? `${day} ${mon} ${yr}, ${hr}:${min}` : `${day} ${mon}, ${hr}:${min}`;
-  } catch {
-    return value;
-  }
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return "—";
+  return d.toLocaleString(undefined, {
+    month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+    year: d.getFullYear() === new Date().getFullYear() ? undefined : "numeric",
+  });
 }
-
-export function date(value: string | null) { return formatDateTime(value, true); }
 /** Axis-friendly bytes: 0, 500 MB, 1.5 GB, 40 GB. */
 export function bytesTick(value: number) {
   if (!value) return "0";

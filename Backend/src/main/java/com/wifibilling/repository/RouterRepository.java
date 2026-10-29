@@ -44,8 +44,12 @@ public interface RouterRepository extends JpaRepository<Router, Long> {
     @Query("select r.wgIp from Router r where r.wgIp is not null and r.wgIp <> ''")
     List<String> findAllAllocatedWgIps();
 
+    /** Find routers that are about to transition to offline to notify tenants. */
+    @Query("select r from Router r join fetch r.tenant where r.status in ('online', 'degraded') and r.lastSeen < :cutoff")
+    List<Router> findStaleRouters(@Param("cutoff") OffsetDateTime cutoff);
+
     /** Bulk-flags routers whose telemetry has gone silent. */
     @Modifying
-    @Query("update Router r set r.status = 'offline' where r.status in ('online', 'degraded') and r.lastSeen < :cutoff")
-    int markOfflineSeenBefore(@Param("cutoff") OffsetDateTime cutoff);
+    @Query("update Router r set r.status = 'offline', r.offlineNotifiedAt = :now where r.status in ('online', 'degraded') and r.lastSeen < :cutoff")
+    int markOfflineSeenBefore(@Param("cutoff") OffsetDateTime cutoff, @Param("now") OffsetDateTime now);
 }
