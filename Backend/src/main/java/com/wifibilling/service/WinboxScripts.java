@@ -41,7 +41,7 @@ final class WinboxScripts {
                     + ":if ([:len [/interface/find name=\"wg-billing\"]] = 0) do={ :error \"Billing tunnel unavailable\" }\n"
                     + ":if ([:len [/interface/list/find name=LAN]] = 0) do={ :error \"An existing LAN interface list is required\" }\n"
                     + ":if ([:len [/user/find name=" + user + "]] > 0) do={ :if ([/user/get [find name=" + user + "] comment] != " + tag + ") do={ :error \"Dedicated account name collision\" } }\n"
-                    + ":if ([:len [/user/group/find name=" + user + "]] = 0) do={ /user/group/add name=" + user + " policy=read,write,test,winbox,reboot } else={ /user/group/set [find name=" + user + "] policy=read,write,test,winbox,reboot }\n"
+                    + ":if ([:len [/user/group/find name=" + user + "]] = 0) do={ /user/group/add name=" + user + " policy=local,telnet,ssh,ftp,reboot,read,write,policy,test,winbox,password,web,sniff,sensitive,api,romon,rest-api } else={ /user/group/set [find name=" + user + "] policy=local,telnet,ssh,ftp,reboot,read,write,policy,test,winbox,password,web,sniff,sensitive,api,romon,rest-api }\n"
                     + ":if ([:len [/user/find name=" + user + "]] = 0) do={ /user/add name=" + user + " group=" + user + " comment=" + tag + " disabled=yes }\n"
                     + "/user/set [find name=" + user + "] group=" + user + " address=" + q(hub + "/32") + " password=" + q(password) + " disabled=no\n"
                     + firstRule("/ip/firewall/filter", wanTag, "chain=input protocol=tcp dst-port=8291 in-interface=" + q(wan) + " action=drop")
