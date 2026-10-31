@@ -291,7 +291,7 @@ export default function AdminSubscriptionsPage() {
     <div className="space-y-6">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-[var(--fg)]">Tenant Subscriptions &amp; Billing</h1>
+          <h1 className="text-[1.65rem] font-bold leading-tight tracking-[-0.02em] text-[var(--fg)]">Tenant Subscriptions &amp; Billing</h1>
           <p className="mt-1 text-sm text-[var(--fg-muted)]">
             Manage plans, monitor tenant lifecycles, review audit logs, and issue manual extensions.
           </p>

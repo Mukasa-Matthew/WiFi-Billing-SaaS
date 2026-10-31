@@ -68,7 +68,7 @@ export default function PaymentGatewaySettings() {
     try { await navigator.clipboard.writeText(gw?.callbackUrl || ""); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* noop */ }
   };
 
-  if (!gw) return <div className={card}><SpinnerGap className="animate-spin text-[var(--fg-faint)]" size={20} /></div>;
+  if (!gw) return <div className={card}><SpinnerGap className="text-[var(--fg-faint)]" size={20} /></div>;
 
   return (
     <div className="space-y-5">
@@ -91,9 +91,9 @@ export default function PaymentGatewaySettings() {
             your business wallet, and you can request withdrawals.
           </p>
           <ul className="mt-4 space-y-1.5 text-xs text-[var(--fg-muted)]">
-            <li className="flex items-center gap-2"><CheckCircle size={14} className="text-emerald-500" /> Transaction fee: {gw.platformFeePercent}% per successful collection</li>
-            <li className="flex items-center gap-2"><CheckCircle size={14} className="text-emerald-500" /> Wallet withdrawals to your mobile money</li>
-            <li className="flex items-center gap-2"><CheckCircle size={14} className="text-emerald-500" /> No provider account needed — nothing to set up</li>
+            <li className="flex items-center gap-2"><CheckCircle size={14} className="text-emerald-700" /> Transaction fee: {gw.platformFeePercent}% per successful collection</li>
+            <li className="flex items-center gap-2"><CheckCircle size={14} className="text-emerald-700" /> Wallet withdrawals to your mobile money</li>
+            <li className="flex items-center gap-2"><CheckCircle size={14} className="text-emerald-700" /> No provider account needed — nothing to set up</li>
           </ul>
           {gw.mode !== "PLATFORM" && (
             <button className={`${buttonGhost} mt-4 w-full`} disabled={busy === "mode"} onClick={() => selectMode("PLATFORM")}>
@@ -121,7 +121,7 @@ export default function PaymentGatewaySettings() {
                 {gw.connectionStatus === "CONNECTED" ? "Connected" : "Connection failed"}
               </Badge>
               {gw.apiKeyMasked && <span className="ml-2 font-mono text-[11px] text-[var(--fg-faint)]">{gw.apiKeyMasked}</span>}
-              {gw.connectionError && <p className="mt-1.5 text-[11px] text-red-500">{gw.connectionError}</p>}
+              {gw.connectionError && <p className="mt-1.5 text-[11px] text-red-700">{gw.connectionError}</p>}
             </div>
           )}
           {gw.mode !== "OWN" && (

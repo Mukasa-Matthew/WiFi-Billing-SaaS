@@ -44,17 +44,17 @@ export function Dialog({ title, description, children, onClose, wide = false }: 
   if (typeof document === "undefined") return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4" role="presentation">
+    <div className="fixed inset-0 z-[80] flex items-end justify-center sm:items-center sm:p-4" role="presentation">
       <div className="absolute inset-0 bg-slate-950/55 backdrop-blur-[2px]" onClick={() => onCloseRef.current()} />
       <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={description ? descriptionId : undefined}
-        className={`dialog-enter relative max-h-[calc(100dvh-2rem)] w-full overflow-y-auto ${wide ? "max-w-2xl" : "max-w-md"} rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--shadow-overlay)] sm:p-6`}>
+        className={`dialog-enter relative max-h-[92dvh] w-full overflow-y-auto ${wide ? "sm:max-w-2xl" : "sm:max-w-md"} rounded-t-2xl border border-[var(--border)] bg-[var(--surface)] p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-[var(--shadow-overlay)] sm:max-h-[calc(100dvh-2rem)] sm:rounded-xl sm:p-6`}>
         <div className="mb-5 flex items-start justify-between gap-3">
           <div>
             <h2 id={titleId} className="text-sm font-semibold text-[var(--fg)]">{title}</h2>
             {description && <p id={descriptionId} className="mt-1 text-xs text-[var(--fg-muted)]">{description}</p>}
           </div>
           <button ref={closeRef} aria-label="Close dialog" onClick={() => onCloseRef.current()}
-            className="min-h-10 min-w-10 rounded-lg p-1.5 text-[var(--fg-faint)] transition hover:bg-[var(--fill)] hover:text-[var(--fg-body)]">
+            className="flex min-h-10 min-w-10 shrink-0 items-center justify-center rounded-lg p-1.5 max-sm:min-h-11 max-sm:min-w-11 text-[var(--fg-faint)] transition hover:bg-[var(--fill)] hover:text-[var(--fg-body)]">
             <X className="h-4 w-4" />
           </button>
         </div>

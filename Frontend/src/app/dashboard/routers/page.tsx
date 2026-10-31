@@ -105,7 +105,7 @@ export default function Page() {
     <div className="space-y-6">{dialog}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-[var(--fg)]">MikroTik routers</h1>
+          <h1 className="text-[1.65rem] font-bold leading-tight tracking-[-0.02em] text-[var(--fg)]">MikroTik routers</h1>
           <p className="mt-1 text-sm text-[var(--fg-muted)]">To get started, add a MikroTik router by clicking 'Link a MikroTik'.</p>
         </div>
         <Link href="/dashboard/routers/new" className={button}>Link a MikroTik</Link>
@@ -161,7 +161,7 @@ export default function Page() {
             <div>
               <p className="mb-2 text-xs font-medium text-amber-700">Run this in the router terminal. Full reprovisioning moves customer interfaces; management-agent installation only enables sync and UTC/NTP time.</p>
               <textarea aria-label="Router setup command" readOnly value={command} onFocus={e => e.target.select()}
-                className="h-24 w-full rounded-lg border border-[var(--border-strong)] bg-[#0B1F36] p-3 font-mono text-xs text-slate-200" />
+                className="h-24 w-full rounded-lg border border-[var(--border-strong)] bg-[var(--sidebar-admin)] p-3 font-mono text-xs text-slate-200" />
               <p className="mt-1 text-xs text-[var(--fg-muted)]">Select the command and copy it. It works once{commandExpiry ? ` and expires at ${new Date(commandExpiry).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}. Generating another command cancels this one.</p>
             </div>
           )}

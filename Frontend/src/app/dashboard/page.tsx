@@ -7,11 +7,12 @@ import {
   ArrowClockwise, ArrowDown, ArrowRight, CellTower, Eye, EyeSlash, Plus, Radio, Stack, Ticket, Users, WarningCircle,
 } from "@/components/icons";
 import {
-  Badge, Card, CardLink, ErrorNotice, Segmented, StatCard, StatusDot, button, buttonGhost,
+  Badge, Card, CardLink, CountUp, ErrorNotice, Segmented, StatCard, StatusDot, button, buttonGhost,
   bytes, compactNumber, field, relativeTime, useApi, useNow, useResource,
 } from "@/components/BillingUI";
 import { BarChart, Meter, MiniBars, StatusBar } from "@/components/charts";
 import { routerState, servicesState } from "@/lib/routerState";
+import type { CSSProperties } from "react";
 
 interface SeriesPoint { date: string; label: string; revenue?: number; transactions?: number; users?: number; registrations?: number }
 interface WeeklySale { date: string; day: string; revenue: number; transactions: number }
@@ -42,6 +43,9 @@ const USAGE_PERIODS = [{ key: "today", label: "Today" }, { key: "week", label: "
 type UsagePeriod = (typeof USAGE_PERIODS)[number]["key"];
 // Upload is a lighter tint of the same hue, so the pair reads as one measure.
 const UPLOAD_FILL = "color-mix(in srgb, var(--chart-1) 38%, transparent)";
+
+/* The hero is ink in both themes, so its charts use the sidebar's signal colours. */
+const HERO_TOKENS = { "--chart-1": "#37E2C4", "--chart-muted": "rgb(255 255 255 / 0.2)", "--fg-faint": "#8FB5B0" } as CSSProperties;
 
 /* Revenue visibility is a per-device preference, so it lives in localStorage. */
 const HIDE_KEY = "wb_hide_revenue";
@@ -102,7 +106,7 @@ export default function TenantDashboardOverview() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
           <p className="text-[13px] font-medium text-[var(--fg-muted)]">{now ? new Date(now).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" }) : " "}</p>
-          <h1 className="mt-0.5 truncate text-[1.45rem] font-semibold leading-tight tracking-tight text-[var(--fg)]">{greeting(now)}, {user?.name?.split(" ")[0] || "there"}</h1>
+          <h1 className="mt-0.5 truncate text-[1.85rem] font-bold leading-tight tracking-[-0.025em] text-[var(--fg)]">{greeting(now)}, {user?.name?.split(" ")[0] || "there"}</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button onClick={() => { stats.load(); routers.load(); payments.load(); usage.load(); }} disabled={stats.refreshing} className={`${buttonGhost} !px-3`} aria-label="Refresh dashboard" title="Refresh dashboard">
@@ -134,15 +138,21 @@ export default function TenantDashboardOverview() {
 
       {/* Revenue: the number owners open the app for. */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-        <section className="panel-shadow flex min-w-0 flex-col overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] lg:col-span-2">
-          <div className="grid flex-1 gap-6 p-5 sm:grid-cols-[1fr_minmax(0,15rem)] sm:p-6">
+        <section className="relative isolate flex min-w-0 flex-col overflow-hidden rounded-2xl bg-[#08282E] text-white shadow-[var(--shadow-overlay)] lg:col-span-2" style={HERO_TOKENS}>
+          <div aria-hidden className="absolute inset-0 -z-10 bg-[radial-gradient(38rem_24rem_at_100%_0%,rgb(11_122_117/0.7),transparent_70%)]" />
+          <svg aria-hidden viewBox="0 0 400 400" fill="none" className="absolute -right-28 -top-36 -z-10 h-[26rem] w-[26rem] text-[#37E2C4]">
+            {[60, 110, 160, 210].map((r, i) => <circle key={r} cx="200" cy="200" r={r} stroke="currentColor" strokeOpacity={0.3 - i * 0.06} />)}
+          </svg>
+          <div className="grid flex-1 gap-6 p-5 sm:grid-cols-[1fr_minmax(0,15rem)] sm:p-7">
             <div className="min-w-0">
-              <p className="text-[13px] font-medium text-[var(--fg-muted)]">Today&apos;s revenue</p>
-              <p className="mt-2 truncate text-[2.4rem] font-semibold leading-none tracking-tight text-[var(--fg)]">{s ? money(s.revenueToday) : "—"}</p>
-              <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-[var(--fg-muted)]">
+              <p className="text-[13px] font-medium text-[#BFDAD6]">Today&apos;s revenue</p>
+              <p className="num mt-3 font-display text-[2.1rem] font-bold leading-none tracking-[-0.03em] [overflow-wrap:anywhere] sm:text-[3rem]">
+                {s ? (hidden ? money(s.revenueToday) : <CountUp value={Number(s.revenueToday || 0)} format={money} />) : "—"}
+              </p>
+              <p className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-[#BFDAD6]">
                 {today && <span className="num">{today.transactions} successful payment{today.transactions === 1 ? "" : "s"}</span>}
                 {delta != null && !hidden && (
-                  <span className={`inline-flex items-center gap-0.5 font-medium ${delta >= 0 ? "text-emerald-700" : "text-red-700"}`}>
+                  <span className={`inline-flex items-center gap-0.5 font-semibold ${delta >= 0 ? "text-[#5EEAD4]" : "text-[#FCA5A5]"}`}>
                     <ArrowDown className={`h-3.5 w-3.5 ${delta >= 0 ? "rotate-180" : ""}`} aria-hidden />{Math.abs(delta).toFixed(0)}% vs yesterday
                   </span>
                 )}
@@ -151,23 +161,23 @@ export default function TenantDashboardOverview() {
             </div>
             {week.length > 0 && (
               <div className="min-w-0 self-end">
-                <p className="mb-2 text-xs font-medium text-[var(--fg-muted)]">Last 7 days</p>
-                {hidden ? <p className="py-4 text-xs text-[var(--fg-faint)]">Hidden</p> : (
+                <p className="mb-2 text-xs font-medium text-[#BFDAD6]">Last 7 days</p>
+                {hidden ? <p className="py-4 text-xs text-[#8FB5B0]">Hidden</p> : (
                   <MiniBars label="Revenue, last 7 days" format={(v) => money(v)}
                     data={week.map((d) => ({ key: d.date, label: d.day.slice(0, 2), value: Number(d.revenue), detail: `${chartDate(d.date)} · ${d.transactions} payments` }))} />
                 )}
               </div>
             )}
           </div>
-          <dl className="grid divide-y divide-[var(--border)] border-t border-[var(--border)] bg-[var(--subtle)] sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+          <dl className="grid divide-y divide-white/10 border-t border-white/10 bg-white/[0.04] sm:grid-cols-3 sm:divide-x sm:divide-y-0">
             {[
               { label: "Last 7 days", value: s ? money(weekTotal) : "—" },
               { label: "This month", value: s ? money(s.revenueMonth) : "—" },
               { label: "All time", value: s ? money(s.revenueAllTime) : "—" },
             ].map((m) => (
               <div key={m.label} className="flex min-w-0 items-baseline justify-between gap-3 px-5 py-3 sm:block sm:px-6 sm:py-3.5">
-                <dt className="text-xs text-[var(--fg-muted)]">{m.label}</dt>
-                <dd className="num truncate text-[14px] font-semibold text-[var(--fg)] sm:mt-0.5 sm:text-[15px]">{m.value}</dd>
+                <dt className="text-xs text-[#BFDAD6]">{m.label}</dt>
+                <dd className="num truncate text-[14px] font-semibold sm:mt-0.5 sm:text-[15px]">{m.value}</dd>
               </div>
             ))}
           </dl>
@@ -264,7 +274,7 @@ export default function TenantDashboardOverview() {
                           <span className="block truncate text-[13.5px] font-medium text-[var(--fg)]">{r.name}</span>
                           <span className="block text-xs text-[var(--fg-muted)]" title={r.lastSeen ? new Date(r.lastSeen).toLocaleString() : undefined}>{r.lastSeen ? `Reported ${relativeTime(r.lastSeen, now)}` : "Never reported"}</span>
                         </span>
-                        <span title={r.st.detail}><Badge tone={r.st.tone} dot>{r.st.label}</Badge></span>
+                        <span title={r.st.detail}><Badge tone={r.st.tone} dot live={r.st.state === "online"}>{r.st.label}</Badge></span>
                       </div>
                       {current && (
                         <div className="mt-2.5 flex flex-wrap gap-x-5 gap-y-1.5 text-xs text-[var(--fg-muted)]">
@@ -279,7 +289,7 @@ export default function TenantDashboardOverview() {
             )}
           {fleet.length > 0 && (
             <div className="mt-auto border-t border-[var(--border)] px-5 py-3">
-              <Link href="/dashboard/routers/new" className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--accent-text)] hover:underline"><Plus className="h-3.5 w-3.5" />Add another router</Link>
+              <Link href="/dashboard/routers/new" className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--accent-text)] hover:underline max-sm:min-h-11"><Plus className="h-3.5 w-3.5" />Add another router</Link>
             </div>
           )}
         </Card>
@@ -407,13 +417,13 @@ function DataUsageCard({ usage, period, onPeriod }: {
   const tick = (b: UsageBucket) => hourly ? new Date(b.start).toLocaleTimeString(undefined, { hour: "numeric" }) : b.label;
 
   return (
-    <section aria-label="Data usage" className={`panel-shadow flex min-w-0 flex-col overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] transition-opacity ${usage.placeholder ? "opacity-60" : ""}`} aria-busy={usage.placeholder}>
+    <section aria-label="Data usage" className={`panel-shadow flex min-w-0 flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] transition-opacity ${usage.placeholder ? "opacity-60" : ""}`} aria-busy={usage.placeholder}>
       <div className="flex flex-1 flex-col p-5 sm:p-6">
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-[13px] font-medium text-[var(--fg-muted)]">Data usage</p>
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+          <p className="whitespace-nowrap text-[13px] font-medium text-[var(--fg-muted)]">Data usage</p>
           <Segmented label="Data usage period" value={period} onChange={onPeriod} options={[...USAGE_PERIODS]} />
         </div>
-        <p className="num mt-2 truncate text-[2rem] font-semibold leading-none tracking-tight text-[var(--fg)]">{d ? bytes(total) : usage.error ? "—" : "…"}</p>
+        <p className="num mt-2 truncate font-display text-[2rem] font-bold leading-none tracking-[-0.025em] text-[var(--fg)]">{d ? bytes(total) : usage.error ? "—" : "…"}</p>
         <p className="mt-2.5 min-h-[1.25rem] text-[13px] text-[var(--fg-muted)]">
           {usage.error && !d ? "Usage unavailable right now"
             : !d ? " "
@@ -468,11 +478,11 @@ function DataUsageCard({ usage, period, onPeriod }: {
           { label: "Upload", value: d ? bytes(d.upBytes) : "—", swatch: UPLOAD_FILL },
           { label: "Customers", value: d ? d.users.toLocaleString() : "—" },
         ].map((m) => (
-          <div key={m.label} className="min-w-0 px-4 py-3 sm:py-3.5">
+          <div key={m.label} className="min-w-0 px-3 py-3 sm:py-3.5">
             <dt className="flex items-center gap-1.5 text-xs text-[var(--fg-muted)]">
               {m.swatch && <span aria-hidden className="h-2 w-2 shrink-0 rounded-[2px]" style={{ background: m.swatch }} />}{m.label}
             </dt>
-            <dd className="num mt-0.5 truncate text-[14px] font-semibold text-[var(--fg)]">{m.value}</dd>
+            <dd className="num mt-0.5 text-[13px] font-semibold leading-tight text-[var(--fg)] [overflow-wrap:anywhere]">{m.value}</dd>
           </div>
         ))}
       </dl>

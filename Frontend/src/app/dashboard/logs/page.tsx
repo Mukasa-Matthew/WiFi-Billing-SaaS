@@ -129,7 +129,7 @@ export default function TenantSessionLogsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-[var(--fg)] flex items-center gap-2.5">
+          <h1 className="text-[1.65rem] font-bold leading-tight tracking-[-0.02em] text-[var(--fg)] flex items-center gap-2.5">
             <FileText className="w-6 h-6 text-[var(--accent-text)]" />
             <span>Accounting Logs</span>
           </h1>
@@ -174,7 +174,7 @@ export default function TenantSessionLogsPage() {
             placeholder="Search code, IP, MAC, cause..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 rounded-xl bg-[var(--canvas)] border border-[var(--border)] text-xs text-[var(--fg)] placeholder-[var(--fg-muted)] focus:outline-none focus:border-indigo-500"
+            className="w-full pl-9 pr-4 py-2 max-sm:min-h-11 rounded-xl bg-[var(--canvas)] border border-[var(--border)] text-xs text-[var(--fg)] placeholder-[var(--fg-muted)] focus:outline-none focus:border-indigo-500"
           />
         </div>
 
@@ -183,7 +183,7 @@ export default function TenantSessionLogsPage() {
             <button
               key={cause}
               onClick={() => setCauseFilter(cause)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition whitespace-nowrap cursor-pointer ${
+              className={`px-3 py-1.5 max-sm:min-h-11 rounded-lg text-xs font-semibold transition whitespace-nowrap cursor-pointer ${
                 causeFilter === cause
                   ? "bg-blue-700 text-white shadow-sm"
                   : "text-[var(--fg-muted)] hover:text-[var(--fg-body)]"
@@ -198,7 +198,7 @@ export default function TenantSessionLogsPage() {
       {/* Logs Table */}
       <div className="rounded-2xl border border-[var(--border)] overflow-hidden bg-[var(--surface)]">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
+          <table className="stack-table w-full text-left border-collapse text-xs">
             <thead>
               <tr className="border-b border-[var(--border)] bg-[var(--subtle)] text-[var(--fg-muted)] font-medium">
                 <th className="py-3 px-4">User / Code</th>
@@ -222,32 +222,32 @@ export default function TenantSessionLogsPage() {
                         {log.username}
                       </span>
                     </td>
-                    <td className="py-3 px-4 font-mono text-[var(--accent-text)]">
+                    <td data-label="IP address" className="py-3 px-4 font-mono text-[var(--accent-text)]">
                       {log.framedIpAddress || <span className="text-[var(--fg-muted)]">—</span>}
                     </td>
-                    <td className="py-3 px-4 font-mono text-[var(--fg-muted)]">
+                    <td data-label="Device MAC" className="py-3 px-4 font-mono text-[var(--fg-muted)]">
                       {log.callingStationId || <span className="text-[var(--fg-muted)]">—</span>}
                     </td>
-                    <td className="py-3 px-4">
+                    <td data-label="Duration" className="py-3 px-4">
                       <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[var(--fill)] text-[var(--fg-body)] font-mono text-[11px]">
                         <Clock className="w-3 h-3 text-[var(--fg-muted)]" />
                         {formatDuration(log.acctSessionTime)}
                       </span>
                     </td>
-                    <td className="py-3 px-4 font-mono text-[var(--fg-body)]">
+                    <td data-label="Data" className="py-3 px-4 font-mono text-[var(--fg-body)]">
                       <div className="flex items-center gap-2">
                         <span className="text-[var(--accent-text)] flex items-center gap-0.5">
                           ↓ {formatBytes(log.acctOutputOctets)}
                         </span>
                         <span className="text-[var(--fg-muted)]">/</span>
-                        <span className="text-amber-500 flex items-center gap-0.5">
+                        <span className="text-amber-700 flex items-center gap-0.5">
                           ↑ {formatBytes(log.acctInputOctets)}
                         </span>
                       </div>
                     </td>
-                    <td className="py-3 px-4 text-[var(--fg-muted)]">{formatDateTime(log.acctStartTime)}</td>
-                    <td className="py-3 px-4 text-[var(--fg-muted)]">{formatDateTime(log.acctStopTime)}</td>
-                    <td className="py-3 px-4">
+                    <td data-label="Connected" className="py-3 px-4 text-[var(--fg-muted)]">{formatDateTime(log.acctStartTime)}</td>
+                    <td data-label="Terminated" className="py-3 px-4 text-[var(--fg-muted)]">{formatDateTime(log.acctStopTime)}</td>
+                    <td data-label="Reason" className="py-3 px-4">
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[var(--fill)] border border-[var(--border-strong)] text-[var(--fg-body)]">
                         {log.acctTerminateCause || "Normal-Logout"}
                       </span>

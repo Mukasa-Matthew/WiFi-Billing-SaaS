@@ -1,11 +1,11 @@
 "use client";
 
-import { CircleNotch } from "@/components/icons";
+import { SignalLoader, SignalMark } from "@/components/SignalLoader";
 import { useLinkStatus } from "next/link";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 export function Spinner({ className = "h-4 w-4" }: { className?: string }) {
-  return <CircleNotch aria-hidden="true" className={`shrink-0 animate-spin motion-reduce:animate-none ${className}`} />;
+  return <SignalMark className={className} />;
 }
 
 export function LoadingIndicator({ label = "Loading…", className = "" }: { label?: string; className?: string }) {
@@ -118,7 +118,7 @@ export function NavigationProgress() {
   return (
     <div className="pointer-events-none fixed inset-x-0 top-0 z-[80] h-0.5" aria-hidden="true">
       <div
-        className={`h-full bg-blue-600 shadow-[0_0_8px_rgba(37,99,235,0.5)] ${phase === "running" ? "nav-progress-run" : "nav-progress-done"}`}
+        className={`h-full bg-[linear-gradient(90deg,#0B7A75,#37E2C4)] shadow-[0_0_10px_rgba(55,226,196,0.6)] ${phase === "running" ? "nav-progress-run" : "nav-progress-done"}`}
       />
     </div>
   );
@@ -126,7 +126,7 @@ export function NavigationProgress() {
 
 export function DashboardLoading({ label = "Loading your dashboard…" }: { label?: string }) {
   return <div className="mx-auto w-full max-w-7xl space-y-5" aria-busy="true">
-    <span className="sr-only" role="status">{label}</span>
+    <SignalLoader label={label} className="py-6" />
     <div aria-hidden="true" className="space-y-5 animate-pulse motion-reduce:animate-none">
       <div className="h-28 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6"><div className="h-5 w-56 max-w-full rounded bg-[var(--border)]" /><div className="mt-4 h-3 w-72 max-w-full rounded bg-[var(--fill)]" /></div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{Array.from({ length: 8 }, (_, i) => <div key={i} className="h-36 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5"><div className="h-3 w-24 rounded bg-[var(--fill)]" /><div className="mt-5 h-7 w-32 rounded bg-[var(--border)]" /><div className="mt-4 h-3 w-36 rounded bg-[var(--fill)]" /></div>)}</div>

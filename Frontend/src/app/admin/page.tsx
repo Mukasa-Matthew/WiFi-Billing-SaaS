@@ -352,7 +352,7 @@ export default function AdminOverviewPage() {
           <p className="px-5 py-12 text-center text-sm text-[var(--fg-muted)]">No businesses yet.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left text-sm">
+            <table className="stack-table w-full text-left text-sm sm:min-w-[640px]">
               <thead className="border-b border-[var(--border)] bg-[var(--subtle)] text-xs text-[var(--fg-muted)]">
                 <tr>
                   <th scope="col" className="px-5 py-2.5 font-medium">Business</th>
@@ -368,17 +368,17 @@ export default function AdminOverviewPage() {
                   return (
                     <tr key={t.id} className="transition-colors hover:bg-[var(--subtle)]">
                       <td className="px-5 py-3">
-                        <Link href={`/admin/tenants/${t.id}`} className="block font-medium text-[var(--fg)] hover:text-[var(--accent-text)] hover:underline">{t.name}</Link>
+                        <Link href={`/admin/tenants/${t.id}`} className="block font-medium text-[var(--fg)] hover:text-[var(--accent-text)] hover:underline max-sm:flex max-sm:min-h-11 max-sm:items-center">{t.name}</Link>
                         <span className="block text-xs text-[var(--fg-muted)]">{t.email}</span>
                       </td>
-                      <td className="px-4 py-3"><Badge tone={statusTone(t.status)} dot>{humanize(t.status)}</Badge></td>
-                      <td className="px-4 py-3">
+                      <td data-label="Account" className="px-4 py-3"><Badge tone={statusTone(t.status)} dot>{humanize(t.status)}</Badge></td>
+                      <td data-label="Routers" className="px-4 py-3">
                         {!t.routerCount ? <span className="text-xs text-[var(--fg-faint)]">None linked</span>
                           : !net ? <span className="num text-[13px]">{t.routerCount}</span>
                           : <StatusDot tone={net.tone}><span className="num">{net.label}</span></StatusDot>}
                       </td>
-                      <td className="num px-4 py-3 text-right text-[var(--fg-body)]">{t.voucherCount.toLocaleString()}</td>
-                      <td className="px-5 py-3 text-right text-xs text-[var(--fg-muted)]" title={new Date(t.createdAt).toLocaleString()}>{relativeTime(t.createdAt, now)}</td>
+                      <td data-label="Active vouchers" className="num px-4 py-3 text-right text-[var(--fg-body)]">{t.voucherCount.toLocaleString()}</td>
+                      <td data-label="Joined" className="px-5 py-3 text-right text-xs text-[var(--fg-muted)]" title={new Date(t.createdAt).toLocaleString()}>{relativeTime(t.createdAt, now)}</td>
                     </tr>
                   );
                 })}

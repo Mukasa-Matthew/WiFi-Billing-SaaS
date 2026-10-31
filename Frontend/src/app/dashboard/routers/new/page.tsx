@@ -162,7 +162,7 @@ export default function AddRouterPage() {
         <div className="mb-2 flex items-center gap-2 text-xs text-[var(--fg-muted)]">
           <span>MikroTik</span><CaretRight className="h-3.5 w-3.5" /><span>Create</span>
         </div>
-        <h1 className="text-3xl font-bold tracking-tight text-[var(--fg)]">Add MikroTik Device</h1>
+        <h1 className="text-[1.65rem] font-bold leading-tight tracking-[-0.02em] text-[var(--fg)]">Add MikroTik Device</h1>
         <p className="mt-1 max-w-2xl text-sm text-[var(--fg-muted)]">
           Connect your MikroTik router to enable automated provisioning, hotspot billing, and management.
         </p>
@@ -235,7 +235,7 @@ export default function AddRouterPage() {
                 </span>
               </label>
 
-              {error && <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-500">{error}</div>}
+              {error && <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-700">{error}</div>}
 
               <div className="flex justify-between border-t border-[var(--border)] pt-5">
                 <button type="button" onClick={() => navigation.push("/dashboard/routers")} className="rounded-lg border border-[var(--border-strong)] px-4 py-2 text-sm text-[var(--fg-body)] hover:bg-[var(--fill)]">Cancel</button>
@@ -248,7 +248,7 @@ export default function AddRouterPage() {
 
           {step === 2 && router && (
             <div className="space-y-6">
-              {error && <p role="alert" className="text-xs text-amber-500">{error}</p>}
+              {error && <p role="alert" className="text-xs text-amber-700">{error}</p>}
               {attempt >= MAX_ATTEMPTS && !connected && <button className="text-xs text-[var(--accent-text)]" onClick={() => setAttempt(0)}>Polling timed out. Retry connection checks</button>}
               <div className="overflow-hidden rounded-xl border border-[var(--border-strong)] bg-[var(--canvas)]">
                 <div className="flex items-center justify-between border-b border-[var(--border-strong)] px-5 py-4">
@@ -257,7 +257,7 @@ export default function AddRouterPage() {
                     {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}{copied ? "Copied" : "Click to copy"}
                   </button>
                 </div>
-                <pre className="overflow-x-auto whitespace-pre bg-[#0B1F36] px-5 py-5 font-mono text-xs text-slate-200">{provisioningCommand || "Creating a one-time setup command…"}</pre>
+                <pre className="overflow-x-auto whitespace-pre bg-[var(--sidebar-admin)] px-5 py-5 font-mono text-xs text-slate-200">{provisioningCommand || "Creating a one-time setup command…"}</pre>
                 {setup && (
                   <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border)] bg-[var(--surface)] px-5 py-3 text-xs text-[var(--fg-muted)]">
                     <span>Works once. Expires at {new Date(setup.expiresAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.</span>
@@ -272,9 +272,9 @@ export default function AddRouterPage() {
 
               <div className={`rounded-xl border p-5 ${connected ? "border-emerald-500/30 bg-emerald-500/10" : "border-[var(--border)] bg-[var(--subtle)]"}`}>
                 <div className="flex items-start gap-3">
-                  {connected ? <CheckCircle className="h-6 w-6 text-emerald-500" /> : <CircleNotch className="h-6 w-6 animate-spin text-[var(--accent-text)]" />}
+                  {connected ? <CheckCircle className="h-6 w-6 text-emerald-700" /> : <CircleNotch className="h-6 w-6 text-[var(--accent-text)]" />}
                   <div>
-                    <p className={`font-mono text-sm font-semibold ${connected ? "text-emerald-500" : "text-[var(--fg)]"}`}>
+                    <p className={`font-mono text-sm font-semibold ${connected ? "text-emerald-700" : "text-[var(--fg)]"}`}>
                       {connected ? "Router is verified and ready" : degraded ? "Router connected, but readiness checks failed" : "$ Paste the provisioning command in your MikroTik terminal to begin"}
                     </p>
                     <p className="mt-2 text-xs text-[var(--fg-muted)]">
@@ -299,7 +299,7 @@ export default function AddRouterPage() {
           {step === 3 && router && (
             <div className="space-y-6">
               <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-6 text-center">
-                <CheckCircle className="mx-auto h-12 w-12 text-emerald-500" />
+                <CheckCircle className="mx-auto h-12 w-12 text-emerald-700" />
                 <h2 className="mt-3 text-xl font-bold text-[var(--fg)]">Router verified and ready</h2>
                 <p className="mt-2 text-sm text-[var(--fg-muted)]">{router.name} is reporting its managed hotspot, RADIUS configuration and captive portal assets as ready.</p>
               </div>
