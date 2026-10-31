@@ -113,8 +113,8 @@ export default function TenantActiveSessionsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-[var(--fg)] flex items-center gap-2.5">
-            <Radio className="w-6 h-6 text-emerald-500 animate-pulse" />
+          <h1 className="text-[1.65rem] font-bold leading-tight tracking-[-0.02em] text-[var(--fg)] flex items-center gap-2.5">
+            <Radio className="w-6 h-6 text-emerald-700 animate-pulse" />
             <span>Live Active Sessions</span>
           </h1>
           <p className="text-xs text-[var(--fg-muted)] mt-1">
@@ -131,8 +131,8 @@ export default function TenantActiveSessionsPage() {
         <div
           className={`p-4 rounded-2xl text-xs font-medium border flex items-center justify-between ${
             msg.type === "success"
-              ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500"
-              : "bg-red-500/10 border-red-500/30 text-red-500"
+              ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-700"
+              : "bg-red-500/10 border-red-500/30 text-red-700"
           }`}
         >
           <span>{msg.text}</span>
@@ -149,13 +149,13 @@ export default function TenantActiveSessionsPage() {
             <span className="text-xs font-medium text-[var(--fg-muted)]">Connected Users</span>
             <div className="text-2xl font-bold tabular-nums text-[var(--fg)] flex items-center gap-2">
               <span>{sessions.length}</span>
-              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/30">
+              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/30">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
                 Online
               </span>
             </div>
           </div>
-          <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500">
+          <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-700">
             <Users className="w-5 h-5" />
           </div>
         </div>
@@ -175,11 +175,11 @@ export default function TenantActiveSessionsPage() {
         <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-sm flex items-center justify-between">
           <div className="space-y-1">
             <span className="text-xs font-medium text-[var(--fg-muted)]">Total Live Upload</span>
-            <div className="text-2xl font-bold tabular-nums text-amber-500">
+            <div className="text-2xl font-bold tabular-nums text-amber-700">
               {formatBytes(totalUploadBytes)}
             </div>
           </div>
-          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500">
+          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700">
             <ArrowCircleUp className="w-5 h-5" />
           </div>
         </div>
@@ -193,14 +193,14 @@ export default function TenantActiveSessionsPage() {
           placeholder="Filter by voucher, IP, or MAC..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-9 pr-4 py-2 rounded-xl bg-[var(--canvas)] border border-[var(--border)] text-xs text-[var(--fg)] placeholder-[var(--fg-muted)] focus:outline-none focus:border-indigo-500"
+          className="w-full pl-9 pr-4 py-2 max-sm:min-h-11 rounded-xl bg-[var(--canvas)] border border-[var(--border)] text-xs text-[var(--fg)] placeholder-[var(--fg-muted)] focus:outline-none focus:border-indigo-500"
         />
       </div>
 
       {/* Active Sessions Table */}
       <div className="rounded-2xl border border-[var(--border)] overflow-hidden bg-[var(--surface)]">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
+          <table className="stack-table w-full text-left border-collapse text-xs">
             <thead>
               <tr className="border-b border-[var(--border)] bg-[var(--subtle)] text-[var(--fg-muted)] font-medium">
                 <th className="py-3 px-4">User / Voucher</th>
@@ -227,39 +227,39 @@ export default function TenantActiveSessionsPage() {
                         </span>
                       </div>
                     </td>
-                    <td className="py-3 px-4 font-mono text-[var(--accent-text)]">
+                    <td data-label="Assigned IP" className="py-3 px-4 font-mono text-[var(--accent-text)]">
                       {session.framedIpAddress || <span className="text-[var(--fg-muted)]">Pending</span>}
                     </td>
-                    <td className="py-3 px-4 font-mono text-[var(--fg-muted)]">
+                    <td data-label="Device MAC" className="py-3 px-4 font-mono text-[var(--fg-muted)]">
                       {session.callingStationId || <span className="text-[var(--fg-muted)]">—</span>}
                     </td>
-                    <td className="py-3 px-4 font-mono text-[var(--fg-muted)]">
+                    <td data-label="Router" className="py-3 px-4 font-mono text-[var(--fg-muted)]">
                       {session.nasIpAddress || <span className="text-[var(--fg-muted)]">—</span>}
                     </td>
-                    <td className="py-3 px-4">
+                    <td data-label="Uptime" className="py-3 px-4">
                       <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[var(--fill)] text-[var(--fg-body)] font-mono text-[11px]">
                         <Clock className="w-3 h-3 text-[var(--fg-muted)]" />
                         {formatDuration(session.acctSessionTime)}
                       </span>
                     </td>
-                    <td className="py-3 px-4 font-mono text-[var(--fg-body)]">
+                    <td data-label="Data" className="py-3 px-4 font-mono text-[var(--fg-body)]">
                       <div className="flex items-center gap-2">
                         <span className="text-[var(--accent-text)] flex items-center gap-0.5">
                           ↓ {formatBytes(session.acctOutputOctets)}
                         </span>
                         <span className="text-[var(--fg-muted)]">/</span>
-                        <span className="text-amber-500 flex items-center gap-0.5">
+                        <span className="text-amber-700 flex items-center gap-0.5">
                           ↑ {formatBytes(session.acctInputOctets)}
                         </span>
                       </div>
                     </td>
-                    <td className="py-3 px-4 text-[var(--fg-muted)]">
+                    <td data-label="Started" className="py-3 px-4 text-[var(--fg-muted)]">
                       {formatTime(session.acctStartTime)}
                     </td>
-                    <td className="py-3 px-4 text-right">
+                    <td data-label="Action" className="py-3 px-4 text-right">
                       <button
                         onClick={() => setDisconnectTarget(session)}
-                        className="px-2.5 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/30 text-[11px] font-semibold transition cursor-pointer flex items-center gap-1.5 ml-auto"
+                        className="px-2.5 py-1 max-sm:min-h-11 max-sm:px-3.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-700 border border-red-500/30 text-[11px] font-semibold transition cursor-pointer flex items-center gap-1.5 ml-auto"
                       >
                         <UserMinus className="w-3 h-3" />
                         <span>Disconnect</span>
@@ -283,7 +283,7 @@ export default function TenantActiveSessionsPage() {
       {disconnectTarget && (
         <Dialog title="Revoke user session" description="Immediately ends the customer's active hotspot session." onClose={() => { if (!disconnecting) setDisconnectTarget(null); }}>
           <div className="space-y-5">
-            <div className="flex items-center gap-3 text-red-500">
+            <div className="flex items-center gap-3 text-red-700">
               <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/30">
                 <ShieldWarning className="w-6 h-6" />
               </div>

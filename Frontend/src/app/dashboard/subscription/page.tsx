@@ -288,7 +288,7 @@ export default function SubscriptionHubPage() {
       {/* Page Title & Action Bar */}
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-[var(--fg)]">Subscription &amp; Billing Hub</h1>
+          <h1 className="text-[1.65rem] font-bold leading-tight tracking-[-0.02em] text-[var(--fg)]">Subscription &amp; Billing Hub</h1>
           <p className="mt-1 text-xs text-[var(--fg-muted)]">
             Review your SaaS subscription, track live renewal time, inspect billing history, and pay via Mobile Money.
           </p>
@@ -353,11 +353,11 @@ export default function SubscriptionHubPage() {
                 {sub.displayStatus}
               </Badge>
               {sub.canAcceptCustomerPayments ? (
-                <span className="flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                <span className="flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-700">
                   <CheckCircle size={11} /> Payments Active
                 </span>
               ) : (
-                <span className="flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-[10px] font-bold text-red-800 dark:bg-red-950/60 dark:text-red-300">
+                <span className="flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-[10px] font-bold text-red-800 dark:bg-red-950/60 dark:text-red-700">
                   <WarningCircle size={11} /> Payments Paused
                 </span>
               )}

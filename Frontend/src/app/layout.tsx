@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Bricolage_Grotesque, Geist_Mono, Instrument_Sans } from "next/font/google";
 import "./globals.css";
 import { NavigationProgress } from "@/components/LoadingUI";
 import { AuthProvider } from "@/context/AuthContext";
@@ -7,9 +7,9 @@ import { ThemeProvider, themeBootstrapScript } from "@/context/ThemeContext";
 import { ToastProvider } from "@/components/ui/Toast";
 import QueryProvider from "@/components/QueryProvider";
 
-// globals.css already resolves --font-geist-* for Tailwind's font-sans/mono;
-// these load the faces so the UI stops falling back to Arial.
-const geistSans = Geist({ subsets: ["latin"], variable: "--font-geist-sans", display: "swap" });
+// globals.css maps these onto Tailwind's font-display, font-sans and font-mono.
+const display = Bricolage_Grotesque({ subsets: ["latin"], variable: "--font-bricolage", display: "swap" });
+const interfaceSans = Instrument_Sans({ subsets: ["latin"], variable: "--font-instrument", display: "swap" });
 const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono", display: "swap" });
 
 export const metadata: Metadata = {
@@ -38,7 +38,7 @@ export default function RootLayout({
   // mismatches. suppressHydrationWarning applies only to the element it is on —
   // mismatches inside the app tree are still reported.
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`${display.variable} ${interfaceSans.variable} ${geistMono.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeBootstrapScript }} />
       </head>

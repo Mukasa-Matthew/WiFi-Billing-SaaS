@@ -429,7 +429,7 @@ export default function Page() {
         >
           <form onSubmit={save} className="space-y-5">
             <div>
-              <label htmlFor="customer-name" className={label}>Full name <span className="text-red-500">*</span></label>
+              <label htmlFor="customer-name" className={label}>Full name <span className="text-red-700">*</span></label>
               <input id="customer-name" autoFocus required maxLength={120} value={edit.name || ""} onChange={e => setEdit({ ...edit, name: e.target.value })} className={field} placeholder="e.g. Sarah Namusoke" />
             </div>
             <div>

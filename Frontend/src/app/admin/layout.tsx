@@ -7,18 +7,8 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import AppShell, { type NavItem } from "@/components/AppShell";
 import { useApi } from "@/components/BillingUI";
-import {
-  CellTower as RouterIcon,
-  HardDrives,
-  Radio,
-  Bank,
-  Bell,
-  Building2,
-  CreditCard,
-  LayoutDashboard,
-  GearSix,
-  ArrowUpRight,
-} from "@/components/icons";
+import { ArrowUpRight, Bell } from "@/components/icons";
+import { BusinessIcon, FinanceIcon, FleetIcon, GuardIcon, HealthIcon, NetworkIcon, PlanIcon, RadarIcon } from "@/components/BrandIcons";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -59,14 +49,14 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   const incidents = useOpenIncidents(ready);
 
   const nav: NavItem[] = [
-    { name: "Command center", href: "/admin", icon: LayoutDashboard, group: "" },
-    { name: "Tenants", href: "/admin/tenants", icon: Building2, group: "Businesses" },
-    { name: "Subscriptions", href: "/admin/subscriptions", icon: CreditCard, group: "Businesses" },
-    { name: "Finance", href: "/admin/finance", icon: Bank, group: "Businesses" },
-    { name: "Network operations", href: "/admin/network", icon: Radio, group: "Network", badge: { value: incidents || 0, tone: "danger", label: "open incidents" } },
-    { name: "Router fleet", href: "/admin/routers", icon: RouterIcon, group: "Network", also: ["/admin/network/routers"] },
-    { name: "System health", href: "/admin/health", icon: HardDrives, group: "Network" },
-    { name: "Settings & security", href: "/admin/settings", icon: GearSix, group: "Platform" },
+    { name: "Command center", href: "/admin", icon: RadarIcon, group: "" },
+    { name: "Tenants", href: "/admin/tenants", icon: BusinessIcon, group: "Businesses" },
+    { name: "Subscriptions", href: "/admin/subscriptions", icon: PlanIcon, group: "Businesses" },
+    { name: "Finance", href: "/admin/finance", icon: FinanceIcon, group: "Businesses" },
+    { name: "Network operations", href: "/admin/network", icon: NetworkIcon, group: "Network", badge: { value: incidents || 0, tone: "danger", label: "open incidents" } },
+    { name: "Router fleet", href: "/admin/routers", icon: FleetIcon, group: "Network", also: ["/admin/network/routers"] },
+    { name: "System health", href: "/admin/health", icon: HealthIcon, group: "Network" },
+    { name: "Settings & security", href: "/admin/settings", icon: GuardIcon, group: "Platform" },
   ];
 
   return (
@@ -80,7 +70,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
           href="/admin/network"
           aria-label={incidents ? `${incidents} open incidents` : "No open incidents"}
           title={incidents ? `${incidents} open incident${incidents === 1 ? "" : "s"}` : "No open incidents"}
-          className="relative rounded-lg p-2 text-[var(--fg-muted)] transition-colors hover:bg-[var(--fill)] hover:text-[var(--fg)]"
+          className="relative flex items-center justify-center rounded-lg p-2 text-[var(--fg-muted)] transition-colors hover:bg-[var(--fill)] hover:text-[var(--fg)] max-sm:h-11 max-sm:w-11"
         >
           <Bell className="h-[18px] w-[18px]" aria-hidden />
           {!!incidents && <span className="num absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--status-bad)] px-1 text-[10px] font-semibold leading-none text-white ring-2 ring-[var(--header)]">{incidents > 99 ? "99+" : incidents}</span>}

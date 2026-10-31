@@ -1,14 +1,14 @@
 "use client";
-import React, { useCallback, useDeferredValue, useEffect, useMemo, useState, useRef } from "react";
+import React, { useCallback, useDeferredValue, useEffect, useMemo, useState, useRef, useSyncExternalStore } from "react";
 import api from "@/lib/api";
 import Link from "next/link";
-import { BusyLabel, NavigationPending, TableSkeletonRows } from "@/components/LoadingUI";
+import { BusyLabel, ListSkeleton, NavigationPending, TableSkeletonRows } from "@/components/LoadingUI";
 import { ArrowLeft, ArrowRight, CaretLeft, CaretRight, MagnifyingGlass, Tray } from "@/components/icons";
 
 /* ---------- design tokens ---------- */
 export const field = "mt-1.5 min-h-11 w-full rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm text-[var(--fg)] placeholder:text-[var(--fg-muted)] outline-none transition-[border-color,box-shadow] focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15 disabled:cursor-not-allowed disabled:opacity-60";
-export const button = "inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg bg-blue-700 px-4 py-2.5 text-xs font-semibold text-white transition-[background-color,transform,opacity] hover:bg-blue-600 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100";
-export const buttonGhost = "inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-4 py-2.5 text-xs font-semibold text-[var(--fg-body)] transition-[background-color,transform,opacity] hover:bg-[var(--subtle)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100";
+export const button = "inline-flex min-h-10 max-sm:min-h-11 items-center justify-center gap-1.5 rounded-lg bg-blue-700 px-4 py-2.5 text-xs font-semibold text-white transition-[background-color,transform,opacity] hover:bg-blue-600 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100";
+export const buttonGhost = "inline-flex min-h-10 max-sm:min-h-11 items-center justify-center gap-1.5 rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-4 py-2.5 text-xs font-semibold text-[var(--fg-body)] transition-[background-color,transform,opacity] hover:bg-[var(--subtle)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100";
 export const panel = "panel-shadow rounded-xl border border-[var(--border)] bg-[var(--surface)]";
 export const label = "block text-xs font-semibold text-[var(--fg-muted)]";
 export const hint = "mt-1.5 text-xs text-[var(--fg-muted)]";
@@ -145,6 +145,25 @@ export function useNow(intervalMs = 30000) {
   return now;
 }
 
+/** Eases a figure up to its value on first load; later updates simply swap the number. */
+export function CountUp({ value, format }: { value: number; format: (v: number) => string }) {
+  const [shown, setShown] = useState<number | null>(null);
+  const settled = useRef(false);
+  useEffect(() => {
+    if (settled.current) return;
+    settled.current = true;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const start = performance.now();
+    let frame = requestAnimationFrame(function tick(now) {
+      const t = Math.min(1, (now - start) / 900);
+      setShown(t === 1 ? null : Math.round(value * (1 - (1 - t) ** 4)));
+      if (t < 1) frame = requestAnimationFrame(tick);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [value]);
+  return <>{format(shown ?? value)}</>;
+}
+
 /* ---------- primitives ---------- */
 export type Tone = "blue" | "green" | "amber" | "red" | "slate";
 
@@ -154,7 +173,7 @@ const dotColor: Record<string, string> = {
 };
 
 /** Tinted label. `dot` adds a status dot so state never rides on colour alone. */
-export function Badge({ children, tone = "blue", dot = false }: { children: React.ReactNode; tone?: string; dot?: boolean }) {
+export function Badge({ children, tone = "blue", dot = false, live = false }: { children: React.ReactNode; tone?: string; dot?: boolean; live?: boolean }) {
   const color =
     tone === "green" ? "text-emerald-700 bg-emerald-50 border-emerald-200" :
     tone === "red" ? "text-red-700 bg-red-50 border-red-200" :
@@ -163,7 +182,7 @@ export function Badge({ children, tone = "blue", dot = false }: { children: Reac
     "text-[var(--accent-text)] bg-blue-50 border-blue-200";
   return (
     <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border px-1.5 py-0.5 text-[11.5px] font-medium leading-4 ${color}`}>
-      {dot && <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotColor[tone] || dotColor.slate}`} aria-hidden />}
+      {dot && <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${live ? "live-dot" : ""} ${dotColor[tone] || dotColor.slate}`} aria-hidden />}
       {children}
     </span>
   );
@@ -191,7 +210,7 @@ export function PageHeader({ title, description, action, meta }: { title: React.
   return (
     <div className="mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
       <div className="min-w-0">
-        <h1 className="text-[1.45rem] font-semibold leading-tight tracking-tight text-[var(--fg)]">{title}</h1>
+        <h1 className="text-[1.65rem] font-bold leading-tight tracking-[-0.02em] text-[var(--fg)]">{title}</h1>
         {description && <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-[var(--fg-muted)]">{description}</p>}
         {meta && <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-[var(--fg-muted)]">{meta}</div>}
       </div>
@@ -231,7 +250,7 @@ export function StatCard({ label, value, icon, hintText, hint, tone, href, child
     </>
   );
   return href ? (
-    <Link href={href} className={`${panel} group block p-5 transition-colors hover:border-[var(--border-strong)]`}>{body}<NavigationPending /></Link>
+    <Link href={href} className={`${panel} panel-lift group block p-5`}>{body}<NavigationPending /></Link>
   ) : (
     <section className={`${panel} p-5`}>{body}</section>
   );
@@ -261,7 +280,7 @@ export function Card({ title, description, action, children, className = "", bod
 /** Quiet text link with an arrow, for "view all" style card actions. */
 export function CardLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <Link href={href} className="group inline-flex items-center gap-1 text-xs font-medium text-[var(--accent-text)] hover:underline">
+    <Link href={href} className="group inline-flex items-center gap-1 text-xs font-medium text-[var(--accent-text)] hover:underline max-sm:min-h-11">
       {children}<ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden />
       <NavigationPending />
     </Link>
@@ -281,7 +300,7 @@ export function Tabs<T extends string>({ tabs, value, onChange, label }: { tabs:
         const active = t.key === value;
         return (
           <button key={t.key} role="tab" aria-selected={active} onClick={() => onChange(t.key)}
-            className={`relative whitespace-nowrap px-3 pb-2.5 pt-2 text-[13px] font-medium transition-colors ${active ? "text-[var(--fg)]" : "text-[var(--fg-muted)] hover:text-[var(--fg)]"}`}>
+            className={`relative whitespace-nowrap px-3 pb-2.5 pt-2 text-[13px] font-medium max-sm:min-h-11 transition-colors ${active ? "text-[var(--fg)]" : "text-[var(--fg-muted)] hover:text-[var(--fg)]"}`}>
             {t.label}
             {t.count !== undefined && <span className="num ml-1.5 rounded bg-[var(--fill)] px-1.5 py-px text-[11px] text-[var(--fg-muted)]">{t.count}</span>}
             {active && <span className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-[var(--primary)]" aria-hidden />}
@@ -313,7 +332,7 @@ export function FilterTabs({ options, value, onChange, loading = false }: { opti
           role="tab"
           aria-selected={value === o.key}
           onClick={() => onChange(o.key)}
-          className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${value === o.key ? "bg-[var(--surface)] text-[var(--fg)] shadow-sm" : "text-[var(--fg-muted)] hover:text-[var(--fg)]"}`}
+          className={`rounded-md px-3 py-1.5 text-xs font-semibold transition max-sm:min-h-11 ${value === o.key ? "bg-[var(--surface)] text-[var(--fg)] shadow-sm" : "text-[var(--fg-muted)] hover:text-[var(--fg)]"}`}
         >
           {o.label}{!loading && o.count !== undefined && <span className="num ml-1.5 text-[var(--fg-muted)]">{o.count}</span>}
         </button>
@@ -333,6 +352,21 @@ export interface Column<T> {
 }
 
 const hideClass = { sm: "hidden sm:table-cell", md: "hidden md:table-cell", lg: "hidden lg:table-cell" } as const;
+const pagerButton = "inline-flex items-center justify-center rounded-md border border-[var(--border-strong)] p-1.5 disabled:opacity-30 max-sm:h-11 max-sm:w-11";
+/* Row actions sit inside cells as small inline controls; phone cards give each one a full touch target. */
+const cardTargets = "[&_a]:inline-flex [&_a]:min-h-11 [&_a]:items-center [&_button]:inline-flex [&_button]:min-h-11 [&_button]:min-w-11 [&_button]:items-center [&_button]:justify-center";
+
+const PHONE_QUERY = "(max-width: 639px)";
+function subscribePhone(cb: () => void) {
+  const query = window.matchMedia(PHONE_QUERY);
+  query.addEventListener("change", cb);
+  return () => query.removeEventListener("change", cb);
+}
+/** Below `sm`. Renders one layout at a time, so screen readers never get the same rows twice. */
+export function useIsPhone() {
+  return useSyncExternalStore(subscribePhone, () => window.matchMedia(PHONE_QUERY).matches, () => false);
+}
+const isActionColumn = <T,>(c: Column<T>) => !c.label || c.label === "Actions";
 
 /**
  * Client-side table: search + pagination over the rows it is given. For
@@ -375,6 +409,9 @@ export function Table<T>({ rows, columns, loading = false, emptyTitle = "No reco
   };
   const checkbox = "h-4 w-4 cursor-pointer rounded border-[var(--border-strong)] accent-[var(--accent-text)]";
   const spanAll = columns.length + (selection ? 1 : 0);
+  const phone = useIsPhone();
+  const [titleColumn, ...detailColumns] = columns.filter((c) => !isActionColumn(c));
+  const actionColumns = columns.filter(isActionColumn);
   return (
     <section className={bare ? "min-w-0" : `${panel} overflow-hidden`} aria-busy={loading}>
       {(searchable || toolbar) && (
@@ -385,11 +422,42 @@ export function Table<T>({ rows, columns, loading = false, emptyTitle = "No reco
               <MagnifyingGlass className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--fg-muted)]" />
               <input aria-label="Search records" placeholder={searchPlaceholder} value={search}
                 onChange={e => { setSearch(e.target.value); setPage(1); }}
-                className="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] py-2 pl-9 pr-3 text-xs text-[var(--fg)] outline-none focus:border-[var(--ring)] focus:ring-2 focus:ring-[var(--ring)]/15 sm:w-60" />
+                className="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] py-2 pl-9 pr-3 text-xs text-[var(--fg)] outline-none focus:border-[var(--ring)] focus:ring-2 focus:ring-[var(--ring)]/15 max-sm:min-h-11 sm:w-60" />
             </div>
           )}
         </div>
       )}
+      {phone ? (
+        loading && !rows.length ? <ListSkeleton rows={5} /> : !filtered.length ? (
+          <EmptyState icon={emptyIcon} title={search ? "No matching records" : emptyTitle} description={search ? "Try a different search." : emptyDescription} />
+        ) : (
+          <ul className="divide-y divide-[var(--border-soft)]">
+            {visible.map((r, i) => (
+              <li key={keyOf(r, i)} className={`px-4 py-3.5 ${selection?.selected.has(keyOf(r, i)) ? "bg-[var(--chart-1-wash)]" : ""}`}>
+                <div className="flex items-center gap-2">
+                  {selection && (
+                    <label className="-ml-2.5 flex h-11 w-11 shrink-0 items-center justify-center">
+                      <input type="checkbox" aria-label="Select row" className={checkbox} checked={selection.selected.has(keyOf(r, i))} onChange={() => toggleRow(keyOf(r, i))} />
+                    </label>
+                  )}
+                  <div className={`min-w-0 flex-1 text-sm font-medium text-[var(--fg)] [overflow-wrap:anywhere] ${cardTargets}`}>{titleColumn?.render(r)}</div>
+                  {actionColumns.map((c, j) => <div key={j} className={`flex shrink-0 items-center ${cardTargets}`}>{c.render(r)}</div>)}
+                </div>
+                {detailColumns.length > 0 && (
+                  <dl className="mt-2 space-y-1.5">
+                    {detailColumns.map((c) => (
+                      <div key={c.label} className="flex items-baseline justify-between gap-4 text-[13px]">
+                        <dt className="shrink-0 text-[var(--fg-muted)]">{c.label}</dt>
+                        <dd className={`min-w-0 text-right text-[var(--fg-body)] [overflow-wrap:anywhere] ${c.align === "right" ? "num" : ""} ${cardTargets}`}>{c.render(r)}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
+              </li>
+            ))}
+          </ul>
+        )
+      ) : (
       <div className="overflow-x-auto">
         <table className="w-full whitespace-nowrap text-left text-sm">
           <thead className="border-b border-[var(--border)] bg-[var(--subtle)] text-xs text-[var(--fg-muted)]">
@@ -423,17 +491,18 @@ export function Table<T>({ rows, columns, loading = false, emptyTitle = "No reco
           </tbody>
         </table>
       </div>
+      )}
       {paginated && (
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-3 text-xs text-[var(--fg-muted)]">
           <span>{loading && !rows.length ? "Loading records…" : `Showing ${filtered.length ? (current - 1) * size + 1 : 0} to ${Math.min(current * size, filtered.length)} of ${filtered.length} results`}</span>
           <div className="flex items-center gap-3">
             <select aria-label="Rows per page" value={size} onChange={e => { setSize(Number(e.target.value)); setPage(1); }}
-              className="rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-2 py-1.5 text-xs">
+              className="rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-2 py-1.5 text-xs max-sm:min-h-11">
               {[10, 25, 50].map(n => <option key={n} value={n}>{n} per page</option>)}
             </select>
-            <button disabled={current === 1} onClick={() => setPage(current - 1)} aria-label="Previous page" className="rounded-md border border-[var(--border-strong)] p-1.5 disabled:opacity-30"><CaretLeft className="h-3.5 w-3.5" /></button>
+            <button disabled={current === 1} onClick={() => setPage(current - 1)} aria-label="Previous page" className={pagerButton}><CaretLeft className="h-3.5 w-3.5" /></button>
             <span className="tabular-nums">{current}/{pages}</span>
-            <button disabled={current === pages} onClick={() => setPage(current + 1)} aria-label="Next page" className="rounded-md border border-[var(--border-strong)] p-1.5 disabled:opacity-30"><CaretRight className="h-3.5 w-3.5" /></button>
+            <button disabled={current === pages} onClick={() => setPage(current + 1)} aria-label="Next page" className={pagerButton}><CaretRight className="h-3.5 w-3.5" /></button>
           </div>
         </div>
       )}
@@ -449,9 +518,9 @@ export function Pager({ page, totalPages, totalElements, onPage, busy }: { page:
       <span className="num">{totalElements !== undefined ? `${totalElements.toLocaleString()} record${totalElements === 1 ? "" : "s"}` : ""}</span>
       {totalPages > 1 && (
         <div className="flex items-center gap-3">
-          <button disabled={page <= 0 || busy} onClick={() => onPage(page - 1)} aria-label="Previous page" className="rounded-md border border-[var(--border-strong)] p-1.5 disabled:opacity-30"><CaretLeft className="h-3.5 w-3.5" /></button>
+          <button disabled={page <= 0 || busy} onClick={() => onPage(page - 1)} aria-label="Previous page" className={pagerButton}><CaretLeft className="h-3.5 w-3.5" /></button>
           <span className="num">Page {page + 1} of {totalPages}</span>
-          <button disabled={page >= totalPages - 1 || busy} onClick={() => onPage(page + 1)} aria-label="Next page" className="rounded-md border border-[var(--border-strong)] p-1.5 disabled:opacity-30"><CaretRight className="h-3.5 w-3.5" /></button>
+          <button disabled={page >= totalPages - 1 || busy} onClick={() => onPage(page + 1)} aria-label="Next page" className={pagerButton}><CaretRight className="h-3.5 w-3.5" /></button>
         </div>
       )}
     </div>
@@ -466,7 +535,7 @@ export function Segmented<T extends string>({ options, value, onChange, label }:
         const active = o.key === value;
         return (
           <button key={o.key} role="radio" aria-checked={active} onClick={() => onChange(o.key)}
-            className={`whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${active ? "bg-[var(--surface)] text-[var(--fg)] shadow-sm" : "text-[var(--fg-muted)] hover:text-[var(--fg)]"}`}>
+            className={`whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-medium transition-colors max-sm:min-h-10 ${active ? "bg-[var(--surface)] text-[var(--fg)] shadow-sm" : "text-[var(--fg-muted)] hover:text-[var(--fg)]"}`}>
             {o.label}{o.count !== undefined && <span className="num ml-1.5 text-[var(--fg-faint)]">{o.count}</span>}
           </button>
         );
@@ -531,7 +600,7 @@ export function humanize(value: string | null | undefined) {
 
 export function BackLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <Link href={href} className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--fg-muted)] transition hover:text-[var(--fg)]">
+    <Link href={href} className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--fg-muted)] transition hover:text-[var(--fg)] max-sm:min-h-11">
       <ArrowLeft size={13} aria-hidden />{children}
     </Link>
   );
@@ -543,7 +612,7 @@ export function FormHeader({ title, description, backHref, backLabel }: {
   return (
     <div>
       <BackLink href={backHref}>{backLabel}</BackLink>
-      <h1 className="mt-3 text-2xl font-bold tracking-tight text-[var(--fg)]">{title}</h1>
+      <h1 className="mt-3 text-[1.65rem] font-bold leading-tight tracking-[-0.02em] text-[var(--fg)]">{title}</h1>
       {description && <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[var(--fg-muted)]">{description}</p>}
     </div>
   );

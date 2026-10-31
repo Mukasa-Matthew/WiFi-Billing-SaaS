@@ -86,7 +86,7 @@ export function ActionMenu({ children, ariaLabel = "Actions" }: ActionMenuProps)
         aria-label={ariaLabel}
         aria-expanded={open}
         onClick={handleToggle}
-        className="rounded-lg p-1.5 text-[var(--fg-muted)] hover:bg-[var(--fill)] hover:text-[var(--fg)] transition cursor-pointer"
+        className="inline-flex items-center justify-center rounded-lg p-1.5 text-[var(--fg-muted)] hover:bg-[var(--fill)] hover:text-[var(--fg)] transition cursor-pointer max-sm:h-11 max-sm:w-11"
       >
         <DotsThreeVertical size={16} />
       </button>
@@ -129,7 +129,7 @@ export function ActionMenuItem({
         e.stopPropagation();
         onClick();
       }}
-      className={`flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-xs font-medium transition cursor-pointer ${
+      className={`flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-xs font-medium transition cursor-pointer max-sm:min-h-11 ${
         danger
           ? "text-red-600 hover:bg-red-500/10"
           : "text-[var(--fg-body)] hover:bg-[var(--fill)]"

@@ -9,25 +9,11 @@ import AppShell, { type NavItem } from "@/components/AppShell";
 import SubscriptionRestrictedBanner from "@/components/SubscriptionRestrictedBanner";
 import { routerState } from "@/lib/routerState";
 import { useApi, useNow, useResource } from "@/components/BillingUI";
+import { ArrowRight, ShieldCheck } from "@/components/icons";
 import {
-  SquaresFour,
-  CellTower as RouterIcon,
-  Stack,
-  Ticket,
-  Radio,
-  ClockCounterClockwise,
-  ShieldCheck,
-  ArrowRight,
-  GearSix,
-  Users,
-  ChatCircleText,
-  Money,
-  Wallet,
-  CalendarCheck,
-  LinkSimple,
-  FileText,
-  Activity,
-} from "@/components/icons";
+  BindingIcon, CustomersIcon, ExpiredIcon, FeedbackIcon, LiveUsersIcon, LogsIcon, OverviewIcon, PackagesIcon, PaymentsIcon,
+  RouterIcon, SessionsIcon, SubscriptionIcon, TuneIcon, VoucherIcon, WalletIcon,
+} from "@/components/BrandIcons";
 
 interface SidebarStats {
   activeUsers?: number;
@@ -69,21 +55,21 @@ function TenantDashboardLayoutInner({ children }: { children: React.ReactNode })
   const offlineRouters = routers.filter((r) => { const st = routerState(r, now).state; return st === "offline" || st === "stale"; }).length;
 
   const nav: NavItem[] = [
-    { name: "Dashboard", href: "/dashboard", icon: SquaresFour, group: "" },
-    { name: "Active users", href: "/dashboard/users", icon: Radio, group: "Customers", badge: { value: stats?.activeUsers || 0, tone: "info", label: "online" } },
-    { name: "Customers", href: "/dashboard/customers", icon: Users, group: "Customers", badge: { value: stats?.totalCustomers || 0, tone: "neutral", label: "customers" } },
-    { name: "Expired users", href: "/dashboard/expired", icon: ClockCounterClockwise, group: "Customers" },
-    { name: "IP bindings", href: "/dashboard/bindings", icon: LinkSimple, group: "Customers" },
-    { name: "Feedback", href: "/dashboard/feedback", icon: ChatCircleText, group: "Customers" },
-    { name: "Packages", href: "/dashboard/packages", icon: Stack, group: "Sales" },
-    { name: "Vouchers", href: "/dashboard/vouchers", icon: Ticket, group: "Sales", badge: { value: stats?.activeVouchers || 0, tone: "neutral", label: "active" } },
-    { name: "Payments", href: "/dashboard/payments", icon: Money, group: "Sales" },
-    { name: "Wallet", href: "/dashboard/wallet", icon: Wallet, group: "Sales" },
+    { name: "Dashboard", href: "/dashboard", icon: OverviewIcon, group: "" },
+    { name: "Active users", href: "/dashboard/users", icon: LiveUsersIcon, group: "Customers", badge: { value: stats?.activeUsers || 0, tone: "info", label: "online" } },
+    { name: "Customers", href: "/dashboard/customers", icon: CustomersIcon, group: "Customers", badge: { value: stats?.totalCustomers || 0, tone: "neutral", label: "customers" } },
+    { name: "Expired users", href: "/dashboard/expired", icon: ExpiredIcon, group: "Customers" },
+    { name: "IP bindings", href: "/dashboard/bindings", icon: BindingIcon, group: "Customers" },
+    { name: "Feedback", href: "/dashboard/feedback", icon: FeedbackIcon, group: "Customers" },
+    { name: "Packages", href: "/dashboard/packages", icon: PackagesIcon, group: "Sales" },
+    { name: "Vouchers", href: "/dashboard/vouchers", icon: VoucherIcon, group: "Sales", badge: { value: stats?.activeVouchers || 0, tone: "neutral", label: "active" } },
+    { name: "Payments", href: "/dashboard/payments", icon: PaymentsIcon, group: "Sales" },
+    { name: "Wallet", href: "/dashboard/wallet", icon: WalletIcon, group: "Sales" },
     { name: "MikroTik routers", href: "/dashboard/routers", icon: RouterIcon, group: "Network", badge: { value: offlineRouters, tone: "danger", label: "offline" } },
-    { name: "Sessions", href: "/dashboard/sessions", icon: Activity, group: "Network" },
-    { name: "Accounting logs", href: "/dashboard/logs", icon: FileText, group: "Network" },
-    { name: "Subscription", href: "/dashboard/subscription", icon: CalendarCheck, group: "Account" },
-    { name: "Settings", href: "/dashboard/settings", icon: GearSix, group: "Account" },
+    { name: "Sessions", href: "/dashboard/sessions", icon: SessionsIcon, group: "Network" },
+    { name: "Accounting logs", href: "/dashboard/logs", icon: LogsIcon, group: "Network" },
+    { name: "Subscription", href: "/dashboard/subscription", icon: SubscriptionIcon, group: "Account" },
+    { name: "Settings", href: "/dashboard/settings", icon: TuneIcon, group: "Account" },
   ];
 
   return (

@@ -429,7 +429,7 @@ export default function SuperAdminSettingsPage() {
 
       {/* Header */}
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-[var(--fg)] flex items-center gap-2.5">
+        <h1 className="text-[1.65rem] font-bold leading-tight tracking-[-0.02em] text-[var(--fg)] flex items-center gap-2.5">
           <GearSix className="w-6 h-6 text-[var(--accent-text)]" />
           <span>Super Admin Settings & Governance</span>
         </h1>
@@ -464,7 +464,7 @@ export default function SuperAdminSettingsPage() {
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition cursor-pointer whitespace-nowrap ${
+              className={`flex items-center gap-2 px-3.5 py-2 max-sm:min-h-11 rounded-xl text-xs font-semibold transition cursor-pointer whitespace-nowrap ${
                 isActive
                   ? "bg-blue-700 text-white shadow-sm"
                   : "text-[var(--fg-muted)] hover:bg-[var(--fill)] hover:text-[var(--fg)]"
@@ -882,7 +882,7 @@ export default function SuperAdminSettingsPage() {
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
+                <table className="stack-table w-full text-left text-xs">
                   <thead>
                     <tr className="border-b border-[var(--border)] text-[var(--fg-muted)]">
                       <th className="py-3 px-4 font-semibold">Action</th>
@@ -904,13 +904,13 @@ export default function SuperAdminSettingsPage() {
                           <td className="py-3 px-4 font-mono font-semibold text-blue-600">
                             {log.action}
                           </td>
-                          <td className="py-3 px-4 text-[var(--fg-body)] max-w-md">
+                          <td data-label="Details" className="py-3 px-4 text-[var(--fg-body)] max-w-md">
                             {log.details}
                           </td>
-                          <td className="py-3 px-4 font-mono text-[var(--fg-muted)]">
+                          <td data-label="IP address" className="py-3 px-4 font-mono text-[var(--fg-muted)]">
                             {log.ipAddress || "—"}
                           </td>
-                          <td className="py-3 px-4 text-[var(--fg-muted)]">
+                          <td data-label="Timestamp" className="py-3 px-4 text-[var(--fg-muted)]">
                             {date(log.createdAt)}
                           </td>
                         </tr>

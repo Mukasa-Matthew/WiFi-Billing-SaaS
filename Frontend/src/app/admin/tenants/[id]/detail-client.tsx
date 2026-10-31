@@ -461,7 +461,7 @@ function BillingTab({ tenantId, sub, subsLoading, wallet }: { tenantId: number; 
             { label: "Status", render: (w) => (
               <span>
                 <Badge tone={WITHDRAWAL_STATUS_TONE[w.status] || "slate"} dot>{humanize(w.status)}</Badge>
-                {w.failureReason && <span className="mt-0.5 block text-[11px] text-red-500">{w.failureReason}</span>}
+                {w.failureReason && <span className="mt-0.5 block text-[11px] text-red-700">{w.failureReason}</span>}
               </span>
             ) },
           ]} />

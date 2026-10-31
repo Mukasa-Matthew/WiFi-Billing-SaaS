@@ -184,13 +184,13 @@ export default function AdminFinancePage() {
               <WarningCircle size={15} /> Provider balance is stale—use Reconcile before reviewing payout safety.
             </p>
           )}
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <div className={panel}>
               <div className="border-b border-[var(--border-soft)] px-5 py-4">
                 <h2 className="text-sm font-bold text-[var(--fg)]">Platform earnings</h2>
                 <p className="mt-0.5 text-xs text-[var(--fg-muted)]">SaaS subscription revenue — owned by the platform.</p>
               </div>
-              <dl className="space-y-2.5 px-5 py-4 text-sm">
+              <dl className="space-y-2.5 px-5 py-4 text-sm [&>div]:gap-3 [&_dd]:min-w-0 [&_dd]:text-right">
                 <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Settled earnings (provider-backed)</dt><dd className="font-bold">{money(plat.settledEarnings)}</dd></div>
                 <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">External earnings (cash/bank)</dt><dd className="font-semibold">{money(plat.externalEarnings)}</dd></div>
                 <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Reserved (in-flight payouts)</dt><dd>{money(plat.reservedEarnings)}</dd></div>
@@ -210,7 +210,7 @@ export default function AdminFinancePage() {
                   <ArrowsClockwise size={14} className={reconBusy ? "animate-spin" : ""} /> Reconcile
                 </button>
               </div>
-              <dl className="space-y-2.5 px-5 py-4 text-sm">
+              <dl className="space-y-2.5 px-5 py-4 text-sm [&>div]:gap-3 [&_dd]:min-w-0 [&_dd]:text-right">
                 <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Available balance</dt><dd className="font-bold">{money(plat.providerBalance)}</dd></div>
                 <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Last synced</dt><dd className="text-xs text-[var(--fg-muted)]">{plat.lastSyncedAt ? date(plat.lastSyncedAt) : "Never"}</dd></div>
                 <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Reconciliation</dt>
@@ -258,7 +258,7 @@ export default function AdminFinancePage() {
                 { label: "Status", render: (p: Payout) => (
                   <span>
                     <Badge tone={STATUS_TONE[p.status] || "slate"}>{p.status}</Badge>
-                    {p.failureReason && <div className="mt-1 text-[11px] text-red-500">{p.failureReason}</div>}
+                    {p.failureReason && <div className="mt-1 text-[11px] text-red-700">{p.failureReason}</div>}
                   </span>
                 )},
                 { label: "Provider ref", render: (p: Payout) => <span className="font-mono text-[11px] text-[var(--fg-faint)]">{p.providerTransactionId || p.payoutRef.slice(0, 8)}</span> },
@@ -271,7 +271,7 @@ export default function AdminFinancePage() {
       <div className={panel}>
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-soft)] px-5 py-4">
           <h2 className="text-sm font-bold text-[var(--fg)]">Withdrawal requests</h2>
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
             <button
               type="button"
               disabled={!withdrawals.length}
@@ -282,7 +282,7 @@ export default function AdminFinancePage() {
               <DownloadSimple className="h-3.5 w-3.5" /> Export CSV
             </button>
             <select value={filter} onChange={(e) => setFilter(e.target.value)}
-              className="rounded-lg border border-[var(--border-strong)] px-3 py-1.5 text-xs">
+              className="min-w-0 max-w-full rounded-lg border border-[var(--border-strong)] px-3 py-1.5 text-xs">
               <option value="">All</option>
               <option value="PENDING_APPROVAL,REQUESTED">Awaiting approval</option>
               <option value="PROCESSING">Processing</option>
@@ -303,7 +303,7 @@ export default function AdminFinancePage() {
             { label: "Status", render: (w: WithdrawalRow) => (
               <span>
                 <Badge tone={STATUS_TONE[w.status] || "slate"}>{w.status.replaceAll("_", " ")}</Badge>
-                {w.failureReason && <div className="mt-1 text-[11px] text-red-500">{w.failureReason}</div>}
+                {w.failureReason && <div className="mt-1 text-[11px] text-red-700">{w.failureReason}</div>}
               </span>
             )},
             { label: "", render: (w: WithdrawalRow) => (

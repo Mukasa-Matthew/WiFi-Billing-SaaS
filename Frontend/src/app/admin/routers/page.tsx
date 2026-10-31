@@ -58,7 +58,7 @@ export default function AdminRoutersPage() {
         emptyDescription={error && !data.length ? "Check your connection and reload." : data.length ? "Change the state or tenant filter." : "Routers appear here once a tenant links one."}
         toolbar={<>
           <Segmented label="Router state" value={filter} onChange={setFilter} options={FILTERS.map((f) => ({ ...f, count: loading ? undefined : count(f.key) }))} />
-          <select aria-label="Filter by tenant" value={tenant} onChange={(e) => setTenant(e.target.value)} className={`${field} !mt-0 !min-h-8 w-full !py-1 text-xs sm:w-48`}>
+          <select aria-label="Filter by tenant" value={tenant} onChange={(e) => setTenant(e.target.value)} className={`${field} !mt-0 w-full !py-1 text-xs sm:!min-h-8 sm:w-48`}>
             <option value="ALL">All tenants</option>
             {tenants.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
           </select>

@@ -90,7 +90,7 @@ export function BarChart({ data, label, height = 220, format = (v) => v.toLocale
               <g key={d.key}>
                 {h > 0 && (
                   <path d={columnPath(x, y(d.value), barW, h)} fill="var(--chart-1)"
-                    opacity={hover == null || hover === i ? 1 : 0.55} className="transition-opacity duration-150" />
+                    opacity={hover == null || hover === i ? 1 : 0.55} className="chart-bar transition-opacity duration-150" style={{ animationDelay: `${Math.min(i, 24) * 22}ms` }} />
                 )}
                 {i % every === 0 && (
                   <text x={left + i * band + band / 2} y={height - 8} textAnchor="middle" className="fill-[var(--fg-muted)] text-[11px]">{d.label}</text>
@@ -206,8 +206,9 @@ export function MiniBars({ data, label, format = (v) => v.toLocaleString(), heig
               className="flex h-full min-w-0 flex-1 cursor-default items-end outline-none"
             >
               <span
-                className="block w-full rounded-t-[3px] transition-opacity"
+                className="chart-bar block w-full rounded-t-[3px] transition-opacity"
                 style={{
+                  animationDelay: `${i * 34}ms`,
                   height: `${Math.max(d.value > 0 ? 6 : 2, (d.value / max) * 100)}%`,
                   background: latest ? "var(--chart-1)" : "var(--chart-muted)",
                   opacity: hover == null || hover === i ? 1 : 0.6,

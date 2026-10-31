@@ -13,8 +13,10 @@ import Link from "next/link";
 import React, { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
 import { LinkPending } from "@/components/LoadingUI";
+import { LogoMark } from "@/components/Logo";
+import { SignalLoader } from "@/components/SignalLoader";
 import ThemeToggle from "@/components/ThemeToggle";
-import { CaretDown, CaretLeft, CaretRight, GearSix, List, SignOut, WifiHigh, X } from "@/components/icons";
+import { CaretDown, CaretLeft, CaretRight, GearSix, List, SignOut, X } from "@/components/icons";
 
 export type NavTone = "neutral" | "info" | "warn" | "danger";
 
@@ -72,7 +74,7 @@ const badgeTone: Record<NavTone, string> = {
   neutral: "bg-white/10 text-[var(--sidebar-fg-dim)]",
   // Literal values: the sidebar is dark in both themes, and the palette
   // utilities are re-tinted under [data-theme="dark"].
-  info: "bg-[#38BDF8]/15 text-[#BAE6FD]",
+  info: "bg-[#37E2C4]/15 text-[#B6F5EA]",
   warn: "bg-[#FBBF24]/15 text-[#FDE68A]",
   danger: "bg-[#F87171]/20 text-[#FECACA]",
 };
@@ -137,15 +139,14 @@ export default function AppShell(props: AppShellProps) {
       >
         {/* Brand */}
         <div className={`flex h-16 shrink-0 items-center gap-3 border-b border-[var(--sidebar-line)] ${rail ? "lg:justify-center lg:px-0" : ""} px-5`}>
-          <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-white/[0.08] text-white ring-1 ring-inset ring-white/10">
-            <WifiHigh className="h-[18px] w-[18px]" aria-hidden />
-            <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-[var(--sidebar-indicator)] ring-2 ring-[var(--sidebar)]" aria-hidden />
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-white/[0.08] text-white ring-1 ring-inset ring-white/10">
+            <LogoMark className="h-[23px] w-[23px]" />
           </span>
           <div className={`min-w-0 flex-1 ${rail ? "lg:hidden" : ""}`}>
-            <span className="block truncate text-[14px] font-semibold tracking-tight text-white">{brand.title}</span>
+            <span className="block truncate font-display text-[15px] font-semibold tracking-tight text-white">{brand.title}</span>
             <span className="block truncate text-[11px] font-medium text-[var(--sidebar-fg-faint)]">{brand.subtitle}</span>
           </div>
-          <button onClick={() => setDrawerOpen(false)} aria-label="Close navigation" className="rounded-md p-1.5 text-[var(--sidebar-fg-dim)] hover:bg-[var(--sidebar-hover)] hover:text-white lg:hidden">
+          <button onClick={() => setDrawerOpen(false)} aria-label="Close navigation" className="flex h-11 w-11 items-center justify-center rounded-md text-[var(--sidebar-fg-dim)] hover:bg-[var(--sidebar-hover)] hover:text-white lg:hidden">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -164,7 +165,7 @@ export default function AppShell(props: AppShellProps) {
                       type="button"
                       onClick={() => setCollapsed((c) => ({ ...c, [group.name]: !c[group.name] }))}
                       aria-expanded={!isCollapsed}
-                      className={`group flex w-full items-center justify-between rounded-md px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--sidebar-fg-faint)] hover:text-[var(--sidebar-fg-dim)] ${rail ? "lg:hidden" : ""}`}
+                      className={`group flex w-full items-center justify-between rounded-md px-3 pb-1.5 max-lg:min-h-11 max-lg:pb-0 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--sidebar-fg-faint)] hover:text-[var(--sidebar-fg-dim)] ${rail ? "lg:hidden" : ""}`}
                     >
                       <span>{group.name}</span>
                       <CaretDown className={`h-3 w-3 opacity-60 transition-transform group-hover:opacity-100 ${isCollapsed ? "-rotate-90" : ""}`} aria-hidden />
@@ -186,14 +187,14 @@ export default function AppShell(props: AppShellProps) {
                             onMouseEnter={() => prefetchRouteData(item.href, user?.role, user?.tenantId)}
                             aria-current={active ? "page" : undefined}
                             title={rail ? item.name : undefined}
-                            className={`group relative flex h-9 items-center gap-3 rounded-lg px-3 text-[13.5px] font-medium transition-colors ${rail ? "lg:justify-center lg:px-0" : ""} ${
+                            className={`group relative flex h-9 max-lg:h-11 items-center gap-3 rounded-lg px-3 text-[13.5px] font-medium transition-colors ${rail ? "lg:justify-center lg:px-0" : ""} ${
                               active
                                 ? "bg-[var(--sidebar-current)] text-white"
                                 : "text-[var(--sidebar-fg-dim)] hover:bg-[var(--sidebar-hover)] hover:text-white"
                             }`}
                           >
                             {active && <span className="absolute inset-y-2 left-0 w-[3px] rounded-r-full bg-[var(--sidebar-indicator)]" aria-hidden />}
-                            <Icon aria-hidden className={`h-[18px] w-[18px] shrink-0 ${active ? "text-white" : "text-[var(--sidebar-fg-faint)] group-hover:text-[var(--sidebar-fg-dim)]"}`} />
+                            <Icon aria-hidden className={`h-5 w-5 shrink-0 ${active ? "text-white" : "text-[var(--sidebar-fg-faint)] group-hover:text-[var(--sidebar-fg-dim)]"}`} />
                             <span className={`min-w-0 flex-1 truncate ${rail ? "lg:sr-only" : ""}`}>{item.name}</span>
                             {badge && (
                               <span
@@ -231,7 +232,7 @@ export default function AppShell(props: AppShellProps) {
         <header className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-[var(--border)] bg-[var(--header)] px-4 sm:px-6 lg:px-8">
           <div className="flex min-w-0 items-center gap-2.5">
             <button aria-label="Open navigation" aria-expanded={drawerOpen} onClick={() => setDrawerOpen(true)}
-              className="-ml-1.5 rounded-lg p-2 text-[var(--fg-muted)] hover:bg-[var(--fill)] hover:text-[var(--fg)] lg:hidden">
+              className="-ml-2.5 flex h-11 w-11 items-center justify-center rounded-lg text-[var(--fg-muted)] hover:bg-[var(--fill)] hover:text-[var(--fg)] lg:hidden">
               <List className="h-5 w-5" />
             </button>
             <nav aria-label="Breadcrumb" className="min-w-0">
@@ -248,6 +249,7 @@ export default function AppShell(props: AppShellProps) {
           </div>
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             {headerActions}
+            <span className="hidden sm:inline-flex"><ThemeToggle compact /></span>
             <UserMenu user={user} roleLabel={roleLabel} settingsHref={settingsHref} onLogout={onLogout} />
           </div>
         </header>
@@ -262,11 +264,8 @@ export default function AppShell(props: AppShellProps) {
           instant navigation. No data is server-rendered — every panel fetches
           with the bearer token — so nothing is exposed behind this. */}
       {!ready && (
-        <div role="status" aria-live="polite" className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--canvas)] text-[var(--fg-muted)]">
-          <div className="flex flex-col items-center gap-3">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--primary)] border-t-transparent motion-reduce:animate-none" />
-            <p className="text-sm">{readyLabel}</p>
-          </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--canvas)]">
+          <SignalLoader label={readyLabel} />
         </div>
       )}
     </div>
@@ -292,7 +291,7 @@ function UserMenu({ user, roleLabel, settingsHref, onLogout }: { user: ShellUser
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="Account menu"
-        className="flex items-center gap-2 rounded-lg p-1 pr-1.5 transition-colors hover:bg-[var(--fill)] sm:pr-2"
+        className="flex min-h-11 items-center gap-2 rounded-lg p-1 pr-1.5 transition-colors hover:bg-[var(--fill)] sm:min-h-0 sm:pr-2"
       >
         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--sidebar)] text-[11px] font-semibold text-white ring-1 ring-inset ring-white/10">{initials(user?.name)}</span>
         <span className="hidden max-w-36 truncate text-[13px] font-medium text-[var(--fg-body)] md:block">{user?.name}</span>
@@ -305,15 +304,15 @@ function UserMenu({ user, roleLabel, settingsHref, onLogout }: { user: ShellUser
             <p className="truncate text-xs text-[var(--fg-muted)]">{user?.email}</p>
             <p className="mt-1.5 inline-flex rounded-md bg-[var(--fill)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--fg-muted)]">{roleLabel}</p>
           </div>
-          <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] px-4 py-2.5">
+          <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] px-4 py-2.5 sm:hidden">
             <span className="text-xs font-medium text-[var(--fg-muted)]">Theme</span>
             <ThemeToggle compact />
           </div>
           <div className="p-1.5">
-            <Link role="menuitem" href={settingsHref} onClick={() => setOpen(false)} className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium text-[var(--fg-body)] hover:bg-[var(--fill)]">
+            <Link role="menuitem" href={settingsHref} onClick={() => setOpen(false)} className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium text-[var(--fg-body)] hover:bg-[var(--fill)] max-sm:min-h-11">
               <GearSix className="h-4 w-4 text-[var(--fg-muted)]" aria-hidden />Settings
             </Link>
-            <button role="menuitem" onClick={onLogout} className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] font-medium text-red-600 hover:bg-red-500/10">
+            <button role="menuitem" onClick={onLogout} className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] font-medium text-red-600 hover:bg-red-500/10 max-sm:min-h-11">
               <SignOut className="h-4 w-4" aria-hidden />Sign out
             </button>
           </div>

@@ -1,15 +1,32 @@
 @import "tailwindcss";
 
 :root {
-  --background: #F5F7FA;
-  --foreground: #111827;
+  --background: #F2F6F5;
+  --foreground: #08282E;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-instrument);
+  --font-display: var(--font-bricolage);
   --font-mono: var(--font-geist-mono);
+}
+
+/* Deep Lagoon. The brand ramp sits under the "blue" and "indigo" names so every
+   existing primary utility follows it; new work should use the tokens below. */
+@theme {
+  --color-blue-50: #E8F6F4;
+  --color-blue-100: #CFEDE9;
+  --color-blue-200: #A6DED7;
+  --color-blue-300: #6FC9BF;
+  --color-blue-400: #33AFA6;
+  --color-blue-500: #0F9A92;
+  --color-blue-600: #0A7F7A;
+  --color-blue-700: #0B7A75;
+  --color-blue-800: #0A625E;
+  --color-blue-900: #08474A;
+  --color-indigo-500: #0F9A92;
 }
 
 html {
@@ -19,7 +36,7 @@ html {
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--font-instrument), Arial, Helvetica, sans-serif;
 }
 
 /* ---------------------------------------------------------------------------
@@ -30,98 +47,101 @@ body {
    --------------------------------------------------------------------------- */
 :root,
 [data-theme="light"] {
-  --canvas: #F5F7FA;
+  --canvas: #F2F6F5;
   --surface: #FFFFFF;
-  --subtle: #F8FAFC;
-  --fill: #F1F5F9;
-  --border: #E2E8F0;
-  --border-strong: #CBD5E1;
-  --border-soft: #F1F5F9;
-  --fg: #0F172A;
-  --fg-body: #334155;
-  --fg-muted: #5A6880;
-  --fg-faint: #626F88;
-  --accent-text: #1D4ED8;
-  --sidebar: #122B49;
-  --sidebar-admin: #0B1F36;
+  --subtle: #F7FAF9;
+  --fill: #E9F0EE;
+  --border: #D9E4E1;
+  --border-strong: #7C9893;
+  --border-soft: #E9F0EE;
+  --fg: #08282E;
+  --fg-body: #24434A;
+  --fg-muted: #4F6A70;
+  --fg-faint: #5B757A;
+  --accent-text: #0B6E6A;
+  --sidebar: #08282E;
+  --sidebar-admin: #051D22;
   --sidebar-active: #FFFFFF;
-  --sidebar-active-fg: #122B49;
-  --sidebar-fg-dim: #C3D6F0;
-  --sidebar-fg-faint: #9DB6D9;
+  --sidebar-active-fg: #08282E;
+  --sidebar-fg-dim: #BFDAD6;
+  --sidebar-fg-faint: #8FB5B0;
   --sidebar-warn: #FCD34D;
   --sidebar-line: rgb(255 255 255 / 0.08);
   --sidebar-hover: rgb(255 255 255 / 0.06);
   --sidebar-current: rgb(255 255 255 / 0.10);
-  --sidebar-indicator: #5EEAD4;
+  --sidebar-indicator: #37E2C4;
   --header: #FFFFFF;
-  --ring: #2563EB;
-  --primary: #1D4ED8;
-  --primary-hover: #1E40AF;
-  --primary-soft: #EFF4FF;
+  --ring: #0B7A75;
+  --primary: #0B7A75;
+  --primary-hover: #0A625E;
+  --primary-soft: #E3F3F1;
+  --brand-accent: #E5376B;
   /* Charts: one validated series hue plus the reserved status set. Status
      marks always ship with a text label, never colour alone. */
-  --chart-1: #2A78D6;
-  --chart-1-wash: rgb(42 120 214 / 0.10);
-  --chart-muted: #C9D6E6;
-  --chart-grid: #EEF2F6;
+  --chart-1: #0E8A84;
+  --chart-1-wash: rgb(14 138 132 / 0.10);
+  --chart-muted: #BFD2CE;
+  --chart-grid: #E6EEEC;
   --status-good: #1BAF7A;
   --status-warn: #EDA100;
   --status-bad: #E34948;
-  --status-idle: #A3AEBD;
-  --shadow-panel: 0 1px 2px rgb(15 23 42 / 0.04), 0 10px 28px -22px rgb(15 23 42 / 0.35);
-  --shadow-overlay: 0 24px 64px -24px rgb(15 23 42 / 0.45);
+  --status-idle: #A0B1AE;
+  --shadow-panel: 0 1px 2px rgb(8 40 46 / 0.04), 0 10px 28px -22px rgb(8 40 46 / 0.35);
+  --shadow-overlay: 0 24px 64px -24px rgb(8 40 46 / 0.45);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
   color-scheme: light;
 }
 
 [data-theme="dark"] {
-  /* Neutral graphite ramp (Calton-style): true grays, no blue tint. */
-  --canvas: #121316;
-  --surface: #17191D;
-  --subtle: #1B1E23;
-  --fill: #21252B;
-  --border: #24282E;
-  --border-strong: #343A43;
-  --border-soft: #1F2227;
-  --fg: #F2F4F7;
-  --fg-body: #C9CED6;
-  --fg-muted: #98A0AA;
-  --fg-faint: #78808B;
-  --accent-text: #8AB4FF;
-  --sidebar: #14161A;
-  --sidebar-admin: #101215;
-  --sidebar-active: #262A30;
-  --sidebar-active-fg: #F2F4F7;
-  --sidebar-fg-dim: #B8BDC6;
-  --sidebar-fg-faint: #8B929C;
+  /* Deep water, not grey: surfaces keep a little of the brand's teal. */
+  --canvas: #0A1719;
+  --surface: #102225;
+  --subtle: #142A2D;
+  --fill: #1A3438;
+  --border: #1F3A3E;
+  --border-strong: #527478;
+  --border-soft: #17292C;
+  --fg: #EAF4F2;
+  --fg-body: #C3D5D2;
+  --fg-muted: #8FA9A6;
+  --fg-faint: #7B9693;
+  --accent-text: #4FE3CB;
+  --sidebar: #081416;
+  --sidebar-admin: #061012;
+  --sidebar-active: #1A3438;
+  --sidebar-active-fg: #EAF4F2;
+  --sidebar-fg-dim: #BFDAD6;
+  --sidebar-fg-faint: #8FB5B0;
   --sidebar-warn: #FCD34D;
   --sidebar-line: rgb(255 255 255 / 0.06);
   --sidebar-hover: rgb(255 255 255 / 0.04);
   --sidebar-current: rgb(255 255 255 / 0.07);
-  --sidebar-indicator: #5EEAD4;
-  --header: #15171B;
-  --ring: #60A5FA;
-  --primary: #2563EB;
-  --primary-hover: #3B82F6;
-  --primary-soft: #16243C;
-  --chart-1: #3987E5;
-  --chart-1-wash: rgb(57 135 229 / 0.14);
-  --chart-muted: #33404F;
-  --chart-grid: #23272D;
+  --sidebar-indicator: #37E2C4;
+  --header: #0D1D20;
+  --ring: #37E2C4;
+  --primary: #0B7A75;
+  --primary-hover: #0A7F7A;
+  --primary-soft: #0F2F31;
+  --brand-accent: #F0507F;
+  --chart-1: #37C9B4;
+  --chart-1-wash: rgb(55 201 180 / 0.14);
+  --chart-muted: #2F4A4E;
+  --chart-grid: #1B3134;
   --status-good: #199E70;
   --status-warn: #D9A21B;
   --status-bad: #E5484D;
-  --status-idle: #5B636E;
+  --status-idle: #5F7775;
   --shadow-panel: 0 1px 2px rgb(0 0 0 / 0.24), 0 12px 32px -24px rgb(0 0 0 / 0.8);
   --shadow-overlay: 0 28px 72px -24px rgb(0 0 0 / 0.8);
   color-scheme: dark;
 
   /* Tailwind v4 emits every palette utility as var(--color-*), so redefining
      these re-tints the tinted badges and chips without touching components. */
-  --color-blue-50: #16243C;
-  --color-blue-100: #1E3356;
-  --color-blue-200: #27406B;
-  --color-blue-700: #2563EB;
+  --color-blue-50: #0F2F31;
+  --color-blue-100: #143B3D;
+  --color-blue-200: #1E4D4E;
+  --color-blue-700: #0B7A75;
   --color-emerald-50: #0D2A1F;
   --color-emerald-100: #14382A;
   --color-emerald-200: #1E4D38;
@@ -141,6 +161,11 @@ body {
 }
 
 body { background: var(--canvas); color: var(--fg); }
+h1, h2, h3 { font-family: var(--font-bricolage), var(--font-instrument), Arial, sans-serif; letter-spacing: -0.015em; }
+
+/* The theme toggle draws its own circular reveal over these snapshots. */
+::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+::view-transition-new(root) { z-index: 1; }
 
 /* Keep keyboard navigation visible on both white panels and the navy sidebar. */
 :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
@@ -247,6 +272,117 @@ button, a { touch-action: manipulation; }
 .portal-sheet { animation: portal-sheet 240ms cubic-bezier(0.16, 1, 0.3, 1) both; }
 @media (prefers-reduced-motion: reduce) {
   .portal-rise, .portal-sheet { animation: none; }
+}
+
+/* iOS zooms the page on focus when a field is under 16px. */
+@media (max-width: 639px) {
+  input:not([type="checkbox"]):not([type="radio"]), select, textarea { font-size: max(16px, 1em); }
+
+  /* Touch floor for every control in the workspace, including ones added later. */
+  :where(main, header) button, :where(main) select, :where(main) input:not([type="checkbox"]):not([type="radio"]):not([type="file"]) { min-height: 44px; }
+
+  /* Hand-built tables read as stacked rows on phones. A cell's data-label names
+     it; a cell without one (the row title, empty and loading rows) spans the row. */
+  .stack-table thead { display: none; }
+  .stack-table, .stack-table tbody, .stack-table tr { display: block; width: 100%; }
+  .stack-table tr { padding: 0.75rem 0; }
+  .stack-table td { display: block; padding: 0.2rem 1rem; white-space: normal; overflow-wrap: anywhere; }
+  .stack-table td[data-label] { display: flex; align-items: center; justify-content: space-between; gap: 1rem; text-align: right; font-size: 13px; }
+  .stack-table td[data-label]::before { content: attr(data-label); flex-shrink: 0; color: var(--fg-muted); text-align: left; }
+}
+
+/* Workspace motion: charts grow in once, drill-down cards answer the pointer,
+   and a live router carries a soft pulse. All of it stops under reduced motion. */
+@keyframes bar-grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes live-pulse { 0% { box-shadow: 0 0 0 0 rgb(27 175 122 / 0.5); } 70%, 100% { box-shadow: 0 0 0 6px rgb(27 175 122 / 0); } }
+.chart-bar { transform-box: fill-box; transform-origin: bottom; animation: bar-grow 560ms var(--ease-out) both; }
+.live-dot { animation: live-pulse 2.4s ease-out infinite; }
+.panel-lift { transition: transform 220ms var(--ease-out), box-shadow 220ms var(--ease-out), border-color 220ms ease; }
+@media (hover: hover) {
+  .panel-lift:hover { transform: translate3d(0, -2px, 0); border-color: var(--border-strong); box-shadow: var(--shadow-overlay); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chart-bar, .live-dot { animation: none; }
+  .panel-lift:hover { transform: none; }
+}
+
+/* The signal loader: the device dot wakes, then each arc draws outward and fades. */
+@keyframes signal-arc { 0%, 12% { stroke-dashoffset: 1; opacity: 0.2; } 48%, 72% { stroke-dashoffset: 0; opacity: 1; } 100% { stroke-dashoffset: -1; opacity: 0.2; } }
+@keyframes signal-dot { 0%, 100% { transform: scale(0.7); opacity: 0.55; } 30% { transform: scale(1.15); opacity: 1; } }
+@keyframes signal-halo { from { transform: scale(0.55); opacity: 0.5; } to { transform: scale(1.25); opacity: 0; } }
+.signal-arc { stroke-dasharray: 1; animation: signal-arc 1.7s var(--ease-out) infinite; }
+.signal-arc-inner { animation-delay: 120ms; }
+.signal-arc-outer { animation-delay: 280ms; }
+.signal-dot { transform-box: fill-box; transform-origin: center; animation: signal-dot 1.7s ease-in-out infinite; }
+.signal-halo { animation: signal-halo 2.1s var(--ease-out) infinite; }
+.signal-halo-late { animation-delay: 700ms; }
+
+/* Brand icons: a line drawing, a soft tint and one signal-coloured moving part. */
+.bi { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; overflow: visible; }
+.bi .soft { fill: currentColor; fill-opacity: 0.16; stroke: none; }
+.bi .acc { stroke: var(--sidebar-indicator); }
+.bi .dot { fill: var(--sidebar-indicator); stroke: none; }
+.bi .knob { fill: var(--sidebar); }
+.bi .acc-ring { stroke: var(--sidebar-indicator); }
+.bi .m-rise, .bi .m-slide, .bi .m-slide-back, .bi .m-spin, .bi .m-flip, .bi .m-grow, .bi .m-sweep { transform-box: fill-box; transition: transform 320ms var(--ease-spring); }
+.bi .m-spin { transform-origin: 0% 0%; }
+.bi .m-flip { transform-origin: center; }
+.bi .m-grow { transform-origin: bottom; }
+.bi .m-sweep { transform-box: view-box; transform-origin: 12px 12px; }
+@keyframes bi-ping { 0% { opacity: 0.25; } 45% { opacity: 1; } 100% { opacity: 0.25; } }
+@keyframes bi-bounce { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-2px); } }
+@keyframes bi-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes bi-grow { from { transform: scaleY(0.4); } to { transform: scaleY(1); } }
+@keyframes bi-flip { from { transform: rotateY(0); } to { transform: rotateY(360deg); } }
+@keyframes bi-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+@keyframes bi-sweep { to { transform: rotate(360deg); } }
+a:hover .bi .m-ping, [aria-current="page"] .bi .m-ping { animation: bi-ping 1.5s ease-in-out infinite; }
+a:hover .bi .m-bounce { transform-box: fill-box; animation: bi-bounce 640ms ease-in-out infinite; }
+a:hover .bi .m-blink { animation: bi-blink 900ms ease-in-out infinite; }
+a:hover .bi .m-draw { stroke-dasharray: 1; animation: bi-draw 620ms var(--ease-out) both; }
+a:hover .bi .m-grow { animation: bi-grow 420ms var(--ease-spring) both; }
+a:hover .bi .m-flip { animation: bi-flip 700ms var(--ease-out) both; }
+a:hover .bi .m-sweep, [aria-current="page"] .bi .m-sweep { animation: bi-sweep 2.4s linear infinite; }
+a:hover .bi .m-rise { transform: translateY(-1.5px); }
+a:hover .bi .m-slide { transform: translateX(1.6px); }
+a:hover .bi .m-slide-back { transform: translateX(-1.6px); }
+a:hover .bi .m-spin { transform: rotate(38deg); }
+.bi .m-late { animation-delay: 110ms !important; }
+.bi .m-later { animation-delay: 220ms !important; }
+
+/* Every other icon answers its control with a small spring. */
+button > svg, a > svg { transition: transform 240ms var(--ease-spring); }
+@media (hover: hover) {
+  button:not(:disabled):hover > svg:not(.bi), a:hover > svg:not(.bi) { transform: translateY(-1px) scale(1.1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .signal-arc, .signal-dot, .signal-halo { animation: none; stroke-dasharray: none; }
+  .bi * { animation: none !important; transform: none !important; }
+  button:not(:disabled):hover > svg, a:hover > svg { transform: none; }
+}
+
+/* Landing stage: copy and router share the screen by shape, not just width, so a
+   wide-but-short window still sits them side by side. Type scales with both axes. */
+.landing-stage { position: absolute; inset: 47% 0 0 0; }
+.landing-copy { align-items: flex-start; padding-top: 5.5rem; }
+.landing-title { font-size: clamp(1.6rem, min(9.2vw, 5.4vh), 3.7rem); }
+.landing-body { font-size: clamp(0.8rem, 1.9vh, 1.05rem); }
+@media (min-aspect-ratio: 1/1) {
+  .landing-stage { inset: 0 0 0 42%; }
+  .landing-copy { align-items: center; padding-top: 3.5rem; }
+  .landing-text { width: 40%; max-width: none; }
+  .landing-title { font-size: clamp(1.45rem, min(3.9vw, 9vh), 3.7rem); }
+}
+
+/* Signed-out screens: one orchestrated moment, then a slow idle breath. */
+@keyframes signal-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes signal-breathe { 0%, 100% { stroke-width: 1.25; } 50% { stroke-width: 2.5; } }
+@keyframes signal-core { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.35); } }
+.signal-ring { stroke-dasharray: 1; animation: signal-draw 1100ms var(--ease-out) both, signal-breathe 5.5s ease-in-out infinite; }
+.signal-core { transform-box: fill-box; transform-origin: center; animation: signal-core 2.75s ease-in-out infinite; }
+.auth-enter { animation: ui-enter 420ms var(--ease-out) both; }
+@media (prefers-reduced-motion: reduce) {
+  .signal-ring, .signal-core, .auth-enter { animation: none; stroke-dasharray: none; }
 }
 
 /* Hide number-input spinners; users type values directly */

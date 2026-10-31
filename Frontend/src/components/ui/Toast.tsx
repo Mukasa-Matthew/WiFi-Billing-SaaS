@@ -48,7 +48,7 @@ const icons = {
   error: <XCircle className="h-4 w-4 text-red-600" />,
   warning: <Warning className="h-4 w-4 text-amber-600" />,
   info: <Info className="h-4 w-4 text-blue-600" />,
-  loading: <CircleNotch className="h-4 w-4 animate-spin text-[var(--fg-muted)] motion-reduce:animate-none" />,
+  loading: <CircleNotch className="h-4 w-4 text-[var(--fg-muted)] motion-reduce:animate-none" />,
 };
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {

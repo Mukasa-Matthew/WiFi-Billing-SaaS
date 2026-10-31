@@ -162,7 +162,7 @@ export default function WalletPage() {
             { label: "Status", render: (w: Withdrawal) => (
               <span>
                 <Badge tone={STATUS_TONE[w.status] || "slate"}>{w.status.replaceAll("_", " ")}</Badge>
-                {w.failureReason && <div className="mt-1 text-[11px] text-red-500">{w.failureReason}</div>}
+                {w.failureReason && <div className="mt-1 text-[11px] text-red-700">{w.failureReason}</div>}
               </span>
             )},
             { label: "", render: (w: Withdrawal) => (

@@ -12,7 +12,7 @@ import { User, Stack, Money } from "@/components/icons";
 interface Plan { id: number; name: string; price: number; sessionTimeout: number; availability: string }
 interface Router { id: number; name: string }
 
-const req = <span className="text-red-500">*</span>;
+const req = <span className="text-red-700">*</span>;
 const METHODS = [["CASH", "Cash"], ["MTN", "MTN Mobile Money"], ["AIRTEL", "Airtel Money"], ["BANK", "Bank"], ["OTHER", "Other"]] as const;
 
 /** "1 day", "7 days", "3 hours" from a package's session length in seconds. */

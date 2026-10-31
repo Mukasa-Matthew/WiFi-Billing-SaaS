@@ -11,7 +11,7 @@ import { Money, CellTower } from "@/components/icons";
 interface RouterRec{id:number;name:string}
 interface Plan{id:number;name:string;price:number;sessionTimeout:number}
 interface Host{address?:string;"mac-address"?:string;"host-name"?:string}
-const req=<span className="text-red-500"> *</span>;
+const req=<span className="text-red-700"> *</span>;
 
 export default function Page(){
  const nav=useRouter();

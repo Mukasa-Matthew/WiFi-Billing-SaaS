@@ -91,7 +91,7 @@ function AssetBox({ title, hintText, has, uploading, onPick, onRemove, inputRef 
       <label className={label}>{title}</label>
       <button type="button" onClick={() => inputRef.current?.click()} disabled={uploading}
         className="flex h-24 w-full flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-[var(--border-strong)] bg-[var(--subtle)] text-xs text-[var(--fg-muted)] transition hover:border-blue-400 hover:bg-blue-50/40">
-        {uploading ? <CircleNotch size={18} className="animate-spin text-blue-600" /> : <CloudArrowDown size={20} className="text-[var(--fg-faint)]" />}
+        {uploading ? <CircleNotch size={18} className="text-blue-600" /> : <CloudArrowDown size={20} className="text-[var(--fg-faint)]" />}
         {has ? "Replace image" : <>Drag &amp; drop or <span className="font-semibold text-[var(--accent-text)]">Browse</span></>}
       </button>
       <input ref={inputRef} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" className="hidden"
@@ -159,7 +159,7 @@ function EmailChange({ currentEmail, onChanged }: { currentEmail: string; onChan
       </div>
       <p className={hint}>Sign-in email — also where withdrawal and password-reset codes are sent.</p>
 
-      {msg && !open && <p className={`mt-2 text-xs font-medium ${msg.kind === "ok" ? "text-emerald-600" : "text-red-500"}`}>{msg.text}</p>}
+      {msg && !open && <p className={`mt-2 text-xs font-medium ${msg.kind === "ok" ? "text-emerald-600" : "text-red-700"}`}>{msg.text}</p>}
 
       {open && (
         <div className="mt-3 max-w-md space-y-3 rounded-xl border border-[var(--border)] bg-[var(--subtle)] p-4">
@@ -173,10 +173,10 @@ function EmailChange({ currentEmail, onChanged }: { currentEmail: string; onChan
               <label className="mb-1 block text-xs font-semibold text-[var(--fg)]">Verification code</label>
               <input inputMode="numeric" maxLength={6} value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
                 placeholder="6-digit code" className={`${field} font-mono tracking-widest`} />
-              {devCode && <p className="mt-1 text-xs text-amber-500">Dev mode — code: {devCode}</p>}
+              {devCode && <p className="mt-1 text-xs text-amber-700">Dev mode — code: {devCode}</p>}
             </div>
           )}
-          {msg && <p className={`text-xs font-medium ${msg.kind === "ok" ? "text-emerald-600" : "text-red-500"}`}>{msg.text}</p>}
+          {msg && <p className={`text-xs font-medium ${msg.kind === "ok" ? "text-emerald-600" : "text-red-700"}`}>{msg.text}</p>}
           <div className="flex items-center gap-2">
             {!sent ? (
               <button type="button" disabled={busy || !newEmail} onClick={sendCode}
@@ -310,7 +310,7 @@ export default function TenantSettingsPage() {
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-[var(--fg)]">Settings</h1>
+        <h1 className="text-[1.65rem] font-bold leading-tight tracking-[-0.02em] text-[var(--fg)]">Settings</h1>
         <p className="mt-1 text-sm text-[var(--fg-muted)]">
           Branding, portal behavior, voucher defaults, and notifications for your hotspot business.
         </p>
@@ -521,7 +521,7 @@ export default function TenantSettingsPage() {
                       )}
                       {previewLoading && (
                         <div className="absolute inset-0 flex items-center justify-center bg-[var(--canvas)] text-xs text-[var(--fg-muted)]">
-                          <CircleNotch size={16} className="mr-2 animate-spin" />Rendering preview…
+                          <CircleNotch size={16} className="mr-2 " />Rendering preview…
                         </div>
                       )}
                     </div>
@@ -593,7 +593,7 @@ export default function TenantSettingsPage() {
 
         <div className="flex items-center gap-4">
           <button disabled={saving} className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50">
-            {saving ? <CircleNotch size={16} className="animate-spin" /> : <FloppyDisk size={16} />}
+            {saving ? <CircleNotch size={16} className="" /> : <FloppyDisk size={16} />}
             <BusyLabel busy={saving} label="Saving…">Save settings</BusyLabel>
           </button>
           {saved && <span className="flex items-center gap-1.5 text-sm text-emerald-700"><CheckCircle size={15} />Saved</span>}
