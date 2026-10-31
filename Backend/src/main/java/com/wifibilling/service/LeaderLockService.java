@@ -46,6 +46,7 @@ public class LeaderLockService {
     public static final String JOB_VOUCHER_EXPIRATION   = "VOUCHER_EXPIRATION";
     public static final String JOB_SUBSCRIPTION_SWEEP   = "SUBSCRIPTION_SWEEP";
     public static final String JOB_PLATFORM_EARNINGS    = "PLATFORM_EARNINGS";
+    public static final String JOB_WITHDRAWAL_RECHECK   = "WITHDRAWAL_RECHECK";
     public static final String JOB_TELEMETRY_SWEEP      = "TELEMETRY_SWEEP";
     public static final String JOB_NOC_INCIDENT         = "NOC_INCIDENT";
     public static final String JOB_WIREGUARD_SYNC       = "WIREGUARD_SYNC";

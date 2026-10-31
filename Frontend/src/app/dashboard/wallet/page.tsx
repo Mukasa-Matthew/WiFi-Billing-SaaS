@@ -13,6 +13,7 @@ interface WalletSummary {
   totalCollected: number; totalFees: number; totalWithdrawn: number;
   currency: string; openWithdrawals: number;
   limits: { min: number; max: number; approvalRequired: boolean; livePayouts: boolean; feePercent: number };
+  maxWithdrawable: number;
 }
 interface LedgerEntry {
   id: number; type: string; amount: number;
@@ -50,6 +51,9 @@ const maxWithdrawable = (available: number, limit: number, percent: number) => {
   while (a > 0 && a + estimateFee(a, percent) > available) a--;
   return Math.max(0, a);
 };
+/** Opaque per-attempt key: the server returns the original withdrawal for a repeat. */
+const newIdempotencyKey = () =>
+  globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
 const shortRef = (ref: string) => `WD-${ref.replaceAll("-", "").slice(0, 8).toUpperCase()}`;
 
 export default function WalletPage() {
@@ -66,8 +70,18 @@ export default function WalletPage() {
   const [otpBusy, setOtpBusy] = useState(false);
   const toast = useToast();
   const { confirm, dialog } = useConfirmDialog();
+  // One key per withdrawal attempt: a retry after a dropped response reuses it, so it
+  // can never create a second payout; it is replaced once the request succeeds.
+  const [idempotencyKey, setIdempotencyKey] = useState("");
   const feePercent = summary?.limits.feePercent ?? 3;
-  const maxAmount = maxWithdrawable(Math.max(0, summary?.available ?? 0), summary?.limits.max ?? 0, feePercent);
+  const available = Math.max(0, summary?.available ?? 0);
+  const maxAmount = summary?.maxWithdrawable ?? maxWithdrawable(available, summary?.limits.max ?? 0, feePercent);
+  const requested = Number(amount) || 0;
+  const requestedFee = requested > 0 ? estimateFee(requested, feePercent) : 0;
+  const overBalance = requested > 0 && requested + requestedFee > available;
+  const underMinimum = requested > 0 && requested < (summary?.limits.min ?? 0);
+  const canWithdraw = !!summary && maxAmount >= summary.limits.min;
+  const openWithdraw = () => { setIdempotencyKey(newIdempotencyKey()); setFormError(""); setOpen(true); };
 
   const loadSummary = useCallback(async () => {
     try { setSummary((await api.get<WalletSummary>("/api/wallet")).data); } catch { /* keep stale */ }
@@ -89,7 +103,9 @@ export default function WalletPage() {
     e.preventDefault();
     setBusy(true); setFormError("");
     try {
-      await api.post("/api/wallet/withdrawals", { amount: Number(amount), phone, otp });
+      await api.post("/api/wallet/withdrawals", { amount: requested, phone, otp },
+        { headers: { "Idempotency-Key": idempotencyKey } });
+      setIdempotencyKey("");
       setOpen(false); setAmount(""); setPhone(""); setOtp(""); setOtpSent(false);
       toast("success", "Withdrawal request submitted for processing.");
       refreshAll();
@@ -111,8 +127,8 @@ export default function WalletPage() {
     <div className="space-y-6">
       {dialog}
       <PageHeader title="Wallet" description="Earnings collected through the platform payment gateway. Payments made through your own payment gateway account settle directly to your wallet there." action={
-        <button className={`${button} w-full sm:w-auto`} onClick={() => setOpen(true)}
-          disabled={!summary || summary.available <= 0}>
+        <button className={`${button} w-full sm:w-auto`} onClick={openWithdraw} disabled={!canWithdraw}
+          title={summary && !canWithdraw ? `Your balance must cover at least ${money(summary.limits.min)} plus the ${feePercent}% gateway fee.` : undefined}>
           <ArrowDown size={15} /> Withdraw
         </button>
       } />
@@ -217,9 +233,19 @@ export default function WalletPage() {
 
             <div className="mt-5">
               <label className={label}>Withdrawal amount (UGX)</label>
-              <input className={field} type="number" required min={summary?.limits.min} max={maxAmount}
-                value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="e.g. 50000" />
-              <p className={hint}>Between {money(summary?.limits.min)} and {money(maxAmount)}, leaving room for the {feePercent}% gateway fee.</p>
+              <input className={field} type="number" required min={summary?.limits.min}
+                value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="e.g. 50000"
+                aria-invalid={overBalance || underMinimum} aria-describedby="withdraw-amount-help" />
+              {overBalance ? (
+                <p id="withdraw-amount-help" role="alert" className="mt-1.5 text-xs text-red-700">
+                  {money(requested)} plus the {money(requestedFee)} gateway fee comes to {money(requested + requestedFee)}, which is more than your available {money(available)}.
+                  {maxAmount >= (summary?.limits.min ?? 0) && <> You can withdraw up to <button type="button" className="font-semibold underline" onClick={() => setAmount(String(maxAmount))}>{money(maxAmount)}</button>.</>}
+                </p>
+              ) : underMinimum ? (
+                <p id="withdraw-amount-help" role="alert" className="mt-1.5 text-xs text-red-700">The minimum withdrawal is {money(summary?.limits.min)}.</p>
+              ) : (
+                <p id="withdraw-amount-help" className={hint}>Between {money(summary?.limits.min)} and {money(maxAmount)}. A {feePercent}% gateway fee is taken from your balance on top of the amount.</p>
+              )}
             </div>
             <div className="mt-4">
               <label className={label}>Mobile money number</label>
@@ -260,7 +286,7 @@ export default function WalletPage() {
             )}
             <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <button type="button" className={buttonGhost} disabled={busy} onClick={() => setOpen(false)}>Cancel</button>
-              <button type="submit" className={button} disabled={busy || otpBusy || otp.length !== 6}>
+              <button type="submit" className={button} disabled={busy || otpBusy || otp.length !== 6 || overBalance || underMinimum || requested <= 0}>
                 <BusyLabel busy={busy} label="Submitting…">Request withdrawal</BusyLabel>
               </button>
             </div>

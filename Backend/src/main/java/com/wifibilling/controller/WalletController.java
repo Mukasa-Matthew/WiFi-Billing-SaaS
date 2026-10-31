@@ -37,7 +37,9 @@ public class WalletController {
             Long totalCollected, Long totalFees, Long totalWithdrawn,
             String currency,
             long openWithdrawals,
-            WithdrawalService.Limits limits
+            WithdrawalService.Limits limits,
+            /** Most that can be requested now: amount + estimated fee within available. */
+            long maxWithdrawable
     ) {}
 
     @GetMapping
@@ -48,7 +50,8 @@ public class WalletController {
                 WithdrawalRequest.PENDING_APPROVAL, WithdrawalRequest.PROCESSING).contains(r.getStatus())).count();
         return new WalletView(w.getAvailableBalance(), w.getPendingBalance(), w.getReservedBalance(),
                 w.getTotalCollected(), w.getTotalFees(), w.getTotalWithdrawn(),
-                w.getCurrency(), open, withdrawalService.limits());
+                w.getCurrency(), open, withdrawalService.limits(),
+                withdrawalService.maxWithdrawable(w.getAvailableBalance()));
     }
 
     public record LedgerView(Long id, String type, Long amount,
@@ -91,17 +94,25 @@ public class WalletController {
         return new OtpResponse(true, devCode);
     }
 
+    /**
+     * Idempotent per {@code Idempotency-Key}: resubmitting the same key (a retry after
+     * a dropped connection, a double tap) returns the original withdrawal — before the
+     * single-use OTP is checked — and never creates a second payout.
+     */
     @PostMapping("/withdrawals")
     public WithdrawalView requestWithdrawal(@AuthenticationPrincipal TenantPrincipal p,
+                                            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
                                             @RequestBody WithdrawalCreate req) {
         if (req == null || req.amount() == null || req.amount() <= 0) {
             throw new org.springframework.web.server.ResponseStatusException(
                     org.springframework.http.HttpStatus.BAD_REQUEST, "A positive amount is required");
         }
-        if (otpRequired) {
+        var earlier = withdrawalService.findByIdempotencyKey(p.getTenantId(), idempotencyKey);
+        if (earlier.isEmpty() && otpRequired) {
             otpService.verify(p.getEmail(), com.wifibilling.model.EmailOtp.PURPOSE_WITHDRAWAL, req.otp());
         }
-        return toView(withdrawalService.request(p.getTenantId(), req.amount(), req.phone()));
+        // A replay still goes through request(), which rejects a changed amount or number.
+        return toView(withdrawalService.request(p.getTenantId(), req.amount(), req.phone(), idempotencyKey));
     }
 
     @PostMapping("/withdrawals/{id}/cancel")

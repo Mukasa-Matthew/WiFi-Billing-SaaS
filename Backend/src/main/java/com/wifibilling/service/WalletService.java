@@ -117,6 +117,24 @@ public class WalletService {
                 delta > 0 ? "Payout fee above estimate" : "Payout fee below estimate — difference released");
     }
 
+    /**
+     * Settle a fee difference learned after the payout was already finalized (the
+     * provider's completion callback beat the dispatch response). The reserve is
+     * gone by then, so the difference moves available ↔ withdrawn directly.
+     * Never throws on balance; idempotent per externalRef.
+     */
+    @Transactional(propagation = Propagation.REQUIRED)
+    public void settleCompletedPayoutFee(Long tenantId, long delta, String externalRef, Long withdrawalId) {
+        if (delta == 0) return;
+        WalletAccount w = walletForUpdate(tenantId);
+        String type = delta > 0 ? WalletLedgerEntry.ADJUSTMENT_DEBIT : WalletLedgerEntry.ADJUSTMENT_CREDIT;
+        if (ledgerRepository.existsByWalletIdAndTypeAndExternalRef(w.getId(), type, externalRef)) return;
+        w.setAvailableBalance(w.getAvailableBalance() - delta);
+        w.setTotalWithdrawn(w.getTotalWithdrawn() + delta);
+        record(w, type, Math.abs(delta), externalRef, null, withdrawalId,
+                delta > 0 ? "Payout fee above estimate" : "Payout fee below estimate — difference returned");
+    }
+
     /** Finalize a completed payout: reserved → gone. Idempotent per externalRef. */
     @Transactional(propagation = Propagation.REQUIRED)
     public boolean finalizeWithdrawal(Long tenantId, long totalDeduction, String externalRef, Long withdrawalId) {

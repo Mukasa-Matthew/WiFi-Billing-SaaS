@@ -68,6 +68,15 @@ public class WithdrawalRequest {
     @Builder.Default
     private String status = REQUESTED;
 
+    /** Client-supplied Idempotency-Key; unique per tenant (partial index in
+     *  deployment/database/03-withdrawal-idempotency.sql). */
+    @Column(length = 64)
+    private String idempotencyKey;
+
+    /** Set by the atomic dispatch claim just before the payout is sent; null means
+     *  it was never sent to the provider (or is a manual payout). */
+    private OffsetDateTime dispatchedAt;
+
     /** Admin who approved (null = auto-approved flow). */
     private Long approvedBy;
     private OffsetDateTime approvedAt;
