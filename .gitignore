@@ -57,3 +57,6 @@ deployment/final-rehearsal-run/
 *.sha256
 deploy-release-*.sh
 rollback-*.sh
+
+# Local investigation scripts; may hold credentials. Never commit.
+scratch/
