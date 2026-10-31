@@ -35,11 +35,18 @@ function subscribeMotion(cb: () => void) {
   return () => query.removeEventListener("change", cb);
 }
 
+function subscribeScroll(cb: () => void) {
+  window.addEventListener("scroll", cb, { passive: true });
+  return () => window.removeEventListener("scroll", cb);
+}
+
 export default function Landing() {
   const track = useRef<HTMLElement>(null);
   const [ready, setReady] = useState(false);
   const onReady = useCallback(() => setReady(true), []);
   const reduced = useSyncExternalStore(subscribeMotion, () => window.matchMedia(REDUCED).matches, () => false);
+  // Clear over the hero; a solid backdrop once content can pass underneath.
+  const scrolled = useSyncExternalStore(subscribeScroll, () => window.scrollY > 8, () => false);
 
   useGSAP(() => {
     const timeline = gsap.timeline({
@@ -56,7 +63,7 @@ export default function Landing() {
 
   return (
     <div className="bg-[#08282E] text-white">
-      <header className="fixed inset-x-0 top-0 z-30 flex h-[4.5rem] items-center justify-between px-5 sm:px-10">
+      <header className={`fixed inset-x-0 top-0 z-30 flex h-[4.5rem] items-center justify-between border-b px-5 transition-[background-color,border-color] duration-300 sm:px-10 ${scrolled ? "border-white/10 bg-[#08282E]/95 backdrop-blur-md" : "border-transparent bg-transparent"}`}>
         <Link href="/" aria-label="AirPairy home" className="flex min-h-11 items-center gap-2.5">
           <LogoMark className="h-8 w-8" dot="#37E2C4" />
           <span className="font-display text-xl font-bold tracking-[-0.03em]">AirPairy</span>
