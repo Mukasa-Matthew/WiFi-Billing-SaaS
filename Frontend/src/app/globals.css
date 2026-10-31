@@ -368,8 +368,8 @@ button > svg, a > svg { transition: transform 240ms var(--ease-spring); }
 .landing-title { font-size: clamp(1.6rem, min(9.2vw, 5.4vh), 3.7rem); }
 .landing-body { font-size: clamp(0.8rem, 1.9vh, 1.05rem); }
 @media (min-aspect-ratio: 1/1) {
-  .landing-stage { inset: 0 0 0 42%; }
-  .landing-copy { align-items: center; padding-top: 3.5rem; }
+  .landing-stage { inset: 4.5rem 0 0 42%; }
+  .landing-copy { align-items: center; padding-top: 4.5rem; }
   .landing-text { width: 40%; max-width: none; }
   .landing-title { font-size: clamp(1.45rem, min(3.9vw, 9vh), 3.7rem); }
 }
