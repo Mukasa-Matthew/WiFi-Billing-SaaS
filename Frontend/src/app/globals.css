@@ -259,3 +259,16 @@ input[type="number"] {
   -moz-appearance: textfield;
   appearance: textfield;
 }
+
+/* Landing: the 3D router and the story text get separate areas so they never overlap.
+   Stacked on tall screens, side by side once the viewport is at least square. */
+.landing-stage { position: absolute; inset: 47% 0 0 0; }
+.landing-copy { align-items: flex-start; padding-top: 5.5rem; }
+.landing-title { font-size: clamp(1.6rem, min(9.2vw, 5.4vh), 3.7rem); }
+.landing-body { font-size: clamp(0.8rem, 1.9vh, 1.05rem); }
+@media (min-aspect-ratio: 1/1) {
+  .landing-stage { inset: 4.5rem 0 0 42%; }
+  .landing-copy { align-items: center; padding-top: 4.5rem; }
+  .landing-text { width: 40%; max-width: none; }
+  .landing-title { font-size: clamp(1.45rem, min(3.9vw, 9vh), 3.7rem); }
+}
