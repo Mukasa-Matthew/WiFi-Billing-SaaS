@@ -61,6 +61,12 @@ export default function AdminFinancePage() {
   const [wdBusy, setWdBusy] = useState(false);
   const [wdErr, setWdErr] = useState("");
   const [reconBusy, setReconBusy] = useState(false);
+  const [extWallet, setExtWallet] = useState<WalletRow | null>(null);
+  const [extAmount, setExtAmount] = useState("");
+  const [extNote, setExtNote] = useState("");
+  const [extPassword, setExtPassword] = useState("");
+  const [extBusy, setExtBusy] = useState(false);
+  const [extErr, setExtErr] = useState("");
   const toast = useToast();
   const { confirm, dialog: confirmationDialog } = useConfirmDialog();
 
@@ -99,6 +105,26 @@ export default function AdminFinancePage() {
       await load();
     } catch (err) { setWdErr(message(err)); }
     finally { setWdBusy(false); }
+  });
+
+  const openExternal = (w: WalletRow) => {
+    setExtWallet(w); setExtAmount(""); setExtNote(""); setExtPassword(""); setExtErr("");
+  };
+  const recordExternal = singleFlight(async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!extWallet) return;
+    setExtBusy(true); setExtErr("");
+    try {
+      const res = await api.post<{ reconcileStatus: string }>(`/api/admin/finance/wallets/${extWallet.tenantId}/external-withdrawals`, {
+        amount: Number(extAmount), note: extNote, password: extPassword,
+      });
+      setExtWallet(null);
+      toast("success", res.data.reconcileStatus === "CLEAN"
+        ? `Recorded for ${extWallet.businessName}. Books now match the provider.`
+        : `Recorded for ${extWallet.businessName}. Reconciliation still shows a difference.`);
+      await load();
+    } catch (err) { setExtErr(message(err)); }
+    finally { setExtBusy(false); }
   });
 
   const exportCsv = () => {
@@ -176,7 +202,7 @@ export default function AdminFinancePage() {
           {plat.reconcileStatus === "DISCREPANCY" && (
             <p className="flex items-start gap-2 rounded-lg border border-red-300 bg-red-50 p-4 text-sm font-medium text-red-800">
               <WarningCircle size={18} className="mt-0.5 shrink-0" />
-              <span><b>Reconciliation discrepancy.</b> {plat.reconcileNote} Payouts are blocked until this is resolved.</span>
+              <span><b>Reconciliation discrepancy.</b> {plat.reconcileNote} Platform payouts and tenant withdrawals are paused until this is resolved. If a tenant was paid without the app recording it, use Record missing withdrawal under Tenant wallets.</span>
             </p>
           )}
           {plat.balanceStale && (
@@ -333,6 +359,12 @@ export default function AdminFinancePage() {
             { label: "Reserved", render: (w: WalletRow) => <span className="text-[var(--fg-muted)]">{money(w.reserved)}</span> },
             { label: "Collected", render: (w: WalletRow) => <span className="text-[var(--fg-muted)]">{money(w.totalCollected)}</span> },
             { label: "Withdrawn", render: (w: WalletRow) => <span className="text-[var(--fg-muted)]">{money(w.totalWithdrawn)}</span> },
+            { label: "", align: "right", render: (w: WalletRow) => (
+              <button className={`${buttonGhost} !h-8 !px-3 !text-xs whitespace-nowrap`} disabled={w.available <= 0} onClick={() => openExternal(w)}
+                title="Record money already paid to this tenant that the app has no record of">
+                Record missing withdrawal
+              </button>
+            )},
           ]}
         />
       </div>
@@ -367,6 +399,40 @@ export default function AdminFinancePage() {
               <button type="button" className={buttonGhost} disabled={wdBusy} onClick={() => setWdOpen(false)}>Cancel</button>
               <button type="submit" className={button} disabled={wdBusy}>
                 <BusyLabel busy={wdBusy} label="Processing…">Withdraw</BusyLabel>
+              </button>
+            </div>
+          </form>
+        </Dialog>
+      )}
+
+      {extWallet && (
+        <Dialog title="Record missing withdrawal" description={`For money already paid to ${extWallet.businessName} that the app has no record of, such as a MarzPay dashboard withdrawal. No money is sent.`} onClose={() => { if (!extBusy) setExtWallet(null); }}>
+          <form onSubmit={recordExternal}>
+            <dl className="space-y-1.5 rounded-lg bg-[var(--subtle)] p-3 text-xs">
+              <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Tenant available balance</dt><dd className="font-semibold">{money(extWallet.available)}</dd></div>
+              {plat && plat.reconcileStatus === "DISCREPANCY" && <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Reconciliation</dt><dd className="text-right font-semibold text-red-700">{plat.reconcileNote}</dd></div>}
+            </dl>
+            <div className="mt-4">
+              <label className={label}>Amount taken from the wallet (UGX)</label>
+              <input className={field} type="number" required min="1" max={extWallet.available}
+                value={extAmount} onChange={(e) => setExtAmount(e.target.value)} />
+              <p className={hint}>Include the MarzPay fee if it should come out of this tenant&apos;s balance.</p>
+            </div>
+            <div className="mt-4">
+              <label className={label}>Note</label>
+              <input className={field} maxLength={255} value={extNote} onChange={(e) => setExtNote(e.target.value)}
+                placeholder="e.g. MarzPay dashboard withdrawal, 31 Oct 12:16" />
+            </div>
+            <div className="mt-4">
+              <label className={label}>Confirm your admin password</label>
+              <input className={field} type="password" required value={extPassword}
+                onChange={(e) => setExtPassword(e.target.value)} autoComplete="current-password" />
+            </div>
+            {extErr && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{extErr}</p>}
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button type="button" className={buttonGhost} disabled={extBusy} onClick={() => setExtWallet(null)}>Cancel</button>
+              <button type="submit" className={button} disabled={extBusy}>
+                <BusyLabel busy={extBusy} label="Recording…">Record withdrawal</BusyLabel>
               </button>
             </div>
           </form>

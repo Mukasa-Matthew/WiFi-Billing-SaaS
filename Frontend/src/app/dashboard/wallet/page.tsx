@@ -12,7 +12,7 @@ interface WalletSummary {
   available: number; pending: number; reserved: number;
   totalCollected: number; totalFees: number; totalWithdrawn: number;
   currency: string; openWithdrawals: number;
-  limits: { min: number; max: number; approvalRequired: boolean; livePayouts: boolean };
+  limits: { min: number; max: number; approvalRequired: boolean; livePayouts: boolean; feePercent: number };
 }
 interface LedgerEntry {
   id: number; type: string; amount: number;
@@ -33,6 +33,8 @@ const LEDGER_LABEL: Record<string, { name: string; tone: string }> = {
   WITHDRAWAL_RELEASE: { name: "Released", tone: "slate" },
   ADJUSTMENT_CREDIT: { name: "Adjustment +", tone: "green" },
   ADJUSTMENT_DEBIT: { name: "Adjustment −", tone: "red" },
+  EXTERNAL_WITHDRAWAL: { name: "Paid out (recorded by admin)", tone: "blue" },
+  RESERVE_CORRECTION: { name: "Reserve correction", tone: "slate" },
 };
 const STATUS_TONE: Record<string, string> = {
   COMPLETED: "green", PROCESSING: "blue", PENDING_APPROVAL: "amber",
@@ -41,7 +43,13 @@ const STATUS_TONE: Record<string, string> = {
 const money = (v?: number | null) => `UGX ${(v ?? 0).toLocaleString()}`;
 const OPEN_STATUSES = ["REQUESTED", "PENDING_APPROVAL", "PROCESSING"];
 // Mirrors WithdrawalService.estimateFee — actual charge is set by the provider and reconciled.
-const estimateFee = (amount: number) => Math.max(500, Math.round(amount * 0.01));
+const estimateFee = (amount: number, percent: number) => Math.max(500, Math.ceil((amount * percent) / 100));
+/** Largest amount whose amount + fee still fits in the available balance. */
+const maxWithdrawable = (available: number, limit: number, percent: number) => {
+  let a = Math.min(limit, Math.floor((available * 100) / (100 + percent)));
+  while (a > 0 && a + estimateFee(a, percent) > available) a--;
+  return Math.max(0, a);
+};
 const shortRef = (ref: string) => `WD-${ref.replaceAll("-", "").slice(0, 8).toUpperCase()}`;
 
 export default function WalletPage() {
@@ -58,6 +66,8 @@ export default function WalletPage() {
   const [otpBusy, setOtpBusy] = useState(false);
   const toast = useToast();
   const { confirm, dialog } = useConfirmDialog();
+  const feePercent = summary?.limits.feePercent ?? 3;
+  const maxAmount = maxWithdrawable(Math.max(0, summary?.available ?? 0), summary?.limits.max ?? 0, feePercent);
 
   const loadSummary = useCallback(async () => {
     try { setSummary((await api.get<WalletSummary>("/api/wallet")).data); } catch { /* keep stale */ }
@@ -207,9 +217,9 @@ export default function WalletPage() {
 
             <div className="mt-5">
               <label className={label}>Withdrawal amount (UGX)</label>
-              <input className={field} type="number" required min={summary?.limits.min} max={Math.min(summary?.limits.max || 0, summary?.available || 0)}
+              <input className={field} type="number" required min={summary?.limits.min} max={maxAmount}
                 value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="e.g. 50000" />
-              <p className={hint}>Between {money(summary?.limits.min)} and {money(Math.min(summary?.limits.max || 0, summary?.available || 0))}.</p>
+              <p className={hint}>Between {money(summary?.limits.min)} and {money(maxAmount)}, leaving room for the {feePercent}% gateway fee.</p>
             </div>
             <div className="mt-4">
               <label className={label}>Mobile money number</label>
@@ -220,8 +230,8 @@ export default function WalletPage() {
             {Number(amount) >= (summary?.limits.min ?? Infinity) && (
               <dl className="mt-4 space-y-1.5 rounded-xl border border-[var(--border-soft)] bg-[var(--subtle)] px-4 py-3 text-xs">
                 <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Withdrawal amount</dt><dd className="font-semibold text-[var(--fg)]">{money(Number(amount))}</dd></div>
-                <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Estimated gateway fee</dt><dd className="text-[var(--fg-muted)]">-{money(estimateFee(Number(amount)))}</dd></div>
-                <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Deducted from wallet</dt><dd className="text-[var(--fg-muted)]">{money(Number(amount) + estimateFee(Number(amount)))}</dd></div>
+                <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Estimated gateway fee</dt><dd className="text-[var(--fg-muted)]">-{money(estimateFee(Number(amount), feePercent))}</dd></div>
+                <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Deducted from wallet</dt><dd className="text-[var(--fg-muted)]">{money(Number(amount) + estimateFee(Number(amount), feePercent))}</dd></div>
                 <div className="flex justify-between border-t border-[var(--border-soft)] pt-1.5"><dt className="font-semibold text-[var(--fg)]">You will receive</dt><dd className="font-bold text-emerald-700">{money(Number(amount))}</dd></div>
               </dl>
             )}

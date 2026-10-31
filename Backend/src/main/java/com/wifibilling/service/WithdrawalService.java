@@ -34,6 +34,7 @@ public class WithdrawalService {
     private final MarzPayClient marzPay;
     private final PlatformProperties props;
     private final TenantRepository tenantRepository;
+    private final PlatformEarningsService platformEarnings;
 
     @Value("${withdrawals.require-approval:true}")
     private boolean requireApproval;
@@ -45,12 +46,14 @@ public class WithdrawalService {
     private long maxAmount;
     @Value("${withdrawals.max-open-per-tenant:1}")
     private long maxOpenPerTenant;
+    @Value("${withdrawals.fee-percent:3}")
+    private long feePercent;
 
     public boolean approvalRequired() { return requireApproval; }
     public boolean livePayoutsEnabled() { return livePayoutsEnabled; }
 
-    public record Limits(long min, long max, boolean approvalRequired, boolean livePayouts) {}
-    public Limits limits() { return new Limits(minAmount, maxAmount, requireApproval, livePayoutsEnabled); }
+    public record Limits(long min, long max, boolean approvalRequired, boolean livePayouts, long feePercent) {}
+    public Limits limits() { return new Limits(minAmount, maxAmount, requireApproval, livePayoutsEnabled, feePercent); }
 
     @Transactional(readOnly = true)
     public List<WithdrawalRequest> list(Long tenantId) {
@@ -72,6 +75,8 @@ public class WithdrawalService {
                 List.of(WithdrawalRequest.REQUESTED, WithdrawalRequest.PENDING_APPROVAL, WithdrawalRequest.PROCESSING)) >= maxOpenPerTenant) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "You already have a withdrawal in progress");
         }
+
+        requireReconciledProvider();
 
         Tenant tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tenant not found"));
@@ -99,9 +104,21 @@ public class WithdrawalService {
         return w;
     }
 
-    private long estimateFee(long amount) {
-        // Conservative buffer: real charge is set from the provider's response.
-        return Math.max(500, Math.round(amount * 0.01));
+    /**
+     * Every tenant payout draws on the one shared platform MarzPay balance. While
+     * that balance disagrees with our books (e.g. money taken out on the MarzPay
+     * dashboard), a payout could spend another tenant's money — so none go out.
+     */
+    private void requireReconciledProvider() {
+        if (PlatformEarningsAccount.RECON_DISCREPANCY.equals(platformEarnings.account().getReconcileStatus())) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "Withdrawals are temporarily paused while platform balances are being reconciled. Please try again later.");
+        }
+    }
+
+    long estimateFee(long amount) {
+        // Must cover the real charge: any shortfall is settled after the money has left.
+        return Math.max(500, (amount * feePercent + 99) / 100);
     }
 
     /** Admin (or auto) approval → attempts the payout. */
@@ -112,6 +129,7 @@ public class WithdrawalService {
         if (!WithdrawalRequest.PENDING_APPROVAL.equals(w.getStatus()) && !WithdrawalRequest.REQUESTED.equals(w.getStatus())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Withdrawal is not awaiting approval");
         }
+        requireReconciledProvider();
         w.setApprovedBy(adminId);
         w.setApprovedAt(OffsetDateTime.now());
         if (!livePayoutsEnabled) {
@@ -137,12 +155,12 @@ public class WithdrawalService {
                     ? res.path("data").path("disbursement") : res.path("data").path("withdrawal");
             var charge = wd.path("charge").path("raw");
             if (charge.isNumber() && charge.longValue() != w.getFee()) {
-                // Reconcile reservation to the actual provider charge.
+                // Reconcile the reservation to the actual provider charge. The money has
+                // already gone out, so nothing here may throw and roll the request back.
                 long delta = charge.longValue() - w.getFee();
                 w.setFee(charge.longValue());
                 w.setTotalDeduction(w.getAmount() + w.getFee());
-                if (delta != 0) walletService.adjust(w.getTenant().getId(), -delta, "FEEADJ:" + w.getPayoutRef(),
-                        "Payout fee reconciliation");
+                walletService.adjustReservation(w.getTenant().getId(), delta, "FEEADJ:" + w.getPayoutRef(), w.getId());
             }
         } catch (MarzPayClient.MarzPayException e) {
             // A timeout/5xx might still have created the payout — do NOT retry blindly.

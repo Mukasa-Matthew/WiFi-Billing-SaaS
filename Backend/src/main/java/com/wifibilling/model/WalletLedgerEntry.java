@@ -31,6 +31,8 @@ public class WalletLedgerEntry {
     public static final String WITHDRAWAL_RESERVE = "WITHDRAWAL_RESERVE";     // available → reserved hold
     public static final String WITHDRAWAL_DEBIT = "WITHDRAWAL_DEBIT";         // payout completed: reserved → gone
     public static final String ADJUSTMENT_DEBIT = "ADJUSTMENT_DEBIT";         // authorized admin debit
+    public static final String EXTERNAL_WITHDRAWAL = "EXTERNAL_WITHDRAWAL";   // paid out directly from the provider, recorded by an admin
+    public static final String RESERVE_CORRECTION = "RESERVE_CORRECTION";     // one-off: stranded reserve cleared, available unchanged
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

@@ -28,6 +28,7 @@ public class AdminFinanceController {
     private final TransactionRepository transactions;
     private final WalletAccountRepository wallets;
     private final WithdrawalService withdrawalService;
+    private final com.wifibilling.service.WalletService walletService;
     private final GatewayConfigService gatewayConfig;
     private final MarzPayClient marzPay;
     private final TenantRepository tenantRepository;
@@ -90,6 +91,31 @@ public class AdminFinanceController {
     public record AdminWithdrawalRow(Long id, Long tenantId, String businessName, Long amount, Long fee,
                                      Long totalDeduction, String phone, String status,
                                      String failureReason, String createdAt) {}
+
+    public record ExternalWithdrawalRequest(Long amount, String note, String password) {}
+
+    /**
+     * Records money already paid to a tenant outside the app (straight from the
+     * MarzPay dashboard) against their wallet, then re-reconciles so the provider
+     * shortfall it caused clears. Step-up auth: moves a tenant's balance.
+     */
+    @PostMapping("/wallets/{tenantId}/external-withdrawals")
+    public Map<String, Object> recordExternalWithdrawal(@PathVariable Long tenantId,
+                                                        @RequestBody ExternalWithdrawalRequest req,
+                                                        @org.springframework.security.core.annotation.AuthenticationPrincipal
+                                                        com.wifibilling.security.TenantPrincipal principal) {
+        if (req == null || req.amount() == null || req.amount() <= 0) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST, "A positive amount is required");
+        }
+        requireAdminPassword(principal, req.password());
+        String note = req.note() == null || req.note().isBlank()
+                ? "Withdrawn outside the app (recorded by admin)"
+                : req.note().trim().substring(0, Math.min(req.note().trim().length(), 255));
+        walletService.recordExternalWithdrawal(tenantId, req.amount(), "EXT:" + java.util.UUID.randomUUID(), note);
+        var recon = platformEarnings.reconcile();
+        return Map.of("reconcileStatus", recon.getStatus(), "available", walletService.wallet(tenantId).getAvailableBalance());
+    }
 
     @GetMapping("/withdrawals")
     public List<AdminWithdrawalRow> withdrawals(@RequestParam(defaultValue = "") String status,
@@ -206,14 +232,18 @@ public class AdminFinanceController {
             throw new org.springframework.web.server.ResponseStatusException(
                     org.springframework.http.HttpStatus.BAD_REQUEST, "amount and phone are required");
         }
+        requireAdminPassword(principal, req.password());
+        var p = platformEarnings.requestPayout(req.amount(), req.phone(), principal.getTenantId());
+        return Map.of("id", p.getId(), "status", p.getStatus(), "payoutRef", p.getPayoutRef());
+    }
+
+    private void requireAdminPassword(com.wifibilling.security.TenantPrincipal principal, String password) {
         var admin = tenantRepository.findById(principal.getTenantId())
                 .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
                         org.springframework.http.HttpStatus.UNAUTHORIZED, "Admin not found"));
-        if (req.password() == null || !passwordEncoder.matches(req.password(), admin.getPasswordHash())) {
+        if (password == null || !passwordEncoder.matches(password, admin.getPasswordHash())) {
             throw new org.springframework.web.server.ResponseStatusException(
                     org.springframework.http.HttpStatus.FORBIDDEN, "Incorrect password");
         }
-        var p = platformEarnings.requestPayout(req.amount(), req.phone(), principal.getTenantId());
-        return Map.of("id", p.getId(), "status", p.getStatus(), "payoutRef", p.getPayoutRef());
     }
 }

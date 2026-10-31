@@ -94,6 +94,29 @@ public class WalletService {
                 "Funds reserved for payout");
     }
 
+    /**
+     * Settle the gap between the estimated and the provider's actual payout fee by
+     * moving it between available and reserved, so finalize later clears exactly
+     * totalDeduction. Runs after the money has already left, so it never throws on
+     * balance: a fee above available leaves the tenant owing it (negative available).
+     * Idempotent per externalRef.
+     */
+    @Transactional(propagation = Propagation.REQUIRED)
+    public void adjustReservation(Long tenantId, long delta, String externalRef, Long withdrawalId) {
+        if (delta == 0) return;
+        WalletAccount w = walletForUpdate(tenantId);
+        String type = delta > 0 ? WalletLedgerEntry.WITHDRAWAL_RESERVE : WalletLedgerEntry.WITHDRAWAL_RELEASE;
+        if (ledgerRepository.existsByWalletIdAndTypeAndExternalRef(w.getId(), type, externalRef)) return;
+        if (delta > 0 && w.getAvailableBalance() < delta) {
+            log.warn("Payout fee for {} exceeds tenant {} available balance by {}", externalRef, tenantId,
+                    delta - w.getAvailableBalance());
+        }
+        w.setAvailableBalance(w.getAvailableBalance() - delta);
+        w.setReservedBalance(w.getReservedBalance() + delta);
+        record(w, type, Math.abs(delta), externalRef, null, withdrawalId,
+                delta > 0 ? "Payout fee above estimate" : "Payout fee below estimate — difference released");
+    }
+
     /** Finalize a completed payout: reserved → gone. Idempotent per externalRef. */
     @Transactional(propagation = Propagation.REQUIRED)
     public boolean finalizeWithdrawal(Long tenantId, long totalDeduction, String externalRef, Long withdrawalId) {
@@ -135,6 +158,27 @@ public class WalletService {
             w.setAvailableBalance(w.getAvailableBalance() - d);
             record(w, WalletLedgerEntry.ADJUSTMENT_DEBIT, d, externalRef, null, null, note);
         }
+    }
+
+    /**
+     * Record money already paid out to the tenant outside the app (e.g. straight
+     * from the MarzPay dashboard): available → gone, counted as withdrawn.
+     * Idempotent per externalRef.
+     */
+    @Transactional(propagation = Propagation.REQUIRED)
+    public boolean recordExternalWithdrawal(Long tenantId, long amount, String externalRef, String note) {
+        if (amount <= 0) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A positive amount is required");
+        WalletAccount w = walletForUpdate(tenantId);
+        if (ledgerRepository.existsByWalletIdAndTypeAndExternalRef(w.getId(),
+                WalletLedgerEntry.EXTERNAL_WITHDRAWAL, externalRef)) return false;
+        if (w.getAvailableBalance() < amount) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Amount exceeds the tenant's available balance of UGX " + w.getAvailableBalance());
+        }
+        w.setAvailableBalance(w.getAvailableBalance() - amount);
+        w.setTotalWithdrawn(w.getTotalWithdrawn() + amount);
+        record(w, WalletLedgerEntry.EXTERNAL_WITHDRAWAL, amount, externalRef, null, null, note);
+        return true;
     }
 
     @Transactional(readOnly = true)
