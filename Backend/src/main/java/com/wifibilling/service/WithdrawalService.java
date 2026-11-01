@@ -77,22 +77,47 @@ public class WithdrawalService {
     private long maxAmount;
     @Value("${withdrawals.max-open-per-tenant:1}")
     private long maxOpenPerTenant;
-    /** The provider's payout fee isn't known until it has been paid (observed: 3%, but
-     *  10% on some amounts), so a generous buffer is held and the unused part returned. */
-    @Value("${withdrawals.fee-reserve-percent:10}")
-    private long feeReservePercent;
-    @Value("${withdrawals.fee-reserve-min:1000}")
-    private long feeReserveMin;
+    /** MarzPay's flat payout fee per amount band; ascending, non-overlapping. */
+    private List<FeeTier> feeTiers = parseFeeTiers(DEFAULT_FEE_TIERS);
     @Value("${withdrawals.recheck-after-seconds:120}")
     private long recheckAfterSeconds;
 
     public boolean approvalRequired() { return requireApproval; }
     public boolean livePayoutsEnabled() { return livePayoutsEnabled; }
 
-    public record Limits(long min, long max, boolean approvalRequired, boolean livePayouts,
-                         long feeReservePercent, long feeReserveMin) {}
+    /** MarzPay's published disbursement fees (flat per payout, by amount band). */
+    static final String DEFAULT_FEE_TIERS = "500-50000=1000,50001-300000=1500,300001-750000=2800,750001-5000000=5000";
+
+    public record FeeTier(long min, long max, long fee) {}
+
+    @Value("${withdrawals.fee-tiers:" + DEFAULT_FEE_TIERS + "}")
+    void setFeeTiers(String spec) { this.feeTiers = parseFeeTiers(spec); }
+
+    /** Parses "min-max=fee,..." (UGX); fails fast on a malformed or overlapping table. */
+    static List<FeeTier> parseFeeTiers(String spec) {
+        List<FeeTier> tiers = java.util.Arrays.stream(spec.split(","))
+                .map(String::trim).filter(t -> !t.isEmpty())
+                .map(t -> {
+                    String[] rangeFee = t.split("=");
+                    String[] range = rangeFee[0].split("-");
+                    return new FeeTier(Long.parseLong(range[0].trim()), Long.parseLong(range[1].trim()),
+                            Long.parseLong(rangeFee[1].trim()));
+                })
+                .sorted(java.util.Comparator.comparingLong(FeeTier::min))
+                .toList();
+        if (tiers.isEmpty()) throw new IllegalArgumentException("withdrawals.fee-tiers is empty");
+        for (int i = 0; i < tiers.size(); i++) {
+            FeeTier t = tiers.get(i);
+            if (t.min() > t.max() || t.fee() < 0 || (i > 0 && t.min() <= tiers.get(i - 1).max())) {
+                throw new IllegalArgumentException("Invalid withdrawals.fee-tiers entry: " + t);
+            }
+        }
+        return tiers;
+    }
+
+    public record Limits(long min, long max, boolean approvalRequired, boolean livePayouts, List<FeeTier> feeTiers) {}
     public Limits limits() {
-        return new Limits(minAmount, maxAmount, requireApproval, livePayoutsEnabled, feeReservePercent, feeReserveMin);
+        return new Limits(minAmount, maxAmount, requireApproval, livePayoutsEnabled, feeTiers);
     }
 
     @Transactional(readOnly = true)
@@ -137,7 +162,7 @@ public class WithdrawalService {
                 if (withdrawals.countByTenantIdAndStatusIn(tenantId, OPEN) >= maxOpenPerTenant) {
                     throw new ResponseStatusException(HttpStatus.CONFLICT, "You already have a withdrawal in progress");
                 }
-                long fee = feeReserve(amount);
+                long fee = payoutFee(amount);
                 if (amount + fee > wallet.getAvailableBalance()) {
                     throw new ResponseStatusException(HttpStatus.CONFLICT,
                             insufficientBalanceMessage(amount, fee, wallet.getAvailableBalance()));
@@ -179,17 +204,19 @@ public class WithdrawalService {
         return earlier;
     }
 
-    /** Largest amount whose amount + fee reserve fits within {@code available}. */
+    /** Largest amount whose amount + payout fee fits within {@code available}. */
     public long maxWithdrawable(long available) {
-        if (available <= 0) return 0;
-        long a = Math.min(maxAmount, Math.floorDiv(available * 100, 100 + feeReservePercent));
-        while (a > 0 && a + feeReserve(a) > available) a--;
-        return Math.max(0, a);
+        long best = 0;
+        for (FeeTier t : feeTiers) {
+            long candidate = Math.min(Math.min(t.max(), maxAmount), available - t.fee());
+            if (candidate >= t.min() && candidate > best) best = candidate;
+        }
+        return best;
     }
 
-    String insufficientBalanceMessage(long amount, long reserve, long available) {
-        String msg = "Insufficient balance: " + ugx(amount) + " plus up to " + ugx(reserve)
-                + " held for the gateway fee comes to " + ugx(amount + reserve)
+    String insufficientBalanceMessage(long amount, long fee, long available) {
+        String msg = "Insufficient balance: " + ugx(amount) + " plus the " + ugx(fee)
+                + " withdrawal fee comes to " + ugx(amount + fee)
                 + ", but your available balance is " + ugx(available) + ".";
         long max = maxWithdrawable(available);
         return max >= minAmount
@@ -197,9 +224,16 @@ public class WithdrawalService {
                 : msg + " That isn't enough to cover the minimum withdrawal and its fee yet.";
     }
 
-    /** Held for the provider's fee on top of the amount; whatever the real fee doesn't use is returned. */
-    long feeReserve(long amount) {
-        return Math.max(feeReserveMin, (amount * feeReservePercent + 99) / 100);
+    /**
+     * MarzPay's flat fee for a payout of {@code amount}, held on top of it. The real
+     * charge from the provider still settles the books: an unused part is returned,
+     * and anything above it can never take the wallet below zero.
+     */
+    long payoutFee(long amount) {
+        for (FeeTier t : feeTiers) {
+            if (amount <= t.max()) return t.fee();
+        }
+        return feeTiers.get(feeTiers.size() - 1).fee();
     }
 
     /**
@@ -321,7 +355,7 @@ public class WithdrawalService {
             platformEarnings.absorbPayoutFeeShortfall(uncovered, ref,
                     "Payout fee above tenant balance (withdrawal " + w.getId() + ", tenant " + tenantId + ")");
             log.error("Payout {} fee {} exceeded the reserve and tenant {} balance; platform absorbed {}. "
-                    + "Raise withdrawals.fee-reserve-percent/min.", w.getPayoutRef(), actualFee, tenantId, uncovered);
+                    + "Check withdrawals.fee-tiers against MarzPay's current pricing.", w.getPayoutRef(), actualFee, tenantId, uncovered);
         }
         w.setFee(actualFee);
         // What the tenant actually paid: the amount plus the part of the fee they covered.

@@ -12,9 +12,10 @@ interface WalletSummary {
   available: number; pending: number; reserved: number;
   totalCollected: number; totalFees: number; totalWithdrawn: number;
   currency: string; openWithdrawals: number;
-  limits: { min: number; max: number; approvalRequired: boolean; livePayouts: boolean; feeReservePercent: number; feeReserveMin: number };
+  limits: { min: number; max: number; approvalRequired: boolean; livePayouts: boolean; feeTiers: FeeTier[] };
   maxWithdrawable: number;
 }
+interface FeeTier { min: number; max: number; fee: number }
 interface LedgerEntry {
   id: number; type: string; amount: number;
   availableAfter: number; pendingAfter: number; reservedAfter: number;
@@ -43,14 +44,13 @@ const STATUS_TONE: Record<string, string> = {
 };
 const money = (v?: number | null) => `UGX ${(v ?? 0).toLocaleString()}`;
 const OPEN_STATUSES = ["REQUESTED", "PENDING_APPROVAL", "PROCESSING"];
-// Mirrors WithdrawalService.feeReserve: held for the gateway fee, unused part returned.
-const feeReserve = (amount: number, percent: number, min: number) => Math.max(min, Math.ceil((amount * percent) / 100));
-/** Largest amount whose amount + fee reserve still fits in the available balance. */
-const maxWithdrawable = (available: number, limit: number, percent: number, min: number) => {
-  let a = Math.min(limit, Math.floor((available * 100) / (100 + percent)));
-  while (a > 0 && a + feeReserve(a, percent, min) > available) a--;
-  return Math.max(0, a);
-};
+// Mirrors WithdrawalService.payoutFee / maxWithdrawable: MarzPay's flat fee per amount band.
+const payoutFee = (amount: number, tiers: FeeTier[]) => (tiers.find((t) => amount <= t.max) ?? tiers[tiers.length - 1])?.fee ?? 0;
+const maxWithdrawable = (available: number, limit: number, tiers: FeeTier[]) =>
+  tiers.reduce((best, t) => {
+    const candidate = Math.min(t.max, limit, available - t.fee);
+    return candidate >= t.min && candidate > best ? candidate : best;
+  }, 0);
 /** Opaque per-attempt key: the server returns the original withdrawal for a repeat. */
 const newIdempotencyKey = () =>
   globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
@@ -73,12 +73,11 @@ export default function WalletPage() {
   // One key per withdrawal attempt: a retry after a dropped response reuses it, so it
   // can never create a second payout; it is replaced once the request succeeds.
   const [idempotencyKey, setIdempotencyKey] = useState("");
-  const feePercent = summary?.limits.feeReservePercent ?? 10;
-  const feeMin = summary?.limits.feeReserveMin ?? 1000;
+  const feeTiers = summary?.limits.feeTiers ?? [];
   const available = Math.max(0, summary?.available ?? 0);
-  const maxAmount = summary?.maxWithdrawable ?? maxWithdrawable(available, summary?.limits.max ?? 0, feePercent, feeMin);
+  const maxAmount = summary?.maxWithdrawable ?? maxWithdrawable(available, summary?.limits.max ?? 0, feeTiers);
   const requested = Number(amount) || 0;
-  const requestedFee = requested > 0 ? feeReserve(requested, feePercent, feeMin) : 0;
+  const requestedFee = requested > 0 ? payoutFee(requested, feeTiers) : 0;
   const overBalance = requested > 0 && requested + requestedFee > available;
   const underMinimum = requested > 0 && requested < (summary?.limits.min ?? 0);
   const canWithdraw = !!summary && maxAmount >= summary.limits.min;
@@ -129,7 +128,7 @@ export default function WalletPage() {
       {dialog}
       <PageHeader title="Wallet" description="Earnings collected through the platform payment gateway. Payments made through your own payment gateway account settle directly to your wallet there." action={
         <button className={`${button} w-full sm:w-auto`} onClick={openWithdraw} disabled={!canWithdraw}
-          title={summary && !canWithdraw ? `Your balance must cover at least ${money(summary.limits.min)} plus the gateway fee reserve.` : undefined}>
+          title={summary && !canWithdraw ? `Your balance must cover at least ${money(summary.limits.min)} plus the withdrawal fee.` : undefined}>
           <ArrowDown size={15} /> Withdraw
         </button>
       } />
@@ -239,7 +238,7 @@ export default function WalletPage() {
               </div>
             </div>
             <p className="mt-2 text-xs text-[var(--fg-muted)]">
-              The rest stays in your wallet: up to {feePercent}% (at least {money(feeMin)}) is held for the mobile money fee, and whatever the real fee doesn&apos;t use comes straight back.
+              Each withdrawal has a flat mobile money fee taken from your wallet: {feeTiers.map((t) => `${money(t.fee)} for ${t.min.toLocaleString()}–${t.max.toLocaleString()}`).join(", ")}.
             </p>
 
             <div className="mt-5">
@@ -249,7 +248,7 @@ export default function WalletPage() {
                 aria-invalid={overBalance || underMinimum} aria-describedby="withdraw-amount-help" />
               {overBalance ? (
                 <p id="withdraw-amount-help" role="alert" className="mt-1.5 text-xs text-red-700">
-                  {money(requested)} plus up to {money(requestedFee)} held for the gateway fee comes to {money(requested + requestedFee)}, which is more than your available {money(available)}.
+                  {money(requested)} plus the {money(requestedFee)} withdrawal fee comes to {money(requested + requestedFee)}, which is more than your available {money(available)}.
                   {maxAmount >= (summary?.limits.min ?? 0) && <> You can withdraw up to <button type="button" className="font-semibold underline" onClick={() => setAmount(String(maxAmount))}>{money(maxAmount)}</button>.</>}
                 </p>
               ) : underMinimum ? (
@@ -267,10 +266,9 @@ export default function WalletPage() {
             {requested >= (summary?.limits.min ?? Infinity) && !overBalance && (
               <dl className="mt-4 space-y-1.5 rounded-xl border border-[var(--border-soft)] bg-[var(--subtle)] px-4 py-3 text-xs">
                 <div className="flex justify-between"><dt className="font-semibold text-[var(--fg)]">Sent to your mobile money</dt><dd className="font-bold text-emerald-700">{money(requested)}</dd></div>
-                <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Held for the gateway fee</dt><dd className="text-[var(--fg-muted)]">up to {money(requestedFee)}</dd></div>
-                <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Taken from your wallet now</dt><dd className="text-[var(--fg-muted)]">{money(requested + requestedFee)}</dd></div>
+                <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Withdrawal fee</dt><dd className="text-[var(--fg-muted)]">{money(requestedFee)}</dd></div>
+                <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Taken from your wallet</dt><dd className="text-[var(--fg-muted)]">{money(requested + requestedFee)}</dd></div>
                 <div className="flex justify-between border-t border-[var(--border-soft)] pt-1.5"><dt className="text-[var(--fg-muted)]">Left in your wallet</dt><dd className="font-semibold text-[var(--fg)]">{money(available - requested - requestedFee)}</dd></div>
-                <p className="pt-1 text-[11px] text-[var(--fg-faint)]">Once the provider confirms the real fee, any unused part of the {money(requestedFee)} returns to your wallet.</p>
               </dl>
             )}
             {/* Email verification — a code must be issued before the request can be submitted. */}
