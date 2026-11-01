@@ -20,6 +20,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -242,5 +243,17 @@ class PlatformEarningsServiceTest {
         var payload = new ObjectMapper().readTree(
                 "{\"transaction\":{\"provider_reference\":\"nope\",\"status\":\"completed\"}}");
         assertFalse(service.processPayoutCallback(payload));
+    }
+
+    @Test
+    void payoutFeeShortfallIsPaidFromPlatformEarningsOnce() {
+        service.absorbPayoutFeeShortfall(400, "FEEADJ:w10", "fee above tenant balance");
+        assertEquals(79_600L, account.getSettledEarnings());
+        assertEquals(400L, account.getTotalFees());
+        verify(ledger).save(argThat(e -> PlatformLedgerEntry.FEE.equals(e.getType()) && e.getAmount() == 400L));
+
+        when(ledger.existsByTypeAndExternalRef(PlatformLedgerEntry.FEE, "FEEADJ:w10")).thenReturn(true);
+        service.absorbPayoutFeeShortfall(400, "FEEADJ:w10", "fee above tenant balance");
+        assertEquals(79_600L, account.getSettledEarnings());
     }
 }

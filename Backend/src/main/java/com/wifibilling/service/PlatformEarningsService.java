@@ -313,6 +313,20 @@ public class PlatformEarningsService {
         return true;
     }
 
+    /**
+     * A tenant payout cost more in provider fees than the tenant had left: the
+     * platform pays the difference from its settled earnings instead of leaving the
+     * tenant's wallet negative. Keeps reconciliation exact. Idempotent per ref.
+     */
+    @Transactional
+    public void absorbPayoutFeeShortfall(long amount, String ref, String note) {
+        if (amount <= 0 || ledger.existsByTypeAndExternalRef(PlatformLedgerEntry.FEE, ref)) return;
+        PlatformEarningsAccount a = accountForUpdate();
+        a.setSettledEarnings(a.getSettledEarnings() - amount);
+        a.setTotalFees(a.getTotalFees() + amount);
+        record(a, PlatformLedgerEntry.FEE, amount, ref, null, null, note);
+    }
+
     public List<PlatformPayout> recentPayouts() { return payouts.findTop100ByOrderByCreatedAtDesc(); }
     public List<PlatformLedgerEntry> recentActivity() { return ledger.findTop200ByOrderByCreatedAtDesc(); }
     public List<ReconciliationLog> recentReconciliations() { return reconLogs.findTop20ByOrderByCreatedAtDesc(); }

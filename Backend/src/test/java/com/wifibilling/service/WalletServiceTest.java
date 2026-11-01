@@ -114,16 +114,43 @@ class WalletServiceTest {
         verify(ledger, never()).save(any());
     }
 
+    /** Replays 1 Nov: 9,000 out of 9,500 with 500 reserved, and the provider charged 900. */
     @Test
-    void feeAboveEstimateMovesDifferenceIntoReserveWithoutThrowing() {
+    void feeAboveReserveNeverTakesTheWalletBelowZero() {
+        wallet.setAvailableBalance(9_500L);
+        service.reserveForWithdrawal(1L, 9_500, "RES:W10", 10L);
+
+        long uncovered = service.adjustReservation(1L, 400, "FEEADJ:W10", 10L);
+
+        assertEquals(400L, uncovered);
+        assertEquals(0L, wallet.getAvailableBalance());
+        assertEquals(9_500L, wallet.getReservedBalance());
+        service.finalizeWithdrawal(1L, 9_500, "PAY:W10", 10L);
+        assertEquals(0L, wallet.getReservedBalance());
+        assertEquals(0L, wallet.getAvailableBalance());
+    }
+
+    @Test
+    void feeAboveReserveIsTakenFromWhatTheTenantHasLeft() {
         wallet.setAvailableBalance(47_180L);
         service.reserveForWithdrawal(1L, 46_500, "RES:W9", 9L);
-        service.adjustReservation(1L, 880, "FEEADJ:W9", 9L);
-        assertEquals(-200L, wallet.getAvailableBalance());
-        assertEquals(47_380L, wallet.getReservedBalance());
-        service.finalizeWithdrawal(1L, 47_380, "PAY:W9", 9L);
-        assertEquals(0L, wallet.getReservedBalance());
-        assertEquals(47_380L, wallet.getTotalWithdrawn());
+
+        long uncovered = service.adjustReservation(1L, 880, "FEEADJ:W9", 9L);
+
+        assertEquals(200L, uncovered);
+        assertEquals(0L, wallet.getAvailableBalance());
+        assertEquals(47_180L, wallet.getReservedBalance());
+    }
+
+    @Test
+    void completedPayoutFeeAboveBalanceStopsAtZero() {
+        wallet.setAvailableBalance(300L);
+
+        long uncovered = service.settleCompletedPayoutFee(1L, 400, "FEEADJ:W11", 11L);
+
+        assertEquals(100L, uncovered);
+        assertEquals(0L, wallet.getAvailableBalance());
+        assertEquals(300L, wallet.getTotalWithdrawn());
     }
 
     @Test

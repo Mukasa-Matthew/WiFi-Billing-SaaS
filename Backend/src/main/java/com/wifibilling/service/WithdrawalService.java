@@ -77,16 +77,23 @@ public class WithdrawalService {
     private long maxAmount;
     @Value("${withdrawals.max-open-per-tenant:1}")
     private long maxOpenPerTenant;
-    @Value("${withdrawals.fee-percent:3}")
-    private long feePercent;
+    /** The provider's payout fee isn't known until it has been paid (observed: 3%, but
+     *  10% on some amounts), so a generous buffer is held and the unused part returned. */
+    @Value("${withdrawals.fee-reserve-percent:10}")
+    private long feeReservePercent;
+    @Value("${withdrawals.fee-reserve-min:1000}")
+    private long feeReserveMin;
     @Value("${withdrawals.recheck-after-seconds:120}")
     private long recheckAfterSeconds;
 
     public boolean approvalRequired() { return requireApproval; }
     public boolean livePayoutsEnabled() { return livePayoutsEnabled; }
 
-    public record Limits(long min, long max, boolean approvalRequired, boolean livePayouts, long feePercent) {}
-    public Limits limits() { return new Limits(minAmount, maxAmount, requireApproval, livePayoutsEnabled, feePercent); }
+    public record Limits(long min, long max, boolean approvalRequired, boolean livePayouts,
+                         long feeReservePercent, long feeReserveMin) {}
+    public Limits limits() {
+        return new Limits(minAmount, maxAmount, requireApproval, livePayoutsEnabled, feeReservePercent, feeReserveMin);
+    }
 
     @Transactional(readOnly = true)
     public List<WithdrawalRequest> list(Long tenantId) {
@@ -130,7 +137,7 @@ public class WithdrawalService {
                 if (withdrawals.countByTenantIdAndStatusIn(tenantId, OPEN) >= maxOpenPerTenant) {
                     throw new ResponseStatusException(HttpStatus.CONFLICT, "You already have a withdrawal in progress");
                 }
-                long fee = estimateFee(amount);
+                long fee = feeReserve(amount);
                 if (amount + fee > wallet.getAvailableBalance()) {
                     throw new ResponseStatusException(HttpStatus.CONFLICT,
                             insufficientBalanceMessage(amount, fee, wallet.getAvailableBalance()));
@@ -172,25 +179,27 @@ public class WithdrawalService {
         return earlier;
     }
 
-    /** Largest amount whose amount + estimated fee fits within {@code available}. */
+    /** Largest amount whose amount + fee reserve fits within {@code available}. */
     public long maxWithdrawable(long available) {
-        long a = Math.min(maxAmount, Math.floorDiv(available * 100, 100 + feePercent));
-        while (a > 0 && a + estimateFee(a) > available) a--;
+        if (available <= 0) return 0;
+        long a = Math.min(maxAmount, Math.floorDiv(available * 100, 100 + feeReservePercent));
+        while (a > 0 && a + feeReserve(a) > available) a--;
         return Math.max(0, a);
     }
 
-    String insufficientBalanceMessage(long amount, long fee, long available) {
-        String msg = "Insufficient balance: " + ugx(amount) + " plus the " + ugx(fee) + " gateway fee comes to "
-                + ugx(amount + fee) + ", but your available balance is " + ugx(available) + ".";
+    String insufficientBalanceMessage(long amount, long reserve, long available) {
+        String msg = "Insufficient balance: " + ugx(amount) + " plus up to " + ugx(reserve)
+                + " held for the gateway fee comes to " + ugx(amount + reserve)
+                + ", but your available balance is " + ugx(available) + ".";
         long max = maxWithdrawable(available);
         return max >= minAmount
                 ? msg + " The most you can withdraw right now is " + ugx(max) + "."
                 : msg + " That isn't enough to cover the minimum withdrawal and its fee yet.";
     }
 
-    long estimateFee(long amount) {
-        // Must cover the real charge: any shortfall is settled after the money has left.
-        return Math.max(500, (amount * feePercent + 99) / 100);
+    /** Held for the provider's fee on top of the amount; whatever the real fee doesn't use is returned. */
+    long feeReserve(long amount) {
+        return Math.max(feeReserveMin, (amount * feeReservePercent + 99) / 100);
     }
 
     /**
@@ -281,30 +290,42 @@ public class WithdrawalService {
         var wd = res.path("data").path("withdrawal").isMissingNode()
                 ? res.path("data").path("disbursement") : res.path("data").path("withdrawal");
         var charge = wd.path("charge").path("raw");
+        // Only the dispatch response carries the charge; callbacks don't.
         if (charge.isNumber()) applyActualFee(w, charge.longValue());
+        else log.warn("Payout {} response had no charge; the full fee reserve {} stays deducted", w.getPayoutRef(), w.getFee());
         return withdrawals.save(w);
     }
 
     /**
-     * Brings the withdrawal and wallet in line with the provider's actual charge.
-     * Caller holds the withdrawal row lock. Never throws on balance — the money has
-     * already gone — and is a no-op once applied.
+     * Brings the withdrawal and wallet in line with the provider's actual charge:
+     * an unused reserve goes back to the tenant; a fee above the reserve is taken
+     * only from what the tenant has left, and the platform absorbs the rest — a
+     * wallet never goes negative. Caller holds the withdrawal row lock. Never throws
+     * on balance (the money has already gone) and is a no-op once applied.
      */
     private void applyActualFee(WithdrawalRequest w, long actualFee) {
         long delta = actualFee - w.getFee();
         if (delta == 0) return;
         Long tenantId = w.getTenant().getId();
         String ref = "FEEADJ:" + w.getPayoutRef();
+        long uncovered;
         if (WithdrawalRequest.COMPLETED.equals(w.getStatus())) {
-            walletService.settleCompletedPayoutFee(tenantId, delta, ref, w.getId());
+            uncovered = walletService.settleCompletedPayoutFee(tenantId, delta, ref, w.getId());
         } else if (WithdrawalRequest.PROCESSING.equals(w.getStatus())) {
-            walletService.adjustReservation(tenantId, delta, ref, w.getId());
+            uncovered = walletService.adjustReservation(tenantId, delta, ref, w.getId());
         } else {
             log.warn("Fee for {} reported after it ended {}; not applied", w.getPayoutRef(), w.getStatus());
             return;
         }
+        if (uncovered > 0) {
+            platformEarnings.absorbPayoutFeeShortfall(uncovered, ref,
+                    "Payout fee above tenant balance (withdrawal " + w.getId() + ", tenant " + tenantId + ")");
+            log.error("Payout {} fee {} exceeded the reserve and tenant {} balance; platform absorbed {}. "
+                    + "Raise withdrawals.fee-reserve-percent/min.", w.getPayoutRef(), actualFee, tenantId, uncovered);
+        }
         w.setFee(actualFee);
-        w.setTotalDeduction(w.getAmount() + actualFee);
+        // What the tenant actually paid: the amount plus the part of the fee they covered.
+        w.setTotalDeduction(w.getTotalDeduction() + delta - uncovered);
     }
 
     // ---------- provider outcome ----------

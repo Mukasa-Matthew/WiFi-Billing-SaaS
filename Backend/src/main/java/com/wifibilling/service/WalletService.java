@@ -95,44 +95,53 @@ public class WalletService {
     }
 
     /**
-     * Settle the gap between the estimated and the provider's actual payout fee by
+     * Settle the gap between the reserved and the provider's actual payout fee by
      * moving it between available and reserved, so finalize later clears exactly
      * totalDeduction. Runs after the money has already left, so it never throws on
-     * balance: a fee above available leaves the tenant owing it (negative available).
+     * balance — and never takes the wallet below zero: a fee above what the tenant
+     * has is only covered up to their available balance.
      * Idempotent per externalRef.
+     *
+     * @return the part of a positive delta the tenant could not cover (0 when fully covered)
      */
     @Transactional(propagation = Propagation.REQUIRED)
-    public void adjustReservation(Long tenantId, long delta, String externalRef, Long withdrawalId) {
-        if (delta == 0) return;
+    public long adjustReservation(Long tenantId, long delta, String externalRef, Long withdrawalId) {
+        if (delta == 0) return 0;
         WalletAccount w = walletForUpdate(tenantId);
         String type = delta > 0 ? WalletLedgerEntry.WITHDRAWAL_RESERVE : WalletLedgerEntry.WITHDRAWAL_RELEASE;
-        if (ledgerRepository.existsByWalletIdAndTypeAndExternalRef(w.getId(), type, externalRef)) return;
-        if (delta > 0 && w.getAvailableBalance() < delta) {
-            log.warn("Payout fee for {} exceeds tenant {} available balance by {}", externalRef, tenantId,
-                    delta - w.getAvailableBalance());
+        if (ledgerRepository.existsByWalletIdAndTypeAndExternalRef(w.getId(), type, externalRef)) return 0;
+        long moved = delta > 0 ? Math.min(delta, Math.max(0, w.getAvailableBalance())) : delta;
+        if (moved != 0) {
+            w.setAvailableBalance(w.getAvailableBalance() - moved);
+            w.setReservedBalance(w.getReservedBalance() + moved);
+            record(w, type, Math.abs(moved), externalRef, null, withdrawalId,
+                    delta > 0 ? "Payout fee above reserve" : "Unused payout fee reserve released");
         }
-        w.setAvailableBalance(w.getAvailableBalance() - delta);
-        w.setReservedBalance(w.getReservedBalance() + delta);
-        record(w, type, Math.abs(delta), externalRef, null, withdrawalId,
-                delta > 0 ? "Payout fee above estimate" : "Payout fee below estimate — difference released");
+        return delta - moved;
     }
 
     /**
      * Settle a fee difference learned after the payout was already finalized (the
      * provider's completion callback beat the dispatch response). The reserve is
      * gone by then, so the difference moves available ↔ withdrawn directly.
-     * Never throws on balance; idempotent per externalRef.
+     * Never throws on balance or goes below zero; idempotent per externalRef.
+     *
+     * @return the part of a positive delta the tenant could not cover (0 when fully covered)
      */
     @Transactional(propagation = Propagation.REQUIRED)
-    public void settleCompletedPayoutFee(Long tenantId, long delta, String externalRef, Long withdrawalId) {
-        if (delta == 0) return;
+    public long settleCompletedPayoutFee(Long tenantId, long delta, String externalRef, Long withdrawalId) {
+        if (delta == 0) return 0;
         WalletAccount w = walletForUpdate(tenantId);
         String type = delta > 0 ? WalletLedgerEntry.ADJUSTMENT_DEBIT : WalletLedgerEntry.ADJUSTMENT_CREDIT;
-        if (ledgerRepository.existsByWalletIdAndTypeAndExternalRef(w.getId(), type, externalRef)) return;
-        w.setAvailableBalance(w.getAvailableBalance() - delta);
-        w.setTotalWithdrawn(w.getTotalWithdrawn() + delta);
-        record(w, type, Math.abs(delta), externalRef, null, withdrawalId,
-                delta > 0 ? "Payout fee above estimate" : "Payout fee below estimate — difference returned");
+        if (ledgerRepository.existsByWalletIdAndTypeAndExternalRef(w.getId(), type, externalRef)) return 0;
+        long moved = delta > 0 ? Math.min(delta, Math.max(0, w.getAvailableBalance())) : delta;
+        if (moved != 0) {
+            w.setAvailableBalance(w.getAvailableBalance() - moved);
+            w.setTotalWithdrawn(w.getTotalWithdrawn() + moved);
+            record(w, type, Math.abs(moved), externalRef, null, withdrawalId,
+                    delta > 0 ? "Payout fee above reserve" : "Unused payout fee reserve returned");
+        }
+        return delta - moved;
     }
 
     /** Finalize a completed payout: reserved → gone. Idempotent per externalRef. */
