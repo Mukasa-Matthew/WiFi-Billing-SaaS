@@ -5,14 +5,15 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import api from "@/lib/api";
+import { useToast } from "@/components/ui/Toast";
 import { ActionMenu } from "@/components/ui/ActionMenu";
 import { accountTone, subscriptionTone, useTenantActions } from "@/components/admin/useTenantActions";
 import {
   Building2, CaretRight, CellTower as RouterIcon, CheckCircle, EnvelopeSimple, Key, WarningCircle,
 } from "@/components/icons";
 import {
-  BackLink, Badge, Card, CardLink, ErrorNotice, Field, Segmented, StatusDot, Table, Tabs, buttonGhost,
-  bytes, date, humanize, relativeTime, shortDate, ugx, useApi, useNow, useResource,
+  BackLink, Badge, Card, CardLink, ErrorNotice, Field, Segmented, StatusDot, Table, Tabs, button, buttonGhost,
+  bytes, date, field, humanize, message, relativeTime, shortDate, ugx, useApi, useNow, useResource,
 } from "@/components/BillingUI";
 import { Meter } from "@/components/charts";
 import { duration, routerState, servicesState, sessionState, severityTone, type RouterStateInfo } from "@/lib/routerState";
@@ -226,6 +227,7 @@ function TenantDetail() {
                       <Field label="Outstanding"><span className={`num ${sub.outstanding > 0 ? "text-amber-700" : ""}`}>{ugx(sub.outstanding)}</span></Field>
                     </dl>}
               </Card>
+              <PlatformFeeCard tenantId={tenantId} />
               <Card title="Customer collections" description="WiFi payments AirPairy holds for this business. Not platform revenue." bodyClassName="px-5 py-1">
                 {wallets.error ? <p className="py-4 text-sm text-[var(--fg-muted)]">Unavailable.</p>
                   : !wallet ? (wallets.loading ? <ListSkeleton rows={2} avatar={false} inset={false} /> : <p className="py-4 text-sm text-[var(--fg-muted)]">No wallet yet. No customer payments collected.</p>)
@@ -248,6 +250,70 @@ function TenantDetail() {
       {tab === "Auth failures" && <AuthTab routers={reachable} />}
       {tab === "Billing" && <BillingTab tenantId={tenantId} sub={sub ?? null} subsLoading={subs.loading} wallet={wallet ?? null} />}
     </div>
+  );
+}
+
+interface PlatformFee { enabled: boolean; percent: number; gatewayMode: string; appliesNow: boolean; earnedThisMonth: number; earnedTotal: number }
+
+/** Per-tenant AirPairy platform fee on customer payments, on top of MarzPay's 3%. */
+function PlatformFeeCard({ tenantId }: { tenantId: number }) {
+  const fee = useApi<PlatformFee>(`/api/admin/tenants/${tenantId}/platform-fee`);
+  const toast = useToast();
+  const [draft, setDraft] = useState<{ enabled: boolean; percent: string } | null>(null);
+  const [saving, setSaving] = useState(false);
+  const current = fee.data;
+  const enabled = draft?.enabled ?? current?.enabled ?? false;
+  const percent = draft?.percent ?? (current ? String(current.percent) : "3");
+  const dirty = !!current && (enabled !== current.enabled || Number(percent) !== Number(current.percent));
+  const example = Math.floor(2000 * (Number(percent) || 0) / 100);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await api.put(`/api/admin/tenants/${tenantId}/platform-fee`, { enabled, percent: Number(percent) });
+      toast("success", enabled ? `Platform fee on at ${percent}% for new payments.` : "Platform fee switched off for new payments.");
+      setDraft(null);
+      fee.load();
+    } catch (e) { toast("error", message(e)); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <Card title="Platform fee" description="AirPairy's cut of each customer payment, on top of MarzPay's 3%" bodyClassName="px-5 py-4"
+      action={current && <Badge tone={current.appliesNow ? "green" : "slate"} dot>{current.appliesNow ? `On · ${current.percent}%` : "Off"}</Badge>}>
+      {fee.error ? <p className="text-sm text-[var(--fg-muted)]">Unavailable.</p> : !current ? <ListSkeleton rows={2} avatar={false} inset={false} /> : (
+        <div className="space-y-4">
+          <label className="flex cursor-pointer items-start gap-4">
+            <button type="button" role="switch" aria-checked={enabled} onClick={() => setDraft({ enabled: !enabled, percent })}
+              className={`relative mt-0.5 h-6 w-11 shrink-0 rounded-full transition ${enabled ? "bg-blue-600" : "bg-[var(--border-strong)]"}`}>
+              <span className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition ${enabled ? "left-6" : "left-1"}`} />
+            </button>
+            <span>
+              <span className="block text-sm font-semibold text-[var(--fg)]">Charge a platform fee</span>
+              <span className="mt-0.5 block text-xs text-[var(--fg-muted)]">Taken from this business&apos;s share of every customer payment and added to platform earnings.</span>
+            </span>
+          </label>
+          <div className="flex items-end gap-3">
+            <label className="w-28">
+              <span className="block text-xs font-semibold text-[var(--fg-muted)]">Rate (%)</span>
+              <input className={field} type="number" min="0.01" max="20" step="0.01" value={percent}
+                onChange={(e) => setDraft({ enabled, percent: e.target.value })} />
+            </label>
+            <button className={button} disabled={!dirty || saving || !(Number(percent) > 0)} onClick={() => void save()}>{saving ? "Saving…" : "Save"}</button>
+          </div>
+          {enabled && Number(percent) > 0 && (
+            <p className="text-xs text-[var(--fg-muted)]">On a UGX 2,000 payment: MarzPay keeps 60, AirPairy keeps {example.toLocaleString()}, the business gets {(1940 - example).toLocaleString()}. Applies to payments started after saving.</p>
+          )}
+          {current.enabled && current.gatewayMode !== "PLATFORM" && (
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">This business collects through its own MarzPay account, so no fee can be taken until it switches to the platform gateway.</p>
+          )}
+          <dl className="divide-y divide-[var(--border-soft)] border-t border-[var(--border-soft)]">
+            <Field label="Earned this month"><span className="num">{ugx(current.earnedThisMonth)}</span></Field>
+            <Field label="Earned all time"><span className="num">{ugx(current.earnedTotal)}</span></Field>
+          </dl>
+        </div>
+      )}
+    </Card>
   );
 }
 

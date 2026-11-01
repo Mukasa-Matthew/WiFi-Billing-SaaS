@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import api from "@/lib/api";
-import { Table, Badge, Notice, panel, button, buttonGhost, field, label, hint, message, PageHeader } from "@/components/BillingUI";
+import { Table, Badge, Notice, panel, button, buttonGhost, field, label, hint, message, PageHeader, date, useResource } from "@/components/BillingUI";
 import { Dialog } from "@/components/ui/Dialog";
 import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { DashboardLoading, BusyLabel } from "@/components/LoadingUI";
@@ -17,7 +17,15 @@ interface Overview {
   suspended: number;
   expiringSoon: number;
   monthRevenue: number;
+  platformFeeMonth: number;
+  platformFeeToday: number;
+  platformFeeTenants: number;
   defaultFee: number;
+}
+
+interface PlatformFeeRow {
+  transactionId: number; at: string; tenantId: number; businessName: string;
+  reference: string; amountPaid: number; percent: number; fee: number;
 }
 
 interface SubscriptionRow {
@@ -341,11 +349,15 @@ export default function AdminSubscriptionsPage() {
           </div>
           <div className={`${panel} p-4`}>
             <div className="text-xs font-semibold text-[var(--fg-muted)]">Month Revenue</div>
-            <div className="mt-2 text-2xl font-bold text-[var(--fg)]">{money(ov.monthRevenue)}</div>
-            <p className="mt-1 text-[11px] text-[var(--fg-faint)]">From SaaS plans</p>
+            <div className="mt-2 text-2xl font-bold text-[var(--fg)]">{money(ov.monthRevenue + ov.platformFeeMonth)}</div>
+            <p className="mt-1 text-[11px] text-[var(--fg-faint)]">
+              {money(ov.monthRevenue)} plans · <span className="font-semibold text-emerald-700">{money(ov.platformFeeMonth)} platform fees</span>
+            </p>
           </div>
         </div>
       )}
+
+      {ov && <PlatformFeesPanel overview={ov} />}
 
       {/* Subscription Plans Management */}
       <div className={panel}>
@@ -745,6 +757,41 @@ export default function AdminSubscriptionsPage() {
           </div>
         </Dialog>
       )}
+    </div>
+  );
+}
+
+/** Platform fees as they arrive: AirPairy's cut of each customer payment from tenants it's switched on for. */
+function PlatformFeesPanel({ overview }: { overview: Overview }) {
+  const feed = useResource<PlatformFeeRow>("/api/admin/subscriptions/platform-fees?limit=50", 30000);
+  return (
+    <div className={panel}>
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--border-soft)] px-5 py-4">
+        <div>
+          <h2 className="text-sm font-bold text-[var(--fg)]">Platform fees coming in</h2>
+          <p className="text-xs text-[var(--fg-muted)]">
+            AirPairy&apos;s cut of each customer payment, from {overview.platformFeeTenants} business{overview.platformFeeTenants === 1 ? "" : "es"} with the fee switched on. Updates every 30 seconds.
+          </p>
+        </div>
+        <div className="flex gap-6 text-right">
+          <div><p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--fg-faint)]">Today</p><p className="text-lg font-bold text-emerald-700">{money(overview.platformFeeToday)}</p></div>
+          <div><p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--fg-faint)]">This month</p><p className="text-lg font-bold text-emerald-700">{money(overview.platformFeeMonth)}</p></div>
+        </div>
+      </div>
+      <Table
+        rows={feed.data}
+        loading={feed.loading}
+        emptyTitle="No platform fees yet"
+        emptyDescription="Switch the fee on for a business from its page under Tenants. Fees appear here as its customers pay."
+        columns={[
+          { label: "When", render: (r: PlatformFeeRow) => <span className="whitespace-nowrap text-[var(--fg-muted)]">{date(r.at)}</span> },
+          { label: "Business", render: (r: PlatformFeeRow) => <a href={`/admin/tenants/${r.tenantId}`} className="font-medium hover:underline">{r.businessName}</a> },
+          { label: "Payment", hideBelow: "md", render: (r: PlatformFeeRow) => <span className="font-mono text-xs text-[var(--fg-muted)]">{r.reference}</span> },
+          { label: "Customer paid", align: "right", render: (r: PlatformFeeRow) => <span className="num">{money(r.amountPaid)}</span> },
+          { label: "Rate", align: "right", hideBelow: "sm", render: (r: PlatformFeeRow) => <span className="num text-[var(--fg-muted)]">{r.percent}%</span> },
+          { label: "Platform fee", align: "right", render: (r: PlatformFeeRow) => <span className="num font-semibold text-emerald-700">+{money(r.fee)}</span> },
+        ]}
+      />
     </div>
   );
 }

@@ -314,6 +314,21 @@ public class PlatformEarningsService {
     }
 
     /**
+     * Credits the platform fee taken from a tenant's customer payment. The money is
+     * already in the platform MarzPay account (it came in with the collection), so it
+     * is settled and withdrawable, like subscription revenue. Idempotent per ref.
+     */
+    @Transactional
+    public boolean creditPlatformFee(long amount, String ref, String note) {
+        if (amount <= 0 || ledger.existsByTypeAndExternalRef(PlatformLedgerEntry.EARNING_PLATFORM_FEE, ref)) return false;
+        PlatformEarningsAccount a = accountForUpdate();
+        a.setSettledEarnings(a.getSettledEarnings() + amount);
+        a.setTotalEarned(a.getTotalEarned() + amount);
+        record(a, PlatformLedgerEntry.EARNING_PLATFORM_FEE, amount, ref, null, null, note);
+        return true;
+    }
+
+    /**
      * A tenant payout cost more in provider fees than the tenant had left: the
      * platform pays the difference from its settled earnings instead of leaving the
      * tenant's wallet negative. Keeps reconciliation exact. Idempotent per ref.

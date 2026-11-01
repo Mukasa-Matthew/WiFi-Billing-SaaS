@@ -68,6 +68,8 @@ class PaymentServiceTest {
     private Router router;
     private PackagePlan packagePlan;
 
+    @Mock private PlatformEarningsService platformEarnings;
+
     @BeforeEach
     void setUp() {
         paymentService = new PaymentService(
@@ -80,7 +82,8 @@ class PaymentServiceTest {
                 marzPay,
                 walletService,
                 platformProperties,
-                subscriptionService
+                subscriptionService,
+                platformEarnings
         );
         lenient().when(gatewayConfig.modeFor(any(Tenant.class))).thenReturn("PLATFORM");
         lenient().when(gatewayConfig.platformConfigured()).thenReturn(false);
@@ -367,5 +370,84 @@ class PaymentServiceTest {
         // Proves that duplicate voucher generation is strictly impossible
         verify(voucherService, times(1)).generate(any(), any(), any(), any());
         assertEquals("SUCCESSFUL", tx.getStatus());
+    }
+
+    // ---------- platform fee ----------
+
+    private Transaction platformCollection(String ref, Integer feeBps, String mode) {
+        return Transaction.builder().id(70L).tenant(tenant).packagePlan(packagePlan).router(router)
+                .reference(ref).externalReference("ext-" + ref).phone("256771234567")
+                .amount(new BigDecimal("2000.00")).status(PaymentService.STATUS_PENDING)
+                .gatewayMode(mode).platformFeeBps(feeBps).createdAt(OffsetDateTime.now()).build();
+    }
+
+    private void completeCollection(Transaction tx) throws Exception {
+        when(transactionRepository.findByExternalReferenceForUpdate("ext-" + tx.getReference())).thenReturn(Optional.of(tx));
+        paymentService.processMarzPayCollection(new tools.jackson.databind.ObjectMapper().readTree(
+                "{\"transaction\":{\"reference\":\"ext-" + tx.getReference() + "\",\"status\":\"completed\","
+                        + "\"net_amount\":{\"raw\":1940},\"charge\":{\"raw\":60}}}"));
+    }
+
+    /** 2,000 paid: MarzPay keeps 60, the platform fee is 60, the tenant gets 1,880. */
+    @Test
+    void platformFeeIsTakenFromTheTenantsShareAndCreditedToThePlatform() throws Exception {
+        Transaction tx = platformCollection("PAY-PF1", 300, "PLATFORM");
+
+        completeCollection(tx);
+
+        assertEquals(60L, tx.getPlatformFee());
+        verify(walletService).creditCollection(eq(1L), eq(1_880L), eq("COL:PAY-PF1"), eq(70L), any());
+        verify(walletService).recordFee(1L, 60L, "FEE:PAY-PF1", 70L);
+        verify(walletService).recordPlatformFee(eq(1L), eq(60L), eq("PFEE:PAY-PF1"), eq(70L), any());
+        verify(platformEarnings).creditPlatformFee(eq(60L), eq("PFEE:PAY-PF1"), any());
+    }
+
+    @Test
+    void withTheFeeOffTheTenantKeepsTheWholeNet() throws Exception {
+        Transaction tx = platformCollection("PAY-PF2", 0, "PLATFORM");
+
+        completeCollection(tx);
+
+        assertEquals(0L, tx.getPlatformFee());
+        verify(walletService).creditCollection(eq(1L), eq(1_940L), eq("COL:PAY-PF2"), eq(70L), any());
+        verify(walletService, never()).recordPlatformFee(anyLong(), anyLong(), any(), any(), any());
+        verifyNoInteractions(platformEarnings);
+    }
+
+    @Test
+    void ownGatewayPaymentsNeverPayThePlatformFee() throws Exception {
+        Transaction tx = platformCollection("PAY-PF3", 300, "OWN");
+
+        completeCollection(tx);
+
+        assertNull(tx.getPlatformFee());
+        verify(walletService, never()).creditCollection(any(), anyLong(), any(), any(), any());
+        verifyNoInteractions(platformEarnings);
+    }
+
+    @Test
+    void theRateIsFrozenWhenThePaymentStarts() {
+        tenant.setPlatformFeeEnabled(true);
+        tenant.setPlatformFeeBps(250);
+        when(routerRepository.findByToken("tok_valid123456")).thenReturn(Optional.of(router));
+        when(packagePlanRepository.findByIdAndTenantId(100L, 1L)).thenReturn(Optional.of(packagePlan));
+        when(transactionRepository.save(any(Transaction.class))).thenAnswer(i -> i.getArgument(0));
+        when(gatewayClient.requestPayment(any(Transaction.class))).thenReturn("EXT-REF-1");
+
+        paymentService.initiatePayment(new PaymentDto.InitiateRequest("tok_valid123456", 100L, "256771234567", null, null, null));
+        tenant.setPlatformFeeEnabled(false); // switched off after the payment started
+
+        ArgumentCaptor<Transaction> captor = ArgumentCaptor.forClass(Transaction.class);
+        verify(transactionRepository, atLeastOnce()).save(captor.capture());
+        assertEquals(250, captor.getAllValues().get(0).getPlatformFeeBps());
+    }
+
+    @Test
+    void platformFeeNeverExceedsWhatReachesTheTenant() {
+        Transaction tx = platformCollection("PAY-PF4", 2_000, "PLATFORM");
+        assertEquals(400L, PaymentService.platformFeeFor(tx, 1_940));
+        assertEquals(100L, PaymentService.platformFeeFor(tx, 100));
+        tx.setPlatformFeeBps(null);
+        assertEquals(0L, PaymentService.platformFeeFor(tx, 1_940));
     }
 }

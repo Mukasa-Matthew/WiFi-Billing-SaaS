@@ -22,6 +22,7 @@ import java.time.OffsetDateTime;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -46,6 +47,11 @@ class AdminTenantControllerTest {
     @Mock
     private com.wifibilling.service.SubscriptionService subscriptionService;
 
+    @Mock
+    private AuditLogRepository auditLogRepository;
+    @Mock
+    private com.wifibilling.service.GatewayConfigService gatewayConfig;
+
     private AdminTenantController controller;
 
     @BeforeEach
@@ -60,7 +66,9 @@ class AdminTenantControllerTest {
                 emailService,
                 emailTemplates,
                 subscriptionService,
-                mock(com.wifibilling.service.WinboxAccessService.class)
+                mock(com.wifibilling.service.WinboxAccessService.class),
+                auditLogRepository,
+                gatewayConfig
         );
     }
 
@@ -132,5 +140,49 @@ class AdminTenantControllerTest {
         assertEquals("10.9.0.9", rows.getFirst().managementIp());
         assertEquals(7, rows.getFirst().activeUsers());
         assertFalse(rows.getFirst().portalReady());
+    }
+
+    // ---------- platform fee ----------
+
+    @Test
+    void platformFeeSwitchSavesTheRateAndIsAudited() {
+        Tenant t = Tenant.builder().id(7L).name("Campus Connect").role("ROLE_ADMIN").build();
+        when(tenantRepository.findById(7L)).thenReturn(Optional.of(t));
+        when(gatewayConfig.modeFor(t)).thenReturn("PLATFORM");
+        var principal = mock(com.wifibilling.security.TenantPrincipal.class);
+        when(principal.getEmail()).thenReturn("admin@example.com");
+
+        var view = controller.updatePlatformFee(7L,
+                new AdminTenantController.PlatformFeeUpdate(true, new java.math.BigDecimal("3")), principal);
+
+        assertTrue(view.enabled());
+        assertTrue(view.appliesNow());
+        assertEquals(300, t.getPlatformFeeBps());
+        verify(auditLogRepository).save(argThat(a -> "PLATFORM_FEE_CHANGED".equals(a.getAction())
+                && a.getDetails().contains("off (rate 3%) -> on at 3%") && "admin@example.com".equals(a.getActorEmail())));
+    }
+
+    @Test
+    void platformFeeOnOwnGatewayIsSavedButDoesNotApply() {
+        Tenant t = Tenant.builder().id(8L).name("Own Gateway Co").role("ROLE_ADMIN").build();
+        when(tenantRepository.findById(8L)).thenReturn(Optional.of(t));
+        when(gatewayConfig.modeFor(t)).thenReturn("OWN");
+
+        var view = controller.updatePlatformFee(8L,
+                new AdminTenantController.PlatformFeeUpdate(true, new java.math.BigDecimal("2.5")), null);
+
+        assertTrue(view.enabled());
+        assertFalse(view.appliesNow());
+        assertEquals(250, t.getPlatformFeeBps());
+    }
+
+    @Test
+    void platformFeeRejectsOutOfRangeRates() {
+        for (String bad : new String[]{"0", "25", "1.555"}) {
+            var ex = assertThrows(ResponseStatusException.class, () -> controller.updatePlatformFee(9L,
+                    new AdminTenantController.PlatformFeeUpdate(true, new java.math.BigDecimal(bad)), null));
+            assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        }
+        verify(tenantRepository, never()).save(any());
     }
 }

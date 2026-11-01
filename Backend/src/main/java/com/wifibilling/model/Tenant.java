@@ -167,6 +167,22 @@ public class Tenant {
     @Builder.Default
     private Boolean portalShowFeedback = true;
 
+    /** Optional AirPairy platform fee on each platform-gateway customer payment,
+     *  on top of the gateway's own charge. Switched per tenant by a super admin. */
+    @Column(name = "platform_fee_enabled", nullable = false)
+    @Builder.Default
+    private Boolean platformFeeEnabled = false;
+
+    /** Platform fee rate in basis points (300 = 3%). */
+    @Column(name = "platform_fee_bps", nullable = false)
+    @Builder.Default
+    private Integer platformFeeBps = 300;
+
+    /** The rate new payments are charged at, in basis points; 0 when the fee is off. */
+    public int activePlatformFeeBps() {
+        return Boolean.TRUE.equals(platformFeeEnabled) && platformFeeBps != null ? Math.max(0, platformFeeBps) : 0;
+    }
+
     @Column(name = "created_at")
     @Builder.Default
     private OffsetDateTime createdAt = OffsetDateTime.now();

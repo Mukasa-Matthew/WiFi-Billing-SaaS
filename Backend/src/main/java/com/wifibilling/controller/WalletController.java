@@ -39,7 +39,9 @@ public class WalletController {
             long openWithdrawals,
             WithdrawalService.Limits limits,
             /** Most that can be requested now: amount + estimated fee within available. */
-            long maxWithdrawable
+            long maxWithdrawable,
+            /** AirPairy platform fee on each customer payment, in percent; 0 when off. */
+            java.math.BigDecimal platformFeePercent
     ) {}
 
     @GetMapping
@@ -51,7 +53,10 @@ public class WalletController {
         return new WalletView(w.getAvailableBalance(), w.getPendingBalance(), w.getReservedBalance(),
                 w.getTotalCollected(), w.getTotalFees(), w.getTotalWithdrawn(),
                 w.getCurrency(), open, withdrawalService.limits(),
-                withdrawalService.maxWithdrawable(w.getAvailableBalance()));
+                withdrawalService.maxWithdrawable(w.getAvailableBalance()),
+                tenantRepository.findById(p.getTenantId())
+                        .map(t -> java.math.BigDecimal.valueOf(t.activePlatformFeeBps(), 2).stripTrailingZeros())
+                        .orElse(java.math.BigDecimal.ZERO));
     }
 
     public record LedgerView(Long id, String type, Long amount,

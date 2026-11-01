@@ -34,6 +34,8 @@ public class AdminTenantController {
     private final EmailTemplates emailTemplates;
     private final com.wifibilling.service.SubscriptionService subscriptionService;
     private final com.wifibilling.service.WinboxAccessService winboxAccess;
+    private final AuditLogRepository auditLogRepository;
+    private final com.wifibilling.service.GatewayConfigService gatewayConfig;
 
     @Value("${app.public-base-url:http://localhost:3000}")
     private String publicBaseUrl;
@@ -274,5 +276,78 @@ public class AdminTenantController {
                         r.getCreatedAt()
                 ))
                 .toList();
+    }
+
+    // ---------- platform fee ----------
+
+    /** Platform fee for one tenant: whether it's on, its rate, and what it has earned. */
+    public record PlatformFeeView(boolean enabled, BigDecimal percent, String gatewayMode, boolean appliesNow,
+                                  long earnedThisMonth, long earnedTotal) {}
+
+    public record PlatformFeeUpdate(Boolean enabled, BigDecimal percent) {}
+
+    @GetMapping("/tenants/{id}/platform-fee")
+    public PlatformFeeView platformFee(@PathVariable Long id) {
+        return platformFeeView(findBusinessTenant(id));
+    }
+
+    /**
+     * Switches the platform fee on or off and sets its rate. Applies only to payments
+     * started from now on; every change is written to the audit log.
+     */
+    @PutMapping("/tenants/{id}/platform-fee")
+    @org.springframework.transaction.annotation.Transactional
+    public PlatformFeeView updatePlatformFee(@PathVariable Long id, @RequestBody PlatformFeeUpdate req,
+                                             @org.springframework.security.core.annotation.AuthenticationPrincipal
+                                             com.wifibilling.security.TenantPrincipal principal) {
+        if (req == null || req.enabled() == null || req.percent() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "enabled and percent are required");
+        }
+        BigDecimal percent = req.percent().stripTrailingZeros();
+        if (percent.scale() > 2 || percent.compareTo(new BigDecimal("0.01")) < 0 || percent.compareTo(new BigDecimal("20")) > 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Rate must be between 0.01% and 20%, with at most two decimals");
+        }
+        Tenant tenant = findBusinessTenant(id);
+        String before = describeFee(tenant);
+        tenant.setPlatformFeeEnabled(req.enabled());
+        tenant.setPlatformFeeBps(percent.movePointRight(2).intValueExact());
+        tenantRepository.save(tenant);
+        String after = describeFee(tenant);
+        if (!before.equals(after)) {
+            auditLogRepository.save(com.wifibilling.model.AuditLog.builder()
+                    .tenantId(tenant.getId())
+                    .actorEmail(principal != null ? principal.getEmail() : null)
+                    .action("PLATFORM_FEE_CHANGED")
+                    .details(tenant.getName() + ": " + before + " -> " + after)
+                    .build());
+        }
+        return platformFeeView(tenant);
+    }
+
+    private Tenant findBusinessTenant(Long id) {
+        Tenant tenant = tenantRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tenant not found"));
+        if ("ROLE_SUPERADMIN".equals(tenant.getRole())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The platform account has no platform fee");
+        }
+        return tenant;
+    }
+
+    private static String describeFee(Tenant t) {
+        String rate = BigDecimal.valueOf(t.getPlatformFeeBps(), 2).stripTrailingZeros().toPlainString() + "%";
+        return Boolean.TRUE.equals(t.getPlatformFeeEnabled()) ? "on at " + rate : "off (rate " + rate + ")";
+    }
+
+    private PlatformFeeView platformFeeView(Tenant tenant) {
+        String mode = gatewayConfig.modeFor(tenant);
+        java.time.OffsetDateTime monthStart = java.time.YearMonth.now().atDay(1).atStartOfDay()
+                .atOffset(java.time.OffsetDateTime.now().getOffset());
+        return new PlatformFeeView(
+                Boolean.TRUE.equals(tenant.getPlatformFeeEnabled()),
+                BigDecimal.valueOf(tenant.getPlatformFeeBps(), 2).stripTrailingZeros(),
+                mode,
+                tenant.activePlatformFeeBps() > 0 && com.wifibilling.model.TenantGatewayConfig.MODE_PLATFORM.equals(mode),
+                transactionRepository.sumPlatformFeeForTenantSince(tenant.getId(), monthStart),
+                transactionRepository.sumPlatformFeeForTenantSince(tenant.getId(), java.time.OffsetDateTime.parse("2000-01-01T00:00:00Z")));
     }
 }
