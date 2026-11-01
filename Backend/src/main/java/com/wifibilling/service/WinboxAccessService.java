@@ -181,8 +181,9 @@ public class WinboxAccessService {
 
     public void acknowledge(Long id, String bearer, long revision, boolean success) {
         WinboxAccess a = agent(id, bearer);
-        if (revision != a.getRevision()) throw new ResponseStatusException(HttpStatus.CONFLICT, "Configuration changed; fetch it again.");
-        a.setAppliedRevision(revision); a.setRouterResult(success ? "APPLIED" : "FAILED"); a.setRouterCheckedAt(OffsetDateTime.now());
+        if (revision != a.getRevision()
+                || accesses.recordRouterAck(a.getPort(), revision, success ? "APPLIED" : "FAILED", OffsetDateTime.now()) == 0)
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Configuration changed; fetch it again.");
     }
 
     public Routes routes(String bearer) {
@@ -207,9 +208,9 @@ public class WinboxAccessService {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
             WinboxAccess a = accesses.findByRouterId(check.routerId()).orElse(null);
             if (a == null || check.revision() != a.getRevision() || !a.isEnabled() || !active(a.getRouter()) || !bound(a)) continue;
-            a.setGatewayRevision(check.revision()); a.setGatewayResult(check.result());
-            a.setGatewayCheckedAt(OffsetDateTime.now());
-            if ("READY".equals(check.result())) a.setLastSuccessfulCheck(OffsetDateTime.now());
+            OffsetDateTime now = OffsetDateTime.now();
+            accesses.recordGatewayCheck(a.getPort(), check.revision(), check.result(), now,
+                    "READY".equals(check.result()) ? now : null);
         }
     }
 
