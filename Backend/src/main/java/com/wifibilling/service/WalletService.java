@@ -80,6 +80,17 @@ public class WalletService {
         record(w, WalletLedgerEntry.FEE_DEBIT, fee, externalRef, transactionId, null, "Gateway collection fee");
     }
 
+    /** Record the AirPairy platform fee as an auditable entry (informational —
+     *  the collection credit is already net of it; never debited again). */
+    @Transactional(propagation = Propagation.REQUIRED)
+    public void recordPlatformFee(Long tenantId, long fee, String externalRef, Long transactionId, String note) {
+        if (fee <= 0) return;
+        WalletAccount w = walletForUpdate(tenantId);
+        if (ledgerRepository.existsByWalletIdAndTypeAndExternalRef(w.getId(),
+                WalletLedgerEntry.PLATFORM_FEE, externalRef)) return;
+        record(w, WalletLedgerEntry.PLATFORM_FEE, fee, externalRef, transactionId, null, note);
+    }
+
     /** Reserve funds for a withdrawal. Moves amount from available to reserved. */
     @Transactional(propagation = Propagation.REQUIRED)
     public void reserveForWithdrawal(Long tenantId, long totalDeduction, String externalRef, Long withdrawalId) {

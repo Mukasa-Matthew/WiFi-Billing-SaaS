@@ -57,6 +57,7 @@ public class PaymentService {
     private final WalletService walletService;
     private final com.wifibilling.config.PlatformProperties platformProperties;
     private final SubscriptionService subscriptionService;
+    private final PlatformEarningsService platformEarnings;
     private LeaderLockService leaderLockService = new LeaderLockService();
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
@@ -170,6 +171,9 @@ public class PaymentService {
                 .network(network)
                 .status(STATUS_PENDING)
                 .gatewayMode(mode)
+                // Freeze the platform fee rate now: switching it later never changes this payment.
+                .platformFeeBps(com.wifibilling.model.TenantGatewayConfig.MODE_PLATFORM.equals(mode)
+                        ? router.getTenant().activePlatformFeeBps() : 0)
                 .createdAt(OffsetDateTime.now());
         if (!mock) {
             // MarzPay collection reference committed WITH the row — the provider
@@ -477,6 +481,13 @@ public class PaymentService {
         if (netAmount != null) tx.setNetAmount(netAmount);
         if (providerTxId != null) tx.setProviderTransactionId(providerTxId);
 
+        // Platform-gateway money lands in the platform MarzPay account: split the
+        // provider's net between the tenant and the AirPairy platform fee (if any).
+        boolean platformGateway = com.wifibilling.model.TenantGatewayConfig.MODE_PLATFORM.equals(tx.getGatewayMode());
+        long net = netAmount != null ? netAmount : tx.getAmount().longValue();
+        long platformFee = platformGateway ? platformFeeFor(tx, net) : 0;
+        if (platformGateway) tx.setPlatformFee(platformFee);
+
         // Provision a single voucher for this tenant and package — exactly once.
         if (tx.getVoucherCode() == null) {
             String nasIp = tx.getRouter() != null ? tx.getRouter().getWgIp() : null;
@@ -503,16 +514,31 @@ public class PaymentService {
         // Platform-gateway collections credit the tenant's internal wallet at the
         // provider-reported net. Own-gateway money settles to the tenant's MarzPay
         // account directly and must never touch our wallet ledger.
-        if (com.wifibilling.model.TenantGatewayConfig.MODE_PLATFORM.equals(tx.getGatewayMode())) {
-            long net = netAmount != null ? netAmount : tx.getAmount().longValue();
-            walletService.creditCollection(tx.getTenant().getId(), net,
+        if (platformGateway) {
+            Long tenantId = tx.getTenant().getId();
+            walletService.creditCollection(tenantId, net - platformFee,
                     "COL:" + tx.getReference(), tx.getId(),
                     "Collection " + tx.getReference());
             if (gatewayFee != null && gatewayFee > 0) {
-                walletService.recordFee(tx.getTenant().getId(), gatewayFee,
-                        "FEE:" + tx.getReference(), tx.getId());
+                walletService.recordFee(tenantId, gatewayFee, "FEE:" + tx.getReference(), tx.getId());
+            }
+            if (platformFee > 0) {
+                String percent = java.math.BigDecimal.valueOf(tx.getPlatformFeeBps(), 2).stripTrailingZeros().toPlainString();
+                walletService.recordPlatformFee(tenantId, platformFee, "PFEE:" + tx.getReference(), tx.getId(),
+                        "AirPairy platform fee " + percent + "%");
+                platformEarnings.creditPlatformFee(platformFee, "PFEE:" + tx.getReference(),
+                        "Platform fee " + percent + "% on " + tx.getReference() + " (" + tx.getTenant().getName() + ")");
             }
         }
+    }
+
+    /** The platform fee owed on this payment: its frozen rate applied to the amount
+     *  the customer paid, never more than what reaches the tenant after the gateway. */
+    static long platformFeeFor(Transaction tx, long net) {
+        Integer bps = tx.getPlatformFeeBps();
+        if (bps == null || bps <= 0) return 0;
+        long fee = tx.getAmount().longValue() * bps / 10_000;
+        return Math.max(0, Math.min(fee, net));
     }
 
     /**

@@ -162,4 +162,23 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             """, nativeQuery = true)
     List<Object[]> salesByPackage(@org.springframework.data.repository.query.Param("tenantId") Long tenantId,
                                   @org.springframework.data.repository.query.Param("month") java.time.OffsetDateTime month);
+
+    /** Platform fees earned from successful payments completed since {@code since}. */
+    @org.springframework.data.jpa.repository.Query("""
+            select coalesce(sum(t.platformFee), 0) from Transaction t
+             where t.platformFee > 0 and t.status = 'SUCCESSFUL' and t.completedAt >= :since""")
+    long sumPlatformFeeSince(@org.springframework.data.repository.query.Param("since") OffsetDateTime since);
+
+    @org.springframework.data.jpa.repository.Query("""
+            select coalesce(sum(t.platformFee), 0) from Transaction t
+             where t.tenant.id = :tenantId and t.platformFee > 0 and t.status = 'SUCCESSFUL'
+               and t.completedAt >= :since""")
+    long sumPlatformFeeForTenantSince(@org.springframework.data.repository.query.Param("tenantId") Long tenantId,
+                                      @org.springframework.data.repository.query.Param("since") OffsetDateTime since);
+
+    /** Most recent payments that paid a platform fee, newest first, with their tenant. */
+    @org.springframework.data.jpa.repository.Query("""
+            select t from Transaction t join fetch t.tenant
+             where t.platformFee > 0 and t.status = 'SUCCESSFUL' order by t.completedAt desc""")
+    List<Transaction> findRecentPlatformFees(org.springframework.data.domain.Pageable page);
 }

@@ -29,6 +29,7 @@ public class AdminSubscriptionController {
     private final SubscriptionPaymentRepository payments;
     private final SubscriptionNotificationRepository notifications;
     private final TenantRepository tenants;
+    private final TransactionRepository transactions;
 
     // ---------- overview ----------
 
@@ -54,18 +55,42 @@ public class AdminSubscriptionController {
             }
         }
 
-        long monthRevenue = payments.sumSince(YearMonth.now().atDay(1).atStartOfDay().atOffset(OffsetDateTime.now().getOffset()));
-        return Map.of(
-                "totalTenants", tenants.count(),
-                "subscribed", all.size(),
-                "active", active,
-                "trialing", trialing,
-                "grace", grace,
-                "suspended", suspended,
-                "expiringSoon", expiringSoon,
-                "monthRevenue", monthRevenue,
-                "defaultFee", service.defaultFee()
+        OffsetDateTime monthStart = YearMonth.now().atDay(1).atStartOfDay().atOffset(OffsetDateTime.now().getOffset());
+        long monthRevenue = payments.sumSince(monthStart);
+        long platformFeeMonth = transactions.sumPlatformFeeSince(monthStart);
+        long platformFeeToday = transactions.sumPlatformFeeSince(
+                java.time.LocalDate.now().atStartOfDay().atOffset(OffsetDateTime.now().getOffset()));
+        long platformFeeTenants = tenants.findAll().stream().filter(t -> t.activePlatformFeeBps() > 0).count();
+        return Map.ofEntries(
+                Map.entry("totalTenants", tenants.count()),
+                Map.entry("subscribed", all.size()),
+                Map.entry("active", active),
+                Map.entry("trialing", trialing),
+                Map.entry("grace", grace),
+                Map.entry("suspended", suspended),
+                Map.entry("expiringSoon", expiringSoon),
+                Map.entry("monthRevenue", monthRevenue),
+                Map.entry("platformFeeMonth", platformFeeMonth),
+                Map.entry("platformFeeToday", platformFeeToday),
+                Map.entry("platformFeeTenants", platformFeeTenants),
+                Map.entry("defaultFee", service.defaultFee())
         );
+    }
+
+    /** One customer payment that paid the platform fee. */
+    public record PlatformFeeRow(Long transactionId, OffsetDateTime at, Long tenantId, String businessName,
+                                 String reference, long amountPaid, java.math.BigDecimal percent, long fee) {}
+
+    /** The latest platform fees as they come in — newest first. */
+    @GetMapping("/platform-fees")
+    public List<PlatformFeeRow> platformFees(@RequestParam(defaultValue = "50") int limit) {
+        int size = Math.max(1, Math.min(limit, 200));
+        return transactions.findRecentPlatformFees(org.springframework.data.domain.PageRequest.of(0, size)).stream()
+                .map(t -> new PlatformFeeRow(t.getId(), t.getCompletedAt(), t.getTenant().getId(), t.getTenant().getName(),
+                        t.getReference(), t.getAmount().longValue(),
+                        java.math.BigDecimal.valueOf(t.getPlatformFeeBps() == null ? 0 : t.getPlatformFeeBps(), 2).stripTrailingZeros(),
+                        t.getPlatformFee()))
+                .toList();
     }
 
     // ---------- list ----------

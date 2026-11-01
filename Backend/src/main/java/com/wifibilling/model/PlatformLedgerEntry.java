@@ -20,6 +20,7 @@ public class PlatformLedgerEntry {
     // Earnings
     public static final String EARNING_MARZPAY = "EARNING_MARZPAY";     // settled into MarzPay
     public static final String EARNING_EXTERNAL = "EARNING_EXTERNAL";   // received outside MarzPay
+    public static final String EARNING_PLATFORM_FEE = "EARNING_PLATFORM_FEE"; // per-payment platform fee, settled in MarzPay
     public static final String EXTERNAL_DEPOSIT = "EXTERNAL_DEPOSIT";   // external funds later verified in MarzPay
     public static final String FEE = "FEE";                             // provider/payout fee recorded
     // Payout lifecycle

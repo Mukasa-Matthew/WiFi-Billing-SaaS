@@ -27,6 +27,7 @@ public class WalletLedgerEntry {
     public static final String SETTLEMENT_RELEASE = "SETTLEMENT_RELEASE";     // pending → available move (debit pending side)
 
     // Types that decrease available balance
+    public static final String PLATFORM_FEE = "PLATFORM_FEE";                 // informational: AirPairy platform fee (credit is already net of it)
     public static final String FEE_DEBIT = "FEE_DEBIT";                       // informational: fee recorded (not deducted twice — credit is net)
     public static final String WITHDRAWAL_RESERVE = "WITHDRAWAL_RESERVE";     // available → reserved hold
     public static final String WITHDRAWAL_DEBIT = "WITHDRAWAL_DEBIT";         // payout completed: reserved → gone

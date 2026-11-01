@@ -71,6 +71,15 @@ public class Transaction {
     @Column(name = "net_amount")
     private Long netAmount;
 
+    /** AirPairy platform fee rate (basis points) frozen when the payment started;
+     *  null or 0 = no platform fee. Later changes to the tenant's rate never apply. */
+    @Column(name = "platform_fee_bps")
+    private Integer platformFeeBps;
+
+    /** Platform fee actually taken from this payment's net, credited to platform earnings. */
+    @Column(name = "platform_fee")
+    private Long platformFee;
+
     /** MarzPay transaction UUID (data.transaction.uuid). */
     @Column(name = "provider_uuid", length = 64)
     private String providerUuid;
