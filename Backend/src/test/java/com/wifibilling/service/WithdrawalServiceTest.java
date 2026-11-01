@@ -55,7 +55,8 @@ class WithdrawalServiceTest {
         ReflectionTestUtils.setField(service, "minAmount", 1_000L);
         ReflectionTestUtils.setField(service, "maxAmount", 5_000_000L);
         ReflectionTestUtils.setField(service, "maxOpenPerTenant", 1L);
-        ReflectionTestUtils.setField(service, "feePercent", 3L);
+        ReflectionTestUtils.setField(service, "feeReservePercent", 10L);
+        ReflectionTestUtils.setField(service, "feeReserveMin", 1_000L);
         ReflectionTestUtils.setField(service, "requireApproval", false);
         ReflectionTestUtils.setField(service, "livePayoutsEnabled", true);
         ReflectionTestUtils.setField(service, "recheckAfterSeconds", 120L);
@@ -113,25 +114,29 @@ class WithdrawalServiceTest {
         var ex = assertThrows(ResponseStatusException.class, () -> service.request(5L, 46_000, "0755032436", null));
 
         assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
-        assertEquals("Insufficient balance: UGX 46,000 plus the UGX 1,380 gateway fee comes to UGX 47,380, "
-                + "but your available balance is UGX 47,180. The most you can withdraw right now is UGX 45,805.",
+        assertEquals("Insufficient balance: UGX 46,000 plus up to UGX 4,600 held for the gateway fee comes to UGX 50,600, "
+                + "but your available balance is UGX 47,180. The most you can withdraw right now is UGX 42,890.",
                 ex.getReason());
         verify(withdrawals, never()).save(any());
         verifyNoInteractions(marzPay);
     }
 
     @Test
-    void maxWithdrawableLeavesExactlyEnoughForTheFee() {
-        assertEquals(45_805L, service.maxWithdrawable(47_180));
-        assertEquals(47_180L, 45_805L + service.estimateFee(45_805));
+    void maxWithdrawableLeavesRoomForTheFeeReserve() {
+        assertEquals(42_890L, service.maxWithdrawable(47_180));
+        assertTrue(42_890L + service.feeReserve(42_890) <= 47_180L);
+        assertTrue(42_891L + service.feeReserve(42_891) > 47_180L);
         assertEquals(0L, service.maxWithdrawable(400));
+        assertEquals(0L, service.maxWithdrawable(-200));
     }
 
     @Test
-    void feeEstimateCoversThreePercentProviderCharge() {
-        assertEquals(1_380L, service.estimateFee(46_000));
-        assertEquals(660L, service.estimateFee(22_000));
-        assertEquals(500L, service.estimateFee(2_000));
+    void feeReserveCoversEveryChargeSeenSoFar() {
+        // Observed MarzPay payout fees: 3% (10,000 / 22,000 / 46,000) and 900 on 9,000.
+        assertTrue(service.feeReserve(9_000) >= 900);
+        assertTrue(service.feeReserve(46_000) >= 1_380);
+        assertEquals(1_000L, service.feeReserve(2_000));
+        assertEquals(4_600L, service.feeReserve(46_000));
     }
 
     @Test
@@ -188,19 +193,32 @@ class WithdrawalServiceTest {
 
     // ---------- dispatch ----------
 
-    /** Replays 31 Oct: the provider fee exceeds the reserve after the money has gone out. */
     @Test
-    void feeAboveEstimateAfterPayoutIsSettledNotRolledBack() throws Exception {
-        providerCharges(1_500);
+    void unusedFeeReserveIsReturnedOnceTheRealFeeIsKnown() throws Exception {
+        providerCharges(1_200);
 
-        WithdrawalRequest w = service.request(5L, 45_000, "0755032436", null);
+        WithdrawalRequest w = service.request(5L, 40_000, "0755032436", null);
 
         assertEquals(WithdrawalRequest.PROCESSING, w.getStatus());
         assertNotNull(w.getDispatchedAt());
-        assertEquals(1_500L, w.getFee());
-        assertEquals(46_500L, w.getTotalDeduction());
-        verify(walletService).reserveForWithdrawal(5L, 46_350L, "RES:" + w.getPayoutRef(), 9L);
-        verify(walletService).adjustReservation(5L, 150L, "FEEADJ:" + w.getPayoutRef(), 9L);
+        assertEquals(1_200L, w.getFee());
+        assertEquals(41_200L, w.getTotalDeduction());
+        verify(walletService).reserveForWithdrawal(5L, 44_000L, "RES:" + w.getPayoutRef(), 9L);
+        verify(walletService).adjustReservation(5L, -2_800L, "FEEADJ:" + w.getPayoutRef(), 9L);
+        verify(platformEarnings, never()).absorbPayoutFeeShortfall(anyLong(), any(), any());
+    }
+
+    /** A fee beyond the reserve and the tenant's balance: the platform pays the rest, never the tenant's debt. */
+    @Test
+    void feeBeyondReserveAndBalanceIsAbsorbedByThePlatform() throws Exception {
+        providerCharges(5_000);
+        when(walletService.adjustReservation(eq(5L), eq(1_000L), any(), eq(9L))).thenReturn(600L);
+
+        WithdrawalRequest w = service.request(5L, 40_000, "0755032436", null);
+
+        assertEquals(5_000L, w.getFee());
+        assertEquals(44_400L, w.getTotalDeduction());
+        verify(platformEarnings).absorbPayoutFeeShortfall(eq(600L), eq("FEEADJ:" + w.getPayoutRef()), any());
     }
 
     @Test
@@ -212,7 +230,7 @@ class WithdrawalServiceTest {
 
         assertEquals(WithdrawalRequest.PROCESSING, w.getStatus());
         assertTrue(w.getFailureReason().startsWith("Dispatch outcome unknown"));
-        verify(walletService).reserveForWithdrawal(eq(5L), eq(20_600L), any(), eq(9L));
+        verify(walletService).reserveForWithdrawal(eq(5L), eq(22_000L), any(), eq(9L));
         verify(walletService, never()).releaseWithdrawal(anyLong(), anyLong(), any(), any());
     }
 
@@ -231,16 +249,16 @@ class WithdrawalServiceTest {
         when(marzPay.sendMoney(any(), anyLong(), any(), any(), any(), any(), any())).thenAnswer(i -> {
             service.processDisbursementCallback(JSON.readTree(
                     "{\"transaction\":{\"provider_reference\":\"" + stored.getPayoutRef() + "\",\"status\":\"completed\"}}"));
-            return JSON.readTree("{\"data\":{\"withdrawal\":{\"charge\":{\"raw\":1500}}}}");
+            return JSON.readTree("{\"data\":{\"withdrawal\":{\"charge\":{\"raw\":1200}}}}");
         });
 
-        WithdrawalRequest w = service.request(5L, 45_000, "0755032436", null);
+        WithdrawalRequest w = service.request(5L, 40_000, "0755032436", null);
 
         assertEquals(WithdrawalRequest.COMPLETED, w.getStatus());
-        verify(walletService).finalizeWithdrawal(5L, 46_350L, "PAY:" + w.getPayoutRef(), 9L);
-        verify(walletService).settleCompletedPayoutFee(5L, 150L, "FEEADJ:" + w.getPayoutRef(), 9L);
+        verify(walletService).finalizeWithdrawal(5L, 44_000L, "PAY:" + w.getPayoutRef(), 9L);
+        verify(walletService).settleCompletedPayoutFee(5L, -2_800L, "FEEADJ:" + w.getPayoutRef(), 9L);
         verify(walletService, never()).adjustReservation(anyLong(), anyLong(), any(), any());
-        assertEquals(46_500L, w.getTotalDeduction());
+        assertEquals(41_200L, w.getTotalDeduction());
     }
 
     // ---------- provider outcome ----------
