@@ -183,11 +183,15 @@ class WinboxAccessServiceTest {
         service.revokeTenant(owner.getTenantId());
         assertThat(service.routes(GATEWAY).routes()).isEmpty(); assertThat(a.isEnabled()).isFalse();
         service.change(owner, router.getId(), "enable", "127.0.0.1"); ready(agent);
-        router.getTenant().setStatus("SUSPENDED");
-        assertThat(service.routes(GATEWAY).routes()).isEmpty(); assertThat(a.isEnabled()).isFalse();
-        router.getTenant().setStatus("ACTIVE");
+        // Status reports clear the persistence context, so state changes are saved, as in production.
+        var tenant = tenants.findById(owner.getTenantId()).orElseThrow();
+        tenant.setStatus("SUSPENDED"); tenants.save(tenant);
         assertThat(service.routes(GATEWAY).routes()).isEmpty();
-        router.setWgIp("10.9.0.99");
+        assertThat(accesses.findByRouterId(router.getId()).orElseThrow().isEnabled()).isFalse();
+        tenant.setStatus("ACTIVE"); tenants.save(tenant);
+        assertThat(service.routes(GATEWAY).routes()).isEmpty();
+        router = routers.findById(router.getId()).orElseThrow();
+        router.setWgIp("10.9.0.99"); routers.save(router);
         assertThat(service.change(owner, router.getId(), "enable", "127.0.0.1").state()).isEqualTo("INSTALL_REQUIRED");
         assertThat(accesses.findByRouterId(router.getId()).orElseThrow().getPort()).isNotEqualTo(a.getPort());
         assertThatThrownBy(() -> service.agentConfig(router.getId(), agent)).isInstanceOf(ResponseStatusException.class);
@@ -218,5 +222,23 @@ class WinboxAccessServiceTest {
         assertThat(service.status(owner, router.getId(), "127.0.0.1").state()).isEqualTo("OFFLINE");
         routerController.delete(owner, router.getId());
         assertThat(accesses.findByRouterId(router.getId())).isEmpty();
+    }
+
+    /** Router acks and gateway checks arrive every few seconds; they must not fight over
+     *  the row version (they used to fail with optimistic-lock errors when they overlapped). */
+    @Test
+    void statusReportsAreRecordedWithoutTouchingTheRowVersion() {
+        enable(); String agent = install();
+        long before = accesses.findByRouterId(router.getId()).orElseThrow().getVersion();
+
+        ready(agent);
+
+        var a = accesses.findByRouterId(router.getId()).orElseThrow();
+        assertThat(a.getVersion()).isEqualTo(before);
+        assertThat(a.getRouterResult()).isEqualTo("APPLIED");
+        assertThat(a.getAppliedRevision()).isEqualTo(a.getRevision());
+        assertThat(a.getGatewayResult()).isEqualTo("READY");
+        assertThat(a.getLastSuccessfulCheck()).isNotNull();
+        assertThat(service.routes(GATEWAY).routes()).hasSize(1);
     }
 }
