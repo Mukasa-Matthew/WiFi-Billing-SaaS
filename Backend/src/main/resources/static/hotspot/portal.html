@@ -446,7 +446,7 @@ function renderSettings(settings) {
    their school ID and PIN first: staff and returning students are connected
    straight away, other students then see packages and pay with a ticket that
    proves the check. Ordinary tenants never reach this code. */
-var SCHOOL = { ticket: null, pinChangeToken: null, busy: false };
+var SCHOOL = { ticket: null, pinChangeToken: null, busy: false, resumed: false };
 function applySchoolMode(settings) {
     if (!settings.school) return;
     document.getElementById('school-section').style.display = '';
@@ -457,8 +457,30 @@ function applySchoolMode(settings) {
     var showPackages = !!SCHOOL.ticket && settings.allowPurchases !== false;
     document.getElementById('packages-section').style.display = showPackages ? '' : 'none';
     document.getElementById('plans-label').style.display = showPackages ? '' : 'none';
+    if (!SCHOOL.resumed) {
+        SCHOOL.resumed = true;
+        trySchoolResume();
+    }
 }
 function schoolMac() { return (MT_MAC && MT_MAC.charAt(0) !== '$') ? MT_MAC : ''; }
+function trySchoolResume() {
+    if (MT_ERROR || !schoolMac()) return;
+    fetch(BASE + '/api/portal/school/resume', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ token: TOKEN, mac: schoolMac() })
+    })
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(res){
+        if (!res) return;
+        if (res.action === 'CONNECT' && res.code) {
+            schoolResult(res);
+        } else if (res.action === 'SIGN_IN' && res.message) {
+            showMsg(escapeText(res.message), true);
+        }
+    })
+    .catch(function(){});
+}
 function schoolPost(path, body, onDone) {
     if (SCHOOL.busy) return;
     if (!schoolMac()) { showMsg('Connect to the school WiFi and open this page again.', true); return; }
@@ -528,9 +550,11 @@ function schoolResult(res) {
         savePurchase(res.code);
         purchasedCode = res.code;
         document.getElementById('username-input').value = res.code;
+        document.getElementById('school-signin').style.display = 'none';
         var who = res.category === 'STAFF' ? 'staff access' : res.category === 'VISITOR' ? 'visitor access' : 'your package';
         if (!LINK_LOGIN || LINK_LOGIN.charAt(0) === '$') { showMsg('Signed in. Reopen this page from the WiFi network to connect.', true); return; }
-        showMsg('Welcome, ' + escapeText(res.fullName || '') + '. Connecting you with ' + who + '…', false);
+        var greeting = res.fullName ? ('Welcome, ' + escapeText(res.fullName) + '. ') : 'Welcome back! ';
+        showMsg(greeting + 'Connecting you with ' + who + '…', false);
         window.scrollTo(0, 0);
         setTimeout(function(){
             document.getElementById('password-input').value = res.code;

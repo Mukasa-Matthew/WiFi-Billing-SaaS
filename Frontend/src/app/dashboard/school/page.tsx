@@ -18,6 +18,7 @@ interface Settings {
   visitorDailyCap: number;
   visitorRateLimit: string | null;
   visitorDataCapMb?: number | null;
+  tetheringProtection?: "OFF" | "LOG" | "BLOCK";
 }
 interface SchoolSummary {
   name: string;
@@ -595,6 +596,11 @@ function SettingsCard({ settings, onSaved }: { settings: Settings; onSaved: () =
   const [visitorCapMb, setVisitorCapMb] = useState(
     settings.visitorDataCapMb && settings.visitorDataCapMb > 0 ? String(settings.visitorDataCapMb) : ""
   );
+  const [tethering, setTethering] = useState<"OFF" | "LOG" | "BLOCK">(
+    settings.tetheringProtection === "OFF" || settings.tetheringProtection === "LOG"
+      ? settings.tetheringProtection
+      : "BLOCK"
+  );
   const [applyNow, setApplyNow] = useState(true);
   const [busy, setBusy] = useState(false);
 
@@ -610,6 +616,7 @@ function SettingsCard({ settings, onSaved }: { settings: Settings; onSaved: () =
         visitorDailyCap: Number(visitorDailyPasses) || 0,
         visitorRateLimit: visitorRate.trim(),
         visitorDataCapMb: visitorCapMb.trim() ? Number(visitorCapMb) : 0,
+        tetheringProtection: tethering,
         applyImmediately: applyNow,
       });
       toast(
@@ -638,7 +645,7 @@ function SettingsCard({ settings, onSaved }: { settings: Settings; onSaved: () =
             <div>
               <h3 className="text-sm font-semibold text-[var(--fg)]">1. School Staff Free WiFi</h3>
               <p className="text-xs text-[var(--fg-muted)]">
-                Staff sign in with their Staff ID and PIN. Daily data caps reset automatically at midnight.
+                Staff sign in once with their Staff ID and PIN and reconnect automatically for their active period. Daily data caps reset at midnight.
               </p>
             </div>
             <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-medium text-[var(--fg)]">
@@ -833,6 +840,56 @@ function SettingsCard({ settings, onSaved }: { settings: Settings; onSaved: () =
               When switched off, the school&apos;s IT staff cannot create visitor passes and the &ldquo;I&apos;m a visitor&rdquo; button is hidden on the captive portal.
             </p>
           )}
+        </div>
+
+        {/* Anti-Hotspot / Anti-Tethering Protection Section */}
+        <div className="space-y-3 rounded-xl border border-[var(--border)] bg-[var(--subtle)] p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold text-[var(--fg)]">
+                3. Block Hotspot &amp; Tethering Sharing
+              </h3>
+              <p className="text-xs text-[var(--fg-muted)]">
+                Prevent a connected phone or laptop from turning on Mobile Hotspot or USB/WiFi sharing to give free internet to other devices.
+              </p>
+            </div>
+            <Badge tone={tethering === "BLOCK" ? "green" : tethering === "LOG" ? "amber" : "slate"} dot>
+              {tethering === "BLOCK" ? "Hotspot sharing blocked" : tethering === "LOG" ? "Detect & log only" : "Sharing allowed"}
+            </Badge>
+          </div>
+          <div className="grid gap-2.5 sm:grid-cols-3">
+            {[
+              {
+                key: "BLOCK" as const,
+                title: "Block Hotspot Sharing (Recommended)",
+                desc: "Locks packet TTL=1 to devices and drops tethered Android/iOS/Windows hotspot traffic.",
+              },
+              {
+                key: "LOG" as const,
+                title: "Detect & Log Only",
+                desc: "Logs hotspot sharing attempts on the router without dropping packets.",
+              },
+              {
+                key: "OFF" as const,
+                title: "Allow Hotspot Sharing",
+                desc: "No tethering filter or TTL lock on the school router.",
+              },
+            ].map((opt) => (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => setTethering(opt.key)}
+                className={`rounded-lg border p-3 text-left transition-colors ${
+                  tethering === opt.key
+                    ? "border-[var(--primary)] bg-[var(--primary-soft)]"
+                    : "border-[var(--border)] bg-[var(--surface)] hover:border-[var(--fg-muted)]"
+                }`}
+              >
+                <span className="block text-xs font-semibold text-[var(--fg)]">{opt.title}</span>
+                <span className="mt-1 block text-[11px] text-[var(--fg-muted)]">{opt.desc}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="flex flex-col gap-3 border-t border-[var(--border)] pt-4 sm:flex-row sm:items-center sm:justify-between">

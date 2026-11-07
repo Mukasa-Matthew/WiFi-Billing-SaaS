@@ -310,4 +310,58 @@ class SchoolFlowIntegrationTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("paused")));
     }
+
+    @Test
+    void staffAndStudentsAutoReconnectByMacWithoutReEnteringIdAndPin() throws Exception {
+        Site school = site("resume-school", true);
+
+        // Unknown MAC gets SIGN_IN without error
+        String initial = portal("resume", "{\"token\":\"" + school.routerToken() + "\",\"mac\":\"" + PHONE_MAC + "\"}");
+        assertEquals("SIGN_IN", JsonPath.read(initial, "$.action"));
+
+        // 1. Staff member signs in once -> voucher is valid for the full 1-year period (not 24h)
+        verified(school.tenant().getId(), "OK", "STAFF", "staff-resume-1");
+        String staffCode = JsonPath.read(portal("verify", verifyBody(school, PHONE_MAC)), "$.code");
+        Voucher staffVoucher = vouchers.findByCode(staffCode).orElseThrow();
+        var staffPlan = plans.findFirstByTenantIdAndAvailabilityAndName(school.tenant().getId(), "SCHOOL", "School staff access").orElseThrow();
+        assertEquals(0, (int) staffPlan.getSessionTimeout(), "staff vouchers do not expire every 24h");
+        assertTrue(staffVoucher.getExpiresAt().isAfter(OffsetDateTime.now().plusDays(300)), "staff voucher lasts until accessUntil (1 year)");
+
+        // Clear Mockito invocations to prove resume does NOT call identity.verify again
+        clearInvocations(identity);
+        String staffResume = portal("resume", "{\"token\":\"" + school.routerToken() + "\",\"mac\":\"" + PHONE_MAC + "\"}");
+        assertEquals("CONNECT", JsonPath.read(staffResume, "$.action"));
+        assertEquals(staffCode, JsonPath.read(staffResume, "$.code"));
+        assertEquals("STAFF", JsonPath.read(staffResume, "$.category"));
+        verifyNoInteractions(identity);
+
+        // 2. Student signs in once and purchases a package on TABLET_MAC -> auto-reconnects while voucher has remaining time
+        verified(school.tenant().getId(), "OK", "STUDENT", "student-resume-1");
+        String ticket = JsonPath.read(portal("verify", verifyBody(school, TABLET_MAC)), "$.ticket");
+        String reference = JsonPath.read(pay(school, TABLET_MAC, ticket), "$.reference");
+        mvc.perform(post("/api/payments/webhook").header("X-Webhook-Secret", "school-test-webhook-secret").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"reference\":\"" + reference + "\",\"status\":\"SUCCESSFUL\"}")).andExpect(status().isOk());
+        String studentCode = JsonPath.read(mvc.perform(get("/api/payments/status/" + reference)).andReturn().getResponse().getContentAsString(), "$.voucherCode");
+
+        clearInvocations(identity);
+        String studentResume = portal("resume", "{\"token\":\"" + school.routerToken() + "\",\"mac\":\"" + TABLET_MAC + "\"}");
+        assertEquals("CONNECT", JsonPath.read(studentResume, "$.action"));
+        assertEquals(studentCode, JsonPath.read(studentResume, "$.code"));
+        assertEquals("STUDENT", JsonPath.read(studentResume, "$.category"));
+        verifyNoInteractions(identity);
+
+        // If IT suspends/disconnects the student, auto-resume stops and requires fresh ID + PIN
+        String body = "{\"tenantId\":" + school.tenant().getId() + ",\"personId\":\"student-resume-1\"}";
+        long now = Instant.now().getEpochSecond();
+        mvc.perform(signedDisconnect(body, SECRET, now, UUID.randomUUID().toString())).andExpect(status().isOk());
+        String afterSuspend = portal("resume", "{\"token\":\"" + school.routerToken() + "\",\"mac\":\"" + TABLET_MAC + "\"}");
+        assertEquals("SIGN_IN", JsonPath.read(afterSuspend, "$.action"));
+
+        // 3. School settings expose and update anti-tethering / hotspot blocking
+        mvc.perform(put("/api/school/settings").header("Authorization", "Bearer " + school.jwt()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"tetheringProtection\":\"BLOCK\",\"applyImmediately\":false}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tetheringProtection").value("BLOCK"));
+        assertEquals("BLOCK", tenants.findById(school.tenant().getId()).orElseThrow().getTetheringProtection());
+    }
 }

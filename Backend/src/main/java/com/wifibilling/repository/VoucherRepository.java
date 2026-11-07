@@ -29,6 +29,12 @@ public interface VoucherRepository extends JpaRepository<Voucher, Long> {
     List<Voucher> findAllLiveForPerson(@org.springframework.data.repository.query.Param("tenantId") Long tenantId,
             @org.springframework.data.repository.query.Param("personId") String personId);
 
+    /** School vouchers currently claimed by a client MAC address for zero-touch portal auto-reconnect. */
+    @org.springframework.data.jpa.repository.Query("select v from Voucher v where v.tenant.id = :tenantId and upper(v.claimedMac) = :mac "
+            + "and v.schoolCategory is not null and v.status in ('unused', 'active') order by v.createdAt desc")
+    List<Voucher> findLiveByTenantIdAndClaimedMac(@org.springframework.data.repository.query.Param("tenantId") Long tenantId,
+            @org.springframework.data.repository.query.Param("mac") String mac);
+
     List<Voucher> findAllByTenantIdAndVisitorPassIdAndStatusIn(Long tenantId, String visitorPassId, java.util.Collection<String> statuses);
 
     List<Voucher> findAllByTenantIdAndVisitorPassId(Long tenantId, String visitorPassId);

@@ -56,9 +56,10 @@ class RouterScriptGeneratorTest {
         assertTrue(s.contains("http://203.0.113.10:8080/api/router/setup/" + SETUP + "/register"));
         assertTrue(s.contains(":local wbPub [/interface/wireguard get [find name=\"wg-billing\"] public-key]"));
         assertTrue(s.contains("http-data=(\"{\\\"publicKey\\\":\\\"\" . $wbPub . \"\\\"}\")"));
-        // tethering BLOCK mode emits drop rules
+        // tethering BLOCK mode emits drop rules + downstream TTL=1 lock
         assertTrue(s.contains("/ip/firewall/filter/add chain=forward ttl=equal:62 action=drop"));
         assertTrue(s.contains("/ip/firewall/filter/add chain=forward ttl=equal:126 action=drop"));
+        assertTrue(s.contains("/ip/firewall/mangle/add chain=postrouting out-interface=\"wb-hotspot-bridge\" action=change-ttl new-ttl=set:1"));
         assertTrue(s.contains("# Provisioning-Version: " + RouterScriptGenerator.PROVISIONING_VERSION));
         assertTrue(s.contains("find name=wb-provisioned comment=$wbMarker"));
         assertTrue(s.contains("Existing wb-hotspot-bridge is not managed by WiFi-Billing"));

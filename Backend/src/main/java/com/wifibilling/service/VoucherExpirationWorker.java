@@ -93,6 +93,13 @@ public class VoucherExpirationWorker {
                             .format(java.time.format.DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm:ss",java.util.Locale.ENGLISH));
                     radCheckRepository.save(RadCheck.builder().username(voucher.getCode())
                             .attribute("Expiration").op(":=").value(expiry).build());
+                } else if (voucher.getHardExpiresAt() != null) {
+                    voucher.setExpiresAt(voucher.getHardExpiresAt());
+                    radCheckRepository.deleteAllByUsernameAndAttribute(voucher.getCode(), "Expiration");
+                    String expiry = voucher.getHardExpiresAt().withOffsetSameInstant(java.time.ZoneOffset.UTC)
+                            .format(java.time.format.DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm:ss",java.util.Locale.ENGLISH));
+                    radCheckRepository.save(RadCheck.builder().username(voucher.getCode())
+                            .attribute("Expiration").op(":=").value(expiry).build());
                 }
                 voucherRepository.save(voucher);
                 log.info("Voucher '{}' activated. First login: {}, expires at: {}", voucher.getCode(), loginTime, voucher.getExpiresAt());
@@ -106,9 +113,11 @@ public class VoucherExpirationWorker {
      */
     private void expireOverdueVouchers() {
         OffsetDateTime now = OffsetDateTime.now();
-        List<Voucher> overdue = new java.util.ArrayList<>(voucherRepository.findAllByStatusAndExpiresAtBefore(STATUS_ACTIVE, now));
-        overdue.addAll(voucherRepository.findAllByStatusAndHardExpiresAtBefore(STATUS_UNUSED, now));
-        for (Voucher voucher : overdue) {
+        var overdueMap = new java.util.LinkedHashMap<Long, Voucher>();
+        voucherRepository.findAllByStatusAndExpiresAtBefore(STATUS_ACTIVE, now).forEach(v -> overdueMap.put(v.getId(), v));
+        voucherRepository.findAllByStatusAndHardExpiresAtBefore(STATUS_UNUSED, now).forEach(v -> overdueMap.put(v.getId(), v));
+        voucherRepository.findAllByStatusAndHardExpiresAtBefore(STATUS_ACTIVE, now).forEach(v -> overdueMap.put(v.getId(), v));
+        for (Voucher voucher : overdueMap.values()) {
             voucher.setStatus(STATUS_EXPIRED);
             voucherRepository.save(voucher);
 
@@ -185,6 +194,9 @@ public class VoucherExpirationWorker {
 
     private void holdSchoolVoucher(Voucher voucher, String reason) {
         voucher.setSchoolHold(true);
+        if (!"IT_HOLD".equals(voucher.getDelivery())) {
+            voucher.setDelivery("CAP_HOLD");
+        }
         voucherRepository.save(voucher);
         radCheckRepository.deleteAllByUsername(voucher.getCode());
         radReplyRepository.deleteAllByUsername(voucher.getCode());

@@ -1,10 +1,14 @@
 package com.wifibilling.school;
 
+import com.wifibilling.model.Router;
 import com.wifibilling.model.Tenant;
+import com.wifibilling.repository.RouterRepository;
 import com.wifibilling.repository.TenantRepository;
 import com.wifibilling.service.EmailService;
 import com.wifibilling.service.EmailTemplates;
+import com.wifibilling.service.RouterManagementService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -24,10 +28,18 @@ public class SchoolManagementService {
     private final EmailService email;
     private final EmailTemplates templates;
     private final String dashboardUrl;
+    private RouterRepository routers;
+    private RouterManagementService routerManagement;
 
     public SchoolManagementService(IdentityClient identity, TenantRepository tenants, SchoolAccessService access, EmailService email,
                                    EmailTemplates templates, @Value("${identity.dashboard-url:}") String dashboardUrl) {
         this.identity = identity; this.tenants = tenants; this.access = access; this.email = email; this.templates = templates; this.dashboardUrl = dashboardUrl;
+    }
+
+    @Autowired(required = false)
+    public void setRouterSync(RouterRepository routers, RouterManagementService routerManagement) {
+        this.routers = routers;
+        this.routerManagement = routerManagement;
     }
 
     /** The IT person's temporary password is emailed; it is returned only when email could not be sent. */
@@ -40,6 +52,9 @@ public class SchoolManagementService {
         tenant.setTenantType("SCHOOL");
         tenant.setSchoolVisitorsEnabled(false);
         tenant.setSchoolVisitorDailyCap(0);
+        if (tenant.getTetheringProtection() == null || "OFF".equals(tenant.getTetheringProtection())) {
+            tenant.setTetheringProtection("BLOCK");
+        }
         tenants.save(tenant);
         return deliver(created.path("admin").path("fullName").asString(itName), tenant.getName(),
                 created.path("admin").path("email").asString(itEmail), created.path("temporaryPassword").asString());
@@ -80,6 +95,7 @@ public class SchoolManagementService {
         result.put("visitorDailyCap", tenant.getSchoolVisitorDailyCap() == null ? 0 : tenant.getSchoolVisitorDailyCap());
         result.put("visitorRateLimit", tenant.getSchoolVisitorRateLimit());
         result.put("visitorDataCapMb", tenant.getSchoolVisitorDataCapMb());
+        result.put("tetheringProtection", tenant.getTetheringProtection() == null ? "OFF" : tenant.getTetheringProtection());
         return result;
     }
 
@@ -89,6 +105,7 @@ public class SchoolManagementService {
                                   Boolean staffEnabled,
                                   @jakarta.validation.constraints.Min(0) @jakarta.validation.constraints.Max(1000000) Integer staffDailyDataCapMb,
                                   @jakarta.validation.constraints.Min(0) @jakarta.validation.constraints.Max(1000000) Integer visitorDataCapMb,
+                                  @jakarta.validation.constraints.Pattern(regexp = "OFF|LOG|BLOCK") String tetheringProtection,
                                   Boolean applyImmediately) {}
 
     /** Visitor changes go to the identity system first, so the IT dashboard never disagrees with AirPairy. */
@@ -106,9 +123,19 @@ public class SchoolManagementService {
         if (req.visitorRateLimit() != null) tenant.setSchoolVisitorRateLimit(rate(req.visitorRateLimit()));
         if (req.staffDailyDataCapMb() != null) tenant.setSchoolStaffDailyDataCapMb(req.staffDailyDataCapMb() > 0 ? req.staffDailyDataCapMb() : null);
         if (req.visitorDataCapMb() != null) tenant.setSchoolVisitorDataCapMb(req.visitorDataCapMb() > 0 ? req.visitorDataCapMb() : null);
-        tenants.save(tenant);
-        access.applyFreeAccessRules(tenant, Boolean.TRUE.equals(req.applyImmediately()));
-        return settings(tenant);
+        if (req.tetheringProtection() != null) tenant.setTetheringProtection(req.tetheringProtection());
+        Tenant saved = tenants.save(tenant);
+        access.applyFreeAccessRules(saved, Boolean.TRUE.equals(req.applyImmediately()));
+        if (req.tetheringProtection() != null && routers != null && routerManagement != null) {
+            for (Router router : routers.findAllByTenantId(saved.getId())) {
+                try {
+                    routerManagement.enqueue(router, "SYNC_TETHERING");
+                } catch (ResponseStatusException e) {
+                    log.debug("Skipping tethering sync for router {}: {}", router.getId(), e.getMessage());
+                }
+            }
+        }
+        return settings(saved);
     }
 
     /** Blank means unlimited; otherwise a MikroTik rate such as "5M/5M". */

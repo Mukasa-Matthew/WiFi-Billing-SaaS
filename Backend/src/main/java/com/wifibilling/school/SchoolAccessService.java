@@ -65,12 +65,97 @@ public class SchoolAccessService {
         this.expiration = expiration; this.clock = clock; this.transaction = new TransactionTemplate(manager);
     }
 
-    /** What the portal should do next: connect with {@code code}, show packages with {@code ticket}, or ask for a new PIN. */
+    public static final String HOLD_IT = "IT_HOLD";
+    public static final String HOLD_CAP = "CAP_HOLD";
+
+    /** What the portal should do next: connect with {@code code}, show packages with {@code ticket}, ask for a new PIN, or show the sign-in form. */
     public record PortalResult(String action, String code, String ticket, String pinChangeToken, String fullName, String category,
-                               LocalDate accessUntil, OffsetDateTime expiresAt) {
-        static PortalResult connect(String code, String fullName, String category, OffsetDateTime expiresAt) {
-            return new PortalResult("CONNECT", code, null, null, fullName, category, null, expiresAt);
+                               LocalDate accessUntil, OffsetDateTime expiresAt, String message) {
+        public PortalResult(String action, String code, String ticket, String pinChangeToken, String fullName, String category,
+                            LocalDate accessUntil, OffsetDateTime expiresAt) {
+            this(action, code, ticket, pinChangeToken, fullName, category, accessUntil, expiresAt, null);
         }
+
+        static PortalResult connect(String code, String fullName, String category, OffsetDateTime expiresAt) {
+            return new PortalResult("CONNECT", code, null, null, fullName, category, null, expiresAt, null);
+        }
+
+        static PortalResult signIn(String message) {
+            return new PortalResult("SIGN_IN", null, null, null, null, null, null, null, message);
+        }
+    }
+
+    /**
+     * Zero-touch auto-reconnect for school devices: when a staff member, student,
+     * or visitor's device (MAC) already holds an active, unexpired voucher in the
+     * system, reconnect it automatically without asking for their ID and PIN again.
+     */
+    public PortalResult resume(String routerToken, String rawMac) {
+        Router router = schoolRouter(routerToken);
+        String mac = requireMac(rawMac);
+        Tenant tenant = router.getTenant();
+        OffsetDateTime now = clock.now();
+        return transaction.execute(status -> {
+            Voucher voucher = vouchers.findLiveByTenantIdAndClaimedMac(tenant.getId(), mac).stream()
+                    .filter(v -> (v.getExpiresAt() == null || v.getExpiresAt().isAfter(now))
+                            && (v.getHardExpiresAt() == null || v.getHardExpiresAt().isAfter(now)))
+                    .min((a, b) -> Boolean.compare(!"active".equals(a.getStatus()), !"active".equals(b.getStatus())))
+                    .orElse(null);
+            if (voucher == null) {
+                return PortalResult.signIn(null);
+            }
+            if (Boolean.TRUE.equals(voucher.getSchoolHold()) && !HOLD_CAP.equals(voucher.getDelivery())) {
+                return PortalResult.signIn(null);
+            }
+            String category = voucher.getSchoolCategory();
+            OffsetDateTime hardLimit = voucher.getHardExpiresAt() != null ? voucher.getHardExpiresAt() : now.plusDays(1);
+            if ("STAFF".equals(category)) {
+                if (!tenant.isSchoolStaffEnabled()) {
+                    holdAndDisconnect(voucher);
+                    return PortalResult.signIn("Free staff WiFi is currently paused by the network owner.");
+                }
+                Integer capMb = tenant.getSchoolStaffDailyDataCapMb();
+                Long remainingBytes = null;
+                if (capMb != null && capMb > 0) {
+                    long capBytes = capMb.longValue() * 1024L * 1024L;
+                    long used = staffUsedTodayBytes(tenant.getId(), voucher.getPersonId(), voucher.getCode());
+                    if (used >= capBytes) {
+                        holdAndDisconnect(voucher);
+                        return PortalResult.signIn("You have reached your daily free data limit (" + capMb + " MB). Your free access resets tomorrow.");
+                    }
+                    remainingBytes = capBytes - used;
+                }
+                systemPlan(tenant, STAFF_PLAN);
+                reprovision(voucher, router, mac, hardLimit, remainingBytes);
+                return PortalResult.connect(voucher.getCode(), null, "STAFF", hardLimit);
+            }
+            if ("VISITOR".equals(category)) {
+                if (Boolean.FALSE.equals(tenant.getSchoolVisitorsEnabled())) {
+                    holdAndDisconnect(voucher);
+                    return PortalResult.signIn("Visitor passes are currently switched off by the network owner.");
+                }
+                Integer capMb = tenant.getSchoolVisitorDataCapMb();
+                Long remainingBytes = null;
+                if (capMb != null && capMb > 0) {
+                    long capBytes = capMb.longValue() * 1024L * 1024L;
+                    long used = visitorPassUsedBytes(tenant.getId(), voucher.getVisitorPassId(), voucher.getCode());
+                    if (used >= capBytes) {
+                        holdAndDisconnect(voucher);
+                        return PortalResult.signIn("This visitor pass has reached its data limit (" + capMb + " MB).");
+                    }
+                    remainingBytes = capBytes - used;
+                }
+                systemPlan(tenant, VISITOR_PLAN);
+                reprovision(voucher, router, mac, hardLimit, remainingBytes);
+                return PortalResult.connect(voucher.getCode(), null, "VISITOR", hardLimit);
+            }
+            if (Boolean.TRUE.equals(voucher.getSchoolHold())) {
+                return PortalResult.signIn(null);
+            }
+            reprovision(voucher, router, mac, hardLimit, null);
+            return PortalResult.connect(voucher.getCode(), null, "STUDENT",
+                    voucher.getExpiresAt() != null ? voucher.getExpiresAt() : hardLimit);
+        });
     }
 
     public PortalResult verify(String routerToken, String identifier, String pin, String rawMac) {
@@ -142,6 +227,12 @@ public class SchoolAccessService {
         voucher.setPersonId(tx.getPersonId());
         voucher.setSchoolCategory("STUDENT");
         voucher.setHardExpiresAt(endOf(tx.getPersonAccessUntil()));
+        if (tx.getClientMac() != null && !tx.getClientMac().isBlank()) {
+            String normalized = tx.getClientMac().trim().toUpperCase(Locale.ROOT).replace('-', ':');
+            if (normalized.matches("([0-9A-F]{2}:){5}[0-9A-F]{2}")) {
+                voucher.setClaimedMac(normalized);
+            }
+        }
         vouchers.save(voucher);
         radCheck.save(RadCheck.builder().username(code).attribute("Expiration").op(":=").value(radiusTime(voucher.getHardExpiresAt())).build());
     }
@@ -164,6 +255,7 @@ public class SchoolAccessService {
             radCheck.deleteAllByUsername(voucher.getCode());
             radReply.deleteAllByUsername(voucher.getCode());
             voucher.setSchoolHold(true);
+            voucher.setDelivery(HOLD_IT);
             vouchers.save(voucher);
             expiration.disconnectActiveSessions(voucher.getCode());
         }
@@ -186,6 +278,7 @@ public class SchoolAccessService {
         voucher.setSchoolCategory(category);
         voucher.setVisitorPassId(passId);
         voucher.setHardExpiresAt(hardLimit);
+        voucher.setClaimedMac(mac);
         return vouchers.save(voucher);
     }
 
@@ -195,8 +288,12 @@ public class SchoolAccessService {
             expiration.disconnectActiveSessions(voucher.getCode());
         }
         voucher.setHardExpiresAt(hardLimit);
+        if ("STAFF".equals(voucher.getSchoolCategory())) {
+            voucher.setExpiresAt(hardLimit);
+        }
         voucher.setSchoolHold(false);
-        if (voucher.getFirstLogin() != null) voucher.setClaimedMac(mac);
+        voucher.setDelivery("MANUAL");
+        voucher.setClaimedMac(mac);
         vouchers.save(voucher);
         PackagePlan plan = voucher.getPackagePlan();
         String code = voucher.getCode();
@@ -267,6 +364,9 @@ public class SchoolAccessService {
         radCheck.deleteAllByUsername(voucher.getCode());
         radReply.deleteAllByUsername(voucher.getCode());
         voucher.setSchoolHold(true);
+        if (!HOLD_IT.equals(voucher.getDelivery())) {
+            voucher.setDelivery(HOLD_CAP);
+        }
         vouchers.save(voucher);
         expiration.disconnectActiveSessions(voucher.getCode());
     }
@@ -320,6 +420,15 @@ public class SchoolAccessService {
                         }
                         remaining = capBytes - used;
                     }
+                    if (Boolean.TRUE.equals(v.getSchoolHold()) && HOLD_CAP.equals(v.getDelivery()) && v.getClaimedMac() != null) {
+                        List<Router> tenantRouters = routers.findAllByTenantId(tenant.getId());
+                        if (!tenantRouters.isEmpty()) {
+                            OffsetDateTime hard = v.getHardExpiresAt() != null ? v.getHardExpiresAt() : clock.now().plusDays(1);
+                            reprovision(v, tenantRouters.getFirst(), v.getClaimedMac(), hard, remaining);
+                            if (disconnectActive) expiration.disconnectActiveSessions(code);
+                            continue;
+                        }
+                    }
                     if (!Boolean.TRUE.equals(v.getSchoolHold())) {
                         syncReplyLimits(code, tenant.getSchoolStaffRateLimit(), remaining);
                         if (disconnectActive) expiration.disconnectActiveSessions(code);
@@ -340,6 +449,15 @@ public class SchoolAccessService {
                         }
                         remaining = capBytes - used;
                     }
+                    if (Boolean.TRUE.equals(v.getSchoolHold()) && HOLD_CAP.equals(v.getDelivery()) && v.getClaimedMac() != null) {
+                        List<Router> tenantRouters = routers.findAllByTenantId(tenant.getId());
+                        if (!tenantRouters.isEmpty()) {
+                            OffsetDateTime hard = v.getHardExpiresAt() != null ? v.getHardExpiresAt() : clock.now().plusDays(1);
+                            reprovision(v, tenantRouters.getFirst(), v.getClaimedMac(), hard, remaining);
+                            if (disconnectActive) expiration.disconnectActiveSessions(code);
+                            continue;
+                        }
+                    }
                     if (!Boolean.TRUE.equals(v.getSchoolHold())) {
                         syncReplyLimits(code, tenant.getSchoolVisitorRateLimit(), remaining);
                         if (disconnectActive) expiration.disconnectActiveSessions(code);
@@ -356,8 +474,11 @@ public class SchoolAccessService {
         PackagePlan plan = plans.findFirstByTenantIdAndAvailabilityAndName(tenant.getId(), SYSTEM_AVAILABILITY, name)
                 .orElseGet(() -> PackagePlan.builder().tenant(tenant).name(name).price(BigDecimal.ZERO).sharedUsers(1)
                         .availability(SYSTEM_AVAILABILITY).featured(false).displayOrder(0)
-                        .description(staff ? "Free staff access, renewed by signing in each day" : "Free visitor access until the pass expires")
-                        .sessionTimeout(staff ? 86_400 : 172_800).rateLimit("").build());
+                        .description(staff ? "Free staff access for their active school period" : "Free visitor access until the pass expires")
+                        .sessionTimeout(staff ? 0 : 172_800).rateLimit("").build());
+        if (staff && plan.getSessionTimeout() != null && plan.getSessionTimeout() > 0) {
+            plan.setSessionTimeout(0);
+        }
         plan.setRateLimit(rate == null ? "" : rate);
         return plans.save(plan);
     }
