@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.Set;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -130,64 +131,54 @@ class RouterScriptGeneratorTest {
     void schoolFilterRulesRenderStudentWhitelistAndStaffAppPolicies() {
         String allowRules = generator.schoolFilterRules(
                 true,
-                "elearning.school.ac.ug, @wikipedia",
+                "elearning.school.ac.ug, @wikipedia, chatgpt.com",
                 "ALLOW_LIST",
-                "@whatsapp, @youtube, @chatgpt, @tiktok",
+                "@whatsapp, @youtube, chatgpt.com, @tiktok",
                 "https://app.qticket.dev"
         );
-        // Student free whitelist
-        assertTrue(allowRules.contains("/ip/firewall/address-list/add list=\"wb-student-sites\" address=\"elearning.school.ac.ug\""));
-        assertTrue(allowRules.contains("/ip/firewall/address-list/add list=\"wb-student-sites\" address=\"wikipedia.org\""));
-        assertTrue(allowRules.contains("/ip/firewall/address-list/add list=\"wb-student-sites\" address=\"app.qticket.dev\""),
-                "portal host is always whitelisted so students can buy packages");
-        assertTrue(allowRules.contains("src-address-list=\"wb-student-free\" dst-address-list=\"wb-student-sites\" action=accept"));
+        // Each site has one shared address list, filled from DNS for the site and all its sub-domains
+        assertTrue(allowRules.contains("/ip/dns/static/add name=\"elearning.school.ac.ug\" type=FWD forward-to=1.1.1.1 match-subdomain=yes address-list=\"wb-site-elearning.school.ac.ug\""));
+        assertTrue(allowRules.contains("/ip/dns/static/add name=\"googlevideo.com\" type=FWD forward-to=1.1.1.1 match-subdomain=yes address-list=\"wb-site-googlevideo.com\""));
+        assertEquals(1, allowRules.split("/ip/dns/static/add name=\"chatgpt.com\"", -1).length - 1, "a site named by both groups is learned once");
+        // ...and both groups use it
+        assertTrue(allowRules.contains("src-address-list=\"wb-student-free\" dst-address-list=\"wb-site-chatgpt.com\" action=accept"));
+        assertTrue(allowRules.contains("src-address-list=\"wb-staff-free\" dst-address-list=\"wb-site-chatgpt.com\" action=accept"));
+        // Student strict allow list
+        assertTrue(allowRules.contains("src-address-list=\"wb-student-free\" dst-address-list=\"wb-site-wikipedia.org\" action=accept"));
+        assertTrue(allowRules.contains("src-address-list=\"wb-student-free\" dst-address-list=\"wb-site-app.qticket.dev\" action=accept"),
+                "portal host is always allowed so students can buy packages");
         assertTrue(allowRules.contains("src-address-list=\"wb-student-free\" action=drop comment=\"wb-school-filter: student drop other\""));
-
-        // Staff allow-list with expanded app presets
-        assertTrue(allowRules.contains("/ip/firewall/address-list/add list=\"wb-staff-sites\" address=\"whatsapp.com\""));
-        assertTrue(allowRules.contains("/ip/firewall/address-list/add list=\"wb-staff-sites\" address=\"youtube.com\""));
-        assertTrue(allowRules.contains("/ip/firewall/address-list/add list=\"wb-staff-sites\" address=\"chatgpt.com\""));
-        assertTrue(allowRules.contains("/ip/firewall/address-list/add list=\"wb-staff-sites\" address=\"tiktok.com\""));
-        assertTrue(allowRules.contains("src-address-list=\"wb-staff-free\" dst-address-list=\"wb-staff-sites\" action=accept"));
-        assertTrue(allowRules.contains("src-address-list=\"wb-staff-free\" action=drop comment=\"wb-school-filter: staff drop other\""));
-
-        // Phones' "is there internet?" probes always pass on allow lists, so devices don't report "no internet"
-        for (String probe : java.util.List.of("connectivitycheck.gstatic.com", "captive.apple.com", "www.msftconnecttest.com")) {
-            assertTrue(allowRules.contains("list=\"wb-staff-sites\" address=\"" + probe + "\""), "staff allow list includes " + probe);
-            assertTrue(allowRules.contains("list=\"wb-student-sites\" address=\"" + probe + "\""), "student allow list includes " + probe);
+        // Staff allow list with expanded presets; typing chatgpt.com brings the rest of ChatGPT
+        for (String site : List.of("whatsapp.com", "youtube.com", "googlevideo.com", "tiktok.com", "oaistatic.com")) {
+            assertTrue(allowRules.contains("src-address-list=\"wb-staff-free\" dst-address-list=\"wb-site-" + site + "\" action=accept"), "staff may use " + site);
         }
-        assertTrue(generator.schoolFilterRules(false, "", "ALLOW_LIST", "@tiktok", "https://app.qticket.dev").contains("address=\"captive.apple.com\""),
-                "a TikTok-only staff allow list still lets phones confirm the connection");
-
-        // Our rules are moved above the router's own accept/fast-track rules, or SNI blocks never run
+        assertTrue(allowRules.contains("src-address-list=\"wb-staff-free\" action=drop comment=\"wb-school-filter: staff drop other\""));
+        // Android's HTTPS probe and the plain probes are always reachable on allow lists, so phones don't say "limited"
+        for (String probe : List.of("www.google.com", "connectivitycheck.gstatic.com", "captive.apple.com", "www.msftconnecttest.com")) {
+            assertTrue(allowRules.contains("src-address-list=\"wb-staff-free\" dst-address-list=\"wb-site-" + probe + "\" action=accept"), "staff reach " + probe);
+            assertTrue(allowRules.contains("src-address-list=\"wb-student-free\" dst-address-list=\"wb-site-" + probe + "\" action=accept"), "students reach " + probe);
+        }
+        // More specific names are learned first, so auth.openai-style sub-sites aren't swallowed by a parent entry
+        assertTrue(allowRules.indexOf("/ip/dns/static/add name=\"www.msftconnecttest.com\"") < allowRules.indexOf("/ip/dns/static/add name=\"chatgpt.com\""));
+        // Rules sit above the router's own forward rules, then apply at once
         String move = ":do { /ip/firewall/filter/move [find where comment~\"^wb-school-filter\"] destination=[:pick [find where chain=forward dynamic=no !(comment~\"^wb-\")] 0] } on-error={}";
         assertTrue(allowRules.contains(move), "school rules are placed above the router's own forward rules");
         assertTrue(allowRules.indexOf(move) < allowRules.indexOf("/ip/dns/cache/flush"), "rules are in place before clients reconnect");
-        assertTrue(allowRules.contains("list=\"wb-staff-free\"] do={ :local ip [/ip/firewall/address-list/get $e address]; /ip/firewall/connection/remove"),
-                "filtered staff reconnect through the new rules at once");
-        assertTrue(allowRules.contains("list=\"wb-student-free\"] do={"), "so do students on free data");
+        assertTrue(allowRules.contains("list=\"wb-staff-free\"] do={ :local ip [/ip/firewall/address-list/get $e address]; /ip/firewall/connection/remove"));
         assertTrue(RouterScriptGenerator.tetheringRules("BLOCK").contains("move [find where comment~\"^wb-tether\"]"), "tethering rules are placed on top too");
         assertFalse(RouterScriptGenerator.tetheringRules("OFF").contains("/move"), "nothing to move when tethering is off");
 
-        // Staff block-list mode drops only matching domains
-        String blockRules = generator.schoolFilterRules(
-                false,
-                "",
-                "BLOCK_LIST",
-                "@tiktok",
-                "https://app.qticket.dev"
-        );
-        assertTrue(blockRules.contains("src-address-list=\"wb-staff-free\" dst-address-list=\"wb-staff-sites\" action=drop comment=\"wb-school-filter: staff block list\""));
+        // Staff block list drops only the selected services, by name and by learned address
+        String blockRules = generator.schoolFilterRules(false, "", "BLOCK_LIST", "youtube.com, @tiktok", "https://app.qticket.dev");
         assertTrue(blockRules.contains("src-address-list=\"wb-staff-free\" protocol=tcp dst-port=443 tls-host=\"*tiktok.com\" action=drop"));
-        // Blocked services are also learned from DNS, so rotating video hosts (googlevideo.com) are caught by address
-        assertTrue(blockRules.contains("/ip/dns/static/add name=\"tiktok.com\" type=FWD forward-to=1.1.1.1 match-subdomain=yes address-list=\"wb-staff-sites\""));
-        assertTrue(generator.schoolFilterRules(false, "", "BLOCK_LIST", "@youtube", "https://app.qticket.dev")
-                .contains("/ip/dns/static/add name=\"googlevideo.com\" type=FWD forward-to=1.1.1.1 match-subdomain=yes address-list=\"wb-staff-sites\""));
-        assertTrue(generator.schoolFilterRules(false, "", "BLOCK_LIST", "@youtube", "https://app.qticket.dev")
-                .contains("/ip/dns/static/add name=\"youtubei.googleapis.com\""), "the YouTube app's API host is blocked too");
+        assertTrue(blockRules.contains("src-address-list=\"wb-staff-free\" dst-address-list=\"wb-site-googlevideo.com\" action=drop"), "typing youtube.com also blocks its videos");
+        assertTrue(blockRules.contains("dst-address-list=\"wb-site-youtubei.googleapis.com\" action=drop"), "and the YouTube app");
+        assertFalse(blockRules.contains("action=drop comment=\"wb-school-filter: staff drop other\""), "a block list never drops other traffic");
+        assertFalse(blockRules.contains("wb-site-www.google.com"), "a block list adds no allowed sites");
         assertTrue(blockRules.contains("src-address-list=\"wb-staff-free\" protocol=udp dst-port=53 action=redirect to-ports=53"), "staff DNS goes through the router");
         assertTrue(blockRules.contains("src-address-list=\"wb-staff-free\" protocol=tcp dst-port=853 action=reject"), "private DNS cannot bypass the router");
         assertTrue(blockRules.contains(":do { /ip/dns/static/remove [find where comment~\"^wb-school-filter\"] } on-error={}"), "old DNS entries are cleared first");
         assertFalse(generator.schoolFilterRules(false, "", "ALL", "", "https://app.qticket.dev").contains("/ip/dns/static/add"), "no filtering means no DNS entries");
     }
+
 }

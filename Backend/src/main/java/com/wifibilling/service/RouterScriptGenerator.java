@@ -143,6 +143,7 @@ public class RouterScriptGenerator {
             java.util.Map.entry("@whatsapp", List.of("whatsapp.com", "whatsapp.net", "wa.me")),
             java.util.Map.entry("@youtube", List.of("youtube.com", "youtu.be", "googlevideo.com", "ytimg.com", "youtube-nocookie.com", "youtubei.googleapis.com", "youtube.googleapis.com")),
             java.util.Map.entry("@chatgpt", List.of("chatgpt.com", "openai.com", "oaistatic.com", "oaiusercontent.com")),
+            java.util.Map.entry("@gmail", List.of("gmail.com", "googlemail.com", "mail.google.com", "accounts.google.com", "gstatic.com", "googleusercontent.com")),
             java.util.Map.entry("@tiktok", List.of("tiktok.com", "tiktokcdn.com", "tiktokv.com", "musical.ly", "byteoversea.com")),
             java.util.Map.entry("@facebook", List.of("facebook.com", "fb.com", "fbcdn.net", "messenger.com")),
             java.util.Map.entry("@instagram", List.of("instagram.com", "cdninstagram.com")),
@@ -154,46 +155,19 @@ public class RouterScriptGenerator {
     );
 
     /**
-     * Parses a comma/newline-separated list of app preset keys (@whatsapp, @youtube, etc.)
-     * and domain names into a deduplicated, sanitized list of domain names.
-     */
-    /**
-     * Hosts phones and laptops probe to decide whether the WiFi "has internet". Allow lists always include
-     * them: without them every device on an allow list reports "connected, no internet" even though its
-     * allowed sites work. Only the probe hosts are listed, not the vendors' whole sites.
+     * Hosts phones and laptops probe to decide whether the WiFi "has internet". Android also runs an HTTPS probe
+     * to www.google.com and reports "connected, limited" when only the plain one passes. Allow lists always
+     * include these, or every device on an allow list warns about its connection even though allowed sites work.
      */
     static final List<String> CONNECTIVITY_CHECK_DOMAINS = List.of(
-            "connectivitycheck.gstatic.com", "connectivitycheck.android.com", "clients3.google.com",
+            "connectivitycheck.gstatic.com", "connectivitycheck.android.com", "clients3.google.com", "www.google.com",
             "captive.apple.com", "www.msftconnecttest.com", "www.msftncsi.com");
 
     /**
-     * Makes the router learn each listed site's real server addresses as devices look them up: a forwarding
-     * DNS entry per domain (and all its sub-domains) adds every answer to {@code list}. This catches services
-     * like YouTube that stream from thousands of rotating hosts and whose TLS names RouterOS often cannot read
-     * (large, split ClientHellos). The group's DNS is forced through the router and DNS-over-TLS is refused
-     * so lookups cannot bypass it. Each line is error-guarded so routers without these features skip it.
+     * Parses a comma/newline-separated list of app preset keys (@whatsapp, @youtube, etc.) and domain names into
+     * a deduplicated, sanitized list. A domain that belongs to a known service brings in the rest of that service
+     * (typing youtube.com also covers googlevideo.com, where the videos actually come from).
      */
-    private static void dnsLearnedSites(StringBuilder s, Set<String> domains, String list, String group, String who) {
-        for (String d : domains) {
-            s.append(":do { /ip/dns/static/add name=").append(q(d)).append(" type=FWD forward-to=1.1.1.1 match-subdomain=yes address-list=")
-                    .append(q(list)).append(" comment=\"wb-school-filter: ").append(who).append(" dns ").append(d).append("\" } on-error={}\n");
-        }
-        for (String protocol : List.of("udp", "tcp")) {
-            s.append(":do { /ip/firewall/nat/add chain=dstnat src-address-list=").append(q(group)).append(" protocol=").append(protocol)
-                    .append(" dst-port=53 action=redirect to-ports=53 comment=\"wb-school-filter: ").append(who).append(" force dns ").append(protocol).append("\" } on-error={}\n");
-        }
-        s.append("/ip/firewall/filter/add chain=forward src-address-list=").append(q(group))
-                .append(" protocol=tcp dst-port=853 action=reject reject-with=tcp-reset comment=\"wb-school-filter: ").append(who).append(" no private dns\"\n");
-    }
-
-    /** Probe hosts go in the address list only: one short line each keeps the stored script small. */
-    private static void connectivityChecks(StringBuilder s, String list, String who) {
-        for (String d : CONNECTIVITY_CHECK_DOMAINS) {
-            s.append("/ip/firewall/address-list/add list=").append(q(list)).append(" address=").append(q(d))
-                    .append(" comment=\"wb-school-filter: ").append(who).append(" connectivity check\"\n");
-        }
-    }
-
     public static Set<String> expandSiteRules(String raw) {
         java.util.Set<String> domains = new java.util.LinkedHashSet<>();
         if (raw == null || raw.isBlank()) return domains;
@@ -218,13 +192,24 @@ public class RouterScriptGenerator {
             }
             if (domains.size() >= 80) break;
         }
+        for (List<String> preset : APP_PRESET_DOMAINS.values()) {
+            if (domains.stream().anyMatch(d -> preset.stream().anyMatch(p -> d.equals(p) || d.endsWith("." + p)))) domains.addAll(preset);
+        }
         return domains;
     }
 
+    /** The address list a site's learned and resolved addresses go into; shared by every group that names the site. */
+    static String siteList(String domain) { return "wb-site-" + domain; }
+
     /**
-     * Generates RouterOS v7 firewall & dynamic DNS address-list rules for:
-     * 1) Student Free Daily Data (strict whitelist: only school-approved sites allowed on wb-student-free).
-     * 2) Staff Free WiFi (whitelist ALLOW_LIST or blacklist BLOCK_LIST on wb-staff-free).
+     * Generates RouterOS v7 rules for school groups:
+     * 1) Student free daily data: a strict allow list on wb-student-free.
+     * 2) Staff free WiFi: ALLOW_LIST or BLOCK_LIST on wb-staff-free.
+     *
+     * Every selected site gets its own address list, filled from a forwarding DNS entry (the site and all its sub-domains), so services that stream from rotating hosts
+     * (YouTube's googlevideo.com) are matched by address. A site named by several groups is learned once and each
+     * group allows or blocks it from the same list. TLS names (SNI) are matched as well. Filtered groups must use the
+     * router for DNS and cannot use DNS-over-TLS, so lookups can't bypass the learning.
      */
     public static String schoolFilterRules(boolean studentFreeEnabled, String studentAllowedSites,
                                            String staffSiteMode, String staffSiteRules, String publicBaseUrl) {
@@ -234,79 +219,57 @@ public class RouterScriptGenerator {
         s.append(":do { /ip/firewall/nat/remove [find where comment~\"^wb-school-filter\"] } on-error={}\n");
         s.append(":do { /ip/dns/static/remove [find where comment~\"^wb-school-filter\"] } on-error={}\n");
 
-        String portalHost = null;
-        if (publicBaseUrl != null && !publicBaseUrl.isBlank()) {
-            Set<String> parsed = expandSiteRules(publicBaseUrl);
-            if (!parsed.isEmpty()) portalHost = parsed.iterator().next();
-        }
+        Set<String> always = new java.util.LinkedHashSet<>(CONNECTIVITY_CHECK_DOMAINS);
+        if (publicBaseUrl != null && !publicBaseUrl.isBlank()) always.addAll(expandSiteRules(publicBaseUrl));
 
-        if (studentFreeEnabled) {
-            Set<String> studentDomains = new java.util.LinkedHashSet<>(expandSiteRules(studentAllowedSites));
-            dnsLearnedSites(s, studentDomains, "wb-student-sites", STUDENT_FREE_ADDRESS_LIST, "student");
-            if (portalHost != null) studentDomains.add(portalHost);
-            connectivityChecks(s, "wb-student-sites", "student");
-            s.append("/ip/firewall/filter/add chain=forward src-address-list=").append(q(STUDENT_FREE_ADDRESS_LIST))
-                    .append(" protocol=udp dst-port=53 action=accept comment=\"wb-school-filter: student dns udp\"\n");
-            s.append("/ip/firewall/filter/add chain=forward src-address-list=").append(q(STUDENT_FREE_ADDRESS_LIST))
-                    .append(" protocol=tcp dst-port=53 action=accept comment=\"wb-school-filter: student dns tcp\"\n");
-            s.append("/ip/firewall/filter/add chain=forward src-address-list=").append(q(STUDENT_FREE_ADDRESS_LIST))
-                    .append(" protocol=udp dst-port=443 action=reject reject-with=icmp-port-unreachable comment=\"wb-school-filter: student disable quic\"\n");
-            for (String d : studentDomains) {
-                s.append("/ip/firewall/address-list/add list=\"wb-student-sites\" address=").append(q(d))
-                        .append(" comment=\"wb-school-filter: student site\"\n");
-                s.append("/ip/firewall/filter/add chain=forward src-address-list=").append(q(STUDENT_FREE_ADDRESS_LIST))
-                        .append(" protocol=tcp dst-port=443 tls-host=").append(q("*" + d))
-                        .append(" action=accept comment=\"wb-school-filter: student sni ").append(d).append("\"\n");
-            }
-            s.append("/ip/firewall/filter/add chain=forward src-address-list=").append(q(STUDENT_FREE_ADDRESS_LIST))
-                    .append(" dst-address-list=\"wb-student-sites\" action=accept comment=\"wb-school-filter: student allow list\"\n");
-            s.append("/ip/firewall/filter/add chain=forward src-address-list=").append(q(STUDENT_FREE_ADDRESS_LIST))
-                    .append(" action=drop comment=\"wb-school-filter: student drop other\"\n");
-        }
-
+        Set<String> student = new java.util.LinkedHashSet<>();
+        if (studentFreeEnabled) { student.addAll(expandSiteRules(studentAllowedSites)); student.addAll(always); }
         String mode = staffSiteMode == null ? "ALL" : staffSiteMode.trim().toUpperCase(java.util.Locale.ROOT);
-        if ("ALLOW_LIST".equals(mode)) {
-            Set<String> staffDomains = new java.util.LinkedHashSet<>(expandSiteRules(staffSiteRules));
-            dnsLearnedSites(s, staffDomains, "wb-staff-sites", STAFF_FREE_ADDRESS_LIST, "staff");
-            if (portalHost != null) staffDomains.add(portalHost);
-            connectivityChecks(s, "wb-staff-sites", "staff");
-            s.append("/ip/firewall/filter/add chain=forward src-address-list=").append(q(STAFF_FREE_ADDRESS_LIST))
-                    .append(" protocol=udp dst-port=53 action=accept comment=\"wb-school-filter: staff dns udp\"\n");
-            s.append("/ip/firewall/filter/add chain=forward src-address-list=").append(q(STAFF_FREE_ADDRESS_LIST))
-                    .append(" protocol=tcp dst-port=53 action=accept comment=\"wb-school-filter: staff dns tcp\"\n");
-            s.append("/ip/firewall/filter/add chain=forward src-address-list=").append(q(STAFF_FREE_ADDRESS_LIST))
-                    .append(" protocol=udp dst-port=443 action=reject reject-with=icmp-port-unreachable comment=\"wb-school-filter: staff disable quic\"\n");
-            for (String d : staffDomains) {
-                s.append("/ip/firewall/address-list/add list=\"wb-staff-sites\" address=").append(q(d))
-                        .append(" comment=\"wb-school-filter: staff site\"\n");
-                s.append("/ip/firewall/filter/add chain=forward src-address-list=").append(q(STAFF_FREE_ADDRESS_LIST))
-                        .append(" protocol=tcp dst-port=443 tls-host=").append(q("*" + d))
-                        .append(" action=accept comment=\"wb-school-filter: staff sni ").append(d).append("\"\n");
-            }
-            s.append("/ip/firewall/filter/add chain=forward src-address-list=").append(q(STAFF_FREE_ADDRESS_LIST))
-                    .append(" dst-address-list=\"wb-staff-sites\" action=accept comment=\"wb-school-filter: staff allow list\"\n");
-            s.append("/ip/firewall/filter/add chain=forward src-address-list=").append(q(STAFF_FREE_ADDRESS_LIST))
-                    .append(" action=drop comment=\"wb-school-filter: staff drop other\"\n");
-        } else if ("BLOCK_LIST".equals(mode)) {
-            Set<String> staffDomains = expandSiteRules(staffSiteRules);
-            if (!staffDomains.isEmpty()) {
-                dnsLearnedSites(s, staffDomains, "wb-staff-sites", STAFF_FREE_ADDRESS_LIST, "staff");
-                s.append("/ip/firewall/filter/add chain=forward src-address-list=").append(q(STAFF_FREE_ADDRESS_LIST))
-                        .append(" protocol=udp dst-port=443 action=reject reject-with=icmp-port-unreachable comment=\"wb-school-filter: staff disable quic\"\n");
-                for (String d : staffDomains) {
-                    s.append("/ip/firewall/address-list/add list=\"wb-staff-sites\" address=").append(q(d))
-                            .append(" comment=\"wb-school-filter: staff site\"\n");
-                    s.append("/ip/firewall/filter/add chain=forward src-address-list=").append(q(STAFF_FREE_ADDRESS_LIST))
-                            .append(" protocol=tcp dst-port=443 tls-host=").append(q("*" + d))
-                            .append(" action=drop comment=\"wb-school-filter: staff block sni ").append(d).append("\"\n");
-                }
-                s.append("/ip/firewall/filter/add chain=forward src-address-list=").append(q(STAFF_FREE_ADDRESS_LIST))
-                        .append(" dst-address-list=\"wb-staff-sites\" action=drop comment=\"wb-school-filter: staff block list\"\n");
-            }
+        Set<String> staff = new java.util.LinkedHashSet<>();
+        if ("ALLOW_LIST".equals(mode)) { staff.addAll(expandSiteRules(staffSiteRules)); staff.addAll(always); }
+        else if ("BLOCK_LIST".equals(mode)) staff.addAll(expandSiteRules(staffSiteRules));
+
+        // Most specific names first: a lookup is learned by the first DNS entry that matches it.
+        List<String> sites = new java.util.ArrayList<>(new java.util.LinkedHashSet<String>() {{ addAll(student); addAll(staff); }});
+        sites.sort(java.util.Comparator.comparingInt((String d) -> d.split("\\.").length).reversed());
+        // Filtered groups must look sites up through the router, so each answer is learned before they connect.
+        for (String d : sites) {
+            s.append(":do { /ip/dns/static/add name=").append(q(d)).append(" type=FWD forward-to=1.1.1.1 match-subdomain=yes address-list=")
+                    .append(q(siteList(d))).append(" comment=\"wb-school-filter: dns ").append(d).append("\" } on-error={}\n");
         }
+
+        if (studentFreeEnabled) groupRules(s, STUDENT_FREE_ADDRESS_LIST, "student", student, true);
+        if ("ALLOW_LIST".equals(mode)) groupRules(s, STAFF_FREE_ADDRESS_LIST, "staff", staff, true);
+        else if ("BLOCK_LIST".equals(mode) && !staff.isEmpty()) groupRules(s, STAFF_FREE_ADDRESS_LIST, "staff", staff, false);
+
         s.append(moveAboveRouterRules("^wb-school-filter"));
         s.append(applyNow());
         return s.toString();
+    }
+
+    /** One group's rules: allow only its sites and drop the rest, or drop its sites and allow the rest. */
+    private static void groupRules(StringBuilder s, String group, String who, Set<String> sites, boolean allowOnly) {
+        String src = "/ip/firewall/filter/add chain=forward src-address-list=" + q(group);
+        for (String protocol : List.of("udp", "tcp")) {
+            s.append(":do { /ip/firewall/nat/add chain=dstnat src-address-list=").append(q(group)).append(" protocol=").append(protocol)
+                    .append(" dst-port=53 action=redirect to-ports=53 comment=\"wb-school-filter: ").append(who).append(" force dns ").append(protocol).append("\" } on-error={}\n");
+        }
+        s.append(src).append(" protocol=tcp dst-port=853 action=reject reject-with=tcp-reset comment=\"wb-school-filter: ").append(who).append(" no private dns\"\n");
+        if (allowOnly) {
+            s.append(src).append(" protocol=udp dst-port=53 action=accept comment=\"wb-school-filter: ").append(who).append(" dns udp\"\n");
+            s.append(src).append(" protocol=tcp dst-port=53 action=accept comment=\"wb-school-filter: ").append(who).append(" dns tcp\"\n");
+        }
+        s.append(src).append(" protocol=udp dst-port=443 action=reject reject-with=icmp-port-unreachable comment=\"wb-school-filter: ").append(who).append(" disable quic\"\n");
+        String action = allowOnly ? "accept" : "drop";
+        for (String d : sites) {
+            // Block lists also match TLS names, catching apps before their first lookup is learned. Allow lists rely
+            // on the learned addresses alone, which keeps the router task small.
+            if (!allowOnly) s.append(src).append(" protocol=tcp dst-port=443 tls-host=").append(q("*" + d)).append(" action=drop")
+                    .append(" comment=\"wb-school-filter: ").append(who).append(" block sni ").append(d).append("\"\n");
+            s.append(src).append(" dst-address-list=").append(q(siteList(d))).append(" action=").append(action)
+                    .append(" comment=\"wb-school-filter: ").append(who).append(allowOnly ? " allow " : " block ").append(d).append("\"\n");
+        }
+        if (allowOnly) s.append(src).append(" action=drop comment=\"wb-school-filter: ").append(who).append(" drop other\"\n");
     }
 
     public String generate(ScriptContext c) {

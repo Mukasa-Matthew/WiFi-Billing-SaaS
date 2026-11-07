@@ -239,6 +239,12 @@ public class Tenant {
 
     public boolean isSchool() { return "SCHOOL".equals(tenantType); }
 
+    /** Where people land after logging in: the owner's choice, else Google for schools, else the page they asked for. */
+    public String postLoginRedirect() {
+        if (redirectUrl != null && !redirectUrl.isBlank()) return redirectUrl;
+        return isSchool() ? "https://www.google.com" : null;
+    }
+
     public boolean isSchoolStaffEnabled() { return !Boolean.FALSE.equals(schoolStaffEnabled); }
 
     public boolean isSchoolStudentFreeEnabled() {

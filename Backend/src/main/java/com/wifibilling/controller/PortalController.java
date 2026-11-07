@@ -70,7 +70,7 @@ public class PortalController {
                 tenant.getName(), tenant.getSupportPhone(), tenant.getSupportPhone2(),
                 tenant.getSupportEmail(), tenant.getWhatsappPhone(),
                 tenant.getBrandColor() == null ? "#3B82F6" : tenant.getBrandColor(),
-                tenant.getRedirectUrl(), tenant.getPortalTemplate() == null ? "midnight" : tenant.getPortalTemplate(),
+                tenant.postLoginRedirect(), tenant.getPortalTemplate() == null ? "midnight" : tenant.getPortalTemplate(),
                 Boolean.TRUE.equals(tenant.getPortalShowPackages()),
                 tenant.getPortalFont() == null ? "Poppins" : tenant.getPortalFont(),
                 tenant.getPortalLanguage() == null ? "English" : tenant.getPortalLanguage(),
@@ -266,8 +266,7 @@ public class PortalController {
     static String renderPortal(com.wifibilling.model.Tenant tenant, String themeOverride) {
         String tpl = themeOverride != null ? themeOverride : tenant.getPortalTemplate();
         String theme = tpl != null && tpl.matches("[a-z0-9-]{1,40}") ? tpl : "midnight";
-        String redirect = tenant.getRedirectUrl() != null && !tenant.getRedirectUrl().isBlank()
-                ? escapeHtml(tenant.getRedirectUrl()) : "";
+        String redirect = tenant.postLoginRedirect() != null ? escapeHtml(tenant.postLoginRedirect()) : "";
         Resource resource = new ClassPathResource("static/hotspot/portal.html");
         try {
             String content = StreamUtils.copyToString(resource.getInputStream(), StandardCharsets.UTF_8);
@@ -360,8 +359,7 @@ public class PortalController {
                     .replace("TENANT_SUPPORT_EMAIL_PLACEHOLDER",
                             tenant.getSupportEmail() != null ? escapeHtml(tenant.getSupportEmail()) : "")
                     .replace("POST_LOGIN_REDIRECT_PLACEHOLDER",
-                            tenant.getRedirectUrl() != null && !tenant.getRedirectUrl().isBlank()
-                                    ? escapeHtml(tenant.getRedirectUrl()) : "$(link-orig)");
+                            tenant.postLoginRedirect() != null ? escapeHtml(tenant.postLoginRedirect()) : "$(link-orig)");
 
             return ResponseEntity.ok()
                     .cacheControl(CacheControl.noStore())
