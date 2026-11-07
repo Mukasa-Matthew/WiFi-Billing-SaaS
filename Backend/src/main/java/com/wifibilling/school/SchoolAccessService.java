@@ -74,32 +74,42 @@ public class SchoolAccessService {
     public record PortalResult(String action, String code, String ticket, String pinChangeToken, String fullName, String category,
                                LocalDate accessUntil, OffsetDateTime expiresAt, String message,
                                Boolean studentFreeAvailable, Integer studentFreeDailyCapMb,
-                               Integer studentFreeRemainingMb, String studentFreeAllowedSites) {
+                               Integer studentFreeRemainingMb, String studentFreeAllowedSites,
+                               List<PaidDevice> paidDevices) {
         public PortalResult(String action, String code, String ticket, String pinChangeToken, String fullName, String category,
                             LocalDate accessUntil, OffsetDateTime expiresAt) {
-            this(action, code, ticket, pinChangeToken, fullName, category, accessUntil, expiresAt, null, null, null, null, null);
+            this(action, code, ticket, pinChangeToken, fullName, category, accessUntil, expiresAt, null, null, null, null, null, null);
         }
 
         public PortalResult(String action, String code, String ticket, String pinChangeToken, String fullName, String category,
                             LocalDate accessUntil, OffsetDateTime expiresAt, String message) {
-            this(action, code, ticket, pinChangeToken, fullName, category, accessUntil, expiresAt, message, null, null, null, null);
+            this(action, code, ticket, pinChangeToken, fullName, category, accessUntil, expiresAt, message, null, null, null, null, null);
         }
 
         static PortalResult connect(String code, String fullName, String category, OffsetDateTime expiresAt) {
-            return new PortalResult("CONNECT", code, null, null, fullName, category, null, expiresAt, null, null, null, null, null);
+            return new PortalResult("CONNECT", code, null, null, fullName, category, null, expiresAt, null, null, null, null, null, null);
         }
 
         static PortalResult signIn(String message) {
-            return new PortalResult("SIGN_IN", null, null, null, null, null, null, null, message, null, null, null, null);
+            return new PortalResult("SIGN_IN", null, null, null, null, null, null, null, message, null, null, null, null, null);
         }
 
         static PortalResult buy(String ticket, String fullName, String category, LocalDate accessUntil,
                                 Boolean studentFreeAvailable, Integer studentFreeDailyCapMb,
-                                Integer studentFreeRemainingMb, String studentFreeAllowedSites) {
+                                Integer studentFreeRemainingMb, List<PaidDevice> paidDevices) {
             return new PortalResult("BUY", null, ticket, null, fullName, category, accessUntil, null, null,
-                    studentFreeAvailable, studentFreeDailyCapMb, studentFreeRemainingMb, studentFreeAllowedSites);
+                    studentFreeAvailable, studentFreeDailyCapMb, studentFreeRemainingMb, null, paidDevices);
         }
     }
+
+    /** Paid packages a student may use on this many devices at once (study data stays one device). */
+    public static final int MAX_PAID_STUDENT_DEVICES = 2;
+
+    /**
+     * A student's package on another device, offered for moving when the device limit is reached.
+     * {@code device} is the end of the device's hardware address, enough for the student to tell them apart.
+     */
+    public record PaidDevice(long id, String packageName, OffsetDateTime expiresAt, String device) {}
 
     /**
      * Zero-touch auto-reconnect for school devices: when a staff member, student,
@@ -174,7 +184,8 @@ public class SchoolAccessService {
                 // The device is recognised by MAC, so no PIN is needed; the ticket lets them pay from here.
                 LocalDate accessUntil = hardLimit.atZoneSameInstant(clock.zone()).toLocalDate();
                 if (!tenant.isSchoolStudentFreeEnabled()) holdAndDisconnect(voucher);
-                return studentChoice(tenant, voucher.getPersonId(), accessUntil, mac, null, "STUDENT");
+                return studentChoice(tenant, voucher.getPersonId(), accessUntil, mac, null, "STUDENT",
+                        livePaidStudents(tenant.getId(), voucher.getPersonId()));
             }
             if (Boolean.TRUE.equals(voucher.getSchoolHold())) {
                 return PortalResult.signIn(null);
@@ -258,12 +269,16 @@ public class SchoolAccessService {
                 reprovision(voucher, router, mac, hardLimit, remainingBytes);
                 return PortalResult.connect(voucher.getCode(), fullName, category, voucher.getExpiresAt() != null ? voucher.getExpiresAt() : hardLimit);
             }
-            Voucher livePaid = livePaidStudent(tenant.getId(), personId);
-            if (livePaid != null) {
-                reprovision(livePaid, router, mac, hardLimit, null);
-                return PortalResult.connect(livePaid.getCode(), fullName, category, livePaid.getExpiresAt());
+            // Each paid package belongs to one device; a package not yet tied to a device is claimed here.
+            List<Voucher> paid = livePaidStudents(tenant.getId(), personId);
+            Voucher here = paid.stream().filter(v -> mac.equalsIgnoreCase(v.getClaimedMac())).findFirst()
+                    .or(() -> paid.stream().filter(v -> v.getClaimedMac() == null).findFirst())
+                    .orElse(null);
+            if (here != null) {
+                reprovision(here, router, mac, hardLimit, null);
+                return PortalResult.connect(here.getCode(), fullName, category, here.getExpiresAt());
             }
-            return studentChoice(tenant, personId, accessUntil, mac, fullName, category);
+            return studentChoice(tenant, personId, accessUntil, mac, fullName, category, paid);
         });
     }
 
@@ -271,23 +286,57 @@ public class SchoolAccessService {
      * The student's options: packages, plus free study data when the school offers it. The allowed study sites
      * are not sent: they can be long, and the portal only needs to say that study sites work.
      */
-    private PortalResult studentChoice(Tenant tenant, String personId, LocalDate accessUntil, String mac, String fullName, String category) {
+    private PortalResult studentChoice(Tenant tenant, String personId, LocalDate accessUntil, String mac, String fullName, String category,
+                                       List<Voucher> paid) {
         String ticket = tickets.issue(new SchoolTickets.Ticket(tenant.getId(), personId, accessUntil, mac));
+        // At the device limit they can't buy here, only move one of their packages to this device.
+        List<PaidDevice> movable = otherDevices(paid, mac).size() < MAX_PAID_STUDENT_DEVICES ? null
+                : otherDevices(paid, mac).stream().map(v -> new PaidDevice(v.getId(),
+                        v.getPackagePlan() != null ? v.getPackagePlan().getName() : "Package", v.getExpiresAt(),
+                        v.getClaimedMac().substring(Math.max(0, v.getClaimedMac().length() - 5)))).toList();
         if (tenant.isSchoolStudentFreeEnabled()) {
             int dailyCapMb = tenant.getSchoolStudentDailyFreeMb();
             long capBytes = dailyCapMb * 1024L * 1024L;
             long usedBytes = studentFreeUsedTodayBytes(tenant.getId(), personId, null);
             int remainingMb = usedBytes >= capBytes ? 0 : (int) Math.max(1L, (capBytes - usedBytes + (1024L * 1024L - 1L)) / (1024L * 1024L));
-            return PortalResult.buy(ticket, fullName, category, accessUntil, true, dailyCapMb, remainingMb, null);
+            return PortalResult.buy(ticket, fullName, category, accessUntil, true, dailyCapMb, remainingMb, movable);
         }
-        return PortalResult.buy(ticket, fullName, category, accessUntil, false, null, null, null);
+        return PortalResult.buy(ticket, fullName, category, accessUntil, false, null, null, movable);
     }
 
-    /** After a successful school payment: ties the new voucher to the student and their leaving date, ending any free study session. */
+    private static List<Voucher> otherDevices(List<Voucher> paid, String mac) {
+        return paid.stream().filter(v -> v.getClaimedMac() != null && !v.getClaimedMac().equalsIgnoreCase(mac)).toList();
+    }
+
+    /** Refuses a purchase that would put the student's paid packages on more than {@link #MAX_PAID_STUDENT_DEVICES} devices. */
+    public void assertCanBuyForDevice(Long tenantId, String personId, String mac) {
+        if (otherDevices(livePaidStudents(tenantId, personId), mac).size() >= MAX_PAID_STUDENT_DEVICES) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "You already have packages on " + MAX_PAID_STUDENT_DEVICES
+                    + " devices. Move one of them to this device instead.");
+        }
+    }
+
+    /** Moves one of the student's paid packages to this device; the device it was on is signed out. */
+    public PortalResult movePaidPackage(String routerToken, String ticketToken, long voucherId, String rawMac) {
+        Router router = schoolRouter(routerToken);
+        String mac = requireMac(rawMac);
+        Tenant tenant = router.getTenant();
+        SchoolTickets.Ticket t = tickets.require(ticketToken, tenant.getId(), mac);
+        return transaction.execute(status -> {
+            Voucher voucher = livePaidStudents(tenant.getId(), t.personId()).stream()
+                    .filter(v -> v.getId() == voucherId).findFirst()
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "That package is no longer available."));
+            reprovision(voucher, router, mac, endOf(t.accessUntil()), null);
+            return PortalResult.connect(voucher.getCode(), null, "STUDENT", voucher.getExpiresAt());
+        });
+    }
+
+    /** After a successful school payment: ties the new voucher to the student and their leaving date, ending study data on that device. */
     public void bindPaidVoucher(Transaction tx, String code) {
         if (tx.getPersonId() != null && tx.getTenant() != null) {
             vouchers.findLiveForPerson(tx.getTenant().getId(), tx.getPersonId(), "STUDENT").stream()
                     .filter(v -> SALE_STUDENT_FREE.equals(v.getSaleType()))
+                    .filter(v -> v.getClaimedMac() == null || tx.getClientMac() == null || v.getClaimedMac().equalsIgnoreCase(tx.getClientMac().replace('-', ':')))
                     .forEach(this::holdAndDisconnect);
         }
         Voucher voucher = vouchers.findByCode(code).orElseThrow();
@@ -337,13 +386,14 @@ public class SchoolAccessService {
                 .orElse(null);
     }
 
-    private Voucher livePaidStudent(Long tenantId, String personId) {
+    /** The student's usable paid packages, active ones first. */
+    private List<Voucher> livePaidStudents(Long tenantId, String personId) {
         OffsetDateTime now = clock.now();
         return vouchers.findLiveForPerson(tenantId, personId, "STUDENT").stream()
                 .filter(v -> !SALE_STUDENT_FREE.equals(v.getSaleType()))
                 .filter(v -> (v.getExpiresAt() == null || v.getExpiresAt().isAfter(now)) && (v.getHardExpiresAt() == null || v.getHardExpiresAt().isAfter(now)))
-                .min((a, b) -> Boolean.compare(!"active".equals(a.getStatus()), !"active".equals(b.getStatus())))
-                .orElse(null);
+                .sorted((a, b) -> Boolean.compare(!"active".equals(a.getStatus()), !"active".equals(b.getStatus())))
+                .toList();
     }
 
     private Voucher liveFreeStudent(Long tenantId, String personId) {

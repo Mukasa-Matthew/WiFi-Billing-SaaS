@@ -122,7 +122,8 @@ public class ProvisioningService {
                 walledGardenHosts(),
                 defaultValue(router.getTenant().getTetheringProtection(), "OFF"),
                 setupCode,
-                winboxInstaller));
+                winboxInstaller,
+                router.getTenant().isSchool()));
     }
 
     /**

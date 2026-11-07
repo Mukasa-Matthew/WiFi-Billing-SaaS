@@ -568,6 +568,13 @@ const CATEGORY_COLOR: Record<string, string> = {
   PAID_CUSTOMER: "#8B5CF6",
 };
 
+const SCHOOL_CATEGORIES = ["STUDENT", "STAFF", "VISITOR"];
+
+/** Whether this tenant runs a school network (same query the menu uses, so it is cached). */
+function useIsSchool() {
+  return useApi<{ school: boolean }>("/api/school/status").data?.school === true;
+}
+
 function MoneyBreakdownCard({
   stats,
   rangeLabel,
@@ -580,6 +587,7 @@ function MoneyBreakdownCard({
   money: (v: number | null | undefined) => string;
 }) {
   const [view, setView] = useState<RevenueView>("channel");
+  const school = useIsSchool();
   const gross = Number(stats?.periodGrossRevenue || 0);
   const gwFees = Number(stats?.periodGatewayFees || 0);
   const platFees = Number(stats?.periodPlatformFees || 0);
@@ -591,7 +599,7 @@ function MoneyBreakdownCard({
     view === "channel"
       ? stats?.revenueByChannel ?? []
       : view === "group"
-      ? stats?.revenueByGroup ?? []
+      ? (stats?.revenueByGroup ?? []).filter((item) => school || item.key !== "STUDENT")
       : stats?.revenueByPackage ?? [];
 
   const segments = rawItems.map((item) => ({
@@ -664,6 +672,7 @@ function GroupBandwidthCard({
   rangeLabel: string;
 }) {
   const [mode, setMode] = useState<GroupPeriodMode>("range");
+  const school = useIsSchool();
 
   const handleMode = (m: GroupPeriodMode) => {
     setMode(m);
@@ -672,10 +681,12 @@ function GroupBandwidthCard({
     }
   };
 
-  const rows: CategoryDataItem[] =
+  const allRows: CategoryDataItem[] =
     mode === "range"
       ? stats?.dataByCategory ?? []
       : usage?.categories ?? stats?.dataByCategory ?? [];
+  // Students, staff and visitors only exist on school networks.
+  const rows = school ? allRows : allRows.filter((r) => !SCHOOL_CATEGORIES.includes(r.category));
 
   const activePeriodLabel =
     mode === "range"
@@ -701,8 +712,8 @@ function GroupBandwidthCard({
 
   return (
     <Card
-      title="Data & bandwidth by group"
-      description={`Internet consumed by Students, Staff, Visitors & Customers · ${activePeriodLabel.toLowerCase()}`}
+      title={school ? "Data & bandwidth by group" : "Data & bandwidth"}
+      description={`${school ? "Internet consumed by Students, Staff, Visitors & Customers" : "Internet consumed by your customers"} · ${activePeriodLabel.toLowerCase()}`}
       action={<Segmented label="Group usage period" value={mode === "range" ? "range" : usagePeriod} onChange={(v) => handleMode(v as GroupPeriodMode)} options={[...GROUP_PERIOD_MODES]} />}
       bodyClassName="flex flex-col justify-between p-5 sm:p-6"
     >

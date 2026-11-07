@@ -159,6 +159,21 @@ public class SchoolManagementService {
         return settings(saved);
     }
 
+    /**
+     * Sends every router of the school the larger hotspot network (~2,000 devices). Routers set up
+     * as a school already have it; for them the change does nothing. Returns how many routers it was sent to.
+     */
+    public int enlargeNetwork(Tenant tenant) {
+        if (routers == null || routerManagement == null) return 0;
+        int sent = 0;
+        for (Router router : routers.findAllByTenantId(tenant.getId())) {
+            if ("DELETED".equalsIgnoreCase(router.getStatus())) continue;
+            routerManagement.enqueue(router, "SYNC_SCHOOL_NETWORK");
+            sent++;
+        }
+        return sent;
+    }
+
     /** Blank means unlimited; otherwise a MikroTik rate such as "5M/5M". */
     private static String rate(String value) {
         if (value.isBlank()) return null;

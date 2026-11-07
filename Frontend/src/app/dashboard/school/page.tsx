@@ -9,6 +9,7 @@ import {
 } from "@/components/BillingUI";
 import { DonutChart } from "@/components/charts";
 import { useToast } from "@/components/ui/Toast";
+import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 interface Settings {
   staffEnabled?: boolean;
@@ -270,6 +271,7 @@ export default function SchoolPage() {
             />
           )}
         </div>
+        <div className="space-y-6">
         <Card
           title="Staff exception requests"
           description="Former students can only get free staff access if you approve. You see only what you need to decide."
@@ -297,6 +299,8 @@ export default function SchoolPage() {
             </ul>
           )}
         </Card>
+        <NetworkSizeCard />
+        </div>
       </div>
 
       {/* Live Connected Devices with Speed, Data Usage, Cap Progress & Disconnect Action */}
@@ -1201,6 +1205,38 @@ function SettingsCard({ settings, onSaved }: { settings: Settings; onSaved: () =
           </button>
         </div>
       </form>
+    </Card>
+  );
+}
+
+/** Lets the owner give routers set up before schools got a larger network room for ~2,000 devices. */
+function NetworkSizeCard() {
+  const toast = useToast();
+  const { confirm, dialog } = useConfirmDialog();
+  const enlarge = () => confirm({
+    title: "Enlarge the school network?",
+    body: "Your routers will make room for about 2,000 devices instead of about 245. Connected devices may drop for up to a minute and then reconnect by themselves, so a quiet time such as the evening is best. Routers already enlarged are not affected.",
+    confirmLabel: "Enlarge network",
+    onConfirm: async () => {
+      try {
+        const { data } = await api.post<{ routers: number }>("/api/school/network/enlarge");
+        toast("success", data.routers ? `Sent to ${data.routers} router${data.routers === 1 ? "" : "s"}. It applies within a minute while they are online.` : "No routers to update yet.");
+      } catch (err) {
+        toast("error", message(err));
+      }
+    },
+  });
+  return (
+    <Card title="Network size" description="How many devices your school WiFi can hand out addresses to at once.">
+      <p className="text-sm text-[var(--fg-body)]">
+        School routers set up from now on hold about <strong>2,000 devices</strong>. Routers set up earlier hold about 245 until you enlarge them.
+      </p>
+      <p className={hint}>Large numbers of users also need a capable MikroTik (hEX S or better; RB5009 or CCR for big schools).</p>
+      <button type="button" onClick={enlarge} className={`${buttonGhost} mt-4`}>
+        <Users className="h-4 w-4" />
+        Enlarge network to ~2,000 devices
+      </button>
+      {dialog}
     </Card>
   );
 }

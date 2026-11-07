@@ -34,6 +34,31 @@ class RouterScriptGeneratorTest {
     }
 
     @Test
+    void schoolsGetALargeHotspotNetworkAndOthersKeepTheirs() {
+        String ordinary = render("s3cret");
+        assertTrue(ordinary.contains("/ip/address add address=10.10.0.1/24 interface=\"wb-hotspot-bridge\""));
+        assertTrue(ordinary.contains("ranges=10.10.0.10-10.10.0.254"));
+        assertTrue(ordinary.contains("lease-time=1h"));
+        assertTrue(ordinary.contains("/ip/dhcp-server/network add address=10.10.0.0/24 gateway=10.10.0.1"));
+
+        String school = generator.generate(new RouterScriptGenerator.ScriptContext(
+                "School", "ether1", List.of("ether2"), "School WiFi", "tok_ABC123xyz", "10.9.0.5", 16, "s3cret", "10.9.0.1",
+                "yoay+E/LyCqRq0xxqsIRJdRoqe8XjRVmkMe3nDx5wEc=", "203.0.113.10", 443, "10.9.0.0/16",
+                "http://203.0.113.10:8080", Set.of("203.0.113.10"), Set.of(), "OFF", SETUP, null, true));
+        assertTrue(school.contains("/ip/address add address=10.10.0.1/21 interface=\"wb-hotspot-bridge\""));
+        assertTrue(school.contains("ranges=10.10.0.10-10.10.7.254"));
+        assertTrue(school.contains("lease-time=30m"));
+        assertTrue(school.contains("/ip/dhcp-server/network add address=10.10.0.0/21 gateway=10.10.0.1 dns-server=10.10.0.1"));
+        assertTrue(school.contains("hotspot-address=10.10.0.1 dns-name=login.wifi"), "the router address and login page are unchanged");
+
+        String enlarge = RouterScriptGenerator.largeNetworkScript();
+        assertTrue(enlarge.contains("address=\"10.10.0.1/24\"]"), "only our own /24 address is changed");
+        assertTrue(enlarge.contains("/ip/address set $a address=10.10.0.1/21"));
+        assertTrue(enlarge.contains("/ip/pool set [find name=\"wb-hotspot-pool\"] ranges=10.10.0.10-10.10.7.254"));
+        assertTrue(enlarge.contains("/ip/dhcp-server/network set [find comment=\"wifi-billing\"] address=10.10.0.0/21"));
+    }
+
+    @Test
     void rendersCoreSectionsRouterOsV7() {
         String s = render("s3cret");
         System.out.println(s);

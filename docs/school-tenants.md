@@ -38,7 +38,7 @@ Use a spare MikroTik provisioned as a test school tenant, and two real phones (o
 2. **Student first sign-in:** ID + temporary PIN → asked for a new PIN → weak PIN rejected → good PIN accepted → packages appear → pay → connected automatically.
 3. **Wrong PIN:** shows attempts left; after 5 tries, locked with a wait time; IT unlock works.
 4. **Returning student:** forget the network, rejoin, sign in → connected with the same package, nothing to pay.
-5. **New phone:** sign in on the second phone → second phone connects, first phone is dropped.
+5. **Two devices:** buy on the phone, then sign in on a laptop → packages appear (the phone stays online) → buy → both are online. Sign in on a third device → no packages, only "Move here" for one of the two; moving signs the old device out. Free study data follows the student to the latest device (one at a time).
 6. **Code sharing:** type the student's voucher code on another phone → rejected.
 7. **Suspension:** IT suspends the student → device is signed out within seconds → sign-in now says access is inactive.
 8. **Leaving date:** set a student's end date to today; after midnight they can't sign in and the package stops.
@@ -46,6 +46,10 @@ Use a spare MikroTik provisioned as a test school tenant, and two real phones (o
 10. **Former student as staff:** IT is blocked → requests an exception → owner approves on the School page → IT moves them → free access works.
 11. **Visitors:** owner switches visitors off → no button on the portal and no Visitors page for IT. Switch on with a cap of 2 → third pass refused → pass connects one phone; a second phone is refused; IT cancels the pass → visitor dropped.
 12. **School paused:** super-admin pauses the school → IT and portal sign-in both stop; reactivate → both work.
+
+## Network size
+
+School routers are set up with a `10.10.0.0/21` hotspot network (router `10.10.0.1`, pool `10.10.0.10-10.10.7.254`, ~2,000 devices, 30-minute leases). Ordinary tenants keep `10.10.0.0/24`. Routers set up before this get the larger network from **School → Network size → Enlarge network** (router task `SYNC_SCHOOL_NETWORK`, safe to repeat).
 
 ## Known limits
 

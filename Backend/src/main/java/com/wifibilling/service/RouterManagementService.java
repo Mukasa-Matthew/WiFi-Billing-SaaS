@@ -151,6 +151,8 @@ public class RouterManagementService {
   }else if("SYNC_TETHERING".equals(action)){
    String mode=r.getTenant().getTetheringProtection();
    script=RouterScriptGenerator.tetheringRules(mode==null?"OFF":mode);
+  }else if("SYNC_SCHOOL_NETWORK".equals(action)){
+   script=RouterScriptGenerator.largeNetworkScript();
   }else if("SYNC_SCHOOL_FILTER".equals(action)){
    var t=r.getTenant();
    script=RouterScriptGenerator.schoolFilterRules(
