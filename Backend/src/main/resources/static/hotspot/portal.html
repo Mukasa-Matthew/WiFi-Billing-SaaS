@@ -188,6 +188,45 @@
     <div class="card-body">
         <div id="msg-area"></div>
 
+        <div id="school-section" style="display:none">
+            <form id="school-signin" onsubmit="schoolVerify(event)">
+                <span class="section-label">Sign in with your school ID</span>
+                <div class="input-wrap">
+                    <span class="icon">🪪</span>
+                    <input class="form-input" id="school-id" type="text" placeholder="Registration or staff ID number" required autocomplete="username" autocapitalize="characters" maxlength="128">
+                </div>
+                <div class="input-wrap">
+                    <span class="icon">🔒</span>
+                    <input class="form-input" id="school-pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" placeholder="4-digit PIN" required autocomplete="current-password">
+                </div>
+                <button type="submit" class="btn btn-dark" id="school-signin-btn">Continue</button>
+            </form>
+            <form id="school-pin-form" style="display:none" onsubmit="schoolChangePin(event)">
+                <span class="section-label">Choose your own PIN</span>
+                <p style="font-size:13px;color:var(--muted);margin:0 0 10px">This is your first sign-in. Pick 4 digits that are not repeated or in order (like 1111 or 1234).</p>
+                <div class="input-wrap">
+                    <span class="icon">🔒</span>
+                    <input class="form-input" id="school-new-pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" placeholder="New 4-digit PIN" required autocomplete="new-password">
+                </div>
+                <div class="input-wrap">
+                    <span class="icon">🔒</span>
+                    <input class="form-input" id="school-new-pin2" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" placeholder="Repeat new PIN" required autocomplete="new-password">
+                </div>
+                <button type="submit" class="btn btn-dark" id="school-pin-btn">Save PIN and continue</button>
+            </form>
+            <div id="school-welcome" class="status-msg success" style="display:none"></div>
+            <button type="button" class="btn btn-outline" id="school-visitor-btn" style="display:none" onclick="showSchoolVisitor()">🧳 &nbsp;I'm a visitor</button>
+            <form id="school-visitor-form" style="display:none" onsubmit="schoolVisitor(event)">
+                <span class="section-label">Visitor pass</span>
+                <div class="input-wrap">
+                    <span class="icon">🎫</span>
+                    <input class="form-input" id="school-visitor-code" type="text" placeholder="Pass code, e.g. ABCD-EFGH" required autocomplete="off" autocapitalize="characters" maxlength="16">
+                </div>
+                <button type="submit" class="btn btn-dark" id="school-visitor-submit">Connect as visitor</button>
+            </form>
+        </div>
+
+        <div id="voucher-entry">
         <span class="section-label">Have a voucher?</span>
         <form id="login-form" name="login" method="post">
             <input type="hidden" name="dst" id="dst-input" value="" />
@@ -201,6 +240,7 @@
         </form>
 
         <button type="button" class="btn btn-outline" onclick="showFind()">🔍 &nbsp;Already bought? Find your voucher</button>
+        </div>
 
         <div class="voucher-result" id="voucher-result">
             <div style="font-size:11.5px;color:var(--muted)">Your voucher code</div>
@@ -398,6 +438,108 @@ function renderSettings(settings) {
         document.getElementById('share-btn').style.display = 'none';
     }
     window.PORTAL_CFG = settings;
+    applySchoolMode(settings);
+}
+
+/* ---------- school sign-in ----------
+   Only for school tenants (settings.school). Students and staff sign in with
+   their school ID and PIN first: staff and returning students are connected
+   straight away, other students then see packages and pay with a ticket that
+   proves the check. Ordinary tenants never reach this code. */
+var SCHOOL = { ticket: null, pinChangeToken: null, busy: false };
+function applySchoolMode(settings) {
+    if (!settings.school) return;
+    document.getElementById('school-section').style.display = '';
+    document.getElementById('voucher-entry').style.display = 'none';
+    document.getElementById('school-visitor-btn').style.display =
+        settings.schoolVisitors && !SCHOOL.ticket && document.getElementById('school-visitor-form').style.display === 'none' ? '' : 'none';
+    if (!settings.schoolVisitors) document.getElementById('school-visitor-form').style.display = 'none';
+    var showPackages = !!SCHOOL.ticket && settings.allowPurchases !== false;
+    document.getElementById('packages-section').style.display = showPackages ? '' : 'none';
+    document.getElementById('plans-label').style.display = showPackages ? '' : 'none';
+}
+function schoolMac() { return (MT_MAC && MT_MAC.charAt(0) !== '$') ? MT_MAC : ''; }
+function schoolPost(path, body, onDone) {
+    if (SCHOOL.busy) return;
+    if (!schoolMac()) { showMsg('Connect to the school WiFi and open this page again.', true); return; }
+    SCHOOL.busy = true;
+    body.token = TOKEN; body.mac = schoolMac();
+    fetch(BASE + '/api/portal/school/' + path, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) })
+        .then(function(r){ return r.json().then(function(res){ return { ok: r.ok, res: res }; }); })
+        .then(function(out){
+            SCHOOL.busy = false;
+            if (!out.ok) {
+                var res = out.res || {};
+                var text = res.message || 'Sign-in failed. Please try again.';
+                if (res.code === 'WRONG_PIN' && res.attemptsLeft) text += ' ' + res.attemptsLeft + ' attempt' + (res.attemptsLeft === '1' ? '' : 's') + ' left.';
+                if (res.code === 'LOCKED' && res.secondsRemaining > 0) text += ' Try again in ' + Math.ceil(res.secondsRemaining / 60) + ' min.';
+                showMsg(escapeText(text), true);
+                if (onDone) onDone(false);
+                return;
+            }
+            schoolResult(out.res);
+            if (onDone) onDone(true);
+        })
+        .catch(function(){ SCHOOL.busy = false; showMsg('Could not reach the server. Check your connection and try again.', true); if (onDone) onDone(false); });
+}
+function schoolVerify(ev) {
+    ev.preventDefault();
+    var pinField = document.getElementById('school-pin');
+    schoolPost('verify', { identifier: document.getElementById('school-id').value.trim(), pin: pinField.value.trim() },
+        function(){ pinField.value = ''; });
+}
+function schoolChangePin(ev) {
+    ev.preventDefault();
+    var a = document.getElementById('school-new-pin'), b = document.getElementById('school-new-pin2');
+    if (a.value !== b.value) { showMsg('The two PINs do not match.', true); return; }
+    schoolPost('change-pin', { pinChangeToken: SCHOOL.pinChangeToken, newPin: a.value.trim() }, function(){ a.value = ''; b.value = ''; });
+}
+function showSchoolVisitor() {
+    document.getElementById('school-signin').style.display = 'none';
+    document.getElementById('school-visitor-btn').style.display = 'none';
+    document.getElementById('school-visitor-form').style.display = '';
+    document.getElementById('school-visitor-code').focus();
+}
+function schoolVisitor(ev) {
+    ev.preventDefault();
+    schoolPost('visitor', { code: document.getElementById('school-visitor-code').value.trim() });
+}
+function schoolResult(res) {
+    if (res.action === 'CHANGE_PIN') {
+        SCHOOL.pinChangeToken = res.pinChangeToken;
+        document.getElementById('school-signin').style.display = 'none';
+        document.getElementById('school-pin-form').style.display = '';
+        showMsg('Welcome, ' + escapeText(res.fullName || '') + '. Please choose a new PIN to continue.', false);
+        return;
+    }
+    document.getElementById('school-pin-form').style.display = 'none';
+    if (res.action === 'BUY') {
+        SCHOOL.ticket = res.ticket;
+        document.getElementById('school-signin').style.display = 'none';
+        var welcome = document.getElementById('school-welcome');
+        welcome.textContent = 'Signed in as ' + (res.fullName || 'student') + '. Choose a package below.';
+        welcome.style.display = '';
+        document.getElementById('msg-area').innerHTML = '';
+        if (window.PORTAL_CFG) applySchoolMode(window.PORTAL_CFG);
+        document.getElementById('packages-section').scrollIntoView({ behavior: 'smooth' });
+        return;
+    }
+    if (res.action === 'CONNECT' && res.code) {
+        savePurchase(res.code);
+        purchasedCode = res.code;
+        document.getElementById('username-input').value = res.code;
+        var who = res.category === 'STAFF' ? 'staff access' : res.category === 'VISITOR' ? 'visitor access' : 'your package';
+        if (!LINK_LOGIN || LINK_LOGIN.charAt(0) === '$') { showMsg('Signed in. Reopen this page from the WiFi network to connect.', true); return; }
+        showMsg('Welcome, ' + escapeText(res.fullName || '') + '. Connecting you with ' + who + '…', false);
+        window.scrollTo(0, 0);
+        setTimeout(function(){
+            document.getElementById('password-input').value = res.code;
+            document.getElementById('login-form').submit();
+        }, 400);
+    }
+}
+function escapeText(text) {
+    var d = document.createElement('div'); d.textContent = text; return d.innerHTML;
 }
 
 if (LINK_LOGIN && LINK_LOGIN.charAt(0) !== '$') {
@@ -644,7 +786,7 @@ function handlePurchase() {
         return;
     }
 
-    var checkout = { ref: newCheckoutRef(), pkgId: selectedPkg.id, phone: phone, paymentRef: null };
+    var checkout = { ref: newCheckoutRef(), pkgId: selectedPkg.id, phone: phone, paymentRef: null, ticket: SCHOOL.ticket || undefined };
     saveCheckout(checkout);
     sendInitiate(checkout);
 }
@@ -660,7 +802,8 @@ function sendInitiate(checkout) {
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
             token: TOKEN, packageId: checkout.pkgId, phone: checkout.phone,
-            network: '', checkoutRef: checkout.ref, mac: (MT_MAC && MT_MAC.charAt(0) !== '$') ? MT_MAC : ''
+            network: '', checkoutRef: checkout.ref, mac: (MT_MAC && MT_MAC.charAt(0) !== '$') ? MT_MAC : '',
+            schoolTicket: checkout.ticket || undefined
         })
     })
     .then(function(r){ return r.json(); })
@@ -695,7 +838,8 @@ function retryInitiate(checkout, attempt) {
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
             token: TOKEN, packageId: checkout.pkgId, phone: checkout.phone,
-            network: '', checkoutRef: checkout.ref, mac: (MT_MAC && MT_MAC.charAt(0) !== '$') ? MT_MAC : ''
+            network: '', checkoutRef: checkout.ref, mac: (MT_MAC && MT_MAC.charAt(0) !== '$') ? MT_MAC : '',
+            schoolTicket: checkout.ticket || undefined
         })
     })
     .then(function(r){ return r.json(); })
