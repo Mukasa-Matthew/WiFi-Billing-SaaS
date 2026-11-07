@@ -14,6 +14,12 @@ interface Settings {
   staffEnabled?: boolean;
   staffRateLimit: string | null;
   staffDailyDataCapMb?: number | null;
+  staffSiteMode?: "ALL" | "ALLOW_LIST" | "BLOCK_LIST";
+  staffSiteRules?: string | null;
+  studentFreeEnabled?: boolean;
+  studentDailyFreeMb?: number | null;
+  studentFreeRateLimit?: string | null;
+  studentAllowedSites?: string | null;
   visitorsEnabled: boolean;
   visitorDailyCap: number;
   visitorRateLimit: string | null;
@@ -97,6 +103,47 @@ const VISITOR_CAP_PRESETS = [
   { label: "2 GB", value: "2048" },
 ];
 
+const STUDENT_FREE_MB_PRESETS = [
+  { label: "20 MB", value: "20" },
+  { label: "50 MB", value: "50" },
+  { label: "100 MB", value: "100" },
+  { label: "200 MB", value: "200" },
+  { label: "500 MB", value: "500" },
+  { label: "1 GB", value: "1024" },
+];
+
+const STUDY_SITE_PRESETS = [
+  { token: "@wikipedia", label: "Wikipedia" },
+  { token: "@scholar", label: "Google Scholar" },
+  { token: "@khanacademy", label: "Khan Academy" },
+  { token: "@chatgpt", label: "ChatGPT" },
+];
+
+const STAFF_APP_PRESETS = [
+  { token: "@whatsapp", label: "WhatsApp" },
+  { token: "@youtube", label: "YouTube" },
+  { token: "@chatgpt", label: "ChatGPT" },
+  { token: "@tiktok", label: "TikTok" },
+  { token: "@facebook", label: "Facebook" },
+  { token: "@instagram", label: "Instagram" },
+  { token: "@twitter", label: "X / Twitter" },
+  { token: "@netflix", label: "Netflix" },
+];
+
+function parseSiteTokens(raw: string): string[] {
+  return raw
+    .split(/[\s,;]+/)
+    .map((t) => t.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function toggleSiteToken(raw: string, token: string): string {
+  const list = parseSiteTokens(raw);
+  const lower = token.toLowerCase();
+  const next = list.includes(lower) ? list.filter((t) => t !== lower) : [...list, lower];
+  return next.join(", ");
+}
+
 function formatCapMb(mb: number | null | undefined) {
   if (!mb || mb <= 0) return "Unlimited data";
   return mb >= 1024 && mb % 1024 === 0 ? `${mb / 1024} GB` : `${mb.toLocaleString()} MB`;
@@ -167,7 +214,11 @@ export default function SchoolPage() {
           value={school?.students.toLocaleString() ?? "—"}
           icon={<GraduationCap />}
           loading={overview.loading}
-          hint="Pay for packages as usual"
+          hint={
+            settings?.studentFreeEnabled && (settings?.studentDailyFreeMb ?? 0) > 0
+              ? `${formatCapMb(settings.studentDailyFreeMb)}/day free study data + paid packages`
+              : "Pay for packages as usual"
+          }
         />
         <StatCard
           label="Staff with free access"
@@ -585,11 +636,25 @@ function SchoolBandwidthMonitor({
 
 function SettingsCard({ settings, onSaved }: { settings: Settings; onSaved: () => void }) {
   const toast = useToast();
+  const [studentFreeEnabled, setStudentFreeEnabled] = useState(Boolean(settings.studentFreeEnabled));
+  const [studentFreeMb, setStudentFreeMb] = useState(
+    settings.studentDailyFreeMb && settings.studentDailyFreeMb > 0 ? String(settings.studentDailyFreeMb) : "100"
+  );
+  const [studentFreeRate, setStudentFreeRate] = useState(settings.studentFreeRateLimit ?? "2M/2M");
+  const [studentAllowedSites, setStudentAllowedSites] = useState(settings.studentAllowedSites ?? "");
+
   const [staffEnabled, setStaffEnabled] = useState(settings.staffEnabled !== false);
   const [staffRate, setStaffRate] = useState(settings.staffRateLimit ?? "");
   const [staffCapMb, setStaffCapMb] = useState(
     settings.staffDailyDataCapMb && settings.staffDailyDataCapMb > 0 ? String(settings.staffDailyDataCapMb) : ""
   );
+  const [staffSiteMode, setStaffSiteMode] = useState<"ALL" | "ALLOW_LIST" | "BLOCK_LIST">(
+    settings.staffSiteMode === "ALLOW_LIST" || settings.staffSiteMode === "BLOCK_LIST"
+      ? settings.staffSiteMode
+      : "ALL"
+  );
+  const [staffSiteRules, setStaffSiteRules] = useState(settings.staffSiteRules ?? "");
+
   const [visitors, setVisitors] = useState(settings.visitorsEnabled);
   const [visitorDailyPasses, setVisitorDailyPasses] = useState(String(settings.visitorDailyCap || 20));
   const [visitorRate, setVisitorRate] = useState(settings.visitorRateLimit ?? "");
@@ -604,14 +669,23 @@ function SettingsCard({ settings, onSaved }: { settings: Settings; onSaved: () =
   const [applyNow, setApplyNow] = useState(true);
   const [busy, setBusy] = useState(false);
 
+  const studentSiteTokens = parseSiteTokens(studentAllowedSites);
+  const staffSiteTokens = parseSiteTokens(staffSiteRules);
+
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
     try {
       await api.put("/api/school/settings", {
+        studentFreeEnabled,
+        studentDailyFreeMb: studentFreeEnabled && studentFreeMb.trim() ? Number(studentFreeMb) : 0,
+        studentFreeRateLimit: studentFreeRate.trim(),
+        studentAllowedSites: studentAllowedSites.trim(),
         staffEnabled,
         staffRateLimit: staffRate.trim(),
         staffDailyDataCapMb: staffCapMb.trim() ? Number(staffCapMb) : 0,
+        staffSiteMode,
+        staffSiteRules: staffSiteRules.trim(),
         visitorsEnabled: visitors,
         visitorDailyCap: Number(visitorDailyPasses) || 0,
         visitorRateLimit: visitorRate.trim(),
@@ -622,8 +696,8 @@ function SettingsCard({ settings, onSaved }: { settings: Settings; onSaved: () =
       toast(
         "success",
         applyNow
-          ? "Saved and applied to active staff and visitor sessions."
-          : "Saved. New rules will apply as staff and visitors sign in."
+          ? "Saved and applied to active school sessions and router filters."
+          : "Saved. New rules will apply as students, staff and visitors sign in."
       );
       onSaved();
     } catch (err) {
@@ -635,17 +709,153 @@ function SettingsCard({ settings, onSaved }: { settings: Settings; onSaved: () =
 
   return (
     <Card
-      title="Free access & bandwidth controls (Staff & Visitors)"
-      description="Control whether free groups can connect, cap their speed, and cap how many megabytes each staff member or visitor pass can consume."
+      title="Free access, website filtering & bandwidth controls"
+      description="Control daily free study MBs & allowed websites for students, staff free WiFi & allowed/blocked apps, visitor passes, and hotspot sharing."
     >
       <form onSubmit={save} className="space-y-6">
-        {/* Staff Controls Section */}
+        {/* 1. Student Daily Free Study Data + Allowed Study Websites */}
         <div className="space-y-4 rounded-xl border border-[var(--border)] bg-[var(--subtle)] p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h3 className="text-sm font-semibold text-[var(--fg)]">1. School Staff Free WiFi</h3>
+              <h3 className="text-sm font-semibold text-[var(--fg)]">
+                1. Student Daily Free Study Data (Restricted Websites)
+              </h3>
               <p className="text-xs text-[var(--fg-muted)]">
-                Staff sign in once with their Staff ID and PIN and reconnect automatically for their active period. Daily data caps reset at midnight.
+                When a student signs in without a paid package, let them choose between buying a full-internet package or using daily free MBs restricted to approved study websites.
+              </p>
+            </div>
+            <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-medium text-[var(--fg)]">
+              <input
+                type="checkbox"
+                className="h-4 w-4"
+                checked={studentFreeEnabled}
+                onChange={(e) => setStudentFreeEnabled(e.target.checked)}
+              />
+              {studentFreeEnabled ? "Daily free study MBs enabled" : "Paid packages only"}
+            </label>
+          </div>
+
+          {studentFreeEnabled ? (
+            <div className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="student-free-mb" className={label}>
+                    Free daily study data per student (MB / day)
+                  </label>
+                  <input
+                    id="student-free-mb"
+                    type="number"
+                    min={1}
+                    max={100000}
+                    required
+                    value={studentFreeMb}
+                    onChange={(e) => setStudentFreeMb(e.target.value)}
+                    placeholder="e.g. 100"
+                    className={field}
+                  />
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {STUDENT_FREE_MB_PRESETS.map((p) => (
+                      <button
+                        key={p.label}
+                        type="button"
+                        onClick={() => setStudentFreeMb(p.value)}
+                        className={`rounded-md border px-2 py-1 text-[11px] font-medium transition-colors ${
+                          studentFreeMb.trim() === p.value
+                            ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--accent-text)]"
+                            : "border-[var(--border)] bg-[var(--surface)] text-[var(--fg-muted)] hover:text-[var(--fg)]"
+                        }`}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className={hint}>Resets every midnight. Buying any paid package upgrades the student to full internet immediately.</p>
+                </div>
+
+                <div>
+                  <label htmlFor="student-free-rate" className={label}>
+                    Free study data speed limit
+                  </label>
+                  <input
+                    id="student-free-rate"
+                    maxLength={30}
+                    value={studentFreeRate}
+                    onChange={(e) => setStudentFreeRate(e.target.value)}
+                    placeholder="e.g. 2M/2M"
+                    className={field}
+                  />
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {SPEED_PRESETS.map((p) => (
+                      <button
+                        key={p.label}
+                        type="button"
+                        onClick={() => setStudentFreeRate(p.value)}
+                        className={`rounded-md border px-2 py-1 text-[11px] font-medium transition-colors ${
+                          studentFreeRate.trim().toUpperCase() === p.value
+                            ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--accent-text)]"
+                            : "border-[var(--border)] bg-[var(--surface)] text-[var(--fg-muted)] hover:text-[var(--fg)]"
+                        }`}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className={hint}>Speed limit while a student is using their free daily study data.</p>
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="student-allowed-sites" className={label}>
+                  Allowed websites on Student Free Data (Strict Whitelist)
+                </label>
+                <input
+                  id="student-allowed-sites"
+                  maxLength={2000}
+                  value={studentAllowedSites}
+                  onChange={(e) => setStudentAllowedSites(e.target.value)}
+                  placeholder="e.g. elearning.school.ac.ug, portal.school.ac.ug, @wikipedia, @scholar"
+                  className={field}
+                />
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  <span className="text-[11px] text-[var(--fg-muted)]">Quick toggle study platforms:</span>
+                  {STUDY_SITE_PRESETS.map((p) => {
+                    const active = studentSiteTokens.includes(p.token);
+                    return (
+                      <button
+                        key={p.token}
+                        type="button"
+                        onClick={() => setStudentAllowedSites(toggleSiteToken(studentAllowedSites, p.token))}
+                        className={`rounded-md border px-2 py-1 text-[11px] font-medium transition-colors ${
+                          active
+                            ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--accent-text)]"
+                            : "border-[var(--border)] bg-[var(--surface)] text-[var(--fg-muted)] hover:text-[var(--fg)]"
+                        }`}
+                      >
+                        {active ? "✓ " : "+ "}
+                        {p.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className={hint}>
+                  When listed, students on free daily data can ONLY open these domains (plus the payment portal to buy a full package). All other sites and apps are blocked on the router.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-[var(--fg-muted)]">
+              Students go straight to buying a paid package after verifying their Registration Number &amp; PIN.
+            </p>
+          )}
+        </div>
+
+        {/* 2. Staff Controls Section + Website & App Access Policy */}
+        <div className="space-y-4 rounded-xl border border-[var(--border)] bg-[var(--subtle)] p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold text-[var(--fg)]">2. School Staff Free WiFi &amp; App Filtering</h3>
+              <p className="text-xs text-[var(--fg-muted)]">
+                Staff sign in once with their Staff ID and PIN and reconnect automatically for their active period. Control their speed, daily MB cap, and which apps/websites they can access.
               </p>
             </div>
             <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-medium text-[var(--fg)]">
@@ -660,69 +870,153 @@ function SettingsCard({ settings, onSaved }: { settings: Settings; onSaved: () =
           </div>
 
           {staffEnabled ? (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label htmlFor="staff-rate" className={label}>
-                  Staff speed limit (Download / Upload)
-                </label>
-                <input
-                  id="staff-rate"
-                  maxLength={30}
-                  value={staffRate}
-                  onChange={(e) => setStaffRate(e.target.value)}
-                  placeholder="Unlimited (or e.g. 5M/5M)"
-                  className={field}
-                />
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {SPEED_PRESETS.map((p) => (
-                    <button
-                      key={p.label}
-                      type="button"
-                      onClick={() => setStaffRate(p.value)}
-                      className={`rounded-md border px-2 py-1 text-[11px] font-medium transition-colors ${
-                        staffRate.trim().toUpperCase() === p.value
-                          ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--accent-text)]"
-                          : "border-[var(--border)] bg-[var(--surface)] text-[var(--fg-muted)] hover:text-[var(--fg)]"
-                      }`}
-                    >
-                      {p.label}
-                    </button>
-                  ))}
+            <div className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="staff-rate" className={label}>
+                    Staff speed limit (Download / Upload)
+                  </label>
+                  <input
+                    id="staff-rate"
+                    maxLength={30}
+                    value={staffRate}
+                    onChange={(e) => setStaffRate(e.target.value)}
+                    placeholder="Unlimited (or e.g. 5M/5M)"
+                    className={field}
+                  />
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {SPEED_PRESETS.map((p) => (
+                      <button
+                        key={p.label}
+                        type="button"
+                        onClick={() => setStaffRate(p.value)}
+                        className={`rounded-md border px-2 py-1 text-[11px] font-medium transition-colors ${
+                          staffRate.trim().toUpperCase() === p.value
+                            ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--accent-text)]"
+                            : "border-[var(--border)] bg-[var(--surface)] text-[var(--fg-muted)] hover:text-[var(--fg)]"
+                        }`}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className={hint}>Prevents one staff laptop from hogging the whole school link.</p>
                 </div>
-                <p className={hint}>Prevents one staff laptop from hogging the whole school link.</p>
+
+                <div>
+                  <label htmlFor="staff-data-cap" className={label}>
+                    Staff daily data cap (MB per staff member / day)
+                  </label>
+                  <input
+                    id="staff-data-cap"
+                    type="number"
+                    min={0}
+                    max={1000000}
+                    value={staffCapMb}
+                    onChange={(e) => setStaffCapMb(e.target.value)}
+                    placeholder="Unlimited (leave empty)"
+                    className={field}
+                  />
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {STAFF_CAP_PRESETS.map((p) => (
+                      <button
+                        key={p.label}
+                        type="button"
+                        onClick={() => setStaffCapMb(p.value)}
+                        className={`rounded-md border px-2 py-1 text-[11px] font-medium transition-colors ${
+                          staffCapMb.trim() === p.value
+                            ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--accent-text)]"
+                            : "border-[var(--border)] bg-[var(--surface)] text-[var(--fg-muted)] hover:text-[var(--fg)]"
+                        }`}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className={hint}>Once a staff member reaches this MB limit today, their free session pauses until tomorrow.</p>
+                </div>
               </div>
 
-              <div>
-                <label htmlFor="staff-data-cap" className={label}>
-                  Staff daily data cap (MB per staff member / day)
-                </label>
-                <input
-                  id="staff-data-cap"
-                  type="number"
-                  min={0}
-                  max={1000000}
-                  value={staffCapMb}
-                  onChange={(e) => setStaffCapMb(e.target.value)}
-                  placeholder="Unlimited (leave empty)"
-                  className={field}
-                />
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {STAFF_CAP_PRESETS.map((p) => (
-                    <button
-                      key={p.label}
-                      type="button"
-                      onClick={() => setStaffCapMb(p.value)}
-                      className={`rounded-md border px-2 py-1 text-[11px] font-medium transition-colors ${
-                        staffCapMb.trim() === p.value
-                          ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--accent-text)]"
-                          : "border-[var(--border)] bg-[var(--surface)] text-[var(--fg-muted)] hover:text-[var(--fg)]"
-                      }`}
-                    >
-                      {p.label}
-                    </button>
-                  ))}
+              <div className="space-y-3 border-t border-[var(--border)] pt-3">
+                <div>
+                  <span className={label}>Staff website &amp; app access policy</span>
+                  <div className="mt-1.5 grid gap-2 sm:grid-cols-3">
+                    {[
+                      {
+                        key: "ALL" as const,
+                        title: "Allow All Websites",
+                        desc: "Staff can browse any website or app within their speed & daily MB cap.",
+                      },
+                      {
+                        key: "ALLOW_LIST" as const,
+                        title: "Allow ONLY Selected Apps & Sites",
+                        desc: "Staff can ONLY access the apps and domains you select below; everything else is blocked.",
+                      },
+                      {
+                        key: "BLOCK_LIST" as const,
+                        title: "Block Selected Apps & Sites",
+                        desc: "Staff can use the full internet EXCEPT the high-bandwidth apps or sites you select below.",
+                      },
+                    ].map((opt) => (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        onClick={() => setStaffSiteMode(opt.key)}
+                        className={`rounded-lg border p-2.5 text-left transition-colors ${
+                          staffSiteMode === opt.key
+                            ? "border-[var(--primary)] bg-[var(--primary-soft)]"
+                            : "border-[var(--border)] bg-[var(--surface)] hover:border-[var(--fg-muted)]"
+                        }`}
+                      >
+                        <span className="block text-xs font-semibold text-[var(--fg)]">{opt.title}</span>
+                        <span className="mt-0.5 block text-[11px] text-[var(--fg-muted)]">{opt.desc}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <p className={hint}>Once a staff member reaches this MB limit today, their free session pauses until tomorrow.</p>
+
+                {staffSiteMode !== "ALL" && (
+                  <div>
+                    <label htmlFor="staff-site-rules" className={label}>
+                      {staffSiteMode === "ALLOW_LIST"
+                        ? "Apps & domains staff are ALLOWED to use"
+                        : "Apps & domains BLOCKED on staff WiFi"}
+                    </label>
+                    <div className="mb-2 flex flex-wrap gap-1.5">
+                      {STAFF_APP_PRESETS.map((app) => {
+                        const active = staffSiteTokens.includes(app.token);
+                        return (
+                          <button
+                            key={app.token}
+                            type="button"
+                            onClick={() => setStaffSiteRules(toggleSiteToken(staffSiteRules, app.token))}
+                            className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
+                              active
+                                ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--accent-text)]"
+                                : "border-[var(--border)] bg-[var(--surface)] text-[var(--fg-muted)] hover:text-[var(--fg)]"
+                            }`}
+                          >
+                            {active ? "✓ " : "+ "}
+                            {app.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <input
+                      id="staff-site-rules"
+                      maxLength={2000}
+                      value={staffSiteRules}
+                      onChange={(e) => setStaffSiteRules(e.target.value)}
+                      placeholder="Click apps above or add custom domains e.g. @whatsapp, @youtube, @chatgpt, elearning.school.ac.ug"
+                      className={field}
+                    />
+                    <p className={hint}>
+                      {staffSiteMode === "ALLOW_LIST"
+                        ? "Only selected apps (@whatsapp, @youtube, @chatgpt, @tiktok, etc.) and custom domains listed above will work on Staff WiFi."
+                        : "Selected apps and custom domains listed above will be blocked on Staff WiFi by the MikroTik router."}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           ) : (
@@ -732,11 +1026,11 @@ function SettingsCard({ settings, onSaved }: { settings: Settings; onSaved: () =
           )}
         </div>
 
-        {/* Visitor Pass Controls Section */}
+        {/* 3. Visitor Pass Controls Section */}
         <div className="space-y-4 rounded-xl border border-[var(--border)] bg-[var(--subtle)] p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h3 className="text-sm font-semibold text-[var(--fg)]">2. School Visitor Passes</h3>
+              <h3 className="text-sm font-semibold text-[var(--fg)]">3. School Visitor Passes</h3>
               <p className="text-xs text-[var(--fg-muted)]">
                 Short-term passes issued by the school&apos;s IT officer for guests.
               </p>
@@ -842,12 +1136,12 @@ function SettingsCard({ settings, onSaved }: { settings: Settings; onSaved: () =
           )}
         </div>
 
-        {/* Anti-Hotspot / Anti-Tethering Protection Section */}
+        {/* 4. Anti-Hotspot / Anti-Tethering Protection Section */}
         <div className="space-y-3 rounded-xl border border-[var(--border)] bg-[var(--subtle)] p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h3 className="text-sm font-semibold text-[var(--fg)]">
-                3. Block Hotspot &amp; Tethering Sharing
+                4. Block Hotspot &amp; Tethering Sharing
               </h3>
               <p className="text-xs text-[var(--fg-muted)]">
                 Prevent a connected phone or laptop from turning on Mobile Hotspot or USB/WiFi sharing to give free internet to other devices.
@@ -900,7 +1194,7 @@ function SettingsCard({ settings, onSaved }: { settings: Settings; onSaved: () =
               checked={applyNow}
               onChange={(e) => setApplyNow(e.target.checked)}
             />
-            <span>Apply new limits immediately to currently connected staff &amp; visitors</span>
+            <span>Apply new limits &amp; website filters immediately to connected devices and routers</span>
           </label>
           <button type="submit" disabled={busy} className={button}>
             {busy ? "Saving…" : "Save & apply controls"}

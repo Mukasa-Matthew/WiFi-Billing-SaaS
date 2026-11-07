@@ -110,6 +110,133 @@ public class RouterScriptGenerator {
         return s.toString();
     }
 
+    public static final String STUDENT_FREE_ADDRESS_LIST = "wb-student-free";
+    public static final String STAFF_FREE_ADDRESS_LIST = "wb-staff-free";
+
+    private static final java.util.Map<String, List<String>> APP_PRESET_DOMAINS = java.util.Map.ofEntries(
+            java.util.Map.entry("@whatsapp", List.of("whatsapp.com", "whatsapp.net", "wa.me")),
+            java.util.Map.entry("@youtube", List.of("youtube.com", "youtu.be", "googlevideo.com", "ytimg.com", "youtube-nocookie.com")),
+            java.util.Map.entry("@chatgpt", List.of("chatgpt.com", "openai.com", "oaistatic.com", "oaiusercontent.com")),
+            java.util.Map.entry("@tiktok", List.of("tiktok.com", "tiktokcdn.com", "tiktokv.com", "musical.ly", "byteoversea.com")),
+            java.util.Map.entry("@facebook", List.of("facebook.com", "fb.com", "fbcdn.net", "messenger.com")),
+            java.util.Map.entry("@instagram", List.of("instagram.com", "cdninstagram.com")),
+            java.util.Map.entry("@twitter", List.of("x.com", "twitter.com", "twimg.com", "t.co")),
+            java.util.Map.entry("@netflix", List.of("netflix.com", "nflxvideo.net", "nflximg.net", "nflxso.net")),
+            java.util.Map.entry("@wikipedia", List.of("wikipedia.org", "wikimedia.org", "wikidata.org")),
+            java.util.Map.entry("@scholar", List.of("scholar.google.com", "books.google.com")),
+            java.util.Map.entry("@khanacademy", List.of("khanacademy.org", "kastatic.org", "kasandbox.org"))
+    );
+
+    /**
+     * Parses a comma/newline-separated list of app preset keys (@whatsapp, @youtube, etc.)
+     * and domain names into a deduplicated, sanitized list of domain names.
+     */
+    public static Set<String> expandSiteRules(String raw) {
+        java.util.Set<String> domains = new java.util.LinkedHashSet<>();
+        if (raw == null || raw.isBlank()) return domains;
+        for (String token : raw.split("[,;\\s\\r\\n]+")) {
+            String item = token.trim().toLowerCase(java.util.Locale.ROOT);
+            if (item.isEmpty()) continue;
+            if (item.startsWith("@")) {
+                List<String> preset = APP_PRESET_DOMAINS.get(item);
+                if (preset != null) domains.addAll(preset);
+                continue;
+            }
+            item = item.replaceFirst("^https?://", "");
+            int slash = item.indexOf('/');
+            if (slash >= 0) item = item.substring(0, slash);
+            int colon = item.indexOf(':');
+            if (colon >= 0) item = item.substring(0, colon);
+            while (item.startsWith("*.") || item.startsWith(".")) {
+                item = item.substring(1);
+            }
+            if (item.length() <= 120 && item.matches("^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$")) {
+                domains.add(item);
+            }
+            if (domains.size() >= 80) break;
+        }
+        return domains;
+    }
+
+    /**
+     * Generates RouterOS v7 firewall & dynamic DNS address-list rules for:
+     * 1) Student Free Daily Data (strict whitelist: only school-approved sites allowed on wb-student-free).
+     * 2) Staff Free WiFi (whitelist ALLOW_LIST or blacklist BLOCK_LIST on wb-staff-free).
+     */
+    public static String schoolFilterRules(boolean studentFreeEnabled, String studentAllowedSites,
+                                           String staffSiteMode, String staffSiteRules, String publicBaseUrl) {
+        StringBuilder s = new StringBuilder();
+        s.append("/ip/firewall/filter/remove [find where comment~\"^wb-school-filter\"]\n");
+        s.append("/ip/firewall/address-list/remove [find where comment~\"^wb-school-filter\"]\n");
+
+        String portalHost = null;
+        if (publicBaseUrl != null && !publicBaseUrl.isBlank()) {
+            Set<String> parsed = expandSiteRules(publicBaseUrl);
+            if (!parsed.isEmpty()) portalHost = parsed.iterator().next();
+        }
+
+        if (studentFreeEnabled) {
+            Set<String> studentDomains = new java.util.LinkedHashSet<>(expandSiteRules(studentAllowedSites));
+            if (portalHost != null) studentDomains.add(portalHost);
+            s.append("/ip/firewall/filter/add chain=forward src-address-list=").append(q(STUDENT_FREE_ADDRESS_LIST))
+                    .append(" protocol=udp dst-port=53 action=accept comment=\"wb-school-filter: student dns udp\"\n");
+            s.append("/ip/firewall/filter/add chain=forward src-address-list=").append(q(STUDENT_FREE_ADDRESS_LIST))
+                    .append(" protocol=tcp dst-port=53 action=accept comment=\"wb-school-filter: student dns tcp\"\n");
+            s.append("/ip/firewall/filter/add chain=forward src-address-list=").append(q(STUDENT_FREE_ADDRESS_LIST))
+                    .append(" protocol=udp dst-port=443 action=reject reject-with=icmp-port-unreachable comment=\"wb-school-filter: student disable quic\"\n");
+            for (String d : studentDomains) {
+                s.append("/ip/firewall/address-list/add list=\"wb-student-sites\" address=").append(q(d))
+                        .append(" comment=\"wb-school-filter: student site\"\n");
+                s.append("/ip/firewall/filter/add chain=forward src-address-list=").append(q(STUDENT_FREE_ADDRESS_LIST))
+                        .append(" protocol=tcp dst-port=443 tls-host=").append(q("*" + d))
+                        .append(" action=accept comment=\"wb-school-filter: student sni ").append(d).append("\"\n");
+            }
+            s.append("/ip/firewall/filter/add chain=forward src-address-list=").append(q(STUDENT_FREE_ADDRESS_LIST))
+                    .append(" dst-address-list=\"wb-student-sites\" action=accept comment=\"wb-school-filter: student allow list\"\n");
+            s.append("/ip/firewall/filter/add chain=forward src-address-list=").append(q(STUDENT_FREE_ADDRESS_LIST))
+                    .append(" action=drop comment=\"wb-school-filter: student drop other\"\n");
+        }
+
+        String mode = staffSiteMode == null ? "ALL" : staffSiteMode.trim().toUpperCase(java.util.Locale.ROOT);
+        if ("ALLOW_LIST".equals(mode)) {
+            Set<String> staffDomains = new java.util.LinkedHashSet<>(expandSiteRules(staffSiteRules));
+            if (portalHost != null) staffDomains.add(portalHost);
+            s.append("/ip/firewall/filter/add chain=forward src-address-list=").append(q(STAFF_FREE_ADDRESS_LIST))
+                    .append(" protocol=udp dst-port=53 action=accept comment=\"wb-school-filter: staff dns udp\"\n");
+            s.append("/ip/firewall/filter/add chain=forward src-address-list=").append(q(STAFF_FREE_ADDRESS_LIST))
+                    .append(" protocol=tcp dst-port=53 action=accept comment=\"wb-school-filter: staff dns tcp\"\n");
+            s.append("/ip/firewall/filter/add chain=forward src-address-list=").append(q(STAFF_FREE_ADDRESS_LIST))
+                    .append(" protocol=udp dst-port=443 action=reject reject-with=icmp-port-unreachable comment=\"wb-school-filter: staff disable quic\"\n");
+            for (String d : staffDomains) {
+                s.append("/ip/firewall/address-list/add list=\"wb-staff-sites\" address=").append(q(d))
+                        .append(" comment=\"wb-school-filter: staff site\"\n");
+                s.append("/ip/firewall/filter/add chain=forward src-address-list=").append(q(STAFF_FREE_ADDRESS_LIST))
+                        .append(" protocol=tcp dst-port=443 tls-host=").append(q("*" + d))
+                        .append(" action=accept comment=\"wb-school-filter: staff sni ").append(d).append("\"\n");
+            }
+            s.append("/ip/firewall/filter/add chain=forward src-address-list=").append(q(STAFF_FREE_ADDRESS_LIST))
+                    .append(" dst-address-list=\"wb-staff-sites\" action=accept comment=\"wb-school-filter: staff allow list\"\n");
+            s.append("/ip/firewall/filter/add chain=forward src-address-list=").append(q(STAFF_FREE_ADDRESS_LIST))
+                    .append(" action=drop comment=\"wb-school-filter: staff drop other\"\n");
+        } else if ("BLOCK_LIST".equals(mode)) {
+            Set<String> staffDomains = expandSiteRules(staffSiteRules);
+            if (!staffDomains.isEmpty()) {
+                s.append("/ip/firewall/filter/add chain=forward src-address-list=").append(q(STAFF_FREE_ADDRESS_LIST))
+                        .append(" protocol=udp dst-port=443 action=reject reject-with=icmp-port-unreachable comment=\"wb-school-filter: staff disable quic\"\n");
+                for (String d : staffDomains) {
+                    s.append("/ip/firewall/address-list/add list=\"wb-staff-sites\" address=").append(q(d))
+                            .append(" comment=\"wb-school-filter: staff site\"\n");
+                    s.append("/ip/firewall/filter/add chain=forward src-address-list=").append(q(STAFF_FREE_ADDRESS_LIST))
+                            .append(" protocol=tcp dst-port=443 tls-host=").append(q("*" + d))
+                            .append(" action=drop comment=\"wb-school-filter: staff block sni ").append(d).append("\"\n");
+                }
+                s.append("/ip/firewall/filter/add chain=forward src-address-list=").append(q(STAFF_FREE_ADDRESS_LIST))
+                        .append(" dst-address-list=\"wb-staff-sites\" action=drop comment=\"wb-school-filter: staff block list\"\n");
+            }
+        }
+        return s.toString();
+    }
+
     public String generate(ScriptContext c) {
         String iface = q(IFACE_NAME);
         String tag = q(TAG);

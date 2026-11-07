@@ -213,9 +213,37 @@ public class Tenant {
     @Column(name = "school_visitor_data_cap_mb")
     private Integer schoolVisitorDataCapMb;
 
+    /** School tenants: whether students get a daily free study data allowance (e.g. 20–200 MB/day on approved sites). */
+    @Column(name = "school_student_free_enabled")
+    private Boolean schoolStudentFreeEnabled;
+
+    /** Daily free study data cap (MB) per student; null or <= 0 means disabled. */
+    @Column(name = "school_student_daily_free_mb")
+    private Integer schoolStudentDailyFreeMb;
+
+    /** Speed limit for students while using their free daily study data, e.g. "2M/2M". */
+    @Column(name = "school_student_free_rate_limit", length = 30)
+    private String schoolStudentFreeRateLimit;
+
+    /** Comma/newline-separated allowed domains for student free daily data (whitelist only). */
+    @Column(name = "school_student_allowed_sites", columnDefinition = "TEXT")
+    private String schoolStudentAllowedSites;
+
+    /** Staff website/app filter mode: "ALL" (unrestricted), "ALLOW_LIST" (only selected), or "BLOCK_LIST" (block selected). */
+    @Column(name = "school_staff_site_mode", length = 16)
+    private String schoolStaffSiteMode;
+
+    /** Comma/newline-separated app keys (@whatsapp,@youtube,@chatgpt,@tiktok,etc.) and domains for staff filtering. */
+    @Column(name = "school_staff_site_rules", columnDefinition = "TEXT")
+    private String schoolStaffSiteRules;
+
     public boolean isSchool() { return "SCHOOL".equals(tenantType); }
 
     public boolean isSchoolStaffEnabled() { return !Boolean.FALSE.equals(schoolStaffEnabled); }
+
+    public boolean isSchoolStudentFreeEnabled() {
+        return Boolean.TRUE.equals(schoolStudentFreeEnabled) && schoolStudentDailyFreeMb != null && schoolStudentDailyFreeMb > 0;
+    }
 
     @Column(name = "created_at")
     @Builder.Default

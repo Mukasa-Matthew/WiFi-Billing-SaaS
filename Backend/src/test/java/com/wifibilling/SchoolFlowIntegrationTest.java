@@ -364,4 +364,62 @@ class SchoolFlowIntegrationTest {
                 .andExpect(jsonPath("$.tetheringProtection").value("BLOCK"));
         assertEquals("BLOCK", tenants.findById(school.tenant().getId()).orElseThrow().getTetheringProtection());
     }
+
+    @Test
+    void studentDailyFreeDataAllowsStudySitesAndUpgradesToPaidPackageCleanly() throws Exception {
+        Site school = site("student-free-school", true);
+        when(identity.updateSchool(eq(school.tenant().getId()), anyMap()))
+                .thenReturn(json.createObjectNode().put("visitorsEnabled", false).put("visitorDailyCap", 20));
+
+        mvc.perform(put("/api/school/settings").header("Authorization", "Bearer " + school.jwt()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"studentFreeEnabled\":true,\"studentDailyFreeMb\":200,\"studentFreeRateLimit\":\"2M/2M\",\"studentAllowedSites\":\"elearning.school.ac.ug, @wikipedia\",\"staffSiteMode\":\"ALLOW_LIST\",\"staffSiteRules\":\"@whatsapp, @youtube, @chatgpt, @tiktok\",\"applyImmediately\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.studentFreeEnabled").value(true))
+                .andExpect(jsonPath("$.studentDailyFreeMb").value(200))
+                .andExpect(jsonPath("$.studentFreeRateLimit").value("2M/2M"))
+                .andExpect(jsonPath("$.studentAllowedSites").value("elearning.school.ac.ug, @wikipedia"))
+                .andExpect(jsonPath("$.staffSiteMode").value("ALLOW_LIST"));
+
+        // Student signs in without a paid package -> portal returns BUY with studentFreeAvailable=true & 200 MB remaining
+        verified(school.tenant().getId(), "OK", "STUDENT", "student-free-1");
+        String verifyResp = portal("verify", verifyBody(school, PHONE_MAC));
+        assertEquals("BUY", JsonPath.read(verifyResp, "$.action"));
+        assertEquals(true, JsonPath.read(verifyResp, "$.studentFreeAvailable"));
+        assertEquals(200, (int) JsonPath.read(verifyResp, "$.studentFreeDailyCapMb"));
+        assertEquals(200, (int) JsonPath.read(verifyResp, "$.studentFreeRemainingMb"));
+        String ticket = JsonPath.read(verifyResp, "$.ticket");
+
+        // Student chooses to connect using their free 200 MB daily study data
+        String freeResp = portal("student-free", "{\"token\":\"" + school.routerToken() + "\",\"ticket\":\"" + ticket + "\",\"mac\":\"" + PHONE_MAC + "\"}");
+        assertEquals("CONNECT", JsonPath.read(freeResp, "$.action"));
+        String freeCode = JsonPath.read(freeResp, "$.code");
+        Voucher freeVoucher = vouchers.findByCode(freeCode).orElseThrow();
+        assertEquals("SCHOOL_STUDENT_FREE", freeVoucher.getSaleType());
+        assertEquals("wb-student-free",
+                radReply.findFirstByUsernameAndAttribute(freeCode, "Mikrotik-Address-List").orElseThrow().getValue(),
+                "student free session is placed in the wb-student-free firewall address list");
+        assertEquals(String.valueOf(200L * 1024L * 1024L),
+                radReply.findFirstByUsernameAndAttribute(freeCode, "Mikrotik-Total-Limit").orElseThrow().getValue());
+        assertEquals("2M/2M",
+                radReply.findFirstByUsernameAndAttribute(freeCode, "Mikrotik-Rate-Limit").orElseThrow().getValue());
+
+        // Student later buys a paid full-internet package -> restricted free voucher is held & paid voucher has NO address-list filter
+        verified(school.tenant().getId(), "OK", "STUDENT", "student-free-1");
+        String buyTicket = JsonPath.read(portal("verify", verifyBody(school, PHONE_MAC)), "$.ticket");
+        String reference = JsonPath.read(pay(school, PHONE_MAC, buyTicket), "$.reference");
+        mvc.perform(post("/api/payments/webhook").header("X-Webhook-Secret", "school-test-webhook-secret").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"reference\":\"" + reference + "\",\"status\":\"SUCCESSFUL\"}")).andExpect(status().isOk());
+        String paidCode = JsonPath.read(mvc.perform(get("/api/payments/status/" + reference)).andReturn().getResponse().getContentAsString(), "$.voucherCode");
+
+        assertTrue(vouchers.findByCode(freeCode).orElseThrow().getSchoolHold(), "free study voucher is held once student upgrades to paid");
+        assertFalse(radCheck.existsByUsername(freeCode));
+        assertTrue(radReply.findFirstByUsernameAndAttribute(paidCode, "Mikrotik-Address-List").isEmpty(),
+                "paid student package has full unrestricted internet");
+
+        // Staff member gets wb-staff-free address list so staff site filter rules apply
+        verified(school.tenant().getId(), "OK", "STAFF", "staff-filter-1");
+        String staffCode = JsonPath.read(portal("verify", verifyBody(school, TABLET_MAC)), "$.code");
+        assertEquals("wb-staff-free",
+                radReply.findFirstByUsernameAndAttribute(staffCode, "Mikrotik-Address-List").orElseThrow().getValue());
+    }
 }
