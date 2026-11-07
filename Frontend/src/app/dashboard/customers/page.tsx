@@ -19,7 +19,7 @@ interface Customer {
 }
 interface History {
   vouchers: { code: string; packageName: string | null; status: string; createdAt: string | null; sessionStart: string | null; sessionEnd: string | null; dataBytes: number; online: boolean }[];
-  payments: { reference: string; amount: number; method: string; voucher: string | null; createdAt: string }[];
+  payments: { reference: string; amount: number; method: string; voucher: string | null; createdAt: string; status: string; mobileMoneyId: string | null; packageName: string | null }[];
 }
 
 const STATUS: Record<Status, { label: string; tone: string }> = {
@@ -153,20 +153,25 @@ function CustomerDetails({ customer: c, now, onClose, onEdit }: { customer: Cust
           </div>
         </section>
         <section>
-          <h3 className="mb-2 text-[13px] font-semibold text-[var(--fg)]">Payments</h3>
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <h3 className="text-[13px] font-semibold text-[var(--fg)]">Payments</h3>
+            {c.phone && <Link href={`/dashboard/payments?phone=${encodeURIComponent(c.phone)}`} className="text-xs font-semibold text-blue-700 hover:underline">Search all payments for {c.phone}</Link>}
+          </div>
           <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
             <table className="w-full whitespace-nowrap text-left text-[13px]">
               <thead className="border-b border-[var(--border)] bg-[var(--subtle)] text-xs text-[var(--fg-muted)]">
-                <tr><th className="px-4 py-2 font-medium">Date</th><th className="px-4 py-2 font-medium">Method</th><th className="px-4 py-2 font-medium">Voucher</th><th className="px-4 py-2 text-right font-medium">Amount</th></tr>
+                <tr><th className="px-4 py-2 font-medium">Date</th><th className="px-4 py-2 font-medium">Status</th><th className="px-4 py-2 font-medium">Method</th><th className="px-4 py-2 font-medium">MoMo ID</th><th className="px-4 py-2 font-medium">Voucher</th><th className="px-4 py-2 text-right font-medium">Amount</th></tr>
               </thead>
               <tbody className="divide-y divide-[var(--border-soft)]">
-                {!h && !history.error && <tr><td colSpan={4} className="px-4 py-6 text-center text-[var(--fg-muted)]">Loading…</td></tr>}
-                {h && !h.payments.length && <tr><td colSpan={4} className="px-4 py-6 text-center text-[var(--fg-muted)]">No recorded payments.</td></tr>}
+                {!h && !history.error && <tr><td colSpan={6} className="px-4 py-6 text-center text-[var(--fg-muted)]">Loading…</td></tr>}
+                {h && !h.payments.length && <tr><td colSpan={6} className="px-4 py-6 text-center text-[var(--fg-muted)]">No recorded payments.</td></tr>}
                 {h?.payments.map((p) => (
                   <tr key={p.reference}>
                     <td className="num px-4 py-2.5 text-[var(--fg-body)]">{shortDateTime(p.createdAt)}</td>
+                    <td className="px-4 py-2.5"><Badge tone={p.status === "SUCCESSFUL" ? "green" : p.status === "FAILED" ? "red" : "amber"}>{p.status === "SUCCESSFUL" ? "Paid" : p.status === "FAILED" ? "Failed" : "Pending"}</Badge></td>
                     <td className="px-4 py-2.5 text-[var(--fg-body)]">{p.method}</td>
-                    <td className="px-4 py-2.5 font-mono text-xs">{p.voucher || "—"}</td>
+                    <td className="num px-4 py-2.5 text-xs">{p.mobileMoneyId || "—"}</td>
+                    <td className="px-4 py-2.5 font-mono text-xs">{p.voucher || "—"}{p.packageName && <span className="block font-sans text-[11px] text-[var(--fg-muted)]">{p.packageName}</span>}</td>
                     <td className="num px-4 py-2.5 text-right font-medium text-[var(--fg)]">{ugx(p.amount)}</td>
                   </tr>
                 ))}

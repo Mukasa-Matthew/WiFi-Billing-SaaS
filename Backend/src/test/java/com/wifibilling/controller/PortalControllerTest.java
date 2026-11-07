@@ -48,7 +48,8 @@ class PortalControllerTest {
 
     @BeforeEach
     void setUp() {
-        controller = new PortalController(routerRepository, packagePlanRepository, transactionRepository, voucherRepository, feedbackRepository, platformProperties);
+        controller = new PortalController(routerRepository, packagePlanRepository,
+                new com.wifibilling.service.VoucherLookupService(transactionRepository, voucherRepository), feedbackRepository, platformProperties);
     }
 
     @Test

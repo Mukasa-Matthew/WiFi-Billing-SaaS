@@ -118,13 +118,15 @@ public class CustomerService {
 
     public record VoucherEntry(String code, String packageName, String status, OffsetDateTime createdAt,
                                OffsetDateTime sessionStart, OffsetDateTime sessionEnd, long dataBytes, boolean online) {}
-    public record PaymentEntry(String reference, BigDecimal amount, String method, String voucher, OffsetDateTime createdAt) {}
+    public record PaymentEntry(String reference, BigDecimal amount, String method, String voucher, OffsetDateTime createdAt,
+                               String status, String mobileMoneyId, String packageName) {}
     public record History(List<VoucherEntry> vouchers, List<PaymentEntry> payments) {}
 
-    /** Every voucher a customer holds (newest first) with its usage, and their successful payments. */
+    /** Every voucher a customer holds (newest first) with its usage, and every payment for those vouchers or from their phone. */
     @Transactional(readOnly = true)
     public Optional<History> history(Long tenantId, Long customerId) {
-        if (customers.findByIdAndTenantId(customerId, tenantId).isEmpty()) return Optional.empty();
+        Optional<Customer> customer = customers.findByIdAndTenantId(customerId, tenantId);
+        if (customer.isEmpty()) return Optional.empty();
         OffsetDateTime now = OffsetDateTime.now();
         List<Voucher> vs = vouchers.findAllByTenantIdAndCustomerIdOrderByCreatedAtDesc(tenantId, customerId);
         Set<String> codes = new HashSet<>();
@@ -143,9 +145,14 @@ public class CustomerService {
                     AccessState.status(v, first, expiry, now), v.getCreatedAt(), first, expiry,
                     u == null ? 0 : ((Number) u[1]).longValue(), u != null && ((Number) u[3]).longValue() > 0);
         }).toList();
-        List<PaymentEntry> payments = codes.isEmpty() ? List.of()
-                : transactions.findAllByTenantIdAndVoucherCodeInAndStatusOrderByCreatedAtDesc(tenantId, codes, "SUCCESSFUL").stream()
-                        .map(t -> new PaymentEntry(t.getReference(), t.getAmount(), t.getNetwork(), t.getVoucherCode(), t.getCreatedAt()))
+        Optional<com.wifibilling.util.PhoneMatch> phone = com.wifibilling.util.PhoneMatch.of(customer.get().getPhone());
+        // An empty IN list is not portable; a code that is never issued stands in for "none".
+        List<PaymentEntry> payments = codes.isEmpty() && phone.isEmpty() ? List.of()
+                : transactions.findForCustomer(tenantId, codes.isEmpty() ? Set.of("") : codes,
+                                phone.map(com.wifibilling.util.PhoneMatch::exact).orElse(Set.of("")),
+                                phone.map(com.wifibilling.util.PhoneMatch::suffix).orElse("")).stream()
+                        .map(t -> new PaymentEntry(t.getReference(), t.getAmount(), t.getNetwork(), t.getVoucherCode(), t.getCreatedAt(),
+                                t.getStatus(), t.getProviderTransactionId(), t.getPackagePlan() == null ? null : t.getPackagePlan().getName()))
                         .toList();
         return Optional.of(new History(voucherEntries, payments));
     }
@@ -286,26 +293,12 @@ public class CustomerService {
         return new Onboarded(customer.getId(), code);
     }
 
-    /** Ugandan numbers in local form (0772270145); null for MANUAL and other non-numbers. */
     static String localPhone(String raw) {
-        if (raw == null) return null;
-        String digits = raw.replaceAll("[^0-9]", "");
-        if (digits.startsWith("256") && digits.length() == 12) return "0" + digits.substring(3);
-        if (digits.startsWith("0") && digits.length() == 10) return digits;
-        if (digits.length() == 9 && digits.startsWith("7")) return "0" + digits;
-        return null;
+        return com.wifibilling.util.PhoneMatch.localPhone(raw);
     }
 
-    /** Every stored spelling of a local number, so manually entered customers match too. */
     static Set<String> phoneVariants(String local) {
-        String rest = local.substring(1);
-        Set<String> out = new LinkedHashSet<>();
-        out.add(local);
-        out.add("256" + rest);
-        out.add("+256" + rest);
-        out.add("+256 " + rest.substring(0, 3) + " " + rest.substring(3, 6) + " " + rest.substring(6));
-        out.add(local.substring(0, 4) + " " + rest.substring(3, 6) + " " + rest.substring(6));
-        return out;
+        return com.wifibilling.util.PhoneMatch.ugandanVariants(local);
     }
 
 }

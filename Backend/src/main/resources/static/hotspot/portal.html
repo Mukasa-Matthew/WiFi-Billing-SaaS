@@ -645,54 +645,56 @@ function findVoucher(){
     var phone = document.getElementById('find-phone').value.trim();
     if (!phone) return;
     document.getElementById('find-result').innerHTML = '<div class="spinner" style="margin:10px auto"></div>';
-    fetch(BASE + '/api/portal/find-voucher?token=' + encodeURIComponent(TOKEN) + '&phone=' + encodeURIComponent(phone))
-        .then(function(r){ return r.json(); })
+    fetch(BASE + '/api/portal/find-voucher?token=' + encodeURIComponent(TOKEN) + '&phone=' + encodeURIComponent(phone) + '&mac=' + encodeURIComponent(schoolMac()))
+        .then(function(r){ return r.json().then(function(body){ if (!r.ok) throw new Error(body.message || ''); return body; }); })
         .then(function(res){
             var list = res.vouchers || [];
-            if (!list.length && res.voucherCode) {
-                list = [{ code: res.voucherCode, packageName: 'WiFi Package', status: 'active', isActive: true }];
-            }
             if (!list.length) {
                 document.getElementById('find-result').innerHTML = '<div class="status-msg error" style="padding:10px;font-size:13px;border-radius:8px;">No vouchers found for that number. If you just paid, please allow a few seconds and check again.</div>';
                 return;
             }
 
-            var html = '<div style="margin-top:14px;max-height:280px;overflow-y:auto;text-align:left;display:flex;flex-direction:column;gap:8px;">';
+            var html = '<div style="margin-top:14px;max-height:320px;overflow-y:auto;text-align:left;display:flex;flex-direction:column;gap:8px;">';
             list.forEach(function(v) {
                 var isActive = v.isActive;
                 var statusColor = isActive ? '#16a34a' : '#94a3b8';
                 var statusBg = isActive ? '#f0fdf4' : '#f8fafc';
                 var statusBorder = isActive ? '#bbf7d0' : '#e2e8f0';
-                var statusLabel = isActive ? 'ACTIVE / READY' : (v.status ? v.status.toUpperCase() : 'EXPIRED');
+                var statusLabel = !isActive ? 'EXPIRED' : v.status === 'active' ? 'IN USE' : 'READY';
 
                 var durationText = v.durationSeconds ? fmtDuration(v.durationSeconds) : '';
                 var purchasedText = v.createdAt ? 'Bought: ' + formatDate(v.createdAt) : '';
-                var statusTimeText = '';
-                if (v.expiresAt) {
-                    statusTimeText = (isActive ? 'Expires: ' : 'Expired: ') + formatDate(v.expiresAt);
-                } else if (v.firstLogin) {
-                    statusTimeText = 'First used: ' + formatDate(v.firstLogin);
-                } else {
-                    statusTimeText = 'Not yet activated';
-                }
+                var statusTimeText = v.expiresAt ? (isActive ? 'Expires: ' : 'Expired: ') + formatDate(v.expiresAt)
+                    : v.firstLogin ? 'First used: ' + formatDate(v.firstLogin) : 'Not yet activated';
 
-                html += '<div style="padding:10px 12px;border:1px solid ' + statusBorder + ';background:' + statusBg + ';border-radius:10px;display:flex;justify-content:space-between;align-items:center;gap:8px;">';
+                html += '<div style="padding:10px 12px;border:1px solid ' + statusBorder + ';background:' + statusBg + ';border-radius:10px;">';
+                html += '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">';
                 html += '  <div style="min-width:0;flex:1;">';
                 html += '    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">';
-                html += '      <span style="font-family:monospace;font-size:15px;font-weight:700;color:var(--text);letter-spacing:0.5px;">' + v.code + '</span>';
+                html += '      <span style="font-size:13px;font-weight:700;color:var(--text);">' + escapeText(v.packageName || 'WiFi Package') + (durationText ? ' (' + durationText + ')' : '') + '</span>';
                 html += '      <span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:6px;background:' + (isActive ? '#dcfce7' : '#f1f5f9') + ';color:' + statusColor + ';">' + statusLabel + '</span>';
                 html += '    </div>';
-                html += '    <div style="font-size:12px;font-weight:600;color:var(--text);margin-top:2px;">' + (v.packageName || 'WiFi Package') + (durationText ? ' (' + durationText + ')' : '') + '</div>';
+                if (v.code) html += '    <div style="font-family:monospace;font-size:15px;font-weight:700;color:var(--text);letter-spacing:0.5px;margin-top:2px;">' + escapeText(v.code) + '</div>';
                 html += '    <div style="font-size:11px;color:var(--muted);margin-top:2px;display:flex;flex-direction:column;gap:1px;">';
                 if (purchasedText) html += '      <span>🗓️ ' + purchasedText + '</span>';
                 html += '      <span style="font-weight:500;color:' + (isActive ? '#15803d' : '#64748b') + ';">' + (isActive ? '⏳ ' : '⌛ ') + statusTimeText + '</span>';
                 html += '    </div>';
                 html += '  </div>';
-
-                if (isActive) {
-                    html += '  <button type="button" onclick="selectFoundVoucher(\'' + v.code + '\')" style="white-space:nowrap;padding:7px 12px;font-size:12px;font-weight:700;background:var(--primary);color:#fff;border:none;border-radius:8px;cursor:pointer;">Connect</button>';
-                } else {
-                    html += '  <button type="button" onclick="document.getElementById(\'username-input\').value=\'' + v.code + '\';hideFind();" style="white-space:nowrap;padding:6px 10px;font-size:11px;font-weight:600;background:#fff;border:1px solid #cbd5e1;color:#64748b;border-radius:8px;cursor:pointer;">Fill Code</button>';
+                if (v.code) {
+                    html += '  <button type="button" onclick="selectFoundVoucher(\'' + escapeText(v.code) + '\')" style="white-space:nowrap;padding:7px 12px;font-size:12px;font-weight:700;background:var(--primary);color:#fff;border:none;border-radius:8px;cursor:pointer;">Connect</button>';
+                } else if (v.canUnlock) {
+                    html += '  <button type="button" onclick="showUnlock(' + Number(v.id) + ')" style="white-space:nowrap;padding:7px 12px;font-size:12px;font-weight:700;background:#fff;border:1px solid var(--primary);color:var(--primary);border-radius:8px;cursor:pointer;">🔒 Unlock</button>';
+                }
+                html += '</div>';
+                if (v.locked && v.canUnlock) {
+                    html += '<div id="unlock-' + Number(v.id) + '" style="display:none;margin-top:8px;border-top:1px dashed #cbd5e1;padding-top:8px;">';
+                    html += '  <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">This was bought on another phone. Enter the <b>last 4 digits of the Transaction ID</b> in your MTN/Airtel payment SMS.</div>';
+                    html += '  <div style="display:flex;gap:6px;"><input class="form-input" id="unlock-digits-' + Number(v.id) + '" type="tel" inputmode="numeric" maxlength="4" placeholder="1234" style="flex:1;padding-left:12px;">';
+                    html += '  <button type="button" onclick="unlockVoucher(' + Number(v.id) + ')" style="white-space:nowrap;padding:7px 12px;font-size:12px;font-weight:700;background:var(--primary);color:#fff;border:none;border-radius:8px;cursor:pointer;">Confirm</button></div>';
+                    html += '  <div id="unlock-msg-' + Number(v.id) + '" style="font-size:12px;margin-top:6px;"></div>';
+                    html += '</div>';
+                } else if (v.locked) {
+                    html += '<div style="font-size:12px;color:var(--muted);margin-top:6px;">🔒 Bought on another phone. Please ask the WiFi attendant for this code.</div>';
                 }
                 html += '</div>';
             });
@@ -700,7 +702,26 @@ function findVoucher(){
 
             document.getElementById('find-result').innerHTML = html;
         })
-        .catch(function(){ document.getElementById('find-result').innerHTML = '<div class="status-msg error">Lookup failed. Please check your connection and try again.</div>'; });
+        .catch(function(e){ document.getElementById('find-result').innerHTML = '<div class="status-msg error">' + escapeText((e && e.message) || 'Lookup failed. Please check your connection and try again.') + '</div>'; });
+}
+
+function showUnlock(id) {
+    var box = document.getElementById('unlock-' + id);
+    if (box) { box.style.display = 'block'; document.getElementById('unlock-digits-' + id).focus(); }
+}
+
+function unlockVoucher(id) {
+    var digits = document.getElementById('unlock-digits-' + id).value.replace(/\D/g, '');
+    var msg = document.getElementById('unlock-msg-' + id);
+    if (digits.length !== 4) { msg.style.color = '#dc2626'; msg.textContent = 'Enter exactly 4 digits.'; return; }
+    msg.style.color = 'var(--muted)'; msg.textContent = 'Checking…';
+    fetch(BASE + '/api/portal/find-voucher/unlock', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: TOKEN, phone: document.getElementById('find-phone').value.trim(), id: id, proof: digits })
+    })
+        .then(function(r){ return r.json().then(function(body){ if (!r.ok) throw new Error(body.message || 'That code could not be unlocked.'); return body; }); })
+        .then(function(res){ selectFoundVoucher(res.code); })
+        .catch(function(e){ msg.style.color = '#dc2626'; msg.textContent = (e && e.message) || 'Please check your connection and try again.'; });
 }
 
 function fmtDuration(seconds) {
