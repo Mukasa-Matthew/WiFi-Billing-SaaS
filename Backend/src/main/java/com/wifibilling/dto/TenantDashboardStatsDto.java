@@ -34,5 +34,14 @@ public record TenantDashboardStatsDto(
     long dataMonthUpBytes,
     long totalCustomers,
     long newCustomersThisWeek,
-    Map<String, Long> activeByCategory
+    Map<String, Long> activeByCategory,
+    BigDecimal periodGrossRevenue,
+    BigDecimal periodGatewayFees,
+    BigDecimal periodPlatformFees,
+    BigDecimal periodNetRevenue,
+    long periodTransactions,
+    List<Map<String, Object>> revenueByChannel,
+    List<Map<String, Object>> revenueByGroup,
+    List<Map<String, Object>> revenueByPackage,
+    List<Map<String, Object>> dataByCategory
 ) {}

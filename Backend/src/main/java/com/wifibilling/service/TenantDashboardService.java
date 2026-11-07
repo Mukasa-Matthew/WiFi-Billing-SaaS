@@ -57,6 +57,7 @@ public class TenantDashboardService {
         List<Transaction> transactions = transactionRepository.findAllByTenantIdOrderByCreatedAtDesc(tenantId);
         BigDecimal revToday = BigDecimal.ZERO;
         BigDecimal revMonth = BigDecimal.ZERO;
+        BigDecimal revAllTime = BigDecimal.ZERO;
 
         Map<LocalDate, BigDecimal> dailyTotals = new LinkedHashMap<>();
         Map<LocalDate, Integer> dailyCounts = new LinkedHashMap<>();
@@ -69,6 +70,7 @@ public class TenantDashboardService {
         for (Transaction t : transactions) {
             if ("SUCCESSFUL".equalsIgnoreCase(t.getStatus())) {
                 BigDecimal amt = t.getAmount() != null ? t.getAmount() : BigDecimal.ZERO;
+                revAllTime = revAllTime.add(amt);
                 if (t.getCreatedAt() != null) {
                     if (!t.getCreatedAt().isBefore(startOfDay)) {
                         revToday = revToday.add(amt);
@@ -205,19 +207,72 @@ public class TenantDashboardService {
             LocalDate k = monthly ? d.withDayOfMonth(1) : d;
             return m.containsKey(k) ? k : null;
         };
-        for (Transaction t : transactions) {
-            LocalDate k = bucketKey.apply(t.getCreatedAt(), rev);
-            if (k != null && "SUCCESSFUL".equalsIgnoreCase(t.getStatus())) {
-                rev.put(k, rev.get(k).add(t.getAmount() != null ? t.getAmount() : BigDecimal.ZERO));
-                txCount.put(k, txCount.get(k) + 1);
-            }
-        }
         Map<String, Voucher> byCode = new HashMap<>();
         for (Voucher v : vouchers) {
             byCode.put(v.getCode(), v);
             LocalDate k = bucketKey.apply(v.getCreatedAt(), regs);
             if (k != null) regs.put(k, regs.get(k) + 1);
         }
+
+        BigDecimal periodGross = BigDecimal.ZERO;
+        BigDecimal periodGwFees = BigDecimal.ZERO;
+        BigDecimal periodPlatFees = BigDecimal.ZERO;
+        BigDecimal periodNet = BigDecimal.ZERO;
+        long periodTxCount = 0;
+
+        Map<String, BigDecimal> channelRev = new LinkedHashMap<>();
+        Map<String, Long> channelTx = new LinkedHashMap<>();
+        for (String ch : List.of("MTN", "AIRTEL", "WALK_IN")) {
+            channelRev.put(ch, BigDecimal.ZERO);
+            channelTx.put(ch, 0L);
+        }
+
+        Map<String, BigDecimal> groupRev = new LinkedHashMap<>();
+        Map<String, Long> groupTx = new LinkedHashMap<>();
+        for (String grp : List.of("STUDENT", "PAID_CUSTOMER", "WALK_IN")) {
+            groupRev.put(grp, BigDecimal.ZERO);
+            groupTx.put(grp, 0L);
+        }
+
+        Map<Long, BigDecimal> periodRevByPlan = new HashMap<>();
+        Map<Long, Long> periodSoldByPlan = new HashMap<>();
+
+        for (Transaction t : transactions) {
+            LocalDate k = bucketKey.apply(t.getCreatedAt(), rev);
+            if (k != null && "SUCCESSFUL".equalsIgnoreCase(t.getStatus())) {
+                BigDecimal amt = t.getAmount() != null ? t.getAmount() : BigDecimal.ZERO;
+                rev.put(k, rev.get(k).add(amt));
+                txCount.put(k, txCount.get(k) + 1);
+
+                periodGross = periodGross.add(amt);
+                periodTxCount++;
+                BigDecimal gwFee = t.getGatewayFee() != null ? BigDecimal.valueOf(t.getGatewayFee()) : BigDecimal.ZERO;
+                BigDecimal platFee = t.getPlatformFee() != null ? BigDecimal.valueOf(t.getPlatformFee()) : BigDecimal.ZERO;
+                BigDecimal netBase = t.getNetAmount() != null ? BigDecimal.valueOf(t.getNetAmount()) : amt.subtract(gwFee);
+                BigDecimal txNet = netBase.subtract(platFee).max(BigDecimal.ZERO);
+                periodGwFees = periodGwFees.add(gwFee);
+                periodPlatFees = periodPlatFees.add(platFee);
+                periodNet = periodNet.add(txNet);
+
+                String net = t.getNetwork() != null ? t.getNetwork().trim().toUpperCase(Locale.ROOT) : "";
+                String chKey = "MTN".equals(net) ? "MTN" : "AIRTEL".equals(net) ? "AIRTEL" : "WALK_IN";
+                channelRev.put(chKey, channelRev.get(chKey).add(amt));
+                channelTx.put(chKey, channelTx.get(chKey) + 1);
+
+                Voucher tv = t.getVoucherCode() != null ? byCode.get(t.getVoucherCode()) : null;
+                boolean isStudent = t.getPersonId() != null || (tv != null && "STUDENT".equals(com.wifibilling.util.AccessState.category(tv)));
+                String grpKey = isStudent ? "STUDENT" : "WALK_IN".equals(chKey) ? "WALK_IN" : "PAID_CUSTOMER";
+                groupRev.put(grpKey, groupRev.get(grpKey).add(amt));
+                groupTx.put(grpKey, groupTx.get(grpKey) + 1);
+
+                if (t.getPackagePlan() != null && t.getPackagePlan().getId() != null) {
+                    Long pid = t.getPackagePlan().getId();
+                    periodRevByPlan.merge(pid, amt, BigDecimal::add);
+                    periodSoldByPlan.merge(pid, 1L, Long::sum);
+                }
+            }
+        }
+
         // Only rows inside the range window or this month are ever read below
         // (both loops filter on that time), so load just those instead of every
         // row for every code. One day of margin absorbs any time-zone handling
@@ -227,13 +282,25 @@ public class TenantDashboardService {
         List<com.wifibilling.radius.RadAcct> accts = byCode.isEmpty() ? List.of()
                 : radAcctRepository.findTenantSessionsSince(tenantId, acctSince);
         Map<String, Long> octets = new HashMap<>();
+        Map<String, long[]> catBytes = new LinkedHashMap<>();
+        Map<String, Set<String>> catUsers = new LinkedHashMap<>();
+        for (String c : CATEGORY_ORDER) {
+            catBytes.put(c, new long[2]); // {down, up}
+            catUsers.put(c, new HashSet<>());
+        }
         for (var a : accts) {
             OffsetDateTime ts = a.getAcctStartTime() != null ? a.getAcctStartTime() : a.getAcctStopTime();
             LocalDate k = bucketKey.apply(ts, users);
             if (k != null && a.getUsername() != null) {
                 users.get(k).add(a.getUsername());
-                octets.merge(a.getUsername(), (a.getAcctInputOctets() != null ? a.getAcctInputOctets() : 0L)
-                        + (a.getAcctOutputOctets() != null ? a.getAcctOutputOctets() : 0L), Long::sum);
+                long in = a.getAcctInputOctets() != null ? a.getAcctInputOctets() : 0L;
+                long out = a.getAcctOutputOctets() != null ? a.getAcctOutputOctets() : 0L;
+                octets.merge(a.getUsername(), in + out, Long::sum);
+                String cat = normalizeCategory(com.wifibilling.util.AccessState.category(byCode.get(a.getUsername())));
+                long[] cb = catBytes.get(cat);
+                cb[0] += out;
+                cb[1] += in;
+                catUsers.get(cat).add(a.getUsername());
             }
         }
         List<Map<String, Object>> revenueSeries = new ArrayList<>(), dailyUsers = new ArrayList<>(), registrations = new ArrayList<>();
@@ -252,6 +319,8 @@ public class TenantDashboardService {
                     m.put("customer", v != null && v.getCustomer() != null ? v.getCustomer().getName() : null);
                     m.put("phone", v != null && v.getCustomer() != null ? v.getCustomer().getPhone() : null);
                     m.put("package", v != null && v.getPackagePlan() != null ? v.getPackagePlan().getName() : null);
+                    m.put("category", com.wifibilling.util.AccessState.category(v));
+                    m.put("categoryLabel", com.wifibilling.util.AccessState.categoryLabel(v));
                     m.put("octets", e.getValue());
                     return m;
                 }).toList();
@@ -274,7 +343,9 @@ public class TenantDashboardService {
             }
         }
         List<Map<String, Object>> packagePerformance = new ArrayList<>();
+        List<Map<String, Object>> revenueByPackage = new ArrayList<>();
         for (var p : planRepository.findAllByTenantIdOrderByPriceAsc(tenantId)) {
+            if ("SCHOOL".equalsIgnoreCase(p.getAvailability())) continue;
             long[] counts = soldByPlan.getOrDefault(p.getId(), new long[2]);
             BigDecimal mRev = monthRevByPlan.getOrDefault(p.getId(), BigDecimal.ZERO);
             long sold = counts[0], monthSold = counts[1];
@@ -284,6 +355,42 @@ public class TenantDashboardService {
             m.put("monthlyRevenue", mRev); m.put("totalSold", sold);
             m.put("arpu", monthSold > 0 ? mRev.divide(BigDecimal.valueOf(monthSold), 0, java.math.RoundingMode.HALF_UP) : BigDecimal.ZERO);
             packagePerformance.add(m);
+
+            Map<String, Object> pm = new LinkedHashMap<>();
+            pm.put("key", String.valueOf(p.getId()));
+            pm.put("id", p.getId());
+            pm.put("label", p.getName());
+            pm.put("price", p.getPrice());
+            pm.put("revenue", periodRevByPlan.getOrDefault(p.getId(), BigDecimal.ZERO));
+            pm.put("transactions", periodSoldByPlan.getOrDefault(p.getId(), 0L));
+            revenueByPackage.add(pm);
+        }
+
+        List<Map<String, Object>> revenueByChannel = List.of(
+                Map.of("key", "MTN", "label", "MTN Mobile Money", "revenue", channelRev.get("MTN"), "transactions", channelTx.get("MTN")),
+                Map.of("key", "AIRTEL", "label", "Airtel Money", "revenue", channelRev.get("AIRTEL"), "transactions", channelTx.get("AIRTEL")),
+                Map.of("key", "WALK_IN", "label", "Walk-in / Cash", "revenue", channelRev.get("WALK_IN"), "transactions", channelTx.get("WALK_IN"))
+        );
+
+        List<Map<String, Object>> revenueByGroup = List.of(
+                Map.of("key", "STUDENT", "label", "Paid Students", "revenue", groupRev.get("STUDENT"), "transactions", groupTx.get("STUDENT")),
+                Map.of("key", "PAID_CUSTOMER", "label", "Mobile Money Buyers", "revenue", groupRev.get("PAID_CUSTOMER"), "transactions", groupTx.get("PAID_CUSTOMER")),
+                Map.of("key", "WALK_IN", "label", "Walk-in / Cash Buyers", "revenue", groupRev.get("WALK_IN"), "transactions", groupTx.get("WALK_IN"))
+        );
+
+        List<Map<String, Object>> dataByCategory = new ArrayList<>();
+        for (String cat : CATEGORY_ORDER) {
+            long[] cb = catBytes.get(cat);
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("category", cat);
+            row.put("label", categoryTitle(cat));
+            row.put("free", isFreeCategory(cat));
+            row.put("downBytes", cb[0]);
+            row.put("upBytes", cb[1]);
+            row.put("totalBytes", cb[0] + cb[1]);
+            row.put("users", (long) catUsers.get(cat).size());
+            row.put("activeNow", activeByCategory.getOrDefault(cat, 0L));
+            dataByCategory.add(row);
         }
 
         // Card extras: router CPU/RAM averages, monthly data split, customer totals
@@ -313,6 +420,15 @@ public class TenantDashboardService {
                 .totalCustomers(totalCustomers)
                 .newCustomersThisWeek(newThisWeek)
                 .activeByCategory(activeByCategory)
+                .periodGrossRevenue(periodGross)
+                .periodGatewayFees(periodGwFees)
+                .periodPlatformFees(periodPlatFees)
+                .periodNetRevenue(periodNet)
+                .periodTransactions(periodTxCount)
+                .revenueByChannel(revenueByChannel)
+                .revenueByGroup(revenueByGroup)
+                .revenueByPackage(revenueByPackage)
+                .dataByCategory(dataByCategory)
                 .revenueSeries(revenueSeries)
                 .dailyActiveUsers(dailyUsers)
                 .registrations(registrations)
@@ -320,6 +436,7 @@ public class TenantDashboardService {
                 .packagePerformance(packagePerformance)
                 .revenueToday(revToday)
                 .revenueMonth(revMonth)
+                .revenueAllTime(revAllTime)
                 .activeUsers(activeUsers)
                 .totalDataConsumedBytes(totalDataConsumed)
                 .totalRouters(totalRouters)
@@ -332,6 +449,25 @@ public class TenantDashboardService {
                 .routerRevenue(routerRevenue)
                 .topConsumers(topConsumers)
                 .build();
+    }
+
+    private static final List<String> CATEGORY_ORDER = List.of("STUDENT", "STAFF", "VISITOR", "PAID_CUSTOMER");
+
+    private static String normalizeCategory(String raw) {
+        return raw != null && CATEGORY_ORDER.contains(raw) ? raw : "PAID_CUSTOMER";
+    }
+
+    private static String categoryTitle(String cat) {
+        return switch (cat) {
+            case "STUDENT" -> "Paid Students";
+            case "STAFF" -> "School Staff";
+            case "VISITOR" -> "Visitors";
+            default -> "Paid Customers";
+        };
+    }
+
+    private static boolean isFreeCategory(String cat) {
+        return "STAFF".equals(cat) || "VISITOR".equals(cat);
     }
 
     /**
@@ -400,7 +536,27 @@ public class TenantDashboardService {
             boolean future = t.atZone(zone).toOffsetDateTime().isAfter(now);
             buckets.add(new DataUsageDto.Bucket(t.toString(), label, e.getValue()[0], e.getValue()[1], future));
         }
-        return new DataUsageDto(p, start, end, down, up, users, previous, buckets);
+
+        Map<String, long[]> catTotals = new LinkedHashMap<>();
+        for (String c : CATEGORY_ORDER) catTotals.put(c, new long[3]); // {down, up, users}
+        List<Object[]> byCatRows = radAcctRepository.dataByCategoryBetween(tenantId, start, end);
+        if (byCatRows != null) {
+            for (Object[] row : byCatRows) {
+                String cat = normalizeCategory(row[0] != null ? String.valueOf(row[0]) : null);
+                long[] vals = catTotals.get(cat);
+                vals[0] += row[1] != null ? ((Number) row[1]).longValue() : 0L;
+                vals[1] += row[2] != null ? ((Number) row[2]).longValue() : 0L;
+                vals[2] += row[3] != null ? ((Number) row[3]).longValue() : 0L;
+            }
+        }
+        List<DataUsageDto.CategoryUsage> categories = new ArrayList<>();
+        for (String cat : CATEGORY_ORDER) {
+            long[] vals = catTotals.get(cat);
+            categories.add(new DataUsageDto.CategoryUsage(cat, categoryTitle(cat), isFreeCategory(cat),
+                    vals[0], vals[1], vals[0] + vals[1], vals[2]));
+        }
+
+        return new DataUsageDto(p, start, end, down, up, users, previous, buckets, categories);
     }
 
     private static LocalDate toLocalDate(Object v) {

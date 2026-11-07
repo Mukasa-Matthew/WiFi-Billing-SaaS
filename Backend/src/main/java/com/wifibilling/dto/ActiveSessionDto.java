@@ -22,5 +22,6 @@ public record ActiveSessionDto(
     String category,
     String categoryLabel,
     String packageName,
-    String customerName
+    String customerName,
+    String rateLimit
 ) {}

@@ -39,10 +39,16 @@ public class VoucherExpirationWorker {
     private final RadiusDisconnectService disconnectService;
     private final RouterManagementService managementService;
     private LeaderLockService leaderLockService = new LeaderLockService();
+    private ReportingClock clock;
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     public void setLeaderLockService(LeaderLockService leaderLockService) {
         this.leaderLockService = leaderLockService;
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setClock(ReportingClock clock) {
+        this.clock = clock;
     }
 
     @Scheduled(fixedDelayString = "PT30S", initialDelayString = "PT10S")
@@ -55,6 +61,7 @@ public class VoucherExpirationWorker {
     public void doProcessVoucherLifecycle() {
         stampFirstLogins();
         expireOverdueVouchers();
+        enforceSchoolDataCaps();
     }
 
     /**
@@ -113,6 +120,76 @@ public class VoucherExpirationWorker {
             disconnectActiveSessions(voucher.getCode());
             log.info("Voucher '{}' expired and revoked.", voucher.getCode());
         }
+    }
+
+    /**
+     * Enforces school staff daily data caps, visitor pass data caps, and pause
+     * switches for active/unused free school vouchers.
+     */
+    private void enforceSchoolDataCaps() {
+        List<Voucher> freeVouchers = voucherRepository.findAllBySchoolCategoryInAndStatusIn(
+                List.of("STAFF", "VISITOR"), List.of(STATUS_UNUSED, STATUS_ACTIVE));
+        if (freeVouchers == null || freeVouchers.isEmpty()) return;
+        OffsetDateTime startOfToday = clock != null ? clock.startOf(clock.today())
+                : java.time.LocalDate.now(java.time.ZoneOffset.UTC).atStartOfDay().atOffset(java.time.ZoneOffset.UTC);
+        for (Voucher voucher : freeVouchers) {
+            if (Boolean.TRUE.equals(voucher.getSchoolHold())) continue;
+            var tenant = voucher.getTenant();
+            if (tenant == null || !tenant.isSchool()) continue;
+            if ("STAFF".equals(voucher.getSchoolCategory())) {
+                if (!tenant.isSchoolStaffEnabled()) {
+                    holdSchoolVoucher(voucher, "staff WiFi paused");
+                    continue;
+                }
+                Integer capMb = tenant.getSchoolStaffDailyDataCapMb();
+                if (capMb != null && capMb > 0) {
+                    long capBytes = capMb.longValue() * 1024L * 1024L;
+                    var codes = new java.util.LinkedHashSet<String>();
+                    if (voucher.getPersonId() != null) {
+                        voucherRepository.findAllByTenantIdAndPersonIdAndSchoolCategory(tenant.getId(), voucher.getPersonId(), "STAFF")
+                                .forEach(v -> codes.add(v.getCode()));
+                    }
+                    codes.add(voucher.getCode());
+                    long used = radAcctRepository.sumOctetsForUsernamesSince(codes, startOfToday);
+                    if (used >= capBytes) {
+                        holdSchoolVoucher(voucher, "staff daily data cap (" + capMb + " MB) reached");
+                    }
+                }
+            } else if ("VISITOR".equals(voucher.getSchoolCategory())) {
+                if (Boolean.FALSE.equals(tenant.getSchoolVisitorsEnabled())) {
+                    holdSchoolVoucher(voucher, "visitor WiFi disabled");
+                    continue;
+                }
+                Integer capMb = tenant.getSchoolVisitorDataCapMb();
+                if (capMb != null && capMb > 0) {
+                    long capBytes = capMb.longValue() * 1024L * 1024L;
+                    var codes = new java.util.LinkedHashSet<String>();
+                    if (voucher.getVisitorPassId() != null) {
+                        voucherRepository.findAllByTenantIdAndVisitorPassId(tenant.getId(), voucher.getVisitorPassId())
+                                .forEach(v -> codes.add(v.getCode()));
+                    }
+                    codes.add(voucher.getCode());
+                    long used = radAcctRepository.sumOctetsForUsernames(codes);
+                    if (used >= capBytes) {
+                        voucher.setStatus(STATUS_EXPIRED);
+                        voucherRepository.save(voucher);
+                        radCheckRepository.deleteAllByUsername(voucher.getCode());
+                        radReplyRepository.deleteAllByUsername(voucher.getCode());
+                        disconnectActiveSessions(voucher.getCode());
+                        log.info("Visitor voucher '{}' expired: data cap ({} MB) reached.", voucher.getCode(), capMb);
+                    }
+                }
+            }
+        }
+    }
+
+    private void holdSchoolVoucher(Voucher voucher, String reason) {
+        voucher.setSchoolHold(true);
+        voucherRepository.save(voucher);
+        radCheckRepository.deleteAllByUsername(voucher.getCode());
+        radReplyRepository.deleteAllByUsername(voucher.getCode());
+        disconnectActiveSessions(voucher.getCode());
+        log.info("School voucher '{}' held and disconnected: {}", voucher.getCode(), reason);
     }
 
     /**

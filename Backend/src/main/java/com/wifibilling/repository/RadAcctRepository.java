@@ -119,6 +119,46 @@ public interface RadAcctRepository extends JpaRepository<RadAcct, Long> {
                                     @Param("fromTs") java.time.OffsetDateTime fromTs,
                                     @Param("toTs") java.time.OffsetDateTime toTs);
 
+    /** Per-category download, upload, and distinct users in a window, tenant-scoped. */
+    @Query(value = """
+            SELECT CASE
+                     WHEN v.school_category IS NOT NULL AND v.school_category <> '' THEN v.school_category
+                     WHEN v.sale_type = 'SCHOOL_STAFF' THEN 'STAFF'
+                     WHEN v.sale_type = 'SCHOOL_VISITOR' THEN 'VISITOR'
+                     ELSE 'PAID_CUSTOMER'
+                   END AS category,
+                   COALESCE(SUM(COALESCE(r.acctoutputoctets, 0)), 0),
+                   COALESCE(SUM(COALESCE(r.acctinputoctets, 0)), 0),
+                   COUNT(DISTINCT r.username)
+            FROM radacct r
+            JOIN vouchers v ON v.code = r.username
+            WHERE v.tenant_id = :tenantId
+              AND COALESCE(r.acctstarttime, r.acctstoptime) >= :fromTs
+              AND COALESCE(r.acctstarttime, r.acctstoptime) < :toTs
+            GROUP BY 1
+            """, nativeQuery = true)
+    List<Object[]> dataByCategoryBetween(@Param("tenantId") Long tenantId,
+                                         @Param("fromTs") java.time.OffsetDateTime fromTs,
+                                         @Param("toTs") java.time.OffsetDateTime toTs);
+
+    /** Total octets (input + output) across a set of voucher codes since a timestamp. */
+    @Query("""
+            SELECT COALESCE(SUM(COALESCE(r.acctInputOctets, 0) + COALESCE(r.acctOutputOctets, 0)), 0)
+            FROM RadAcct r
+            WHERE r.username IN :usernames
+              AND COALESCE(r.acctStartTime, r.acctStopTime) >= :fromTs
+            """)
+    long sumOctetsForUsernamesSince(@Param("usernames") Collection<String> usernames,
+                                    @Param("fromTs") OffsetDateTime fromTs);
+
+    /** Total octets (input + output) across a set of voucher codes over all time. */
+    @Query("""
+            SELECT COALESCE(SUM(COALESCE(r.acctInputOctets, 0) + COALESCE(r.acctOutputOctets, 0)), 0)
+            FROM RadAcct r
+            WHERE r.username IN :usernames
+            """)
+    long sumOctetsForUsernames(@Param("usernames") Collection<String> usernames);
+
     /** Per-username aggregates for the user directory: first login, total octets, live device count. */
     @Query(value = """
             SELECT username, MIN(acctstarttime),

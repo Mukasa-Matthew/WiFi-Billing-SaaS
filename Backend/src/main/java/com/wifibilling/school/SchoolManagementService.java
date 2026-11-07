@@ -73,16 +73,23 @@ public class SchoolManagementService {
 
     public Map<String, Object> settings(Tenant tenant) {
         var result = new LinkedHashMap<String, Object>();
+        result.put("staffEnabled", tenant.isSchoolStaffEnabled());
+        result.put("staffRateLimit", tenant.getSchoolStaffRateLimit());
+        result.put("staffDailyDataCapMb", tenant.getSchoolStaffDailyDataCapMb());
         result.put("visitorsEnabled", Boolean.TRUE.equals(tenant.getSchoolVisitorsEnabled()));
         result.put("visitorDailyCap", tenant.getSchoolVisitorDailyCap() == null ? 0 : tenant.getSchoolVisitorDailyCap());
-        result.put("staffRateLimit", tenant.getSchoolStaffRateLimit());
         result.put("visitorRateLimit", tenant.getSchoolVisitorRateLimit());
+        result.put("visitorDataCapMb", tenant.getSchoolVisitorDataCapMb());
         return result;
     }
 
     public record SettingsRequest(Boolean visitorsEnabled, @jakarta.validation.constraints.Min(0) @jakarta.validation.constraints.Max(1000) Integer visitorDailyCap,
                                   @jakarta.validation.constraints.Size(max = 30) String staffRateLimit,
-                                  @jakarta.validation.constraints.Size(max = 30) String visitorRateLimit) {}
+                                  @jakarta.validation.constraints.Size(max = 30) String visitorRateLimit,
+                                  Boolean staffEnabled,
+                                  @jakarta.validation.constraints.Min(0) @jakarta.validation.constraints.Max(1000000) Integer staffDailyDataCapMb,
+                                  @jakarta.validation.constraints.Min(0) @jakarta.validation.constraints.Max(1000000) Integer visitorDataCapMb,
+                                  Boolean applyImmediately) {}
 
     /** Visitor changes go to the identity system first, so the IT dashboard never disagrees with AirPairy. */
     public Map<String, Object> updateSettings(Tenant tenant, SettingsRequest req) {
@@ -94,11 +101,13 @@ public class SchoolManagementService {
             tenant.setSchoolVisitorsEnabled(school.path("visitorsEnabled").asBoolean());
             tenant.setSchoolVisitorDailyCap(school.path("visitorDailyCap").asInt());
         }
+        if (req.staffEnabled() != null) tenant.setSchoolStaffEnabled(req.staffEnabled());
         if (req.staffRateLimit() != null) tenant.setSchoolStaffRateLimit(rate(req.staffRateLimit()));
         if (req.visitorRateLimit() != null) tenant.setSchoolVisitorRateLimit(rate(req.visitorRateLimit()));
+        if (req.staffDailyDataCapMb() != null) tenant.setSchoolStaffDailyDataCapMb(req.staffDailyDataCapMb() > 0 ? req.staffDailyDataCapMb() : null);
+        if (req.visitorDataCapMb() != null) tenant.setSchoolVisitorDataCapMb(req.visitorDataCapMb() > 0 ? req.visitorDataCapMb() : null);
         tenants.save(tenant);
-        access.systemPlan(tenant, SchoolAccessService.STAFF_PLAN);
-        access.systemPlan(tenant, SchoolAccessService.VISITOR_PLAN);
+        access.applyFreeAccessRules(tenant, Boolean.TRUE.equals(req.applyImmediately()));
         return settings(tenant);
     }
 

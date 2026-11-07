@@ -18,8 +18,14 @@ public record DataUsageDto(
     long upBytes,
     long users,
     long previousBytes,
-    List<Bucket> buckets
+    List<Bucket> buckets,
+    List<CategoryUsage> categories
 ) {
+    public DataUsageDto(String period, OffsetDateTime from, OffsetDateTime to, long downBytes, long upBytes, long users, long previousBytes, List<Bucket> buckets) {
+        this(period, from, to, downBytes, upBytes, users, previousBytes, buckets, List.of());
+    }
     /** One hour (today) or one day (week, month), keyed by its reporting-zone start. */
     public record Bucket(String start, String label, long downBytes, long upBytes, boolean future) {}
+    /** Per-category bandwidth usage in the window (STUDENT, STAFF, VISITOR, PAID_CUSTOMER). */
+    public record CategoryUsage(String category, String label, boolean free, long downBytes, long upBytes, long totalBytes, long users) {}
 }
