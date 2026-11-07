@@ -131,6 +131,23 @@ public class RouterScriptGenerator {
      * Parses a comma/newline-separated list of app preset keys (@whatsapp, @youtube, etc.)
      * and domain names into a deduplicated, sanitized list of domain names.
      */
+    /**
+     * Hosts phones and laptops probe to decide whether the WiFi "has internet". Allow lists always include
+     * them: without them every device on an allow list reports "connected, no internet" even though its
+     * allowed sites work. Only the probe hosts are listed, not the vendors' whole sites.
+     */
+    static final List<String> CONNECTIVITY_CHECK_DOMAINS = List.of(
+            "connectivitycheck.gstatic.com", "connectivitycheck.android.com", "clients3.google.com",
+            "captive.apple.com", "www.msftconnecttest.com", "www.msftncsi.com");
+
+    /** Probe hosts go in the address list only: one short line each keeps the stored script small. */
+    private static void connectivityChecks(StringBuilder s, String list, String who) {
+        for (String d : CONNECTIVITY_CHECK_DOMAINS) {
+            s.append("/ip/firewall/address-list/add list=").append(q(list)).append(" address=").append(q(d))
+                    .append(" comment=\"wb-school-filter: ").append(who).append(" connectivity check\"\n");
+        }
+    }
+
     public static Set<String> expandSiteRules(String raw) {
         java.util.Set<String> domains = new java.util.LinkedHashSet<>();
         if (raw == null || raw.isBlank()) return domains;
@@ -178,6 +195,7 @@ public class RouterScriptGenerator {
         if (studentFreeEnabled) {
             Set<String> studentDomains = new java.util.LinkedHashSet<>(expandSiteRules(studentAllowedSites));
             if (portalHost != null) studentDomains.add(portalHost);
+            connectivityChecks(s, "wb-student-sites", "student");
             s.append("/ip/firewall/filter/add chain=forward src-address-list=").append(q(STUDENT_FREE_ADDRESS_LIST))
                     .append(" protocol=udp dst-port=53 action=accept comment=\"wb-school-filter: student dns udp\"\n");
             s.append("/ip/firewall/filter/add chain=forward src-address-list=").append(q(STUDENT_FREE_ADDRESS_LIST))
@@ -201,6 +219,7 @@ public class RouterScriptGenerator {
         if ("ALLOW_LIST".equals(mode)) {
             Set<String> staffDomains = new java.util.LinkedHashSet<>(expandSiteRules(staffSiteRules));
             if (portalHost != null) staffDomains.add(portalHost);
+            connectivityChecks(s, "wb-staff-sites", "staff");
             s.append("/ip/firewall/filter/add chain=forward src-address-list=").append(q(STAFF_FREE_ADDRESS_LIST))
                     .append(" protocol=udp dst-port=53 action=accept comment=\"wb-school-filter: staff dns udp\"\n");
             s.append("/ip/firewall/filter/add chain=forward src-address-list=").append(q(STAFF_FREE_ADDRESS_LIST))

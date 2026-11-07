@@ -151,6 +151,14 @@ class RouterScriptGeneratorTest {
         assertTrue(allowRules.contains("src-address-list=\"wb-staff-free\" dst-address-list=\"wb-staff-sites\" action=accept"));
         assertTrue(allowRules.contains("src-address-list=\"wb-staff-free\" action=drop comment=\"wb-school-filter: staff drop other\""));
 
+        // Phones' "is there internet?" probes always pass on allow lists, so devices don't report "no internet"
+        for (String probe : java.util.List.of("connectivitycheck.gstatic.com", "captive.apple.com", "www.msftconnecttest.com")) {
+            assertTrue(allowRules.contains("list=\"wb-staff-sites\" address=\"" + probe + "\""), "staff allow list includes " + probe);
+            assertTrue(allowRules.contains("list=\"wb-student-sites\" address=\"" + probe + "\""), "student allow list includes " + probe);
+        }
+        assertTrue(generator.schoolFilterRules(false, "", "ALLOW_LIST", "@tiktok", "https://app.qticket.dev").contains("address=\"captive.apple.com\""),
+                "a TikTok-only staff allow list still lets phones confirm the connection");
+
         // Staff block-list mode drops only matching domains
         String blockRules = generator.schoolFilterRules(
                 false,
