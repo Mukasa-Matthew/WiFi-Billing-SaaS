@@ -127,7 +127,7 @@ public class RouterScriptGenerator {
 
     private static final java.util.Map<String, List<String>> APP_PRESET_DOMAINS = java.util.Map.ofEntries(
             java.util.Map.entry("@whatsapp", List.of("whatsapp.com", "whatsapp.net", "wa.me")),
-            java.util.Map.entry("@youtube", List.of("youtube.com", "youtu.be", "googlevideo.com", "ytimg.com", "youtube-nocookie.com")),
+            java.util.Map.entry("@youtube", List.of("youtube.com", "youtu.be", "googlevideo.com", "ytimg.com", "youtube-nocookie.com", "youtubei.googleapis.com", "youtube.googleapis.com")),
             java.util.Map.entry("@chatgpt", List.of("chatgpt.com", "openai.com", "oaistatic.com", "oaiusercontent.com")),
             java.util.Map.entry("@tiktok", List.of("tiktok.com", "tiktokcdn.com", "tiktokv.com", "musical.ly", "byteoversea.com")),
             java.util.Map.entry("@facebook", List.of("facebook.com", "fb.com", "fbcdn.net", "messenger.com")),

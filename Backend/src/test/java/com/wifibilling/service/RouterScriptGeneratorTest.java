@@ -179,6 +179,8 @@ class RouterScriptGeneratorTest {
         assertTrue(blockRules.contains("/ip/dns/static/add name=\"tiktok.com\" type=FWD forward-to=1.1.1.1 match-subdomain=yes address-list=\"wb-staff-sites\""));
         assertTrue(generator.schoolFilterRules(false, "", "BLOCK_LIST", "@youtube", "https://app.qticket.dev")
                 .contains("/ip/dns/static/add name=\"googlevideo.com\" type=FWD forward-to=1.1.1.1 match-subdomain=yes address-list=\"wb-staff-sites\""));
+        assertTrue(generator.schoolFilterRules(false, "", "BLOCK_LIST", "@youtube", "https://app.qticket.dev")
+                .contains("/ip/dns/static/add name=\"youtubei.googleapis.com\""), "the YouTube app's API host is blocked too");
         assertTrue(blockRules.contains("src-address-list=\"wb-staff-free\" protocol=udp dst-port=53 action=redirect to-ports=53"), "staff DNS goes through the router");
         assertTrue(blockRules.contains("src-address-list=\"wb-staff-free\" protocol=tcp dst-port=853 action=reject"), "private DNS cannot bypass the router");
         assertTrue(blockRules.contains(":do { /ip/dns/static/remove [find where comment~\"^wb-school-filter\"] } on-error={}"), "old DNS entries are cleared first");
