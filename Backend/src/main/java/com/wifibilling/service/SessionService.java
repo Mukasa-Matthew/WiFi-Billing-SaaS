@@ -5,6 +5,7 @@ import com.wifibilling.model.Voucher;
 import com.wifibilling.radius.RadAcct;
 import com.wifibilling.repository.RadAcctRepository;
 import com.wifibilling.repository.VoucherRepository;
+import com.wifibilling.util.AccessState;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -14,7 +15,9 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -38,7 +41,7 @@ public class SessionService {
             }
             sessions = radAcctRepository.findAllByUsernameInAndAcctStopTimeIsNullOrderByAcctStartTimeDesc(tenantVouchers);
         }
-        return sessions.stream().map(this::toDto).toList();
+        return toDtos(sessions);
     }
 
     @Transactional(readOnly = true)
@@ -53,7 +56,7 @@ public class SessionService {
             }
             sessions = radAcctRepository.findTop100ByUsernameInOrderByAcctStartTimeDesc(tenantVouchers);
         }
-        return sessions.stream().map(this::toDto).toList();
+        return toDtos(sessions);
     }
 
     public boolean disconnectSession(Long tenantId, String role, String username) {
@@ -73,7 +76,15 @@ public class SessionService {
         return voucherRepository.codesByTenant(tenantId);
     }
 
-    private ActiveSessionDto toDto(RadAcct a) {
+    private List<ActiveSessionDto> toDtos(List<RadAcct> sessions) {
+        if (sessions.isEmpty()) return Collections.emptyList();
+        Set<String> codes = sessions.stream().map(RadAcct::getUsername).filter(java.util.Objects::nonNull).collect(Collectors.toSet());
+        List<Voucher> found = codes.isEmpty() ? List.of() : voucherRepository.findAllByCodeIn(codes);
+        Map<String, Voucher> byCode = found == null ? Map.of() : found.stream().collect(Collectors.toMap(Voucher::getCode, Function.identity(), (a, b) -> a));
+        return sessions.stream().map(s -> toDto(s, byCode.get(s.getUsername()))).toList();
+    }
+
+    private ActiveSessionDto toDto(RadAcct a, Voucher v) {
         long in = a.getAcctInputOctets() != null ? a.getAcctInputOctets() : 0L;
         long out = a.getAcctOutputOctets() != null ? a.getAcctOutputOctets() : 0L;
         boolean isActive = a.getAcctStopTime() == null;
@@ -92,6 +103,10 @@ public class SessionService {
                 .totalOctets(in + out)
                 .status(isActive ? "ACTIVE" : "TERMINATED")
                 .acctTerminateCause(a.getAcctTerminateCause())
+                .category(AccessState.category(v))
+                .categoryLabel(AccessState.categoryLabel(v))
+                .packageName(v != null && v.getPackagePlan() != null ? v.getPackagePlan().getName() : null)
+                .customerName(AccessState.displayName(v))
                 .build();
     }
 }

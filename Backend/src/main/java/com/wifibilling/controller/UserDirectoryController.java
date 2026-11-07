@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
 public class UserDirectoryController {
  private final VoucherRepository vouchers; private final RadAcctRepository accounting; private final RouterRepository routers;
  public record User(Long id,Long customerId,String customerName,String phone,String voucher,String packageName,
-  String status,boolean online,String ip,String mac,String router,Integer deviceLimit,long devices,
+  String category,String categoryLabel,String status,boolean online,String ip,String mac,String router,Integer deviceLimit,long devices,
   OffsetDateTime firstLogin,OffsetDateTime expiresAt,long dataBytes,Long timeLeftSeconds) {}
  @GetMapping @Transactional(readOnly=true)
  public List<User> list(@AuthenticationPrincipal TenantPrincipal p){
@@ -40,7 +40,7 @@ public class UserDirectoryController {
    String status=AccessState.status(v,first,expiry,now);
    Router router=latest==null?null:rs.get((String)latest[3]);
    long data=agg==null?0:agg.data();
-   return new User(v.getId(),v.getCustomer()==null?null:v.getCustomer().getId(),v.getCustomer()==null?null:v.getCustomer().getName(),v.getCustomer()==null?null:v.getCustomer().getPhone(),v.getCode(),v.getPackagePlan().getName(),status,devices>0,latest==null?null:(String)latest[1],latest==null?v.getClaimedMac():(String)latest[2],router==null?null:router.getName(),v.getPackagePlan().getSharedUsers(),devices,first,expiry,data,expiry==null?null:Math.max(0,java.time.Duration.between(now,expiry).getSeconds()));
+   return new User(v.getId(),v.getCustomer()==null?null:v.getCustomer().getId(),AccessState.displayName(v),v.getCustomer()==null?null:v.getCustomer().getPhone(),v.getCode(),v.getPackagePlan().getName(),AccessState.category(v),AccessState.categoryLabel(v),status,devices>0,latest==null?null:(String)latest[1],latest==null?v.getClaimedMac():(String)latest[2],router==null?null:router.getName(),v.getPackagePlan().getSharedUsers(),devices,first,expiry,data,expiry==null?null:Math.max(0,java.time.Duration.between(now,expiry).getSeconds()));
   }).toList();
  }
 }

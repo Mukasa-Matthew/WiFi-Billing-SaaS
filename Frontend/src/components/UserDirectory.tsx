@@ -7,7 +7,20 @@ import { useResource, Table, Badge, Notice, ErrorNotice, date, bytes, remaining,
 import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
 
-interface User {id:number;customerId:number|null;customerName:string|null;phone:string|null;voucher:string;packageName:string;status:string;online:boolean;ip:string|null;mac:string|null;router:string|null;deviceLimit:number;devices:number;firstLogin:string|null;expiresAt:string|null;dataBytes:number;timeLeftSeconds:number|null}
+interface User {id:number;customerId:number|null;customerName:string|null;phone:string|null;voucher:string;packageName:string;category?:string;categoryLabel?:string;status:string;online:boolean;ip:string|null;mac:string|null;router:string|null;deviceLimit:number;devices:number;firstLogin:string|null;expiresAt:string|null;dataBytes:number;timeLeftSeconds:number|null}
+
+const CATEGORY_TONE: Record<string, "green" | "blue" | "amber" | "slate"> = {
+  STUDENT: "green",
+  STAFF: "blue",
+  VISITOR: "amber",
+  PAID_CUSTOMER: "slate",
+};
+
+function CategoryBadge({u}:{u:User}) {
+ const cat = u.category || "PAID_CUSTOMER";
+ const lbl = u.categoryLabel || (cat === "STUDENT" ? "Paid Student" : cat === "STAFF" ? "School Staff" : cat === "VISITOR" ? "Visitor Pass" : "Paid Customer");
+ return <Badge tone={CATEGORY_TONE[cat] ?? "slate"}>{lbl}</Badge>;
+}
 
 function expiredAgo(value:string|null) {
  if (!value) return "—";
@@ -30,18 +43,24 @@ export default function UserDirectory({expired=false}:{expired?:boolean}) {
  // Every voucher with its accounting aggregates (~1 MB for busy tenants):
  // refresh once a minute, not every 20 s.
  const {data,loading,error,load}=useResource<User>("/api/users",60000);
- const [tab,setTab]=useState("ONLINE"), [note,setNote]=useState(""), [actionError,setActionError]=useState("");
+ const [tab,setTab]=useState("ONLINE"), [catFilter,setCatFilter]=useState("ALL"), [note,setNote]=useState(""), [actionError,setActionError]=useState("");
  const [pending,setPending]=useState<number|null>(null);
  const [view,setView]=useState<User|null>(null);
  const toast=useToast();
  const {confirm,dialog}=useConfirmDialog();
  const active=data.filter(u=>u.status==="active"), online=active.filter(u=>u.online), offline=active.filter(u=>!u.online);
+ const onlineStudents=online.filter(u=>u.category==="STUDENT").length;
+ const onlineStaff=online.filter(u=>u.category==="STAFF").length;
+ const onlineVisitors=online.filter(u=>u.category==="VISITOR").length;
+ const onlineCustomers=online.filter(u=>!u.category||u.category==="PAID_CUSTOMER").length;
+ const hasSchoolCategories=active.some(u=>u.category&&u.category!=="PAID_CUSTOMER");
  const expiredRows=data.filter(u=>["expired","revoked"].includes(u.status)).sort((a,b)=>(Date.parse(b.expiresAt||"")||0)-(Date.parse(a.expiresAt||"")||0));
  const now=Date.now(), day=86400000;
  const expToday=expiredRows.filter(u=>u.expiresAt&&now-Date.parse(u.expiresAt)<day).length;
  const expWeek=expiredRows.filter(u=>u.expiresAt&&now-Date.parse(u.expiresAt)<7*day).length;
  const revoked=expiredRows.filter(u=>u.status==="revoked").length;
- const rows=expired?expiredRows:tab==="ONLINE"?online:tab==="OFFLINE"?offline:active;
+ const baseRows=expired?expiredRows:tab==="ONLINE"?online:tab==="OFFLINE"?offline:active;
+ const rows=catFilter==="ALL"?baseRows:baseRows.filter(u=>(u.category||"PAID_CUSTOMER")===catFilter);
  const action=(u:User)=>confirm({
   title:expired?"Archive record":`Disconnect ${u.voucher}`,
   body:expired?"Archive this expired record? Payment and accounting history will be retained.":"Send a disconnect request? The session ends only when the router confirms it.",
@@ -66,17 +85,20 @@ export default function UserDirectory({expired=false}:{expired?:boolean}) {
    <StatCard label="Revoked" value={loading?"—":revoked} icon={<Prohibit size={20}/>} tone="red" hintText="Manually blocked vouchers"/>
    <StatCard label="Total inactive" value={loading?"—":expiredRows.length} icon={<Users size={20}/>} hintText="All expired and revoked records"/>
   </div>:<>
-   <div className="grid gap-4 sm:grid-cols-3"><StatCard label="All active" value={loading?"—":active.length} icon={<Users size={20}/>} hintText="Vouchers within their validity period"/><StatCard label="Online now" value={loading?"—":online.length} icon={<WifiHigh size={20}/>} tone="green" hintText="Recent accounting received within 6 minutes"/><StatCard label="Offline" value={loading?"—":offline.length} icon={<WifiSlash size={20}/>} hintText="Valid access with no recent connection"/></div>
-   <div className="flex sm:justify-end"><FilterTabs loading={loading} value={tab} onChange={setTab} options={[{key:"ONLINE",label:"Online now",count:online.length},{key:"OFFLINE",label:"Offline",count:offline.length},{key:"ALL",label:"All active",count:active.length}]}/></div>
+   <div className="grid gap-4 sm:grid-cols-3"><StatCard label="All active" value={loading?"—":active.length} icon={<Users size={20}/>} hintText="Vouchers within their validity period"/><StatCard label="Online now" value={loading?"—":online.length} icon={<WifiHigh size={20}/>} tone="green" hintText={hasSchoolCategories?`${onlineStudents} student · ${onlineStaff} staff · ${onlineVisitors} visitor${onlineCustomers?` · ${onlineCustomers} customer`:""}`:"Recent accounting received within 6 minutes"}/><StatCard label="Offline" value={loading?"—":offline.length} icon={<WifiSlash size={20}/>} hintText="Valid access with no recent connection"/></div>
+   <div className="flex flex-wrap items-center justify-between gap-3">
+    {hasSchoolCategories ? <FilterTabs loading={loading} value={catFilter} onChange={setCatFilter} options={[{key:"ALL",label:"All types",count:baseRows.length},{key:"STUDENT",label:"Paid Students",count:baseRows.filter(u=>u.category==="STUDENT").length},{key:"STAFF",label:"School Staff",count:baseRows.filter(u=>u.category==="STAFF").length},{key:"VISITOR",label:"Visitor Passes",count:baseRows.filter(u=>u.category==="VISITOR").length},{key:"PAID_CUSTOMER",label:"Walk-in / Paid",count:baseRows.filter(u=>!u.category||u.category==="PAID_CUSTOMER").length}]}/> : <span />}
+    <FilterTabs loading={loading} value={tab} onChange={setTab} options={[{key:"ONLINE",label:"Online now",count:online.length},{key:"OFFLINE",label:"Offline",count:offline.length},{key:"ALL",label:"All active",count:active.length}]}/>
+   </div>
   </>}
-  <Table key={expired?"expired":tab} rows={rows} loading={loading} emptyTitle={expired?"No expired users":tab==="ONLINE"?"No users online":tab==="OFFLINE"?"No offline users":"No active users"} emptyDescription={expired?"Expired and revoked vouchers will appear here.":tab==="ONLINE"?"Connected users appear when recent router accounting is received.":"Users appear here after activating a voucher."} columns={expired?[
+  <Table key={expired?"expired":`${tab}-${catFilter}`} rows={rows} loading={loading} emptyTitle={expired?"No expired users":tab==="ONLINE"?"No users online":tab==="OFFLINE"?"No offline users":"No active users"} emptyDescription={expired?"Expired and revoked vouchers will appear here.":tab==="ONLINE"?"Connected users appear when recent router accounting is received.":"Users appear here after activating a voucher."} columns={expired?[
    {label:"Username",render:u=><span className="font-mono text-xs font-semibold">{u.customerId?`C${u.customerId}`:u.voucher}</span>},
-   {label:"Full name",render:u=><span className="font-medium">{u.customerName||"Walk-in customer"}</span>},{label:"Phone",render:u=>u.phone||"—"},
+   {label:"User / Type",render:u=><div className="flex flex-col gap-1"><span className="font-medium">{u.customerName||"Paid Customer"}</span><div><CategoryBadge u={u}/></div></div>},{label:"Phone",render:u=>u.phone||"—"},
    {label:"Status",render:u=><Badge tone="red">{u.status}</Badge>},{label:"Package",render:u=>u.packageName},
    {label:"Expiry date",render:u=><span className="tabular-nums whitespace-nowrap text-[13px] text-red-700">{date(u.expiresAt)}</span>},
    {label:"Expired",render:u=>u.expiresAt?<Badge tone="red">{expiredAgo(u.expiresAt)}</Badge>:"—"},actionColumn
   ]:[
-   {label:"Customer",render:u=><div><span className="font-medium">{u.customerName||"Unassigned"}</span>{u.phone&&<span className="block text-xs text-[var(--fg-muted)]">{u.phone}</span>}</div>},
+   {label:"User / Category",render:u=><div className="space-y-1"><span className="block font-medium">{u.customerName||"Paid Customer"}</span><div className="flex flex-wrap items-center gap-1.5"><CategoryBadge u={u}/>{u.phone&&<span className="text-xs text-[var(--fg-muted)]">{u.phone}</span>}</div></div>},
    {label:"Voucher",render:u=><Badge tone="amber">{u.voucher}</Badge>},
    {label:"Connection",render:u=><OnlineDot online={u.online}/>},
    {label:"Package",render:u=>u.packageName},

@@ -31,11 +31,16 @@ interface ActiveSession {
   totalOctets: number | null;
   status: string;
   acctTerminateCause: string | null;
+  category?: string | null;
+  categoryLabel?: string | null;
+  packageName?: string | null;
+  customerName?: string | null;
 }
 
 export default function TenantActiveSessionsPage() {
   const { data: sessions, loading, refreshing, load: fetchActiveSessions } = useResource<ActiveSession>("/api/sessions/active", 20000);
   const [search, setSearch] = useState("");
+  const [catFilter, setCatFilter] = useState("ALL");
 
   const [msg, setMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
@@ -96,14 +101,29 @@ export default function TenantActiveSessionsPage() {
 
   const filteredSessions = useMemo(() => {
     return sessions.filter((s) => {
+      const cat = s.category || "PAID_CUSTOMER";
+      if (catFilter !== "ALL" && cat !== catFilter) return false;
+      const q = search.toLowerCase();
       const match =
-        s.username.toLowerCase().includes(search.toLowerCase()) ||
+        s.username.toLowerCase().includes(q) ||
+        (s.categoryLabel && s.categoryLabel.toLowerCase().includes(q)) ||
+        (s.packageName && s.packageName.toLowerCase().includes(q)) ||
+        (s.customerName && s.customerName.toLowerCase().includes(q)) ||
         (s.framedIpAddress && s.framedIpAddress.includes(search)) ||
-        (s.callingStationId && s.callingStationId.toLowerCase().includes(search.toLowerCase())) ||
+        (s.callingStationId && s.callingStationId.toLowerCase().includes(q)) ||
         (s.nasIpAddress && s.nasIpAddress.includes(search));
       return match;
     });
-  }, [sessions, search]);
+  }, [sessions, search, catFilter]);
+
+  const countByCat = useMemo(() => {
+    const counts: Record<string, number> = { ALL: sessions.length, STUDENT: 0, STAFF: 0, VISITOR: 0, PAID_CUSTOMER: 0 };
+    sessions.forEach((s) => {
+      const c = s.category || "PAID_CUSTOMER";
+      counts[c] = (counts[c] || 0) + 1;
+    });
+    return counts;
+  }, [sessions]);
 
   const totalDownloadBytes = sessions.reduce((acc, s) => acc + (s.acctOutputOctets || 0), 0);
   const totalUploadBytes = sessions.reduce((acc, s) => acc + (s.acctInputOctets || 0), 0);
@@ -185,16 +205,40 @@ export default function TenantActiveSessionsPage() {
         </div>
       </div>
 
-      {/* Search Bar */}
-      <div className="relative w-full sm:w-80">
-        <MagnifyingGlass className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--fg-muted)]" />
-        <input
-          type="text"
-          placeholder="Filter by voucher, IP, or MAC..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-9 pr-4 py-2 rounded-xl bg-[var(--canvas)] border border-[var(--border)] text-xs text-[var(--fg)] placeholder-[var(--fg-muted)] focus:outline-none focus:border-indigo-500"
-        />
+      {/* Search Bar & Category Breakdown */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="relative w-full sm:w-80">
+          <MagnifyingGlass className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--fg-muted)]" />
+          <input
+            type="text"
+            placeholder="Filter by voucher, category, IP, or MAC..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 rounded-xl bg-[var(--canvas)] border border-[var(--border)] text-xs text-[var(--fg)] placeholder-[var(--fg-muted)] focus:outline-none focus:border-indigo-500"
+          />
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {[
+            { key: "ALL", label: "All Connected" },
+            { key: "STUDENT", label: "Paid Students" },
+            { key: "STAFF", label: "School Staff" },
+            { key: "VISITOR", label: "Visitor Passes" },
+            { key: "PAID_CUSTOMER", label: "Paid Customers" },
+          ].map((opt) => (
+            <button
+              key={opt.key}
+              type="button"
+              onClick={() => setCatFilter(opt.key)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition ${
+                catFilter === opt.key
+                  ? "bg-[var(--fg)] text-[var(--surface)] border-[var(--fg)]"
+                  : "bg-[var(--surface)] text-[var(--fg-muted)] border-[var(--border)] hover:text-[var(--fg)]"
+              }`}
+            >
+              {opt.label} ({countByCat[opt.key] || 0})
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Active Sessions Table */}
@@ -204,6 +248,7 @@ export default function TenantActiveSessionsPage() {
             <thead>
               <tr className="border-b border-[var(--border)] bg-[var(--subtle)] text-[var(--fg-muted)] font-medium">
                 <th className="py-3 px-4">User / Voucher</th>
+                <th className="py-3 px-4">Category & Plan</th>
                 <th className="py-3 px-4">Assigned IP</th>
                 <th className="py-3 px-4">Device MAC</th>
                 <th className="py-3 px-4">Router</th>
@@ -215,17 +260,35 @@ export default function TenantActiveSessionsPage() {
             </thead>
             <tbody className="divide-y divide-[var(--border)]">
               {loading && sessions.length === 0 ? (
-                Array.from({ length: 5 }, (_, row) => <tr key={row} aria-hidden="true">{Array.from({ length: 8 }, (_, column) => <td key={column} className="px-4 py-4"><span className="block h-3.5 animate-pulse rounded bg-[var(--fill)] motion-reduce:animate-none" style={{ width: `${55 + ((row + column) % 4) * 10}%` }} /></td>)}</tr>)
+                Array.from({ length: 5 }, (_, row) => <tr key={row} aria-hidden="true">{Array.from({ length: 9 }, (_, column) => <td key={column} className="px-4 py-4"><span className="block h-3.5 animate-pulse rounded bg-[var(--fill)] motion-reduce:animate-none" style={{ width: `${55 + ((row + column) % 4) * 10}%` }} /></td>)}</tr>)
               ) : filteredSessions.length > 0 ? (
                 filteredSessions.map((session) => (
                   <tr key={session.radAcctId || session.username} className="hover:bg-[var(--subtle)] transition">
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-                        <span className="font-mono text-xs font-bold text-[var(--fg)] tracking-wide">
-                          {session.username}
-                        </span>
+                        <div>
+                          <span className="font-mono text-xs font-bold text-[var(--fg)] tracking-wide block">
+                            {session.username}
+                          </span>
+                          {session.customerName && (
+                            <span className="text-[11px] text-[var(--fg-muted)] block">{session.customerName}</span>
+                          )}
+                        </div>
                       </div>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold ${
+                        session.category === "STAFF" ? "bg-blue-500/10 text-blue-600 border border-blue-500/20" :
+                        session.category === "VISITOR" ? "bg-amber-500/10 text-amber-600 border border-amber-500/20" :
+                        session.category === "STUDENT" ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20" :
+                        "bg-[var(--fill)] text-[var(--fg-body)]"
+                      }`}>
+                        {session.categoryLabel || "Paid Customer"}
+                      </span>
+                      {session.packageName && (
+                        <span className="block text-[11px] text-[var(--fg-muted)] mt-0.5">{session.packageName}</span>
+                      )}
                     </td>
                     <td className="py-3 px-4 font-mono text-[var(--accent-text)]">
                       {session.framedIpAddress || <span className="text-[var(--fg-muted)]">Pending</span>}

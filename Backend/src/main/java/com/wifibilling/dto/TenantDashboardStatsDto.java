@@ -33,5 +33,6 @@ public record TenantDashboardStatsDto(
     long dataMonthDownBytes,
     long dataMonthUpBytes,
     long totalCustomers,
-    long newCustomersThisWeek
+    long newCustomersThisWeek,
+    Map<String, Long> activeByCategory
 ) {}
