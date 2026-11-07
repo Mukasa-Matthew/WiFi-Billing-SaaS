@@ -127,7 +127,7 @@ public class RouterScriptGenerator {
 
     private static final java.util.Map<String, List<String>> APP_PRESET_DOMAINS = java.util.Map.ofEntries(
             java.util.Map.entry("@whatsapp", List.of("whatsapp.com", "whatsapp.net", "wa.me")),
-            java.util.Map.entry("@youtube", List.of("youtube.com", "youtu.be", "googlevideo.com", "ytimg.com", "youtube-nocookie.com")),
+            java.util.Map.entry("@youtube", List.of("youtube.com", "youtu.be", "googlevideo.com", "ytimg.com", "youtube-nocookie.com", "youtubei.googleapis.com", "youtube.googleapis.com")),
             java.util.Map.entry("@chatgpt", List.of("chatgpt.com", "openai.com", "oaistatic.com", "oaiusercontent.com")),
             java.util.Map.entry("@tiktok", List.of("tiktok.com", "tiktokcdn.com", "tiktokv.com", "musical.ly", "byteoversea.com")),
             java.util.Map.entry("@facebook", List.of("facebook.com", "fb.com", "fbcdn.net", "messenger.com")),
@@ -151,6 +151,26 @@ public class RouterScriptGenerator {
     static final List<String> CONNECTIVITY_CHECK_DOMAINS = List.of(
             "connectivitycheck.gstatic.com", "connectivitycheck.android.com", "clients3.google.com",
             "captive.apple.com", "www.msftconnecttest.com", "www.msftncsi.com");
+
+    /**
+     * Makes the router learn each listed site's real server addresses as devices look them up: a forwarding
+     * DNS entry per domain (and all its sub-domains) adds every answer to {@code list}. This catches services
+     * like YouTube that stream from thousands of rotating hosts and whose TLS names RouterOS often cannot read
+     * (large, split ClientHellos). The group's DNS is forced through the router and DNS-over-TLS is refused
+     * so lookups cannot bypass it. Each line is error-guarded so routers without these features skip it.
+     */
+    private static void dnsLearnedSites(StringBuilder s, Set<String> domains, String list, String group, String who) {
+        for (String d : domains) {
+            s.append(":do { /ip/dns/static/add name=").append(q(d)).append(" type=FWD forward-to=1.1.1.1 match-subdomain=yes address-list=")
+                    .append(q(list)).append(" comment=\"wb-school-filter: ").append(who).append(" dns ").append(d).append("\" } on-error={}\n");
+        }
+        for (String protocol : List.of("udp", "tcp")) {
+            s.append(":do { /ip/firewall/nat/add chain=dstnat src-address-list=").append(q(group)).append(" protocol=").append(protocol)
+                    .append(" dst-port=53 action=redirect to-ports=53 comment=\"wb-school-filter: ").append(who).append(" force dns ").append(protocol).append("\" } on-error={}\n");
+        }
+        s.append("/ip/firewall/filter/add chain=forward src-address-list=").append(q(group))
+                .append(" protocol=tcp dst-port=853 action=reject reject-with=tcp-reset comment=\"wb-school-filter: ").append(who).append(" no private dns\"\n");
+    }
 
     /** Probe hosts go in the address list only: one short line each keeps the stored script small. */
     private static void connectivityChecks(StringBuilder s, String list, String who) {
@@ -197,6 +217,8 @@ public class RouterScriptGenerator {
         StringBuilder s = new StringBuilder();
         s.append("/ip/firewall/filter/remove [find where comment~\"^wb-school-filter\"]\n");
         s.append("/ip/firewall/address-list/remove [find where comment~\"^wb-school-filter\"]\n");
+        s.append(":do { /ip/firewall/nat/remove [find where comment~\"^wb-school-filter\"] } on-error={}\n");
+        s.append(":do { /ip/dns/static/remove [find where comment~\"^wb-school-filter\"] } on-error={}\n");
 
         String portalHost = null;
         if (publicBaseUrl != null && !publicBaseUrl.isBlank()) {
@@ -206,6 +228,7 @@ public class RouterScriptGenerator {
 
         if (studentFreeEnabled) {
             Set<String> studentDomains = new java.util.LinkedHashSet<>(expandSiteRules(studentAllowedSites));
+            dnsLearnedSites(s, studentDomains, "wb-student-sites", STUDENT_FREE_ADDRESS_LIST, "student");
             if (portalHost != null) studentDomains.add(portalHost);
             connectivityChecks(s, "wb-student-sites", "student");
             s.append("/ip/firewall/filter/add chain=forward src-address-list=").append(q(STUDENT_FREE_ADDRESS_LIST))
@@ -230,6 +253,7 @@ public class RouterScriptGenerator {
         String mode = staffSiteMode == null ? "ALL" : staffSiteMode.trim().toUpperCase(java.util.Locale.ROOT);
         if ("ALLOW_LIST".equals(mode)) {
             Set<String> staffDomains = new java.util.LinkedHashSet<>(expandSiteRules(staffSiteRules));
+            dnsLearnedSites(s, staffDomains, "wb-staff-sites", STAFF_FREE_ADDRESS_LIST, "staff");
             if (portalHost != null) staffDomains.add(portalHost);
             connectivityChecks(s, "wb-staff-sites", "staff");
             s.append("/ip/firewall/filter/add chain=forward src-address-list=").append(q(STAFF_FREE_ADDRESS_LIST))
@@ -252,6 +276,7 @@ public class RouterScriptGenerator {
         } else if ("BLOCK_LIST".equals(mode)) {
             Set<String> staffDomains = expandSiteRules(staffSiteRules);
             if (!staffDomains.isEmpty()) {
+                dnsLearnedSites(s, staffDomains, "wb-staff-sites", STAFF_FREE_ADDRESS_LIST, "staff");
                 s.append("/ip/firewall/filter/add chain=forward src-address-list=").append(q(STAFF_FREE_ADDRESS_LIST))
                         .append(" protocol=udp dst-port=443 action=reject reject-with=icmp-port-unreachable comment=\"wb-school-filter: staff disable quic\"\n");
                 for (String d : staffDomains) {
