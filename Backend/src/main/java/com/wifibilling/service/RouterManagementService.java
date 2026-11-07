@@ -106,6 +106,37 @@ public class RouterManagementService {
   return "/system/clock/set time-zone-autodetect=no time-zone-name=Etc/UTC date="+now.toLocalDate()+" time="+now.format(DateTimeFormatter.ofPattern("HH:mm:ss"));
  }
  @Transactional public RouterTask enqueue(Router r,String action){
+  String script=scriptFor(r,action);
+  // Idempotent: a pending task for the same action already covers this change —
+  // reuse it rather than failing the caller's transaction.
+  var existing=tasks.findAllByRouterIdOrderByCreatedAtDesc(r.getId()).stream()
+      .filter(t->"PENDING".equals(t.getStatus())&&action.equals(t.getAction())).findFirst();
+  if(existing.isPresent()){
+   RouterTask pending=existing.get();
+   pending.setScript(script);
+   return tasks.save(pending);
+  }
+  return tasks.save(RouterTask.builder().router(r).action(action).script(script).build());
+ }
+
+ /**
+  * Re-sends school filter and anti-tethering rules to every router whose last task for them differs from
+  * what the current release generates, so rule fixes reach routers on deploy without anyone pressing Save.
+  * Routers never configured for an action are left alone.
+  */
+ @Transactional public int resyncChangedRules(){
+  int queued=0;
+  for(Router r:routers.findAll()){
+   if("DELETED".equalsIgnoreCase(r.getStatus())||r.getTenant()==null) continue;
+   for(String action:List.of("SYNC_SCHOOL_FILTER","SYNC_TETHERING")){
+    var latest=tasks.findAllByRouterIdOrderByCreatedAtDesc(r.getId()).stream().filter(t->action.equals(t.getAction())).findFirst();
+    if(latest.isPresent()&&!scriptFor(r,action).equals(latest.get().getScript())){ enqueue(r,action); queued++; }
+   }
+  }
+  return queued;
+ }
+
+ String scriptFor(Router r,String action){
   String script;
   if("SYNC_PORTAL".equals(action)){
    // Pull the current template set now, then migrate the on-router wb-portal-sync
@@ -130,15 +161,6 @@ public class RouterManagementService {
        props.getPublicBaseUrl()
    );
   }else throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Unknown router action");
-  // Idempotent: a pending task for the same action already covers this change —
-  // reuse it rather than failing the caller's transaction.
-  var existing=tasks.findAllByRouterIdOrderByCreatedAtDesc(r.getId()).stream()
-      .filter(t->"PENDING".equals(t.getStatus())&&action.equals(t.getAction())).findFirst();
-  if(existing.isPresent()){
-   RouterTask pending=existing.get();
-   pending.setScript(script);
-   return tasks.save(pending);
-  }
-  return tasks.save(RouterTask.builder().router(r).action(action).script(script).build());
+  return script;
  }
 }
