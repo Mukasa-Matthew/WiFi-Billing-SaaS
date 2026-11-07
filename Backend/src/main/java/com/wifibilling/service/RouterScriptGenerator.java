@@ -101,6 +101,20 @@ public class RouterScriptGenerator {
         return ":do { /ip/firewall/filter/move [find where comment~\"" + commentPrefix + "\"] destination=[:pick [find where chain=forward dynamic=no !(comment~\"^wb-\")] 0] } on-error={}\n";
     }
 
+    /**
+     * Makes new site rules take effect at once instead of when phones' cached addresses expire: the router's
+     * DNS cache is cleared so every lookup is learned afresh, and the open connections of filtered students
+     * and staff are dropped so apps reconnect through the new rules. Users stay signed in; apps just reconnect.
+     */
+    static String applyNow() {
+        StringBuilder s = new StringBuilder(":do { /ip/dns/cache/flush } on-error={}\n");
+        for (String list : List.of(STAFF_FREE_ADDRESS_LIST, STUDENT_FREE_ADDRESS_LIST)) {
+            s.append(":do { :foreach e in=[/ip/firewall/address-list/find where list=").append(q(list))
+                    .append("] do={ :local ip [/ip/firewall/address-list/get $e address]; /ip/firewall/connection/remove [find where src-address~(\"^\" . $ip . \":\")] } } on-error={}\n");
+        }
+        return s.toString();
+    }
+
     public static String tetheringRules(String mode) {
         StringBuilder s = new StringBuilder();
         s.append("/ip/firewall/filter/remove [find where comment~\"^wb-tether\"]\n");
@@ -291,6 +305,7 @@ public class RouterScriptGenerator {
             }
         }
         s.append(moveAboveRouterRules("^wb-school-filter"));
+        s.append(applyNow());
         return s.toString();
     }
 

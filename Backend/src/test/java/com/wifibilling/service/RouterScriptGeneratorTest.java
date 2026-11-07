@@ -161,7 +161,11 @@ class RouterScriptGeneratorTest {
 
         // Our rules are moved above the router's own accept/fast-track rules, or SNI blocks never run
         String move = ":do { /ip/firewall/filter/move [find where comment~\"^wb-school-filter\"] destination=[:pick [find where chain=forward dynamic=no !(comment~\"^wb-\")] 0] } on-error={}";
-        assertTrue(allowRules.trim().endsWith(move), "school rules are placed above the router's own forward rules");
+        assertTrue(allowRules.contains(move), "school rules are placed above the router's own forward rules");
+        assertTrue(allowRules.indexOf(move) < allowRules.indexOf("/ip/dns/cache/flush"), "rules are in place before clients reconnect");
+        assertTrue(allowRules.contains("list=\"wb-staff-free\"] do={ :local ip [/ip/firewall/address-list/get $e address]; /ip/firewall/connection/remove"),
+                "filtered staff reconnect through the new rules at once");
+        assertTrue(allowRules.contains("list=\"wb-student-free\"] do={"), "so do students on free data");
         assertTrue(RouterScriptGenerator.tetheringRules("BLOCK").contains("move [find where comment~\"^wb-tether\"]"), "tethering rules are placed on top too");
         assertFalse(RouterScriptGenerator.tetheringRules("OFF").contains("/move"), "nothing to move when tethering is off");
 
