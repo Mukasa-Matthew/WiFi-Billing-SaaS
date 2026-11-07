@@ -1012,7 +1012,7 @@ function SettingsCard({ settings, onSaved }: { settings: Settings; onSaved: () =
                     />
                     <p className={hint}>
                       {staffSiteMode === "ALLOW_LIST"
-                        ? "Only selected apps (@whatsapp, @youtube, @chatgpt, @tiktok, etc.) and custom domains listed above will work on Staff WiFi."
+                        ? "Only these apps and domains will work on Staff WiFi. Everything else, including Google search, news and banking, is blocked. To stop just a few apps (like TikTok), choose \"Block Selected Apps & Sites\" instead."
                         : "Selected apps and custom domains listed above will be blocked on Staff WiFi by the MikroTik router."}
                     </p>
                   </div>
