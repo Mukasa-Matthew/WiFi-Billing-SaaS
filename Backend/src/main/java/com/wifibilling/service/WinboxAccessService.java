@@ -127,6 +127,9 @@ public class WinboxAccessService {
             a = null;
         }
         if (a == null) {
+            // A router on its first setup has no WireGuard key yet; enrolling then would fail the
+            // NOT NULL peer_key and abort the whole setup transaction. It enrolls on a later setup.
+            if (r.getWgPublicKey() == null || r.getWgPublicKey().isBlank()) return null;
             a = new WinboxAccess();
             a.setRouter(r);
             a.setTenantId(r.getTenant().getId());
