@@ -90,6 +90,17 @@ public class RouterScriptGenerator {
      * connected devices cannot forward/hotspot packets to downstream devices.
      * mode: "OFF" (stale rules removed), "LOG" (detect only), "BLOCK" (drop + TTL=1 lock).
      */
+    /**
+     * Moves our rules above the router's own forward rules. Most routers accept or fast-track established
+     * connections near the top of the chain; rules appended below them never see the TLS ClientHello, so
+     * SNI blocks silently fail and only IP matches work (enough for TikTok, not for YouTube's rotating
+     * Google servers). Dynamic hotspot rules stay where RouterOS keeps them. One self-contained line, so it
+     * works however the router runs the task; a router with no other forward rules simply skips it.
+     */
+    static String moveAboveRouterRules(String commentPrefix) {
+        return ":do { /ip/firewall/filter/move [find where comment~\"" + commentPrefix + "\"] destination=[:pick [find where chain=forward dynamic=no !(comment~\"^wb-\")] 0] } on-error={}\n";
+    }
+
     public static String tetheringRules(String mode) {
         StringBuilder s = new StringBuilder();
         s.append("/ip/firewall/filter/remove [find where comment~\"^wb-tether\"]\n");
@@ -106,6 +117,7 @@ public class RouterScriptGenerator {
                 s.append("/ip/firewall/mangle/add chain=postrouting out-interface=").append(q(BRIDGE_NAME))
                         .append(" action=change-ttl new-ttl=set:1 passthrough=yes comment=\"wb-tether: lock downstream ttl=1\"\n");
             }
+            s.append(moveAboveRouterRules("^wb-tether"));
         }
         return s.toString();
     }
@@ -253,6 +265,7 @@ public class RouterScriptGenerator {
                         .append(" dst-address-list=\"wb-staff-sites\" action=drop comment=\"wb-school-filter: staff block list\"\n");
             }
         }
+        s.append(moveAboveRouterRules("^wb-school-filter"));
         return s.toString();
     }
 

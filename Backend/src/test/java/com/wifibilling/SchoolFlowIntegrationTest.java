@@ -422,4 +422,25 @@ class SchoolFlowIntegrationTest {
         assertEquals("wb-staff-free",
                 radReply.findFirstByUsernameAndAttribute(staffCode, "Mikrotik-Address-List").orElseThrow().getValue());
     }
+
+    @Autowired com.wifibilling.service.RouterManagementService routerManagement;
+    @Autowired RouterTaskRepository routerTasks;
+    @Autowired RouterRepository routerRepository;
+
+    @Test
+    void routersWithOutdatedSchoolRulesAreResentOnStartupExactlyOnce() throws Exception {
+        Site school = site("resync-school", true);
+        var router = routerRepository.findByToken(school.routerToken()).orElseThrow();
+        routerTasks.save(com.wifibilling.model.RouterTask.builder().router(router).action("SYNC_SCHOOL_FILTER")
+                .script("/ip/firewall/filter/add comment=\"wb-school-filter: rules from an older release\"").status("APPLIED").build());
+        int before = routerTasks.findAllByRouterIdOrderByCreatedAtDesc(router.getId()).size();
+        assertTrue(routerManagement.resyncChangedRules() >= 1);
+        var latest = routerTasks.findAllByRouterIdOrderByCreatedAtDesc(router.getId()).getFirst();
+        assertEquals("SYNC_SCHOOL_FILTER", latest.getAction());
+        assertEquals("PENDING", latest.getStatus());
+        assertTrue(latest.getScript().contains("/ip/firewall/filter/move [find where comment~\"^wb-school-filter\"]"));
+        assertEquals(before + 1, routerTasks.findAllByRouterIdOrderByCreatedAtDesc(router.getId()).size());
+        routerManagement.resyncChangedRules();
+        assertEquals(before + 1, routerTasks.findAllByRouterIdOrderByCreatedAtDesc(router.getId()).size(), "an up-to-date router gets nothing new");
+    }
 }

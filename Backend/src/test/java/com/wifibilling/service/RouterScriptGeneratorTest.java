@@ -159,6 +159,12 @@ class RouterScriptGeneratorTest {
         assertTrue(generator.schoolFilterRules(false, "", "ALLOW_LIST", "@tiktok", "https://app.qticket.dev").contains("address=\"captive.apple.com\""),
                 "a TikTok-only staff allow list still lets phones confirm the connection");
 
+        // Our rules are moved above the router's own accept/fast-track rules, or SNI blocks never run
+        String move = ":do { /ip/firewall/filter/move [find where comment~\"^wb-school-filter\"] destination=[:pick [find where chain=forward dynamic=no !(comment~\"^wb-\")] 0] } on-error={}";
+        assertTrue(allowRules.trim().endsWith(move), "school rules are placed above the router's own forward rules");
+        assertTrue(RouterScriptGenerator.tetheringRules("BLOCK").contains("move [find where comment~\"^wb-tether\"]"), "tethering rules are placed on top too");
+        assertFalse(RouterScriptGenerator.tetheringRules("OFF").contains("/move"), "nothing to move when tethering is off");
+
         // Staff block-list mode drops only matching domains
         String blockRules = generator.schoolFilterRules(
                 false,
