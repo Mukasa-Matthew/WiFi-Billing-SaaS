@@ -17,7 +17,7 @@ School tenants link AirPairy to the school identity system (the SYNERGY WIFI rep
 
 ## Database
 
-All new columns are nullable and new tables are additive, so Hibernate's automatic update applies them on start-up without touching existing rows:
+Production runs with `ddl-auto=none`, so apply `deployment/database/05-school-tenants.sql` to radius_db **before** deploying (after a backup). It is additive, nullable-only and safe while the previous release runs. It adds:
 
 - `tenants`: `tenant_type`, `school_visitors_enabled`, `school_visitor_daily_cap`, `school_staff_rate_limit`, `school_visitor_rate_limit`
 - `vouchers`: `person_id`, `school_category`, `visitor_pass_id`, `hard_expires_at`, `school_hold`
