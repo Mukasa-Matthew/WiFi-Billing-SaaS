@@ -115,7 +115,7 @@ class SchoolFlowIntegrationTest {
         Site shop = site("ordinary-shop", false);
         mvc.perform(get("/api/portal/config").param("token", shop.routerToken())).andExpect(status().isOk())
                 .andExpect(jsonPath("$.settings.school").value(false)).andExpect(jsonPath("$.settings.schoolVisitors").value(false))
-                .andExpect(jsonPath("$.settings.buyForOther").value(true));
+                .andExpect(jsonPath("$.settings.buyForOther").value(true)).andExpect(jsonPath("$.settings.redirectUrl").doesNotExist());
         mvc.perform(post("/api/portal/school/verify").contentType(MediaType.APPLICATION_JSON).content(verifyBody(shop, PHONE_MAC))).andExpect(status().isNotFound());
         mvc.perform(post("/api/payments/initiate").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"token\":\"" + shop.routerToken() + "\",\"packageId\":" + shop.planId() + ",\"phone\":\"0770000002\",\"mac\":\"" + PHONE_MAC + "\"}"))
@@ -129,7 +129,8 @@ class SchoolFlowIntegrationTest {
     void studentsMustSignInToBuyAndTheirVoucherFollowsThemAcrossDevicesAndSuspension() throws Exception {
         Site school = site("student-school", true);
         mvc.perform(get("/api/portal/config").param("token", school.routerToken()))
-                .andExpect(jsonPath("$.settings.school").value(true)).andExpect(jsonPath("$.settings.buyForOther").value(false));
+                .andExpect(jsonPath("$.settings.school").value(true)).andExpect(jsonPath("$.settings.buyForOther").value(false))
+                .andExpect(jsonPath("$.settings.redirectUrl").value("https://www.google.com"));
         assertTrue(pay(school, PHONE_MAC, null).contains("Sign in with your school ID"));
         verified(school.tenant().getId(), "OK", "STUDENT", "demo-0000aaaa");
         String result = portal("verify", verifyBody(school, PHONE_MAC.toLowerCase().replace(':', '-')));
