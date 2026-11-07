@@ -231,3 +231,171 @@ export function MiniBars({ data, label, format = (v) => v.toLocaleString(), heig
     </div>
   );
 }
+
+export interface DonutSegment {
+  key: string;
+  label: string;
+  value: number;
+  tone?: StatusTone;
+  color?: string;
+  sublabel?: string;
+  badge?: string;
+}
+
+const DONUT_PALETTE = [
+  "var(--chart-1)",
+  "var(--status-good)",
+  "var(--status-warn)",
+  "#8B5CF6",
+  "#EC4899",
+  "var(--status-idle)",
+];
+
+/**
+ * Part-to-whole Donut / Pie chart with interactive slice + legend highlighting,
+ * center total/slice readout, and an accessible screen-reader table.
+ */
+export function DonutChart({
+  segments,
+  label,
+  centerLabel = "Total",
+  centerValue,
+  format = (v) => v.toLocaleString(),
+  size = 152,
+}: {
+  segments: DonutSegment[];
+  label: string;
+  centerLabel?: string;
+  centerValue?: string;
+  format?: (v: number) => string;
+  size?: number;
+}) {
+  const [hover, setHover] = useState<string | null>(null);
+  const total = segments.reduce((sum, s) => sum + Math.max(0, s.value), 0);
+  const stroke = 20;
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const nonZeroCount = segments.filter((s) => s.value > 0).length;
+  const gap = nonZeroCount > 1 ? 2.5 : 0;
+
+  const resolvedColor = (s: DonutSegment, idx: number) =>
+    s.color || (s.tone ? toneVar[s.tone] : DONUT_PALETTE[idx % DONUT_PALETTE.length]);
+
+  let accOffset = 0;
+  const arcs = segments.map((s, idx) => {
+    const val = Math.max(0, s.value);
+    const share = total > 0 ? val / total : 0;
+    const rawLen = share * circumference;
+    const len = val > 0 ? Math.max(2, rawLen - gap) : 0;
+    const offset = accOffset;
+    accOffset += rawLen;
+    return { ...s, color: resolvedColor(s, idx), share, len, offset };
+  });
+
+  const active = hover ? arcs.find((a) => a.key === hover) : null;
+
+  return (
+    <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+      <div className="relative mx-auto shrink-0" style={{ width: size, height: size }}>
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img" aria-label={label} className="-rotate-90 block">
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke="var(--fill)"
+            strokeWidth={stroke}
+          />
+          {total > 0 &&
+            arcs.map((a) =>
+              a.len > 0 ? (
+                <circle
+                  key={a.key}
+                  cx={size / 2}
+                  cy={size / 2}
+                  r={radius}
+                  fill="none"
+                  stroke={a.color}
+                  strokeWidth={hover === a.key ? stroke + 3 : stroke}
+                  strokeDasharray={`${a.len} ${Math.max(0, circumference - a.len)}`}
+                  strokeDashoffset={-a.offset}
+                  strokeLinecap="butt"
+                  opacity={hover == null || hover === a.key ? 1 : 0.45}
+                  className="cursor-pointer transition-all duration-150"
+                  onPointerEnter={() => setHover(a.key)}
+                  onPointerLeave={() => setHover(null)}
+                />
+              ) : null
+            )}
+        </svg>
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-4 text-center">
+          <span className="max-w-full truncate text-[11px] font-medium text-[var(--fg-muted)]">
+            {active ? active.label : centerLabel}
+          </span>
+          <span className="num mt-0.5 max-w-full truncate text-[14px] font-semibold leading-tight text-[var(--fg)]">
+            {active ? format(active.value) : centerValue ?? format(total)}
+          </span>
+          {active && total > 0 && (
+            <span className="num mt-0.5 text-[11px] font-medium text-[var(--fg-muted)]">
+              {Math.round(active.share * 100)}% share
+            </span>
+          )}
+        </div>
+      </div>
+
+      <ul className="min-w-0 flex-1 divide-y divide-[var(--border-soft)]">
+        {arcs.map((a) => {
+          const pct = total > 0 ? Math.round(a.share * 100) : 0;
+          return (
+            <li
+              key={a.key}
+              onPointerEnter={() => setHover(a.key)}
+              onPointerLeave={() => setHover(null)}
+              className={`flex items-center justify-between gap-3 rounded-lg px-2.5 py-2 transition-colors ${
+                hover === a.key ? "bg-[var(--subtle)]" : ""
+              }`}
+            >
+              <div className="flex min-w-0 items-start gap-2.5">
+                <span
+                  aria-hidden
+                  className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-[3px]"
+                  style={{ background: a.color }}
+                />
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="truncate text-[13px] font-medium text-[var(--fg)]">{a.label}</span>
+                    {a.badge && (
+                      <span className="rounded bg-[var(--fill)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--fg-muted)]">
+                        {a.badge}
+                      </span>
+                    )}
+                  </div>
+                  {a.sublabel && (
+                    <span className="block truncate text-[11.5px] text-[var(--fg-muted)]">{a.sublabel}</span>
+                  )}
+                </div>
+              </div>
+              <div className="shrink-0 text-right">
+                <span className="num block text-[13px] font-semibold text-[var(--fg)]">{format(a.value)}</span>
+                <span className="num block text-[11px] text-[var(--fg-muted)]">{pct}%</span>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+
+      <table className="sr-only">
+        <caption>{label}</caption>
+        <tbody>
+          {arcs.map((a) => (
+            <tr key={a.key}>
+              <th scope="row">{a.label}</th>
+              <td>{format(a.value)}</td>
+              <td>{total > 0 ? `${Math.round(a.share * 100)}%` : "0%"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}

@@ -59,6 +59,8 @@ class SchoolFlowIntegrationTest {
     @Autowired TenantRepository tenants;
     @Autowired VoucherRepository vouchers;
     @Autowired RadCheckRepository radCheck;
+    @Autowired RadReplyRepository radReply;
+    @Autowired RadAcctRepository radAcct;
     @Autowired PackagePlanRepository plans;
     @Autowired PasswordEncoder passwords;
     @Autowired com.wifibilling.service.SubscriptionService subscriptions;
@@ -260,5 +262,52 @@ class SchoolFlowIntegrationTest {
         assertThrows(IdentityException.class, () -> adminTenants.createTenant(new com.wifibilling.dto.AdminTenantDto.CreateRequest("Broken School", "owner@broken.test", "+256700000021", "SCHOOL", "it@broken.test", "IT")));
         assertFalse(tenants.existsByEmailIgnoreCase("owner@broken.test"), "the tenant is rolled back when the school cannot be created");
         assertThrows(org.springframework.web.server.ResponseStatusException.class, () -> adminTenants.createTenant(new com.wifibilling.dto.AdminTenantDto.CreateRequest("No IT", "owner@noit.test", "+256700000022", "SCHOOL", null, null)));
+    }
+
+    @Test
+    void staffAndVisitorDataCapsWriteMikrotikTotalLimitAndCutOffWhenExceeded() throws Exception {
+        Site school = site("datacap-school", true);
+        when(identity.updateSchool(eq(school.tenant().getId()), anyMap()))
+                .thenReturn(json.createObjectNode().put("visitorsEnabled", true).put("visitorDailyCap", 15));
+
+        mvc.perform(put("/api/school/settings").header("Authorization", "Bearer " + school.jwt()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"staffEnabled\":true,\"staffRateLimit\":\"3M/3M\",\"staffDailyDataCapMb\":500,\"visitorsEnabled\":true,\"visitorDailyCap\":15,\"visitorRateLimit\":\"2M/2M\",\"visitorDataCapMb\":250,\"applyImmediately\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.staffEnabled").value(true))
+                .andExpect(jsonPath("$.staffDailyDataCapMb").value(500))
+                .andExpect(jsonPath("$.visitorDataCapMb").value(250));
+
+        verified(school.tenant().getId(), "OK", "STAFF", "staff-cap-1");
+        String code = JsonPath.read(portal("verify", verifyBody(school, PHONE_MAC)), "$.code");
+        assertEquals(String.valueOf(500L * 1024L * 1024L),
+                radReply.findFirstByUsernameAndAttribute(code, "Mikrotik-Total-Limit").orElseThrow().getValue());
+        assertEquals("3M/3M",
+                radReply.findFirstByUsernameAndAttribute(code, "Mikrotik-Rate-Limit").orElseThrow().getValue());
+
+        // Simulate 500 MB consumed today in radacct
+        radAcct.saveAndFlush(com.wifibilling.radius.RadAcct.builder()
+                .acctSessionId("sess-staff-cap-1").acctUniqueId("uniq-staff-cap-1").username(code)
+                .nasIpAddress("10.9.0.2").acctStartTime(OffsetDateTime.now().minusMinutes(10))
+                .acctInputOctets(100L * 1024L * 1024L).acctOutputOctets(400L * 1024L * 1024L).build());
+
+        // Worker holds voucher and clears radcheck/radreply when cap is reached
+        lifecycle.processVoucherLifecycle();
+        assertTrue(vouchers.findByCode(code).orElseThrow().getSchoolHold());
+        assertFalse(radCheck.existsByUsername(code));
+
+        // Portal blocks re-sign-in today with a clear daily cap message
+        mvc.perform(post("/api/portal/school/verify").contentType(MediaType.APPLICATION_JSON).content(verifyBody(school, PHONE_MAC)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("daily free data limit")));
+
+        // Pausing staff WiFi blocks staff sign-in
+        mvc.perform(put("/api/school/settings").header("Authorization", "Bearer " + school.jwt()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"staffEnabled\":false,\"staffDailyDataCapMb\":0,\"applyImmediately\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.staffEnabled").value(false));
+        verified(school.tenant().getId(), "OK", "STAFF", "staff-cap-2");
+        mvc.perform(post("/api/portal/school/verify").contentType(MediaType.APPLICATION_JSON).content(verifyBody(school, PHONE_MAC)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("paused")));
     }
 }

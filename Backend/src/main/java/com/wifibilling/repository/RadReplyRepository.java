@@ -17,4 +17,7 @@ public interface RadReplyRepository extends JpaRepository<RadReply, Long> {
 
     @Transactional
     long deleteAllByUsername(String username);
+
+    @Transactional
+    long deleteAllByUsernameAndAttribute(String username, String attribute);
 }

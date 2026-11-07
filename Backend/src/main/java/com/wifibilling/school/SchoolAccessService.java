@@ -50,6 +50,7 @@ public class SchoolAccessService {
     private final PackagePlanRepository plans;
     private final RadCheckRepository radCheck;
     private final RadReplyRepository radReply;
+    private final RadAcctRepository radAcct;
     private final VoucherService voucherService;
     private final VoucherExpirationWorker expiration;
     private final ReportingClock clock;
@@ -57,9 +58,10 @@ public class SchoolAccessService {
 
     public SchoolAccessService(IdentityClient identity, SchoolTickets tickets, RouterRepository routers, TenantRepository tenants,
                                VoucherRepository vouchers, PackagePlanRepository plans, RadCheckRepository radCheck, RadReplyRepository radReply,
-                               VoucherService voucherService, VoucherExpirationWorker expiration, ReportingClock clock, PlatformTransactionManager manager) {
+                               RadAcctRepository radAcct, VoucherService voucherService, VoucherExpirationWorker expiration,
+                               ReportingClock clock, PlatformTransactionManager manager) {
         this.identity = identity; this.tickets = tickets; this.routers = routers; this.tenants = tenants; this.vouchers = vouchers;
-        this.plans = plans; this.radCheck = radCheck; this.radReply = radReply; this.voucherService = voucherService;
+        this.plans = plans; this.radCheck = radCheck; this.radReply = radReply; this.radAcct = radAcct; this.voucherService = voucherService;
         this.expiration = expiration; this.clock = clock; this.transaction = new TransactionTemplate(manager);
     }
 
@@ -87,14 +89,18 @@ public class SchoolAccessService {
         Router router = schoolRouter(routerToken);
         String mac = requireMac(rawMac);
         Tenant tenant = router.getTenant();
+        if (Boolean.FALSE.equals(tenant.getSchoolVisitorsEnabled())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Visitor passes are currently switched off by the network owner.");
+        }
         JsonNode pass = identity.admitVisitor(tenant.getId(), code, mac);
         String passId = pass.path("passId").asString();
         OffsetDateTime until = OffsetDateTime.parse(pass.path("expiresAt").asString());
         String fullName = pass.path("fullName").asString();
         return transaction.execute(status -> {
-            Voucher voucher = vouchers.findAllByTenantIdAndVisitorPassIdAndStatusIn(tenant.getId(), passId, List.of("unused", "active")).stream().findFirst()
-                    .orElseGet(() -> issue(tenant, systemPlan(tenant, VISITOR_PLAN), router, mac, null, "VISITOR", passId, until));
-            reprovision(voucher, router, mac, until);
+            Voucher existing = vouchers.findAllByTenantIdAndVisitorPassIdAndStatusIn(tenant.getId(), passId, List.of("unused", "active")).stream().findFirst().orElse(null);
+            Long remainingBytes = checkVisitorDataCap(tenant, passId, existing);
+            Voucher voucher = existing != null ? existing : issue(tenant, systemPlan(tenant, VISITOR_PLAN), router, mac, null, "VISITOR", passId, until);
+            reprovision(voucher, router, mac, until, remainingBytes);
             return PortalResult.connect(voucher.getCode(), fullName, "VISITOR", until);
         });
     }
@@ -112,12 +118,17 @@ public class SchoolAccessService {
         return transaction.execute(status -> {
             Voucher live = live(tenant.getId(), personId, category);
             if ("STAFF".equals(category)) {
+                if (!tenant.isSchoolStaffEnabled()) {
+                    if (live != null) holdAndDisconnect(live);
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Free staff WiFi is currently paused by the network owner.");
+                }
+                Long remainingBytes = checkStaffDailyCap(tenant, personId, live);
                 Voucher voucher = live != null ? live : issue(tenant, systemPlan(tenant, STAFF_PLAN), router, mac, personId, "STAFF", null, hardLimit);
-                reprovision(voucher, router, mac, hardLimit);
+                reprovision(voucher, router, mac, hardLimit, remainingBytes);
                 return PortalResult.connect(voucher.getCode(), fullName, category, voucher.getExpiresAt() != null ? voucher.getExpiresAt() : hardLimit);
             }
             if (live != null) {
-                reprovision(live, router, mac, hardLimit);
+                reprovision(live, router, mac, hardLimit, null);
                 return PortalResult.connect(live.getCode(), fullName, category, live.getExpiresAt());
             }
             String ticket = tickets.issue(new SchoolTickets.Ticket(tenant.getId(), personId, accessUntil, mac));
@@ -179,7 +190,7 @@ public class SchoolAccessService {
     }
 
     /** Rebuilds the voucher's RADIUS entries for this device and router, ending any session elsewhere. */
-    private void reprovision(Voucher voucher, Router router, String mac, OffsetDateTime hardLimit) {
+    private void reprovision(Voucher voucher, Router router, String mac, OffsetDateTime hardLimit, Long remainingBytes) {
         if (Boolean.TRUE.equals(voucher.getSchoolHold()) || voucher.getClaimedMac() != null && !voucher.getClaimedMac().equalsIgnoreCase(mac)) {
             expiration.disconnectActiveSessions(voucher.getCode());
         }
@@ -201,6 +212,141 @@ public class SchoolAccessService {
         radCheck.saveAll(checks);
         if (plan.getRateLimit() != null && !plan.getRateLimit().isBlank()) radReply.save(RadReply.builder().username(code).attribute("Mikrotik-Rate-Limit").op(":=").value(plan.getRateLimit()).build());
         if (plan.getSessionTimeout() != null && plan.getSessionTimeout() > 0) radReply.save(RadReply.builder().username(code).attribute("Session-Timeout").op(":=").value(String.valueOf(plan.getSessionTimeout())).build());
+        if (remainingBytes != null && remainingBytes > 0) writeTotalLimit(code, remainingBytes);
+    }
+
+    private Long checkStaffDailyCap(Tenant tenant, String personId, Voucher live) {
+        Integer capMb = tenant.getSchoolStaffDailyDataCapMb();
+        if (capMb == null || capMb <= 0) return null;
+        long capBytes = capMb.longValue() * 1024L * 1024L;
+        long used = staffUsedTodayBytes(tenant.getId(), personId, live != null ? live.getCode() : null);
+        if (used >= capBytes) {
+            if (live != null) holdAndDisconnect(live);
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "You have reached your daily free data limit (" + capMb + " MB). Your free access resets tomorrow.");
+        }
+        return capBytes - used;
+    }
+
+    private Long checkVisitorDataCap(Tenant tenant, String passId, Voucher live) {
+        Integer capMb = tenant.getSchoolVisitorDataCapMb();
+        if (capMb == null || capMb <= 0) return null;
+        long capBytes = capMb.longValue() * 1024L * 1024L;
+        long used = visitorPassUsedBytes(tenant.getId(), passId, live != null ? live.getCode() : null);
+        if (used >= capBytes) {
+            if (live != null) holdAndDisconnect(live);
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "This visitor pass has reached its data limit (" + capMb + " MB).");
+        }
+        return capBytes - used;
+    }
+
+    long staffUsedTodayBytes(Long tenantId, String personId, String fallbackCode) {
+        var codes = new java.util.LinkedHashSet<String>();
+        if (personId != null) {
+            vouchers.findAllByTenantIdAndPersonIdAndSchoolCategory(tenantId, personId, "STAFF")
+                    .forEach(v -> codes.add(v.getCode()));
+        }
+        if (fallbackCode != null) codes.add(fallbackCode);
+        if (codes.isEmpty()) return 0L;
+        return radAcct.sumOctetsForUsernamesSince(codes, clock.startOf(clock.today()));
+    }
+
+    long visitorPassUsedBytes(Long tenantId, String passId, String fallbackCode) {
+        var codes = new java.util.LinkedHashSet<String>();
+        if (passId != null) {
+            vouchers.findAllByTenantIdAndVisitorPassId(tenantId, passId)
+                    .forEach(v -> codes.add(v.getCode()));
+        }
+        if (fallbackCode != null) codes.add(fallbackCode);
+        if (codes.isEmpty()) return 0L;
+        return radAcct.sumOctetsForUsernames(codes);
+    }
+
+    private void holdAndDisconnect(Voucher voucher) {
+        radCheck.deleteAllByUsername(voucher.getCode());
+        radReply.deleteAllByUsername(voucher.getCode());
+        voucher.setSchoolHold(true);
+        vouchers.save(voucher);
+        expiration.disconnectActiveSessions(voucher.getCode());
+    }
+
+    private void writeTotalLimit(String username, long remainingBytes) {
+        if (remainingBytes >= (1L << 32)) {
+            radReply.save(RadReply.builder().username(username).attribute("Mikrotik-Total-Limit-Gigawords").op(":=").value(String.valueOf(remainingBytes >>> 32)).build());
+        }
+        radReply.save(RadReply.builder().username(username).attribute("Mikrotik-Total-Limit").op(":=").value(String.valueOf(remainingBytes & 0xFFFF_FFFFL)).build());
+    }
+
+    private void syncReplyLimits(String username, String rateLimit, Long remainingBytes) {
+        radReply.deleteAllByUsernameAndAttribute(username, "Mikrotik-Rate-Limit");
+        radReply.deleteAllByUsernameAndAttribute(username, "Mikrotik-Total-Limit");
+        radReply.deleteAllByUsernameAndAttribute(username, "Mikrotik-Total-Limit-Gigawords");
+        if (rateLimit != null && !rateLimit.isBlank()) {
+            radReply.save(RadReply.builder().username(username).attribute("Mikrotik-Rate-Limit").op(":=").value(rateLimit).build());
+        }
+        if (remainingBytes != null && remainingBytes > 0) {
+            writeTotalLimit(username, remainingBytes);
+        }
+    }
+
+    /**
+     * Applies the owner's current speed limits, data caps, and enable switches
+     * to live staff and visitor vouchers, and optionally disconnects active free
+     * sessions so MikroTik immediately enforces the updated RADIUS attributes.
+     */
+    public void applyFreeAccessRules(Tenant tenant, boolean disconnectActive) {
+        transaction.executeWithoutResult(status -> {
+            systemPlan(tenant, STAFF_PLAN);
+            systemPlan(tenant, VISITOR_PLAN);
+            List<Voucher> liveFree = vouchers.findAllByTenantIdAndSchoolCategoryInAndStatusIn(
+                    tenant.getId(), List.of("STAFF", "VISITOR"), List.of("unused", "active"));
+            if (liveFree == null || liveFree.isEmpty()) return;
+            for (Voucher v : liveFree) {
+                String code = v.getCode();
+                if ("STAFF".equals(v.getSchoolCategory())) {
+                    if (!tenant.isSchoolStaffEnabled()) {
+                        holdAndDisconnect(v);
+                        continue;
+                    }
+                    Integer capMb = tenant.getSchoolStaffDailyDataCapMb();
+                    Long remaining = null;
+                    if (capMb != null && capMb > 0) {
+                        long capBytes = capMb.longValue() * 1024L * 1024L;
+                        long used = staffUsedTodayBytes(tenant.getId(), v.getPersonId(), code);
+                        if (used >= capBytes) {
+                            holdAndDisconnect(v);
+                            continue;
+                        }
+                        remaining = capBytes - used;
+                    }
+                    if (!Boolean.TRUE.equals(v.getSchoolHold())) {
+                        syncReplyLimits(code, tenant.getSchoolStaffRateLimit(), remaining);
+                        if (disconnectActive) expiration.disconnectActiveSessions(code);
+                    }
+                } else if ("VISITOR".equals(v.getSchoolCategory())) {
+                    if (Boolean.FALSE.equals(tenant.getSchoolVisitorsEnabled())) {
+                        holdAndDisconnect(v);
+                        continue;
+                    }
+                    Integer capMb = tenant.getSchoolVisitorDataCapMb();
+                    Long remaining = null;
+                    if (capMb != null && capMb > 0) {
+                        long capBytes = capMb.longValue() * 1024L * 1024L;
+                        long used = visitorPassUsedBytes(tenant.getId(), v.getVisitorPassId(), code);
+                        if (used >= capBytes) {
+                            holdAndDisconnect(v);
+                            continue;
+                        }
+                        remaining = capBytes - used;
+                    }
+                    if (!Boolean.TRUE.equals(v.getSchoolHold())) {
+                        syncReplyLimits(code, tenant.getSchoolVisitorRateLimit(), remaining);
+                        if (disconnectActive) expiration.disconnectActiveSessions(code);
+                    }
+                }
+            }
+        });
     }
 
     /** The hidden free package behind staff or visitor access, created on first use with the owner's speed limit. */

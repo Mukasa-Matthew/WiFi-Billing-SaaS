@@ -174,4 +174,37 @@ class TenantDashboardServiceTest {
 
         assertThat(service.getDataUsage(TENANT, "bogus").period()).isEqualTo("today");
     }
+
+    @Test
+    void moneyAndGroupBandwidthBreakdownsAreComputedForSelectedRange() {
+        OffsetDateTime recent = OffsetDateTime.parse("2026-10-27T10:00:00Z");
+        Transaction studentMtn = Transaction.builder().packagePlan(plan1).router(router).status("SUCCESSFUL")
+                .network("MTN").amount(BigDecimal.valueOf(2000)).gatewayFee(60L).platformFee(40L)
+                .personId("student-1").voucherCode("VS1").createdAt(recent).build();
+        Transaction walkInCash = Transaction.builder().packagePlan(plan2).router(router).status("SUCCESSFUL")
+                .network("CASH").amount(BigDecimal.valueOf(5000)).voucherCode("VW1").createdAt(recent).build();
+        when(transactions.findAllByTenantIdOrderByCreatedAtDesc(TENANT)).thenReturn(List.of(studentMtn, walkInCash));
+        when(vouchers.findAllByTenantIdOrderByCreatedAtDesc(TENANT)).thenReturn(List.of(
+                Voucher.builder().code("VS1").packagePlan(plan1).schoolCategory("STUDENT").status("active").createdAt(recent).build(),
+                Voucher.builder().code("VF1").packagePlan(plan1).schoolCategory("STAFF").status("active").createdAt(recent).build(),
+                Voucher.builder().code("VW1").packagePlan(plan2).status("active").createdAt(recent).build()
+        ));
+        when(accounting.findTenantSessionsSince(eq(TENANT), any())).thenReturn(List.of(
+                com.wifibilling.radius.RadAcct.builder().username("VS1").acctStartTime(recent).acctOutputOctets(800L).acctInputOctets(200L).build(),
+                com.wifibilling.radius.RadAcct.builder().username("VF1").acctStartTime(recent).acctOutputOctets(400L).acctInputOctets(100L).build()
+        ));
+
+        TenantDashboardStatsDto s = service.getStats(TENANT, "ROLE_ADMIN", "7d");
+
+        assertThat(s.periodGrossRevenue()).isEqualByComparingTo("7000");
+        assertThat(s.periodGatewayFees()).isEqualByComparingTo("60");
+        assertThat(s.periodPlatformFees()).isEqualByComparingTo("40");
+        assertThat(s.periodNetRevenue()).isEqualByComparingTo("6900");
+        assertThat(s.periodTransactions()).isEqualTo(2);
+        assertThat(s.revenueByChannel()).extracting(m -> m.get("key")).containsExactly("MTN", "AIRTEL", "WALK_IN");
+        assertThat(s.revenueByGroup()).extracting(m -> m.get("key")).containsExactly("STUDENT", "PAID_CUSTOMER", "WALK_IN");
+        assertThat(s.dataByCategory()).extracting(m -> m.get("category")).containsExactly("STUDENT", "STAFF", "VISITOR", "PAID_CUSTOMER");
+        assertThat(s.dataByCategory().get(0)).containsEntry("totalBytes", 1000L).containsEntry("free", false);
+        assertThat(s.dataByCategory().get(1)).containsEntry("totalBytes", 500L).containsEntry("free", true);
+    }
 }

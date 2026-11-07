@@ -194,6 +194,10 @@ public class Tenant {
     @Column(name = "school_visitor_daily_cap")
     private Integer schoolVisitorDailyCap;
 
+    /** School tenants: whether free staff WiFi is enabled (null or true = enabled). */
+    @Column(name = "school_staff_enabled")
+    private Boolean schoolStaffEnabled;
+
     /** MikroTik rate limits for free staff and visitor access, e.g. "5M/5M"; null means unlimited. */
     @Column(name = "school_staff_rate_limit", length = 30)
     private String schoolStaffRateLimit;
@@ -201,7 +205,17 @@ public class Tenant {
     @Column(name = "school_visitor_rate_limit", length = 30)
     private String schoolVisitorRateLimit;
 
+    /** Daily data cap (MB) per staff member; null or <= 0 means unlimited. */
+    @Column(name = "school_staff_daily_data_cap_mb")
+    private Integer schoolStaffDailyDataCapMb;
+
+    /** Total data cap (MB) per visitor pass; null or <= 0 means unlimited. */
+    @Column(name = "school_visitor_data_cap_mb")
+    private Integer schoolVisitorDataCapMb;
+
     public boolean isSchool() { return "SCHOOL".equals(tenantType); }
+
+    public boolean isSchoolStaffEnabled() { return !Boolean.FALSE.equals(schoolStaffEnabled); }
 
     @Column(name = "created_at")
     @Builder.Default

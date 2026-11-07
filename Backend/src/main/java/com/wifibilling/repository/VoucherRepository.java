@@ -31,6 +31,14 @@ public interface VoucherRepository extends JpaRepository<Voucher, Long> {
 
     List<Voucher> findAllByTenantIdAndVisitorPassIdAndStatusIn(Long tenantId, String visitorPassId, java.util.Collection<String> statuses);
 
+    List<Voucher> findAllByTenantIdAndVisitorPassId(Long tenantId, String visitorPassId);
+
+    List<Voucher> findAllByTenantIdAndPersonIdAndSchoolCategory(Long tenantId, String personId, String schoolCategory);
+
+    List<Voucher> findAllByTenantIdAndSchoolCategoryInAndStatusIn(Long tenantId, java.util.Collection<String> categories, java.util.Collection<String> statuses);
+
+    List<Voucher> findAllBySchoolCategoryInAndStatusIn(java.util.Collection<String> categories, java.util.Collection<String> statuses);
+
     /** Never-used vouchers whose hard limit (leaving date, pass expiry) has passed. */
     List<Voucher> findAllByStatusAndHardExpiresAtBefore(String status, OffsetDateTime cutoff);
     Optional<Voucher> findByCodeAndTenantId(String code, Long tenantId);

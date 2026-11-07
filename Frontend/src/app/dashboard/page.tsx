@@ -10,15 +10,17 @@ import {
   Badge, Card, CardLink, ErrorNotice, Segmented, StatCard, StatusDot, button, buttonGhost,
   bytes, compactNumber, field, relativeTime, useApi, useNow, useResource,
 } from "@/components/BillingUI";
-import { BarChart, Meter, MiniBars, StatusBar } from "@/components/charts";
+import { BarChart, DonutChart, Meter, MiniBars, StatusBar } from "@/components/charts";
 import { routerState, servicesState } from "@/lib/routerState";
 
 interface SeriesPoint { date: string; label: string; revenue?: number; transactions?: number; users?: number; registrations?: number }
 interface WeeklySale { date: string; day: string; revenue: number; transactions: number }
 interface RouterRevenue { routerId: number; name: string; status: string; revenueToday: number; revenueMonth: number; revenueTotal: number; transactions: number; activeUsers: number }
-interface TopDataUser { username: string; customer: string | null; phone: string | null; package: string | null; octets: number }
+interface TopDataUser { username: string; customer: string | null; phone: string | null; package: string | null; category?: string | null; categoryLabel?: string | null; octets: number }
 interface Consumer { username: string; totalOctets: number }
 interface PackagePerf { id: number; name: string; price: number; activeUsers: number; monthlyRevenue: number; totalSold: number; arpu: number }
+interface RevenueSplitItem { key: string; label: string; revenue: number; transactions: number; price?: number }
+interface CategoryDataItem { category: string; label: string; free: boolean; downBytes: number; upBytes: number; totalBytes: number; users: number; activeNow?: number }
 interface DashboardStats {
   revenueToday: number; revenueMonth: number; revenueAllTime: number; activeUsers: number;
   totalRouters: number; onlineRouters: number; totalVouchers: number; activeVouchers: number; usedVouchers: number; expiredVouchers: number;
@@ -27,12 +29,15 @@ interface DashboardStats {
   topDataUsers: TopDataUser[]; packagePerformance: PackagePerf[];
   dataMonthDownBytes: number; dataMonthUpBytes: number; totalCustomers: number; newCustomersThisWeek: number;
   activeByCategory?: Record<string, number>;
+  periodGrossRevenue?: number; periodGatewayFees?: number; periodPlatformFees?: number; periodNetRevenue?: number; periodTransactions?: number;
+  revenueByChannel?: RevenueSplitItem[]; revenueByGroup?: RevenueSplitItem[]; revenueByPackage?: RevenueSplitItem[];
+  dataByCategory?: CategoryDataItem[];
 }
 // Tenant router list. The response also carries provisioning secrets; only these fields are read.
 interface RouterRec { id: number; name: string; status: string; lastSeen: string | null; cpuLoad: number | null; memoryUsage: number | null; hotspotReady: boolean | null; radiusReady: boolean | null; portalReady: boolean | null }
 interface Payment { id: number; reference: string; method: string; amount: number; status: string; phone: string | null; voucher: string | null; packageName: string | null; router: string | null; createdAt: string }
 interface UsageBucket { start: string; label: string; downBytes: number; upBytes: number; future: boolean }
-interface DataUsage { period: string; downBytes: number; upBytes: number; users: number; previousBytes: number; buckets: UsageBucket[] }
+interface DataUsage { period: string; downBytes: number; upBytes: number; users: number; previousBytes: number; buckets: UsageBucket[]; categories?: CategoryDataItem[] }
 
 const RANGES = [
   { key: "today", label: "Today" }, { key: "7d", label: "7 days" }, { key: "week", label: "This week" }, { key: "lastweek", label: "Last week" },
@@ -222,6 +227,12 @@ export default function TenantDashboardOverview() {
                   data={s.dailyActiveUsers.map((p) => ({ key: p.date, label: p.label, value: p.users || 0, detail: chartDate(p.date) }))} />}
           </Card>
         </div>
+
+        {/* Money Breakdown & Group Bandwidth Breakdown (Pie / Donut Charts) */}
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          <MoneyBreakdownCard stats={s} rangeLabel={rangeLabel} hidden={hidden} money={money} />
+          <GroupBandwidthCard stats={s} usage={usage.data} usagePeriod={usagePeriod} onUsagePeriod={setUsagePeriod} rangeLabel={rangeLabel} />
+        </div>
       </section>
 
       {/* Money in, and the network that earns it */}
@@ -361,7 +372,7 @@ export default function TenantDashboardOverview() {
 
         <Card title="Top data users" description={s ? `${bytes(s.dataMonthDownBytes + s.dataMonthUpBytes)} used this month · ↓ ${bytes(s.dataMonthDownBytes)} ↑ ${bytes(s.dataMonthUpBytes)}` : "Highest usage"} action={<CardLink href="/dashboard/users">Active users</CardLink>} bodyClassName="">
           {(() => {
-            const rows = s?.topDataUsers?.length ? s.topDataUsers : (s?.topConsumers ?? []).map((c) => ({ username: c.username, customer: null, phone: null, package: null, octets: c.totalOctets }));
+            const rows: TopDataUser[] = s?.topDataUsers?.length ? s.topDataUsers : (s?.topConsumers ?? []).map((c) => ({ username: c.username, customer: null, phone: null, package: null, category: null, categoryLabel: null, octets: c.totalOctets }));
             if (!rows.length) return <p className="px-5 py-10 text-center text-sm text-[var(--fg-muted)]">{s ? `No data usage ${rangeLabel.toLowerCase() === "today" ? "today" : `in ${rangeLabel.toLowerCase()}`}.` : "Data unavailable."}</p>;
             const max = Math.max(1, ...rows.map((r) => r.octets));
             return (
@@ -371,7 +382,13 @@ export default function TenantDashboardOverview() {
                     <div className="flex items-center justify-between gap-3">
                       <span className="flex min-w-0 items-center gap-2.5">
                         <span className="num w-4 shrink-0 text-xs text-[var(--fg-faint)]">{i + 1}</span>
-                        <span className="min-w-0"><span className="block truncate text-[13.5px] font-medium text-[var(--fg)]">{u.customer || u.username}</span><span className="block truncate text-xs text-[var(--fg-muted)]">{[u.package, u.phone].filter(Boolean).join(" · ") || u.username}</span></span>
+                        <span className="min-w-0">
+                          <span className="flex flex-wrap items-center gap-1.5">
+                            <span className="truncate text-[13.5px] font-medium text-[var(--fg)]">{u.customer || u.username}</span>
+                            {u.categoryLabel && <Badge tone={u.category === "STUDENT" ? "green" : u.category === "STAFF" ? "blue" : u.category === "VISITOR" ? "amber" : "slate"}>{u.categoryLabel}</Badge>}
+                          </span>
+                          <span className="block truncate text-xs text-[var(--fg-muted)]">{[u.package, u.phone].filter(Boolean).join(" · ") || u.username}</span>
+                        </span>
                       </span>
                       <span className="num shrink-0 text-[13px] font-medium text-[var(--fg-body)]">{bytes(u.octets)}</span>
                     </div>
@@ -524,5 +541,233 @@ function PackageTable({ rows, money }: { rows: PackagePerf[]; money: (v: number)
         </tbody>
       </table>
     </div>
+  );
+}
+
+const REVENUE_VIEWS = [
+  { key: "channel", label: "By channel" },
+  { key: "group", label: "By group" },
+  { key: "package", label: "By package" },
+] as const;
+type RevenueView = (typeof REVENUE_VIEWS)[number]["key"];
+
+const CHANNEL_COLOR: Record<string, string> = {
+  MTN: "var(--status-warn)",
+  AIRTEL: "var(--status-bad)",
+  WALK_IN: "var(--status-good)",
+};
+const GROUP_COLOR: Record<string, string> = {
+  STUDENT: "var(--status-good)",
+  PAID_CUSTOMER: "var(--chart-1)",
+  WALK_IN: "var(--status-warn)",
+};
+const CATEGORY_COLOR: Record<string, string> = {
+  STUDENT: "var(--status-good)",
+  STAFF: "var(--chart-1)",
+  VISITOR: "var(--status-warn)",
+  PAID_CUSTOMER: "#8B5CF6",
+};
+
+function MoneyBreakdownCard({
+  stats,
+  rangeLabel,
+  hidden,
+  money,
+}: {
+  stats: DashboardStats | null | undefined;
+  rangeLabel: string;
+  hidden: boolean;
+  money: (v: number | null | undefined) => string;
+}) {
+  const [view, setView] = useState<RevenueView>("channel");
+  const gross = Number(stats?.periodGrossRevenue || 0);
+  const gwFees = Number(stats?.periodGatewayFees || 0);
+  const platFees = Number(stats?.periodPlatformFees || 0);
+  const totalFees = gwFees + platFees;
+  const net = stats?.periodNetRevenue != null ? Number(stats.periodNetRevenue) : Math.max(0, gross - totalFees);
+  const txCount = Number(stats?.periodTransactions || 0);
+
+  const rawItems: RevenueSplitItem[] =
+    view === "channel"
+      ? stats?.revenueByChannel ?? []
+      : view === "group"
+      ? stats?.revenueByGroup ?? []
+      : stats?.revenueByPackage ?? [];
+
+  const segments = rawItems.map((item) => ({
+    key: item.key,
+    label: item.label,
+    value: Number(item.revenue || 0),
+    color: view === "channel" ? CHANNEL_COLOR[item.key] : view === "group" ? GROUP_COLOR[item.key] : undefined,
+    sublabel: `${item.transactions || 0} payment${item.transactions === 1 ? "" : "s"}${item.price != null ? ` · ${money(item.price)} each` : ""}`,
+  }));
+
+  return (
+    <Card
+      title="Money breakdown"
+      description={`Where revenue comes from · ${rangeLabel.toLowerCase()}`}
+      action={<Segmented label="Money breakdown view" value={view} onChange={setView} options={[...REVENUE_VIEWS]} />}
+      bodyClassName="flex flex-col justify-between p-5 sm:p-6"
+    >
+      {hidden ? (
+        <p className="py-14 text-center text-sm text-[var(--fg-muted)]">Revenue is hidden. Use the eye button to show it.</p>
+      ) : !stats ? (
+        <p className="py-14 text-center text-sm text-[var(--fg-muted)]">Data unavailable.</p>
+      ) : (
+        <div className="space-y-5">
+          <DonutChart
+            label={`Revenue breakdown ${rangeLabel}`}
+            centerLabel={rangeLabel}
+            centerValue={money(gross)}
+            format={(v) => money(v)}
+            segments={segments}
+          />
+          <dl className="grid grid-cols-3 divide-x divide-[var(--border)] rounded-lg border border-[var(--border)] bg-[var(--subtle)] text-center sm:text-left">
+            <div className="px-3 py-2.5 sm:px-4">
+              <dt className="text-[11px] text-[var(--fg-muted)]">Gross sales ({txCount})</dt>
+              <dd className="num mt-0.5 truncate text-[13.5px] font-semibold text-[var(--fg)]">{money(gross)}</dd>
+            </div>
+            <div className="px-3 py-2.5 sm:px-4">
+              <dt className="text-[11px] text-[var(--fg-muted)]">Gateway &amp; platform fees</dt>
+              <dd className="num mt-0.5 truncate text-[13.5px] font-semibold text-[var(--fg-body)]">{money(totalFees)}</dd>
+            </div>
+            <div className="px-3 py-2.5 sm:px-4">
+              <dt className="text-[11px] text-[var(--fg-muted)]">Net earnings</dt>
+              <dd className="num mt-0.5 truncate text-[13.5px] font-semibold text-emerald-700">{money(net)}</dd>
+            </div>
+          </dl>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+const GROUP_PERIOD_MODES = [
+  { key: "range", label: "Selected period" },
+  { key: "today", label: "Today" },
+  { key: "week", label: "This week" },
+  { key: "month", label: "This month" },
+] as const;
+type GroupPeriodMode = (typeof GROUP_PERIOD_MODES)[number]["key"];
+
+function GroupBandwidthCard({
+  stats,
+  usage,
+  usagePeriod,
+  onUsagePeriod,
+  rangeLabel,
+}: {
+  stats: DashboardStats | null | undefined;
+  usage: DataUsage | null | undefined;
+  usagePeriod: UsagePeriod;
+  onUsagePeriod: (p: UsagePeriod) => void;
+  rangeLabel: string;
+}) {
+  const [mode, setMode] = useState<GroupPeriodMode>("range");
+
+  const handleMode = (m: GroupPeriodMode) => {
+    setMode(m);
+    if (m === "today" || m === "week" || m === "month") {
+      onUsagePeriod(m);
+    }
+  };
+
+  const rows: CategoryDataItem[] =
+    mode === "range"
+      ? stats?.dataByCategory ?? []
+      : usage?.categories ?? stats?.dataByCategory ?? [];
+
+  const activePeriodLabel =
+    mode === "range"
+      ? rangeLabel
+      : mode === "today"
+      ? "Today"
+      : mode === "week"
+      ? "This week"
+      : "This month";
+
+  const totalBytes = rows.reduce((sum, r) => sum + Number(r.totalBytes || 0), 0);
+  const freeBytes = rows.filter((r) => r.free).reduce((sum, r) => sum + Number(r.totalBytes || 0), 0);
+  const freeSharePct = totalBytes > 0 ? Math.round((freeBytes / totalBytes) * 100) : 0;
+
+  const segments = rows.map((r) => ({
+    key: r.category,
+    label: r.label,
+    value: Number(r.totalBytes || 0),
+    color: CATEGORY_COLOR[r.category],
+    badge: r.free ? "Free" : "Paid",
+    sublabel: `↓ ${bytes(r.downBytes || 0)} · ↑ ${bytes(r.upBytes || 0)} · ${r.users || 0} user${r.users === 1 ? "" : "s"}`,
+  }));
+
+  return (
+    <Card
+      title="Data & bandwidth by group"
+      description={`Internet consumed by Students, Staff, Visitors & Customers · ${activePeriodLabel.toLowerCase()}`}
+      action={<Segmented label="Group usage period" value={mode === "range" ? "range" : usagePeriod} onChange={(v) => handleMode(v as GroupPeriodMode)} options={[...GROUP_PERIOD_MODES]} />}
+      bodyClassName="flex flex-col justify-between p-5 sm:p-6"
+    >
+      {!stats && !usage ? (
+        <p className="py-14 text-center text-sm text-[var(--fg-muted)]">Data unavailable.</p>
+      ) : (
+        <div className="space-y-5">
+          <DonutChart
+            label={`Bandwidth by group, ${activePeriodLabel}`}
+            centerLabel={activePeriodLabel}
+            centerValue={bytes(totalBytes)}
+            format={(v) => bytes(v)}
+            segments={segments}
+          />
+
+          {freeBytes > 0 && freeSharePct >= 30 && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-xs text-amber-900">
+              <span>
+                <strong>Free access ({bytes(freeBytes)})</strong> is using <strong>{freeSharePct}%</strong> of your total bandwidth in this period.
+              </span>
+              <Link href="/dashboard/school" className="font-semibold underline hover:no-underline">
+                Cap speed or data on School page →
+              </Link>
+            </div>
+          )}
+
+          <div className="overflow-x-auto rounded-lg border border-[var(--border)]">
+            <table className="w-full text-left text-xs">
+              <thead className="border-b border-[var(--border)] bg-[var(--subtle)] text-[var(--fg-muted)]">
+                <tr>
+                  <th scope="col" className="px-3 py-2 font-medium">Group</th>
+                  <th scope="col" className="px-2 py-2 text-right font-medium">Users</th>
+                  <th scope="col" className="hidden px-2 py-2 text-right font-medium sm:table-cell">Download</th>
+                  <th scope="col" className="hidden px-2 py-2 text-right font-medium sm:table-cell">Upload</th>
+                  <th scope="col" className="px-3 py-2 text-right font-medium">Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--border-soft)]">
+                {rows.map((r) => {
+                  const pct = totalBytes > 0 ? Math.round((r.totalBytes / totalBytes) * 100) : 0;
+                  return (
+                    <tr key={r.category} className="hover:bg-[var(--subtle)]">
+                      <td className="px-3 py-2">
+                        <span className="flex items-center gap-2 font-medium text-[var(--fg)]">
+                          <span className="h-2 w-2 shrink-0 rounded-[2px]" style={{ background: CATEGORY_COLOR[r.category] }} />
+                          {r.label}
+                          <span className="rounded bg-[var(--fill)] px-1.5 py-0.5 text-[10px] font-normal text-[var(--fg-muted)]">
+                            {r.free ? "Free" : "Paid"}
+                          </span>
+                        </span>
+                      </td>
+                      <td className="num px-2 py-2 text-right text-[var(--fg-body)]">{r.users}</td>
+                      <td className="num hidden px-2 py-2 text-right text-[var(--fg-muted)] sm:table-cell">{bytes(r.downBytes)}</td>
+                      <td className="num hidden px-2 py-2 text-right text-[var(--fg-muted)] sm:table-cell">{bytes(r.upBytes)}</td>
+                      <td className="num px-3 py-2 text-right font-semibold text-[var(--fg)]">
+                        {bytes(r.totalBytes)} <span className="font-normal text-[var(--fg-muted)]">({pct}%)</span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </Card>
   );
 }
