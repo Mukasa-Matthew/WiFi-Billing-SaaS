@@ -17,6 +17,22 @@ public interface VoucherRepository extends JpaRepository<Voucher, Long> {
             @org.springframework.data.repository.query.Param("tenantId") Long tenantId);
 
     Optional<Voucher> findByCode(String code);
+
+    /** School vouchers of one person that may still be used, newest first. */
+    @org.springframework.data.jpa.repository.Query("select v from Voucher v where v.tenant.id = :tenantId and v.personId = :personId "
+            + "and v.schoolCategory = :category and v.status in ('unused', 'active') order by v.createdAt desc")
+    List<Voucher> findLiveForPerson(@org.springframework.data.repository.query.Param("tenantId") Long tenantId,
+            @org.springframework.data.repository.query.Param("personId") String personId,
+            @org.springframework.data.repository.query.Param("category") String category);
+
+    @org.springframework.data.jpa.repository.Query("select v from Voucher v where v.tenant.id = :tenantId and v.personId = :personId and v.status in ('unused', 'active')")
+    List<Voucher> findAllLiveForPerson(@org.springframework.data.repository.query.Param("tenantId") Long tenantId,
+            @org.springframework.data.repository.query.Param("personId") String personId);
+
+    List<Voucher> findAllByTenantIdAndVisitorPassIdAndStatusIn(Long tenantId, String visitorPassId, java.util.Collection<String> statuses);
+
+    /** Never-used vouchers whose hard limit (leaving date, pass expiry) has passed. */
+    List<Voucher> findAllByStatusAndHardExpiresAtBefore(String status, OffsetDateTime cutoff);
     Optional<Voucher> findByCodeAndTenantId(String code, Long tenantId);
     /** Vouchers linked to a customer: the customer directory's rows. */
     List<Voucher> findAllByTenantIdAndCustomerIsNotNullOrderByCreatedAtDesc(Long tenantId);

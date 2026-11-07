@@ -183,6 +183,26 @@ public class Tenant {
         return Boolean.TRUE.equals(platformFeeEnabled) && platformFeeBps != null ? Math.max(0, platformFeeBps) : 0;
     }
 
+    /** "SCHOOL" for tenants linked to the school identity system; null for ordinary hotspot businesses. */
+    @Column(name = "tenant_type", length = 16)
+    private String tenantType;
+
+    /** School tenants only. Mirrors the owner's visitor switch, which is also sent to the identity system. */
+    @Column(name = "school_visitors_enabled")
+    private Boolean schoolVisitorsEnabled;
+
+    @Column(name = "school_visitor_daily_cap")
+    private Integer schoolVisitorDailyCap;
+
+    /** MikroTik rate limits for free staff and visitor access, e.g. "5M/5M"; null means unlimited. */
+    @Column(name = "school_staff_rate_limit", length = 30)
+    private String schoolStaffRateLimit;
+
+    @Column(name = "school_visitor_rate_limit", length = 30)
+    private String schoolVisitorRateLimit;
+
+    public boolean isSchool() { return "SCHOOL".equals(tenantType); }
+
     @Column(name = "created_at")
     @Builder.Default
     private OffsetDateTime createdAt = OffsetDateTime.now();

@@ -12,6 +12,9 @@ public interface PackagePlanRepository extends JpaRepository<PackagePlan, Long> 
 
     List<PackagePlan> findAllByTenantIdOrderByPriceAsc(Long tenantId);
 
+    /** School system packages (staff and visitor access) are found by their fixed name. */
+    java.util.Optional<PackagePlan> findFirstByTenantIdAndAvailabilityAndName(Long tenantId, String availability, String name);
+
     /** Tenant-scoped lookup so one tenant can never reference another tenant's package by ID. */
     Optional<PackagePlan> findByIdAndTenantId(Long id, Long tenantId);
 }

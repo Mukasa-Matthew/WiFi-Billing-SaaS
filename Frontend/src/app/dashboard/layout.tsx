@@ -27,6 +27,7 @@ import {
   LinkSimple,
   FileText,
   Activity,
+  GraduationCap,
 } from "@/components/icons";
 
 interface SidebarStats {
@@ -52,6 +53,8 @@ function TenantDashboardLayoutInner({ children }: { children: React.ReactNode })
   const { data: stats } = useApi<SidebarStats>("/api/dashboard/stats?range=7d");
   // Router badge uses the same stale rule as every router view (src/lib/routerState).
   const { data: routers } = useResource<{ status: string; lastSeen: string | null }>("/api/routers");
+  // Only school tenants get the School page; everyone else sees the usual menu.
+  const { data: schoolStatus } = useApi<{ school: boolean }>("/api/school/status");
 
   useEffect(() => {
     if (user?.tenantId) prefetchTenantEssential(user.tenantId);
@@ -82,6 +85,7 @@ function TenantDashboardLayoutInner({ children }: { children: React.ReactNode })
     { name: "MikroTik routers", href: "/dashboard/routers", icon: RouterIcon, group: "Network", badge: { value: offlineRouters, tone: "danger", label: "offline" } },
     { name: "Sessions", href: "/dashboard/sessions", icon: Activity, group: "Network" },
     { name: "Accounting logs", href: "/dashboard/logs", icon: FileText, group: "Network" },
+    ...(schoolStatus?.school ? [{ name: "School", href: "/dashboard/school", icon: GraduationCap, group: "Account" }] : []),
     { name: "Subscription", href: "/dashboard/subscription", icon: CalendarCheck, group: "Account" },
     { name: "Settings", href: "/dashboard/settings", icon: GearSix, group: "Account" },
   ];

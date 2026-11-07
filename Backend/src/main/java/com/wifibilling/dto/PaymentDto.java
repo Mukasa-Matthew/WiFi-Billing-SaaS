@@ -16,7 +16,12 @@ public class PaymentDto {
              *  of the same checkout resume the existing transaction. */
             String checkoutRef,
             /** MikroTik hotspot client MAC, echoed by the portal from $(mac). */
-            String mac) {
+            String mac,
+            /** School tenants only: proof the buyer passed the school ID and PIN check on this device. */
+            String schoolTicket) {
+        public InitiateRequest(String token, Long packageId, String phone, String network, String checkoutRef, String mac) {
+            this(token, packageId, phone, network, checkoutRef, mac, null);
+        }
     }
 
     public record InitiateResponse(

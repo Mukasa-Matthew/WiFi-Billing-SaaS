@@ -87,6 +87,7 @@ export {
   UserMinus,
   UserPlus,
   Users,
+  GraduationCap,
   Wallet,
   Wifi as WifiHigh,
   WifiOff as WifiSlash,

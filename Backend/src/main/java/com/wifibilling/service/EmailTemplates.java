@@ -107,6 +107,31 @@ public class EmailTemplates {
         return shell("Your AirPairy account is ready", body, "");
     }
 
+    /** Sent to a school's IT person when their identity dashboard account is created or reset. */
+    public String schoolItAccountEmail(String fullName, String schoolName, String email, String temporaryPassword, String dashboardUrl) {
+        String body = """
+                <p style="margin:0 0 16px;font-size:14px;color:#334155;line-height:1.6;">
+                  Hello %s,
+                </p>
+                <p style="margin:0 0 18px;font-size:14px;color:#334155;line-height:1.6;">
+                  You can now manage %s's students, staff and visitor passes for the school WiFi. Sign in with the temporary credentials below.
+                </p>
+                <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;padding:16px;margin-bottom:18px;">
+                  <p style="margin:0 0 8px;font-size:13px;color:#475569;"><b>Email:</b> %s</p>
+                  <p style="margin:0;font-size:13px;color:#475569;"><b>Temporary password:</b>
+                    <span style="font-family:Menlo,Consolas,monospace;">%s</span></p>
+                </div>
+                <p style="margin:0 0 18px;font-size:13px;color:#B45309;line-height:1.6;">
+                  You will choose a new password and set up an authenticator app the first time you sign in.
+                </p>
+                <p style="margin:0;text-align:center;">
+                  <a href="%s" style="display:inline-block;background:#1D4ED8;color:#ffffff;text-decoration:none;
+                     border-radius:9px;padding:11px 22px;font-size:13px;font-weight:bold;">Open the school dashboard</a>
+                </p>
+                """.formatted(escape(fullName), escape(schoolName), escape(email), escape(temporaryPassword), escape(dashboardUrl));
+        return shell("Your school WiFi dashboard account", body, "");
+    }
+
     private String escape(String s) {
         if (s == null) return "";
         return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");

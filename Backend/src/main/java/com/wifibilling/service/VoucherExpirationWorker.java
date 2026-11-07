@@ -77,6 +77,11 @@ public class VoucherExpirationWorker {
                 Integer timeoutSeconds = voucher.getPackagePlan().getSessionTimeout();
                 if (timeoutSeconds != null && timeoutSeconds > 0) {
                     voucher.setExpiresAt(loginTime.plusSeconds(timeoutSeconds));
+                    // School vouchers never outlast their hard limit (leaving date or visitor pass expiry).
+                    if (voucher.getHardExpiresAt() != null) {
+                        if (voucher.getHardExpiresAt().isBefore(voucher.getExpiresAt())) voucher.setExpiresAt(voucher.getHardExpiresAt());
+                        radCheckRepository.deleteAllByUsernameAndAttribute(voucher.getCode(), "Expiration");
+                    }
                     String expiry = voucher.getExpiresAt().withOffsetSameInstant(java.time.ZoneOffset.UTC)
                             .format(java.time.format.DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm:ss",java.util.Locale.ENGLISH));
                     radCheckRepository.save(RadCheck.builder().username(voucher.getCode())
@@ -94,7 +99,8 @@ public class VoucherExpirationWorker {
      */
     private void expireOverdueVouchers() {
         OffsetDateTime now = OffsetDateTime.now();
-        List<Voucher> overdue = voucherRepository.findAllByStatusAndExpiresAtBefore(STATUS_ACTIVE, now);
+        List<Voucher> overdue = new java.util.ArrayList<>(voucherRepository.findAllByStatusAndExpiresAtBefore(STATUS_ACTIVE, now));
+        overdue.addAll(voucherRepository.findAllByStatusAndHardExpiresAtBefore(STATUS_UNUSED, now));
         for (Voucher voucher : overdue) {
             voucher.setStatus(STATUS_EXPIRED);
             voucherRepository.save(voucher);

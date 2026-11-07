@@ -80,8 +80,11 @@ public class PortalController {
                 Boolean.TRUE.equals(tenant.getPortalShowDeviceMac()),
                 !Boolean.FALSE.equals(tenant.getPortalShowPackageTime()),
                 !Boolean.FALSE.equals(tenant.getPortalAllowPurchases()),
-                !Boolean.FALSE.equals(tenant.getPortalBuyForOther()),
-                !Boolean.FALSE.equals(tenant.getPortalShowFeedback()));
+                // School vouchers are tied to the verified student's own device.
+                !tenant.isSchool() && !Boolean.FALSE.equals(tenant.getPortalBuyForOther()),
+                !Boolean.FALSE.equals(tenant.getPortalShowFeedback()),
+                tenant.isSchool(),
+                tenant.isSchool() && Boolean.TRUE.equals(tenant.getSchoolVisitorsEnabled()));
         String fingerprint = settings.toString() + "|" + packages.toString();
         String version;
         try {

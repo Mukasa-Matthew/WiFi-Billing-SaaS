@@ -119,6 +119,9 @@ function CreateOperatorDialog({ onClose, onCreated }: { onClose: () => void; onC
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [kind, setKind] = useState<"BUSINESS" | "SCHOOL">("BUSINESS");
+  const [itName, setItName] = useState("");
+  const [itEmail, setItEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const close = () => { if (!busy) onClose(); };
@@ -129,10 +132,18 @@ function CreateOperatorDialog({ onClose, onCreated }: { onClose: () => void; onC
     setError(null);
     setBusy(true);
     try {
-      const res = await api.post<{ temporaryPassword: string | null; welcomeEmailSent: boolean }>("/api/admin/tenants", { name: name.trim(), email: email.trim(), phone: phone.trim() });
+      const school = kind === "SCHOOL";
+      const res = await api.post<{ temporaryPassword: string | null; welcomeEmailSent: boolean; schoolItEmailSent: boolean | null; schoolItTemporaryPassword: string | null }>("/api/admin/tenants", {
+        name: name.trim(), email: email.trim(), phone: phone.trim(),
+        ...(school ? { tenantType: "SCHOOL", itAdminName: itName.trim(), itAdminEmail: itEmail.trim() } : {}),
+      });
       onClose();
-      if (res.data.welcomeEmailSent) toast("success", "Operator created. Their temporary login details were sent by email.");
-      else onCreated({ text: "Operator created. Email isn't configured, so give them this temporary password securely. It won't be shown again.", secret: res.data.temporaryPassword ?? undefined });
+      const pending = [
+        !res.data.welcomeEmailSent && res.data.temporaryPassword ? `Owner password: ${res.data.temporaryPassword}` : null,
+        school && !res.data.schoolItEmailSent && res.data.schoolItTemporaryPassword ? `IT person password: ${res.data.schoolItTemporaryPassword}` : null,
+      ].filter(Boolean).join("  ·  ");
+      if (!pending) toast("success", school ? "School created. The owner and the IT person were emailed their temporary login details." : "Operator created. Their temporary login details were sent by email.");
+      else onCreated({ text: `${school ? "School" : "Operator"} created. Email isn't configured, so give these temporary passwords securely. They won't be shown again.`, secret: pending });
     } catch (err) {
       setError(message(err) === "Request failed. Please retry." ? "Failed to create tenant." : message(err));
     } finally {
@@ -147,12 +158,22 @@ function CreateOperatorDialog({ onClose, onCreated }: { onClose: () => void; onC
       </p>
       {error && <p role="alert" className="mb-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700"><WarningCircle className="h-4 w-4 shrink-0" />{error}</p>}
       <form onSubmit={submit} className="space-y-4">
-        <div><label htmlFor="operator-business" className={label}>Business name</label>
+        <Segmented label="Account type" value={kind} onChange={setKind} options={[{ key: "BUSINESS", label: "Hotspot business" }, { key: "SCHOOL", label: "School" }]} />
+        {kind === "SCHOOL" && <p className="rounded-lg border border-[var(--border)] bg-[var(--subtle)] p-3 text-xs leading-5 text-[var(--fg-muted)]">
+          A school gets the same dashboard and captive portal, plus student and staff sign-in. Its IT person gets a separate school dashboard to manage students; they never see money.
+        </p>}
+        <div><label htmlFor="operator-business" className={label}>{kind === "SCHOOL" ? "School name" : "Business name"}</label>
           <input id="operator-business" required autoFocus maxLength={120} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Acacia Cafe & Lounge" className={field} /></div>
         <div><label htmlFor="operator-email" className={label}>Operator email</label>
           <input id="operator-email" type="email" required autoComplete="email" maxLength={120} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="e.g. manager@acaciacafe.ug" className={field} /></div>
         <div><label htmlFor="operator-phone" className={label}>Contact phone number</label>
           <input id="operator-phone" type="tel" required autoComplete="tel" maxLength={30} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="e.g. +256770000000" className={field} /></div>
+        {kind === "SCHOOL" && <>
+          <div><label htmlFor="school-it-name" className={label}>School IT person&apos;s name</label>
+            <input id="school-it-name" required maxLength={200} value={itName} onChange={(e) => setItName(e.target.value)} placeholder="e.g. Grace Namusoke" className={field} /></div>
+          <div><label htmlFor="school-it-email" className={label}>School IT person&apos;s email</label>
+            <input id="school-it-email" type="email" required maxLength={254} value={itEmail} onChange={(e) => setItEmail(e.target.value)} placeholder="e.g. it@kampalahigh.ac.ug" className={field} /></div>
+        </>}
         <div className="flex flex-col-reverse gap-2 border-t border-[var(--border)] pt-5 sm:flex-row sm:justify-end">
           <button type="button" onClick={close} disabled={busy} className={buttonGhost}>Cancel</button>
           <button type="submit" disabled={busy} className={button}><BusyLabel busy={busy} label="Creating account…"><UserPlus className="h-4 w-4" />Create operator account</BusyLabel></button>

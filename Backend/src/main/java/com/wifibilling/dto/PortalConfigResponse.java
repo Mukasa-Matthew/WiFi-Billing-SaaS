@@ -30,6 +30,9 @@ public record PortalConfigResponse(
             boolean showPackageTime,
             boolean allowPurchases,
             boolean buyForOther,
-            boolean showFeedback
+            boolean showFeedback,
+            /** School tenants sign people in with an ID number and PIN before showing packages. */
+            boolean school,
+            boolean schoolVisitors
     ) {}
 }

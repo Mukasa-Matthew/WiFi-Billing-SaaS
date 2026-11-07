@@ -115,6 +115,13 @@ public class Transaction {
 
     @Column(length=1000) private String notes;
 
+    /** School tenants: the verified student buying, and the end of their school access. */
+    @Column(name = "person_id", length = 80)
+    private String personId;
+
+    @Column(name = "person_access_until")
+    private java.time.LocalDate personAccessUntil;
+
     @Column(name = "created_at")
     @Builder.Default
     private OffsetDateTime createdAt = OffsetDateTime.now();

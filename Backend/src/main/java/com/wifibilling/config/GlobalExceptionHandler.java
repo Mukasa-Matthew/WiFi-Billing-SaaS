@@ -81,6 +81,23 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 .body(errorBody(HttpStatus.UNAUTHORIZED, "Please sign in again.", request.getRequestURI(), null));
     }
 
+    /**
+     * Problems reported by the school identity system keep their status and user-facing message. The extra
+     * fields (code, attemptsLeft, secondsRemaining, endedOn, startsOn) let the captive portal explain sign-in failures.
+     */
+    @ExceptionHandler(com.wifibilling.school.IdentityException.class)
+    public ResponseEntity<Object> handleIdentity(com.wifibilling.school.IdentityException ex, HttpServletRequest request) {
+        HttpStatusCode status = HttpStatusCode.valueOf(ex.status());
+        Map<String, Object> body = errorBody(status, ex.getMessage(), request.getRequestURI(), null);
+        body.put("code", ex.code());
+        if (ex.body() != null) {
+            for (String field : java.util.List.of("attemptsLeft", "secondsRemaining", "endedOn", "startsOn")) {
+                if (ex.body().has(field)) body.put(field, ex.body().get(field).asString());
+            }
+        }
+        return ResponseEntity.status(status).body(body);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Object> handleUnexpected(Exception ex, HttpServletRequest request) {
         String reference = newReference();

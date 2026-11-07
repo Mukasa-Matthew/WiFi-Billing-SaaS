@@ -35,9 +35,13 @@ public class PackagePlanController {
         }
     }
 
+    /** Free staff and visitor packages are managed by the School settings, never edited as packages. */
+    private static final String SCHOOL_SYSTEM = com.wifibilling.school.SchoolAccessService.SYSTEM_AVAILABILITY;
+
     @GetMapping
     public List<PackagePlanDto.Response> list(@AuthenticationPrincipal TenantPrincipal principal) {
         return packagePlanRepository.findAllByTenantIdOrderByPriceAsc(principal.getTenantId()).stream()
+                .filter(p -> !SCHOOL_SYSTEM.equals(p.getAvailability()))
                 .map(this::toResponse)
                 .toList();
     }
@@ -83,6 +87,7 @@ public class PackagePlanController {
             subscriptionService.assertTenantManagementAllowed(principal.getTenantId());
         }
         PackagePlan plan = packagePlanRepository.findByIdAndTenantId(id, principal.getTenantId())
+                .filter(p -> !SCHOOL_SYSTEM.equals(p.getAvailability()))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Package not found"));
 
         plan.setName(req.name().trim());
@@ -108,6 +113,7 @@ public class PackagePlanController {
             @AuthenticationPrincipal TenantPrincipal principal,
             @PathVariable Long id) {
         PackagePlan plan = packagePlanRepository.findByIdAndTenantId(id, principal.getTenantId())
+                .filter(p -> !SCHOOL_SYSTEM.equals(p.getAvailability()))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Package not found"));
         return toResponse(plan);
     }
@@ -121,6 +127,7 @@ public class PackagePlanController {
             subscriptionService.assertTenantManagementAllowed(principal.getTenantId());
         }
         PackagePlan plan = packagePlanRepository.findByIdAndTenantId(id, principal.getTenantId())
+                .filter(p -> !SCHOOL_SYSTEM.equals(p.getAvailability()))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Package not found"));
         plan.setAvailability(req.availability());
         PackagePlan saved = packagePlanRepository.save(plan);
@@ -141,6 +148,7 @@ public class PackagePlanController {
             subscriptionService.assertTenantManagementAllowed(principal.getTenantId());
         }
         PackagePlan plan = packagePlanRepository.findByIdAndTenantId(id, principal.getTenantId())
+                .filter(p -> !SCHOOL_SYSTEM.equals(p.getAvailability()))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Package not found"));
         packagePlanRepository.delete(plan);
         syncPortals(principal.getTenantId());

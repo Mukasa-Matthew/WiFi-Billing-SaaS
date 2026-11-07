@@ -83,6 +83,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/router/setup/**").permitAll()
                 .requestMatchers("/api/router/winbox/**", "/api/internal/winbox/**").permitAll()
                 .requestMatchers("/api/payments/**").permitAll()
+                // Signed server-to-server calls from the school identity system (see IdentityIntegrationController).
+                .requestMatchers("/api/integrations/identity/**").permitAll()
                 // /error must be public or a failed public request re-dispatches
                 // to /error and gets a misleading 401 instead of the real status.
                 .requestMatchers("/error").permitAll()
