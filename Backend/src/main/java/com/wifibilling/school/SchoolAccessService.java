@@ -170,20 +170,11 @@ public class SchoolAccessService {
                 return PortalResult.connect(voucher.getCode(), null, "VISITOR", hardLimit);
             }
             if (SALE_STUDENT_FREE.equals(voucher.getSaleType())) {
-                if (!tenant.isSchoolStudentFreeEnabled()) {
-                    holdAndDisconnect(voucher);
-                    return PortalResult.signIn("Free daily student study data is currently switched off. Sign in to buy a package.");
-                }
-                int capMb = tenant.getSchoolStudentDailyFreeMb();
-                long capBytes = capMb * 1024L * 1024L;
-                long used = studentFreeUsedTodayBytes(tenant.getId(), voucher.getPersonId(), voucher.getCode());
-                if (used >= capBytes) {
-                    holdAndDisconnect(voucher);
-                    return PortalResult.signIn("You have used your " + capMb + " MB free daily study data for today. Sign in below to purchase a full-internet package.");
-                }
-                systemPlan(tenant, STUDENT_FREE_PLAN);
-                reprovision(voucher, router, mac, hardLimit, capBytes - used);
-                return PortalResult.connect(voucher.getCode(), null, "STUDENT_FREE", hardLimit);
+                // A returning student on study data chooses again: keep studying for free, or buy full internet.
+                // The device is recognised by MAC, so no PIN is needed; the ticket lets them pay from here.
+                LocalDate accessUntil = hardLimit.atZoneSameInstant(clock.zone()).toLocalDate();
+                if (!tenant.isSchoolStudentFreeEnabled()) holdAndDisconnect(voucher);
+                return studentChoice(tenant, voucher.getPersonId(), accessUntil, mac, null, "STUDENT");
             }
             if (Boolean.TRUE.equals(voucher.getSchoolHold())) {
                 return PortalResult.signIn(null);
@@ -272,16 +263,24 @@ public class SchoolAccessService {
                 reprovision(livePaid, router, mac, hardLimit, null);
                 return PortalResult.connect(livePaid.getCode(), fullName, category, livePaid.getExpiresAt());
             }
-            String ticket = tickets.issue(new SchoolTickets.Ticket(tenant.getId(), personId, accessUntil, mac));
-            if (tenant.isSchoolStudentFreeEnabled()) {
-                int dailyCapMb = tenant.getSchoolStudentDailyFreeMb();
-                long capBytes = dailyCapMb * 1024L * 1024L;
-                long usedBytes = studentFreeUsedTodayBytes(tenant.getId(), personId, null);
-                int remainingMb = usedBytes >= capBytes ? 0 : (int) Math.max(1L, (capBytes - usedBytes + (1024L * 1024L - 1L)) / (1024L * 1024L));
-                return PortalResult.buy(ticket, fullName, category, accessUntil, true, dailyCapMb, remainingMb, tenant.getSchoolStudentAllowedSites());
-            }
-            return PortalResult.buy(ticket, fullName, category, accessUntil, false, null, null, null);
+            return studentChoice(tenant, personId, accessUntil, mac, fullName, category);
         });
+    }
+
+    /**
+     * The student's options: packages, plus free study data when the school offers it. The allowed study sites
+     * are not sent: they can be long, and the portal only needs to say that study sites work.
+     */
+    private PortalResult studentChoice(Tenant tenant, String personId, LocalDate accessUntil, String mac, String fullName, String category) {
+        String ticket = tickets.issue(new SchoolTickets.Ticket(tenant.getId(), personId, accessUntil, mac));
+        if (tenant.isSchoolStudentFreeEnabled()) {
+            int dailyCapMb = tenant.getSchoolStudentDailyFreeMb();
+            long capBytes = dailyCapMb * 1024L * 1024L;
+            long usedBytes = studentFreeUsedTodayBytes(tenant.getId(), personId, null);
+            int remainingMb = usedBytes >= capBytes ? 0 : (int) Math.max(1L, (capBytes - usedBytes + (1024L * 1024L - 1L)) / (1024L * 1024L));
+            return PortalResult.buy(ticket, fullName, category, accessUntil, true, dailyCapMb, remainingMb, null);
+        }
+        return PortalResult.buy(ticket, fullName, category, accessUntil, false, null, null, null);
     }
 
     /** After a successful school payment: ties the new voucher to the student and their leaving date, ending any free study session. */

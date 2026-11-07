@@ -404,9 +404,18 @@ class SchoolFlowIntegrationTest {
         assertEquals("2M/2M",
                 radReply.findFirstByUsernameAndAttribute(freeCode, "Mikrotik-Rate-Limit").orElseThrow().getValue());
 
+        // The same phone comes back while on study data: no PIN, and a choice (study data or packages) instead of auto-connecting
+        clearInvocations(identity);
+        String resumed = portal("resume", "{\"token\":\"" + school.routerToken() + "\",\"mac\":\"" + PHONE_MAC + "\"}");
+        assertEquals("BUY", JsonPath.read(resumed, "$.action"));
+        assertEquals(true, JsonPath.read(resumed, "$.studentFreeAvailable"));
+        assertFalse(resumed.contains("elearning.school.ac.ug"), "the allowed study sites are not sent to the portal");
+        verifyNoInteractions(identity);
+        String continued = portal("student-free", "{\"token\":\"" + school.routerToken() + "\",\"ticket\":\"" + JsonPath.read(resumed, "$.ticket") + "\",\"mac\":\"" + PHONE_MAC + "\"}");
+        assertEquals(freeCode, JsonPath.read(continued, "$.code"), "choosing study data again reuses today's study voucher");
+
         // Student later buys a paid full-internet package -> restricted free voucher is held & paid voucher has NO address-list filter
-        verified(school.tenant().getId(), "OK", "STUDENT", "student-free-1");
-        String buyTicket = JsonPath.read(portal("verify", verifyBody(school, PHONE_MAC)), "$.ticket");
+        String buyTicket = JsonPath.read(portal("resume", "{\"token\":\"" + school.routerToken() + "\",\"mac\":\"" + PHONE_MAC + "\"}"), "$.ticket");
         String reference = JsonPath.read(pay(school, PHONE_MAC, buyTicket), "$.reference");
         mvc.perform(post("/api/payments/webhook").header("X-Webhook-Secret", "school-test-webhook-secret").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"reference\":\"" + reference + "\",\"status\":\"SUCCESSFUL\"}")).andExpect(status().isOk());

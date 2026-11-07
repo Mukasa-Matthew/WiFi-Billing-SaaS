@@ -42,6 +42,8 @@
         <p>You have been successfully logged out.</p>
         <p>Thank you for using TENANT_NAME_PLACEHOLDER WiFi.</p>
         <a href="$(link-login)" class="btn">Login Again</a>
+        <script>/* Schools go straight back to the sign-in page to buy a package or continue on study data. */
+            if ('SCHOOL_ONLY_DISPLAY' !== 'none') location.replace('$(link-login)');</script>
     </div>
 </body>
 </html>
