@@ -22,6 +22,12 @@ public class SchoolPortalController {
         @Override public String toString() { return "ChangePin[redacted]"; }
     }
     public record Visitor(@NotBlank @Size(max = 128) String token, @NotBlank @Size(max = 16) String code, @Size(max = 24) String mac) {}
+    public record Resume(@NotBlank @Size(max = 128) String token, @NotBlank @Size(max = 24) String mac) {}
+
+    @PostMapping("/resume")
+    public SchoolAccessService.PortalResult resume(@Valid @RequestBody Resume body) {
+        return access.resume(body.token(), body.mac());
+    }
 
     @PostMapping("/verify")
     public SchoolAccessService.PortalResult verify(@Valid @RequestBody Verify body) {

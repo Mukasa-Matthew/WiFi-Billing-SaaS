@@ -86,11 +86,14 @@ public class RouterScriptGenerator {
     /**
      * Firewall rules implementing tethering protection. Tethered traffic arrives
      * with TTL decremented by the sharing phone (63 on Android/iOS, 127 on Windows).
-     * mode: "OFF" (stale rules removed), "LOG" (detect only), "BLOCK" (drop).
+     * In BLOCK mode, also sets TTL=1 on packets leaving the hotspot bridge so
+     * connected devices cannot forward/hotspot packets to downstream devices.
+     * mode: "OFF" (stale rules removed), "LOG" (detect only), "BLOCK" (drop + TTL=1 lock).
      */
     public static String tetheringRules(String mode) {
         StringBuilder s = new StringBuilder();
         s.append("/ip/firewall/filter/remove [find where comment~\"^wb-tether\"]\n");
+        s.append("/ip/firewall/mangle/remove [find where comment~\"^wb-tether\"]\n");
         if ("LOG".equals(mode) || "BLOCK".equals(mode)) {
             String action = "BLOCK".equals(mode) ? "drop" : "log";
             // TTL is decremented before the forward chain, so direct clients
@@ -99,6 +102,10 @@ public class RouterScriptGenerator {
                     .append(" log=yes log-prefix=\"wb-tether\" comment=\"wb-tether: android/ios tethered\"\n");
             s.append("/ip/firewall/filter/add chain=forward ttl=equal:126 action=").append(action)
                     .append(" log=yes log-prefix=\"wb-tether\" comment=\"wb-tether: windows tethered\"\n");
+            if ("BLOCK".equals(mode)) {
+                s.append("/ip/firewall/mangle/add chain=postrouting out-interface=").append(q(BRIDGE_NAME))
+                        .append(" action=change-ttl new-ttl=set:1 passthrough=yes comment=\"wb-tether: lock downstream ttl=1\"\n");
+            }
         }
         return s.toString();
     }

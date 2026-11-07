@@ -125,7 +125,11 @@ public class RouterManagementService {
   // reuse it rather than failing the caller's transaction.
   var existing=tasks.findAllByRouterIdOrderByCreatedAtDesc(r.getId()).stream()
       .filter(t->"PENDING".equals(t.getStatus())&&action.equals(t.getAction())).findFirst();
-  if(existing.isPresent())return existing.get();
+  if(existing.isPresent()){
+   RouterTask pending=existing.get();
+   pending.setScript(script);
+   return tasks.save(pending);
+  }
   return tasks.save(RouterTask.builder().router(r).action(action).script(script).build());
  }
 }
