@@ -135,15 +135,19 @@ public class PaymentService {
         if (router.getTenant().isSchool()) {
             if (schoolTickets == null) throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "School sign-in is unavailable");
             student = schoolTickets.require(req.schoolTicket(), router.getTenant().getId(), sanitizeMac(req.mac()));
+            if (schoolAccess != null) schoolAccess.assertCanBuyForDevice(router.getTenant().getId(), student.personId(), sanitizeMac(req.mac()));
         }
 
         String phoneE164 = toE164(req.phone());
 
-        // Keyless clients: derive a stable key from
-        // (router, phone, package, 10-min bucket) so they dedupe too.
+        // Keyless clients: derive a stable key from (router, phone, package,
+        // device, 10-min bucket) so they dedupe too. The device keeps a student's
+        // second device from getting the first device's purchase back.
         boolean derivedRef = checkoutRef == null;
         if (derivedRef) {
+            String device = sanitizeMac(req.mac());
             checkoutRef = "AUTO-" + sha256(router.getId() + "|" + phoneE164 + "|" + req.packageId()
+                        + (device == null ? "" : "|" + device)
                         + "|" + (System.currentTimeMillis() / (AUTO_CHECKOUT_BUCKET_SECONDS * 1000))).substring(0, 40);
             var existing = transactionRepository.findByCheckoutRefForUpdate(checkoutRef);
             if (existing.isPresent()) {

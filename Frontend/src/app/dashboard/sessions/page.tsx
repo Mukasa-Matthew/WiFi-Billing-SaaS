@@ -1,6 +1,6 @@
 "use client";
 import { BusyLabel } from "@/components/LoadingUI";
-import { useResource } from "@/components/BillingUI";
+import { useApi, useResource } from "@/components/BillingUI";
 
 import React, { useCallback, useEffect, useState, useMemo } from "react";
 import api from "@/lib/api";
@@ -41,6 +41,8 @@ export default function TenantActiveSessionsPage() {
   const { data: sessions, loading, refreshing, load: fetchActiveSessions } = useResource<ActiveSession>("/api/sessions/active", 20000);
   const [search, setSearch] = useState("");
   const [catFilter, setCatFilter] = useState("ALL");
+  // Students, staff and visitors only exist on school networks.
+  const school = useApi<{ school: boolean }>("/api/school/status").data?.school === true;
 
   const [msg, setMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
@@ -218,13 +220,13 @@ export default function TenantActiveSessionsPage() {
           />
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
-          {[
+          {(school ? [
             { key: "ALL", label: "All Connected" },
             { key: "STUDENT", label: "Paid Students" },
             { key: "STAFF", label: "School Staff" },
             { key: "VISITOR", label: "Visitor Passes" },
             { key: "PAID_CUSTOMER", label: "Paid Customers" },
-          ].map((opt) => (
+          ] : []).map((opt) => (
             <button
               key={opt.key}
               type="button"

@@ -38,6 +38,11 @@ public class SchoolController {
         return schools.updateSettings(schools.school(principal.getTenantId()), body);
     }
 
+    @PostMapping("/network/enlarge")
+    public Map<String, Object> enlargeNetwork(@AuthenticationPrincipal TenantPrincipal principal) {
+        return Map.of("routers", schools.enlargeNetwork(schools.school(principal.getTenantId())));
+    }
+
     @GetMapping("/visitor-passes")
     public JsonNode visitorPasses(@AuthenticationPrincipal TenantPrincipal principal, @RequestParam(defaultValue = "0") int page) {
         return identity.visitorPasses(schools.school(principal.getTenantId()).getId(), Math.max(0, page));

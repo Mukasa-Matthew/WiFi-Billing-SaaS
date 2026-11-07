@@ -148,10 +148,12 @@ class SchoolFlowIntegrationTest {
         assertTrue(radCheck.findFirstByUsernameAndAttribute(code, "Expiration").isPresent());
         assertEquals(PHONE_MAC, radCheck.findFirstByUsernameAndAttribute(code, "Calling-Station-Id").orElseThrow().getValue());
 
-        String again = portal("verify", verifyBody(school, TABLET_MAC));
+        String again = portal("verify", verifyBody(school, PHONE_MAC));
         assertEquals("CONNECT", JsonPath.read(again, "$.action"));
-        assertEquals(code, JsonPath.read(again, "$.code"), "signing in again reuses the paid voucher instead of selling another");
-        assertEquals(TABLET_MAC, radCheck.findFirstByUsernameAndAttribute(code, "Calling-Station-Id").orElseThrow().getValue());
+        assertEquals(code, JsonPath.read(again, "$.code"), "signing in again on the same device reuses the paid voucher instead of selling another");
+        assertEquals("BUY", JsonPath.read(portal("verify", verifyBody(school, TABLET_MAC)), "$.action"),
+                "a second device gets its own package; the phone keeps this one");
+        assertEquals(PHONE_MAC, radCheck.findFirstByUsernameAndAttribute(code, "Calling-Station-Id").orElseThrow().getValue());
 
         String body = "{\"tenantId\":" + school.tenant().getId() + ",\"personId\":\"demo-0000aaaa\"}";
         long now = Instant.now().getEpochSecond();
@@ -556,5 +558,83 @@ class SchoolFlowIntegrationTest {
                 .andExpect(jsonPath("$.payments.length()").value(4))
                 .andExpect(jsonPath("$.payments[1].status").value("SUCCESSFUL"))
                 .andExpect(jsonPath("$.payments[2].status").value("FAILED"));
+    }
+
+    @Test
+    void studentsKeepPaidPackagesOnTwoDevicesAndMoveOneFromAThird() throws Exception {
+        Site school = site("two-device-school", true);
+        String laptop = "AA:BB:CC:00:00:03";
+        verified(school.tenant().getId(), "OK", "STUDENT", "student-two-devices");
+
+        // Phone buys a package
+        String phoneTicket = JsonPath.read(portal("verify", verifyBody(school, PHONE_MAC)), "$.ticket");
+        String phoneCode = paidStudent(school, PHONE_MAC, phoneTicket);
+
+        // Signing in on the tablet offers packages instead of taking the phone's package away
+        String onTablet = portal("verify", verifyBody(school, TABLET_MAC));
+        assertEquals("BUY", JsonPath.read(onTablet, "$.action"));
+        assertNull(JsonPath.read(onTablet, "$.paidDevices"));
+        String tabletCode = paidStudent(school, TABLET_MAC, JsonPath.read(onTablet, "$.ticket"));
+        assertNotEquals(phoneCode, tabletCode);
+        assertEquals(PHONE_MAC, vouchers.findByCode(phoneCode).orElseThrow().getClaimedMac(), "the phone keeps its package");
+        assertEquals(PHONE_MAC, radCheck.findAllByUsername(phoneCode).stream().filter(c -> c.getAttribute().equals("Calling-Station-Id")).findFirst().orElseThrow().getValue());
+        assertEquals(TABLET_MAC, vouchers.findByCode(tabletCode).orElseThrow().getClaimedMac());
+
+        // Each device reconnects to its own package
+        assertEquals(phoneCode, JsonPath.read(portal("verify", verifyBody(school, PHONE_MAC)), "$.code"));
+        assertEquals(tabletCode, JsonPath.read(portal("resume", "{\"token\":\"" + school.routerToken() + "\",\"mac\":\"" + TABLET_MAC + "\"}"), "$.code"));
+
+        // A third device can't buy, only move one of the two packages over
+        String onLaptop = portal("verify", verifyBody(school, laptop));
+        assertEquals("BUY", JsonPath.read(onLaptop, "$.action"));
+        assertEquals(2, (int) JsonPath.read(onLaptop, "$.paidDevices.length()"));
+        String laptopTicket = JsonPath.read(onLaptop, "$.ticket");
+        assertTrue(pay(school, laptop, laptopTicket).contains("2 devices"), "buying for a third device is refused");
+        Number phoneVoucherId = vouchers.findByCode(phoneCode).orElseThrow().getId();
+        String moved = portal("move-package", "{\"token\":\"" + school.routerToken() + "\",\"ticket\":\"" + laptopTicket
+                + "\",\"voucherId\":" + phoneVoucherId + ",\"mac\":\"" + laptop + "\"}");
+        assertEquals("CONNECT", JsonPath.read(moved, "$.action"));
+        assertEquals(phoneCode, JsonPath.read(moved, "$.code"));
+        assertEquals(laptop, vouchers.findByCode(phoneCode).orElseThrow().getClaimedMac());
+        assertEquals(TABLET_MAC, vouchers.findByCode(tabletCode).orElseThrow().getClaimedMac(), "the other device is untouched");
+    }
+
+    @Test
+    void freeStudyDataStaysOnOneDeviceAtATime() throws Exception {
+        Site school = site("study-one-device", true);
+        when(identity.updateSchool(eq(school.tenant().getId()), anyMap()))
+                .thenReturn(json.createObjectNode().put("visitorsEnabled", false).put("visitorDailyCap", 20));
+        mvc.perform(put("/api/school/settings").header("Authorization", "Bearer " + school.jwt()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"studentFreeEnabled\":true,\"studentDailyFreeMb\":200,\"applyImmediately\":false}")).andExpect(status().isOk());
+        verified(school.tenant().getId(), "OK", "STUDENT", "student-study-one");
+        String onPhone = portal("student-free", "{\"token\":\"" + school.routerToken() + "\",\"ticket\":\""
+                + JsonPath.read(portal("verify", verifyBody(school, PHONE_MAC)), "$.ticket") + "\",\"mac\":\"" + PHONE_MAC + "\"}");
+        String onTablet = portal("student-free", "{\"token\":\"" + school.routerToken() + "\",\"ticket\":\""
+                + JsonPath.read(portal("verify", verifyBody(school, TABLET_MAC)), "$.ticket") + "\",\"mac\":\"" + TABLET_MAC + "\"}");
+        String code = JsonPath.read(onPhone, "$.code");
+        assertEquals(code, JsonPath.read(onTablet, "$.code"), "there is one study voucher per student");
+        assertEquals(TABLET_MAC, vouchers.findByCode(code).orElseThrow().getClaimedMac(), "it moved to the tablet");
+        assertEquals("1", radCheck.findAllByUsername(code).stream().filter(c -> c.getAttribute().equals("Simultaneous-Use")).findFirst().orElseThrow().getValue());
+    }
+
+    private String paidStudent(Site site, String mac, String ticket) throws Exception {
+        String reference = JsonPath.read(pay(site, mac, ticket), "$.reference");
+        mvc.perform(post("/api/payments/webhook").header("X-Webhook-Secret", "school-test-webhook-secret").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"reference\":\"" + reference + "\",\"status\":\"SUCCESSFUL\"}")).andExpect(status().isOk());
+        return JsonPath.read(mvc.perform(get("/api/payments/status/" + reference)).andReturn().getResponse().getContentAsString(), "$.voucherCode");
+    }
+
+    @Test
+    void ownerEnlargesTheSchoolNetworkOnTheirRoutersOnly() throws Exception {
+        Site school = site("big-network-school", true);
+        Site shop = site("big-network-shop", false);
+        mvc.perform(post("/api/school/network/enlarge").header("Authorization", "Bearer " + school.jwt()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.routers").value(1));
+        var router = routerRepository.findAllByTenantId(school.tenant().getId()).get(0);
+        var task = routerTasks.findAllByRouterIdOrderByCreatedAtDesc(router.getId()).stream()
+                .filter(t -> "SYNC_SCHOOL_NETWORK".equals(t.getAction())).findFirst().orElseThrow();
+        assertTrue(task.getScript().contains("10.10.0.0/21"));
+        mvc.perform(post("/api/school/network/enlarge").header("Authorization", "Bearer " + shop.jwt()))
+                .andExpect(status().is4xxClientError());
     }
 }

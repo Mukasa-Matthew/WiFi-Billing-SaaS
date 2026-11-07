@@ -215,6 +215,7 @@
                 <button type="submit" class="btn btn-dark" id="school-pin-btn">Save PIN and continue</button>
             </form>
             <div id="school-welcome" class="status-msg success" style="display:none"></div>
+            <div id="school-move-box" style="display:none;margin:10px 0 14px;padding:14px;border-radius:12px;border:1px solid rgba(245,158,11,0.4);background:rgba(245,158,11,0.08);text-align:left"></div>
             <div id="school-student-free-box" style="display:none;margin:10px 0 14px;padding:14px;border-radius:12px;border:1px solid rgba(59,130,246,0.35);background:rgba(59,130,246,0.08);text-align:left">
                 <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px" id="school-student-free-title">🎓 Daily Free Study Data</div>
                 <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:10px" id="school-student-free-desc"></div>
@@ -548,8 +549,10 @@ function schoolResult(res) {
         SCHOOL.ticket = res.ticket;
         document.getElementById('school-signin').style.display = 'none';
         var welcome = document.getElementById('school-welcome');
+        var atDeviceLimit = !!(res.paidDevices && res.paidDevices.length);
         welcome.textContent = (res.fullName ? 'Signed in as ' + res.fullName + '. ' : 'Welcome back. ') +
-            (res.studentFreeAvailable ? 'Use your free daily study data or buy a full-internet package below.' : 'Choose a package below.');
+            (atDeviceLimit ? 'Your packages work on 2 devices at a time.'
+                : res.studentFreeAvailable ? 'Use your free daily study data or buy a full-internet package below.' : 'Choose a package below.');
         welcome.style.display = '';
         var freeBox = document.getElementById('school-student-free-box');
         var freeBtn = document.getElementById('school-student-free-btn');
@@ -561,7 +564,8 @@ function schoolResult(res) {
             var cap = Number(res.studentFreeDailyCapMb || 0);
             if (rem > 0) {
                 freeTitle.textContent = '🎓 Free Daily Study Data (' + rem + ' MB of ' + cap + ' MB left today)';
-                freeDesc.textContent = 'Works on the school\'s study websites only. Need full internet later? Open login.wifi in your browser and tap "Buy full internet", or buy a package below now.';
+                freeDesc.textContent = atDeviceLimit ? 'Works on the school\'s study websites only, on one device at a time.'
+                    : 'Works on the school\'s study websites only. Need full internet later? Open login.wifi in your browser and tap "Buy full internet", or buy a package below now.';
                 freeBtn.style.display = '';
                 freeBtn.textContent = '🎓 Connect with Free ' + rem + ' MB Study Data';
             } else {
@@ -574,7 +578,27 @@ function schoolResult(res) {
         }
         document.getElementById('msg-area').innerHTML = '';
         if (window.PORTAL_CFG) applySchoolMode(window.PORTAL_CFG);
-        document.getElementById('packages-section').scrollIntoView({ behavior: 'smooth' });
+        var moveBox = document.getElementById('school-move-box');
+        var devices = res.paidDevices || [];
+        if (devices.length) {
+            // Paid packages work on 2 devices at a time: here they can only move one over.
+            var html = '<div style="font-weight:700;font-size:14px;margin-bottom:4px;">Your packages are on 2 other devices</div>' +
+                '<div style="font-size:12.5px;color:var(--muted);margin-bottom:10px;">Move one to this device. The device it is on now will be signed out.</div>';
+            devices.forEach(function(d){
+                html += '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-top:1px solid rgba(148,163,184,0.3);">' +
+                    '<div style="min-width:0;font-size:12.5px;"><b>' + escapeText(d.packageName || 'Package') + '</b>' +
+                    '<div style="color:var(--muted);">Device …' + escapeText(d.device || '') + (d.expiresAt ? ' · until ' + formatDate(d.expiresAt) : '') + '</div></div>' +
+                    '<button type="button" class="btn btn-dark" style="width:auto;margin:0;padding:8px 12px;font-size:12px;" onclick="movePackage(' + Number(d.id) + ')">Move here</button></div>';
+            });
+            moveBox.innerHTML = html;
+            moveBox.style.display = '';
+            document.getElementById('packages-section').style.display = 'none';
+            document.getElementById('plans-label').style.display = 'none';
+            moveBox.scrollIntoView({ behavior: 'smooth' });
+        } else {
+            moveBox.style.display = 'none';
+            document.getElementById('packages-section').scrollIntoView({ behavior: 'smooth' });
+        }
         return;
     }
     if (res.action === 'CONNECT' && res.code) {
@@ -583,6 +607,7 @@ function schoolResult(res) {
         document.getElementById('username-input').value = res.code;
         document.getElementById('school-signin').style.display = 'none';
         document.getElementById('school-student-free-box').style.display = 'none';
+        document.getElementById('school-move-box').style.display = 'none';
         var who = res.category === 'STAFF' ? 'staff access' : res.category === 'VISITOR' ? 'visitor access' : res.category === 'STUDENT_FREE' ? 'free daily study data' : 'your package';
         if (!LINK_LOGIN || LINK_LOGIN.charAt(0) === '$') { showMsg('Signed in. Reopen this page from the WiFi network to connect.', true); return; }
         var greeting = res.fullName ? ('Welcome, ' + escapeText(res.fullName) + '. ') : 'Welcome back! ';
@@ -593,6 +618,16 @@ function schoolResult(res) {
             document.getElementById('login-form').submit();
         }, 400);
     }
+}
+function movePackage(id) {
+    showMsg('Moving your package to this device…', false);
+    fetch(BASE + '/api/portal/school/move-package', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: TOKEN, ticket: SCHOOL.ticket, voucherId: id, mac: schoolMac() })
+    })
+        .then(function(r){ return r.json().then(function(body){ if (!r.ok) throw new Error(body.message || ''); return body; }); })
+        .then(function(res){ document.getElementById('school-move-box').style.display = 'none'; schoolResult(res); })
+        .catch(function(e){ showMsg(escapeText((e && e.message) || 'The package could not be moved. Please try again.'), true); });
 }
 function escapeText(text) {
     var d = document.createElement('div'); d.textContent = text; return d.innerHTML;

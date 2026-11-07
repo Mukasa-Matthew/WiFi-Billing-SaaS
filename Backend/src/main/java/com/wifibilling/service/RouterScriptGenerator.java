@@ -36,6 +36,29 @@ public class RouterScriptGenerator {
     private static final String POLICY = "read,write,policy,test";
     private static final String TAG = "wifi-billing";
 
+    // The hotspot network. Schools get /21 (10.10.0.0-10.10.7.255, ~2,000 devices) with shorter
+    // leases so departed phones free their address; everyone else keeps /24. The router stays 10.10.0.1.
+    private static final String SMALL_GATEWAY = "10.10.0.1/24", SMALL_NETWORK = "10.10.0.0/24",
+            SMALL_RANGE = "10.10.0.10-10.10.0.254", SMALL_LEASE = "1h";
+    private static final String LARGE_GATEWAY = "10.10.0.1/21", LARGE_NETWORK = "10.10.0.0/21",
+            LARGE_RANGE = "10.10.0.10-10.10.7.254", LARGE_LEASE = "30m";
+    /** Customer addresses a binding may use on a school (large) or ordinary network. */
+    public static final String LARGE_NETWORK_CIDR = LARGE_NETWORK, SMALL_NETWORK_CIDR = SMALL_NETWORK;
+
+    /**
+     * Enlarges an already provisioned hotspot network from /24 to the school size, in place:
+     * the router keeps 10.10.0.1 and existing leases stay valid. Safe to run again.
+     */
+    public static String largeNetworkScript() {
+        String tag = q(TAG);
+        return ":local a [/ip/address find comment=" + tag + " address=\"" + SMALL_GATEWAY + "\"]\n"
+                + ":if ([:len $a] > 0) do={ /ip/address set $a address=" + LARGE_GATEWAY + " }\n"
+                + "/ip/pool set [find name=" + q(POOL_NAME) + "] ranges=" + LARGE_RANGE + "\n"
+                + "/ip/dhcp-server/network set [find comment=" + tag + "] address=" + LARGE_NETWORK + "\n"
+                + "/ip/dhcp-server set [find name=" + q(DHCP_NAME) + "] lease-time=" + LARGE_LEASE + "\n"
+                + ":log info \"wifi-billing: hotspot network enlarged to " + LARGE_NETWORK + "\"\n";
+    }
+
     private static final List<String> PORTAL_TEMPLATES = List.of(
             "login.html",
             "feedback.html",
@@ -69,8 +92,21 @@ public class RouterScriptGenerator {
             /** One-time setup code; authorizes only this setup's register/complete callbacks. */
             String setupCode,
             /** Optional WinBox agent installer snippet. */
-            String winboxInstaller
+            String winboxInstaller,
+            /** Schools: a /21 hotspot network (~2,000 devices) instead of /24 (~245). */
+            boolean largeNetwork
     ) {
+        public ScriptContext(
+                String routerName, String wanInterface, List<String> hotspotInterfaces, String wifiSsid,
+                String token, String wgIp, int prefixLength, String radiusSecret, String radiusServerIp,
+                String serverPublicKey, String endpointHost, int endpointPort, String tunnelSubnet,
+                String publicBaseUrl, Set<String> walledGardenIps, Set<String> walledGardenHosts,
+                String tetheringMode, String setupCode, String winboxInstaller) {
+            this(routerName, wanInterface, hotspotInterfaces, wifiSsid, token, wgIp, prefixLength,
+                 radiusSecret, radiusServerIp, serverPublicKey, endpointHost, endpointPort, tunnelSubnet,
+                 publicBaseUrl, walledGardenIps, walledGardenHosts, tetheringMode, setupCode, winboxInstaller, false);
+        }
+
         public ScriptContext(
                 String routerName, String wanInterface, List<String> hotspotInterfaces, String wifiSsid,
                 String token, String wgIp, int prefixLength, String radiusSecret, String radiusServerIp,
@@ -79,7 +115,7 @@ public class RouterScriptGenerator {
                 String tetheringMode, String setupCode) {
             this(routerName, wanInterface, hotspotInterfaces, wifiSsid, token, wgIp, prefixLength,
                  radiusSecret, radiusServerIp, serverPublicKey, endpointHost, endpointPort, tunnelSubnet,
-                 publicBaseUrl, walledGardenIps, walledGardenHosts, tetheringMode, setupCode, null);
+                 publicBaseUrl, walledGardenIps, walledGardenHosts, tetheringMode, setupCode, null, false);
         }
     }
 
@@ -298,9 +334,10 @@ public class RouterScriptGenerator {
         s.append(":local wbBridge [/interface/bridge find name=").append(q(BRIDGE_NAME)).append("]\n");
         s.append(":if ([:len $wbBridge] > 0 && [/interface/bridge get [:pick $wbBridge 0] comment] != ")
                 .append(tag).append(") do={ :error \"Existing wb-hotspot-bridge is not managed by WiFi-Billing; no changes made\" }\n");
-        s.append(":local wbAddress [/ip/address find address=\"10.10.0.1/24\"]\n");
+        String gateway = c.largeNetwork() ? LARGE_GATEWAY : SMALL_GATEWAY;
+        s.append(":local wbAddress [/ip/address find address=\"").append(gateway).append("\"]\n");
         s.append(":if ([:len $wbAddress] > 0 && [/ip/address get [:pick $wbAddress 0] comment] != ")
-                .append(tag).append(") do={ :error \"10.10.0.1/24 is already used by an unmanaged configuration; no changes made\" }\n");
+                .append(tag).append(") do={ :error \"").append(gateway).append(" is already used by an unmanaged configuration; no changes made\" }\n");
         s.append(":log info \"wifi-billing: provisioning started\"\n\n");
         s.append(":do { /export file=before-wifi-billing } on-error={}\n\n");
 
@@ -404,11 +441,12 @@ public class RouterScriptGenerator {
                 + " on-error={ :do { /interface/wifi set $w security.authentication-types=\"\" security.passphrase=\"\" } on-error={} } } }";
         s.append(":do { :local f [:parse ").append(q(legacyWifi)).append("]; $f } on-error={}\n");
         s.append(":do { :local f [:parse ").append(q(newWifi)).append("]; $f } on-error={}\n");
-        s.append("/ip/address add address=10.10.0.1/24 interface=").append(q(BRIDGE_NAME)).append(" comment=").append(tag).append('\n');
-        s.append("/ip/pool add name=").append(q(POOL_NAME)).append(" ranges=10.10.0.10-10.10.0.254\n");
+        s.append("/ip/address add address=").append(gateway).append(" interface=").append(q(BRIDGE_NAME)).append(" comment=").append(tag).append('\n');
+        s.append("/ip/pool add name=").append(q(POOL_NAME)).append(" ranges=").append(c.largeNetwork() ? LARGE_RANGE : SMALL_RANGE).append('\n');
         s.append("/ip/dhcp-server add name=").append(q(DHCP_NAME)).append(" interface=").append(q(BRIDGE_NAME))
-                .append(" address-pool=").append(q(POOL_NAME)).append(" lease-time=1h disabled=no\n");
-        s.append("/ip/dhcp-server/network add address=10.10.0.0/24 gateway=10.10.0.1 dns-server=10.10.0.1 comment=").append(tag).append('\n');
+                .append(" address-pool=").append(q(POOL_NAME)).append(" lease-time=").append(c.largeNetwork() ? LARGE_LEASE : SMALL_LEASE).append(" disabled=no\n");
+        s.append("/ip/dhcp-server/network add address=").append(c.largeNetwork() ? LARGE_NETWORK : SMALL_NETWORK)
+                .append(" gateway=10.10.0.1 dns-server=10.10.0.1 comment=").append(tag).append('\n');
         s.append("/ip/dns/set allow-remote-requests=yes\n");
         s.append("/ip/firewall/nat add chain=srcnat out-interface=").append(q(c.wanInterface()))
                 .append(" action=masquerade comment=").append(tag).append("\n\n");
