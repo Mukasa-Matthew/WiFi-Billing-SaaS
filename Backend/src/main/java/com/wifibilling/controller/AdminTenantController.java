@@ -40,6 +40,11 @@ public class AdminTenantController {
     @Value("${app.public-base-url:http://localhost:3000}")
     private String publicBaseUrl;
 
+    private com.wifibilling.school.SchoolManagementService schools;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setSchools(com.wifibilling.school.SchoolManagementService schools) { this.schools = schools; }
+
     /**
      * Lists all provisioned tenants with aggregate metrics.
      */
@@ -71,10 +76,15 @@ public class AdminTenantController {
      */
     @PostMapping("/tenants")
     @ResponseStatus(HttpStatus.CREATED)
+    @org.springframework.transaction.annotation.Transactional
     public AdminTenantDto.CreateResponse createTenant(@Valid @RequestBody AdminTenantDto.CreateRequest req) {
         String email = req.email().trim().toLowerCase();
         if (tenantRepository.existsByEmailIgnoreCase(email)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Tenant email is already registered");
+        }
+        if (req.school() && (schools == null || req.itAdminEmail() == null || req.itAdminEmail().isBlank()
+                || req.itAdminName() == null || req.itAdminName().isBlank())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A school needs its IT person's name and email");
         }
 
         String temporaryPassword = generateTemporaryPassword();
@@ -94,6 +104,8 @@ public class AdminTenantController {
         if (subscriptionService != null) {
             subscriptionService.grantTrialIfEligible(tenant);
         }
+        // A school is created in the identity system before anything is emailed; a failure rolls the tenant back.
+        var schoolCredentials = req.school() ? schools.link(tenant, req.itAdminEmail(), req.itAdminName()) : null;
 
         AdminTenantDto.SummaryResponse summary = new AdminTenantDto.SummaryResponse(
                 tenant.getId(),
@@ -119,7 +131,9 @@ public class AdminTenantController {
                 // The account remains usable; the Superadmin receives the password as a fallback.
             }
         }
-        return new AdminTenantDto.CreateResponse(summary, emailSent ? null : temporaryPassword, emailSent);
+        return new AdminTenantDto.CreateResponse(summary, emailSent ? null : temporaryPassword, emailSent,
+                schoolCredentials == null ? null : schoolCredentials.emailSent(),
+                schoolCredentials == null ? null : schoolCredentials.temporaryPassword());
     }
 
     /**

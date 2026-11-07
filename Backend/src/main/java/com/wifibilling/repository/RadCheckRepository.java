@@ -19,4 +19,7 @@ public interface RadCheckRepository extends JpaRepository<RadCheck, Long> {
 
     @Transactional
     long deleteAllByUsername(String username);
+
+    @org.springframework.transaction.annotation.Transactional
+    long deleteAllByUsernameAndAttribute(String username, String attribute);
 }

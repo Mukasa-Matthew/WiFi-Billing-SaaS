@@ -67,6 +67,15 @@ public class PaymentService {
 
     private CustomerService customerService;
 
+    private com.wifibilling.school.SchoolTickets schoolTickets;
+    private com.wifibilling.school.SchoolAccessService schoolAccess;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setSchool(com.wifibilling.school.SchoolTickets schoolTickets, com.wifibilling.school.SchoolAccessService schoolAccess) {
+        this.schoolTickets = schoolTickets;
+        this.schoolAccess = schoolAccess;
+    }
+
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     public void setCustomerService(CustomerService customerService) {
         this.customerService = customerService;
@@ -119,6 +128,13 @@ public class PaymentService {
         }
         if (packagePlan.getRouter() != null && !packagePlan.getRouter().getId().equals(router.getId())) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Package not found for router");
+        }
+
+        // School tenants sell only to students who just passed the ID and PIN check on this device.
+        com.wifibilling.school.SchoolTickets.Ticket student = null;
+        if (router.getTenant().isSchool()) {
+            if (schoolTickets == null) throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "School sign-in is unavailable");
+            student = schoolTickets.require(req.schoolTicket(), router.getTenant().getId(), sanitizeMac(req.mac()));
         }
 
         String phoneE164 = toE164(req.phone());
@@ -175,6 +191,9 @@ public class PaymentService {
                 .platformFeeBps(com.wifibilling.model.TenantGatewayConfig.MODE_PLATFORM.equals(mode)
                         ? router.getTenant().activePlatformFeeBps() : 0)
                 .createdAt(OffsetDateTime.now());
+        if (student != null) {
+            builder.personId(student.personId()).personAccessUntil(student.accessUntil());
+        }
         if (!mock) {
             // MarzPay collection reference committed WITH the row — the provider
             // request is only sent after this transaction is durable.
@@ -500,6 +519,7 @@ public class PaymentService {
                 String voucherCode = vouchers.get(0).code();
                 tx.setVoucherCode(voucherCode);
                 voucherService.recordOnlineSale(tx.getTenant().getId(), voucherCode);
+                if (tx.getPersonId() != null && schoolAccess != null) schoolAccess.bindPaidVoucher(tx, voucherCode);
                 // The paying number becomes (or matches) a customer once this commits.
                 if (customerService != null) {
                     customerService.recordBuyerAfterCommit(tx.getTenant().getId(), tx.getPhone(), voucherCode, tx.getCreatedAt());

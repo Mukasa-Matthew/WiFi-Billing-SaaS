@@ -3,6 +3,7 @@ package com.wifibilling.dto;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Pattern;
 
 import java.time.OffsetDateTime;
 
@@ -19,8 +20,22 @@ public class AdminTenantDto {
 
             @NotBlank(message = "Phone number is required")
             @Size(max = 30)
-            String phone
-    ) {}
+            String phone,
+
+            /** "SCHOOL" links the new tenant to the school identity system; omitted for ordinary businesses. */
+            @Pattern(regexp = "SCHOOL", message = "Unknown tenant type")
+            String tenantType,
+
+            @Email(message = "Valid IT person email is required")
+            @Size(max = 254)
+            String itAdminEmail,
+
+            @Size(max = 200)
+            String itAdminName
+    ) {
+        public CreateRequest(String name, String email, String phone) { this(name, email, phone, null, null, null); }
+        public boolean school() { return "SCHOOL".equals(tenantType); }
+    }
 
     public record SummaryResponse(
             Long id,
@@ -37,8 +52,15 @@ public class AdminTenantDto {
     public record CreateResponse(
             SummaryResponse tenant,
             String temporaryPassword,
-            boolean welcomeEmailSent
-    ) {}
+            boolean welcomeEmailSent,
+            /** School tenants: whether the IT person's credentials were emailed, and the password only if not. */
+            Boolean schoolItEmailSent,
+            String schoolItTemporaryPassword
+    ) {
+        public CreateResponse(SummaryResponse tenant, String temporaryPassword, boolean welcomeEmailSent) {
+            this(tenant, temporaryPassword, welcomeEmailSent, null, null);
+        }
+    }
 
     public record ResetCredentialsResponse(
             Long tenantId,
