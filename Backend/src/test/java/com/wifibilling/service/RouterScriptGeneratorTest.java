@@ -125,4 +125,41 @@ class RouterScriptGeneratorTest {
         assertFalse(s.contains(":set wbDate"), "NTP wait must not re-:set inside a block");
         assertTrue(s.contains(":delay 10s"), "NTP wait must use a bounded :delay");
     }
+
+    @Test
+    void schoolFilterRulesRenderStudentWhitelistAndStaffAppPolicies() {
+        String allowRules = generator.schoolFilterRules(
+                true,
+                "elearning.school.ac.ug, @wikipedia",
+                "ALLOW_LIST",
+                "@whatsapp, @youtube, @chatgpt, @tiktok",
+                "https://app.qticket.dev"
+        );
+        // Student free whitelist
+        assertTrue(allowRules.contains("/ip/firewall/address-list/add list=\"wb-student-sites\" address=\"elearning.school.ac.ug\""));
+        assertTrue(allowRules.contains("/ip/firewall/address-list/add list=\"wb-student-sites\" address=\"wikipedia.org\""));
+        assertTrue(allowRules.contains("/ip/firewall/address-list/add list=\"wb-student-sites\" address=\"app.qticket.dev\""),
+                "portal host is always whitelisted so students can buy packages");
+        assertTrue(allowRules.contains("src-address-list=\"wb-student-free\" dst-address-list=\"wb-student-sites\" action=accept"));
+        assertTrue(allowRules.contains("src-address-list=\"wb-student-free\" action=drop comment=\"wb-school-filter: student drop other\""));
+
+        // Staff allow-list with expanded app presets
+        assertTrue(allowRules.contains("/ip/firewall/address-list/add list=\"wb-staff-sites\" address=\"whatsapp.com\""));
+        assertTrue(allowRules.contains("/ip/firewall/address-list/add list=\"wb-staff-sites\" address=\"youtube.com\""));
+        assertTrue(allowRules.contains("/ip/firewall/address-list/add list=\"wb-staff-sites\" address=\"chatgpt.com\""));
+        assertTrue(allowRules.contains("/ip/firewall/address-list/add list=\"wb-staff-sites\" address=\"tiktok.com\""));
+        assertTrue(allowRules.contains("src-address-list=\"wb-staff-free\" dst-address-list=\"wb-staff-sites\" action=accept"));
+        assertTrue(allowRules.contains("src-address-list=\"wb-staff-free\" action=drop comment=\"wb-school-filter: staff drop other\""));
+
+        // Staff block-list mode drops only matching domains
+        String blockRules = generator.schoolFilterRules(
+                false,
+                "",
+                "BLOCK_LIST",
+                "@tiktok",
+                "https://app.qticket.dev"
+        );
+        assertTrue(blockRules.contains("src-address-list=\"wb-staff-free\" dst-address-list=\"wb-staff-sites\" action=drop comment=\"wb-school-filter: staff block list\""));
+        assertTrue(blockRules.contains("src-address-list=\"wb-staff-free\" protocol=tcp dst-port=443 tls-host=\"*tiktok.com\" action=drop"));
+    }
 }

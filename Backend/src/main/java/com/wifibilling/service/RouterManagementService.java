@@ -120,6 +120,15 @@ public class RouterManagementService {
   }else if("SYNC_TETHERING".equals(action)){
    String mode=r.getTenant().getTetheringProtection();
    script=RouterScriptGenerator.tetheringRules(mode==null?"OFF":mode);
+  }else if("SYNC_SCHOOL_FILTER".equals(action)){
+   var t=r.getTenant();
+   script=RouterScriptGenerator.schoolFilterRules(
+       t.isSchoolStudentFreeEnabled(),
+       t.getSchoolStudentAllowedSites(),
+       t.getSchoolStaffSiteMode(),
+       t.getSchoolStaffSiteRules(),
+       props.getPublicBaseUrl()
+   );
   }else throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Unknown router action");
   // Idempotent: a pending task for the same action already covers this change —
   // reuse it rather than failing the caller's transaction.

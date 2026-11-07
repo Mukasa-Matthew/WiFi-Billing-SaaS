@@ -91,6 +91,12 @@ public class SchoolManagementService {
         result.put("staffEnabled", tenant.isSchoolStaffEnabled());
         result.put("staffRateLimit", tenant.getSchoolStaffRateLimit());
         result.put("staffDailyDataCapMb", tenant.getSchoolStaffDailyDataCapMb());
+        result.put("staffSiteMode", tenant.getSchoolStaffSiteMode() == null ? "ALL" : tenant.getSchoolStaffSiteMode());
+        result.put("staffSiteRules", tenant.getSchoolStaffSiteRules() == null ? "" : tenant.getSchoolStaffSiteRules());
+        result.put("studentFreeEnabled", Boolean.TRUE.equals(tenant.getSchoolStudentFreeEnabled()));
+        result.put("studentDailyFreeMb", tenant.getSchoolStudentDailyFreeMb());
+        result.put("studentFreeRateLimit", tenant.getSchoolStudentFreeRateLimit());
+        result.put("studentAllowedSites", tenant.getSchoolStudentAllowedSites() == null ? "" : tenant.getSchoolStudentAllowedSites());
         result.put("visitorsEnabled", Boolean.TRUE.equals(tenant.getSchoolVisitorsEnabled()));
         result.put("visitorDailyCap", tenant.getSchoolVisitorDailyCap() == null ? 0 : tenant.getSchoolVisitorDailyCap());
         result.put("visitorRateLimit", tenant.getSchoolVisitorRateLimit());
@@ -105,6 +111,12 @@ public class SchoolManagementService {
                                   Boolean staffEnabled,
                                   @jakarta.validation.constraints.Min(0) @jakarta.validation.constraints.Max(1000000) Integer staffDailyDataCapMb,
                                   @jakarta.validation.constraints.Min(0) @jakarta.validation.constraints.Max(1000000) Integer visitorDataCapMb,
+                                  @jakarta.validation.constraints.Pattern(regexp = "ALL|ALLOW_LIST|BLOCK_LIST") String staffSiteMode,
+                                  @jakarta.validation.constraints.Size(max = 4000) String staffSiteRules,
+                                  Boolean studentFreeEnabled,
+                                  @jakarta.validation.constraints.Min(0) @jakarta.validation.constraints.Max(1000000) Integer studentDailyFreeMb,
+                                  @jakarta.validation.constraints.Size(max = 30) String studentFreeRateLimit,
+                                  @jakarta.validation.constraints.Size(max = 4000) String studentAllowedSites,
                                   @jakarta.validation.constraints.Pattern(regexp = "OFF|LOG|BLOCK") String tetheringProtection,
                                   Boolean applyImmediately) {}
 
@@ -123,15 +135,24 @@ public class SchoolManagementService {
         if (req.visitorRateLimit() != null) tenant.setSchoolVisitorRateLimit(rate(req.visitorRateLimit()));
         if (req.staffDailyDataCapMb() != null) tenant.setSchoolStaffDailyDataCapMb(req.staffDailyDataCapMb() > 0 ? req.staffDailyDataCapMb() : null);
         if (req.visitorDataCapMb() != null) tenant.setSchoolVisitorDataCapMb(req.visitorDataCapMb() > 0 ? req.visitorDataCapMb() : null);
+        if (req.staffSiteMode() != null) tenant.setSchoolStaffSiteMode(req.staffSiteMode());
+        if (req.staffSiteRules() != null) tenant.setSchoolStaffSiteRules(req.staffSiteRules().trim().isEmpty() ? null : req.staffSiteRules().trim());
+        if (req.studentFreeEnabled() != null) tenant.setSchoolStudentFreeEnabled(req.studentFreeEnabled());
+        if (req.studentDailyFreeMb() != null) tenant.setSchoolStudentDailyFreeMb(req.studentDailyFreeMb() > 0 ? req.studentDailyFreeMb() : null);
+        if (req.studentFreeRateLimit() != null) tenant.setSchoolStudentFreeRateLimit(rate(req.studentFreeRateLimit()));
+        if (req.studentAllowedSites() != null) tenant.setSchoolStudentAllowedSites(req.studentAllowedSites().trim().isEmpty() ? null : req.studentAllowedSites().trim());
         if (req.tetheringProtection() != null) tenant.setTetheringProtection(req.tetheringProtection());
         Tenant saved = tenants.save(tenant);
         access.applyFreeAccessRules(saved, Boolean.TRUE.equals(req.applyImmediately()));
-        if (req.tetheringProtection() != null && routers != null && routerManagement != null) {
+        boolean syncFilter = req.studentFreeEnabled() != null || req.studentDailyFreeMb() != null
+                || req.studentAllowedSites() != null || req.staffSiteMode() != null || req.staffSiteRules() != null;
+        if (routers != null && routerManagement != null && (req.tetheringProtection() != null || syncFilter)) {
             for (Router router : routers.findAllByTenantId(saved.getId())) {
                 try {
-                    routerManagement.enqueue(router, "SYNC_TETHERING");
+                    if (req.tetheringProtection() != null) routerManagement.enqueue(router, "SYNC_TETHERING");
+                    if (syncFilter) routerManagement.enqueue(router, "SYNC_SCHOOL_FILTER");
                 } catch (ResponseStatusException e) {
-                    log.debug("Skipping tethering sync for router {}: {}", router.getId(), e.getMessage());
+                    log.debug("Skipping router sync for router {}: {}", router.getId(), e.getMessage());
                 }
             }
         }

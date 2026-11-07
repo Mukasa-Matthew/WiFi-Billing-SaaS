@@ -215,6 +215,11 @@
                 <button type="submit" class="btn btn-dark" id="school-pin-btn">Save PIN and continue</button>
             </form>
             <div id="school-welcome" class="status-msg success" style="display:none"></div>
+            <div id="school-student-free-box" style="display:none;margin:10px 0 14px;padding:14px;border-radius:12px;border:1px solid rgba(59,130,246,0.35);background:rgba(59,130,246,0.08);text-align:left">
+                <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px" id="school-student-free-title">🎓 Daily Free Study Data</div>
+                <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:10px" id="school-student-free-desc"></div>
+                <button type="button" class="btn btn-dark" id="school-student-free-btn" onclick="useStudentFree()">Use Free Study Data</button>
+            </div>
             <button type="button" class="btn btn-outline" id="school-visitor-btn" style="display:none" onclick="showSchoolVisitor()">🧳 &nbsp;I'm a visitor</button>
             <form id="school-visitor-form" style="display:none" onsubmit="schoolVisitor(event)">
                 <span class="section-label">Visitor pass</span>
@@ -526,6 +531,10 @@ function schoolVisitor(ev) {
     ev.preventDefault();
     schoolPost('visitor', { code: document.getElementById('school-visitor-code').value.trim() });
 }
+function useStudentFree() {
+    if (!SCHOOL.ticket) return;
+    schoolPost('student-free', { ticket: SCHOOL.ticket });
+}
 function schoolResult(res) {
     if (res.action === 'CHANGE_PIN') {
         SCHOOL.pinChangeToken = res.pinChangeToken;
@@ -539,8 +548,33 @@ function schoolResult(res) {
         SCHOOL.ticket = res.ticket;
         document.getElementById('school-signin').style.display = 'none';
         var welcome = document.getElementById('school-welcome');
-        welcome.textContent = 'Signed in as ' + (res.fullName || 'student') + '. Choose a package below.';
+        welcome.textContent = 'Signed in as ' + (res.fullName || 'student') + '. ' +
+            (res.studentFreeAvailable ? 'Use your free daily study data or buy a full-internet package below.' : 'Choose a package below.');
         welcome.style.display = '';
+        var freeBox = document.getElementById('school-student-free-box');
+        var freeBtn = document.getElementById('school-student-free-btn');
+        var freeTitle = document.getElementById('school-student-free-title');
+        var freeDesc = document.getElementById('school-student-free-desc');
+        if (res.studentFreeAvailable && res.studentFreeDailyCapMb > 0) {
+            freeBox.style.display = '';
+            var rem = Number(res.studentFreeRemainingMb || 0);
+            var cap = Number(res.studentFreeDailyCapMb || 0);
+            var sites = (res.studentFreeAllowedSites || '').trim();
+            if (rem > 0) {
+                freeTitle.textContent = '🎓 Free Daily Study Data (' + rem + ' MB of ' + cap + ' MB left today)';
+                freeDesc.textContent = sites
+                    ? 'Works on school-approved study websites (' + sites + '). For full unrestricted internet, purchase a package below.'
+                    : 'Entitles you to ' + cap + ' MB per day for school & study websites. For full unrestricted internet, purchase a package below.';
+                freeBtn.style.display = '';
+                freeBtn.textContent = '🎓 Connect with Free ' + rem + ' MB Study Data';
+            } else {
+                freeTitle.textContent = '⌛ Daily Free Study Data Used Up (' + cap + ' MB / day)';
+                freeDesc.textContent = 'You have used your ' + cap + ' MB free daily study allowance for today (resets tomorrow). Purchase a package below for full internet access.';
+                freeBtn.style.display = 'none';
+            }
+        } else {
+            freeBox.style.display = 'none';
+        }
         document.getElementById('msg-area').innerHTML = '';
         if (window.PORTAL_CFG) applySchoolMode(window.PORTAL_CFG);
         document.getElementById('packages-section').scrollIntoView({ behavior: 'smooth' });
@@ -551,7 +585,8 @@ function schoolResult(res) {
         purchasedCode = res.code;
         document.getElementById('username-input').value = res.code;
         document.getElementById('school-signin').style.display = 'none';
-        var who = res.category === 'STAFF' ? 'staff access' : res.category === 'VISITOR' ? 'visitor access' : 'your package';
+        document.getElementById('school-student-free-box').style.display = 'none';
+        var who = res.category === 'STAFF' ? 'staff access' : res.category === 'VISITOR' ? 'visitor access' : res.category === 'STUDENT_FREE' ? 'free daily study data' : 'your package';
         if (!LINK_LOGIN || LINK_LOGIN.charAt(0) === '$') { showMsg('Signed in. Reopen this page from the WiFi network to connect.', true); return; }
         var greeting = res.fullName ? ('Welcome, ' + escapeText(res.fullName) + '. ') : 'Welcome back! ';
         showMsg(greeting + 'Connecting you with ' + who + '…', false);

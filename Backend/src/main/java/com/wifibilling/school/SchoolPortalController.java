@@ -23,10 +23,16 @@ public class SchoolPortalController {
     }
     public record Visitor(@NotBlank @Size(max = 128) String token, @NotBlank @Size(max = 16) String code, @Size(max = 24) String mac) {}
     public record Resume(@NotBlank @Size(max = 128) String token, @NotBlank @Size(max = 24) String mac) {}
+    public record StudentFree(@NotBlank @Size(max = 128) String token, @NotBlank @Size(max = 600) String ticket, @NotBlank @Size(max = 24) String mac) {}
 
     @PostMapping("/resume")
     public SchoolAccessService.PortalResult resume(@Valid @RequestBody Resume body) {
         return access.resume(body.token(), body.mac());
+    }
+
+    @PostMapping("/student-free")
+    public SchoolAccessService.PortalResult studentFree(@Valid @RequestBody StudentFree body) {
+        return access.studentFree(body.token(), body.ticket(), body.mac());
     }
 
     @PostMapping("/verify")

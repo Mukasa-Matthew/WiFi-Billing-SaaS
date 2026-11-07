@@ -137,7 +137,7 @@ public class VoucherExpirationWorker {
      */
     private void enforceSchoolDataCaps() {
         List<Voucher> freeVouchers = voucherRepository.findAllBySchoolCategoryInAndStatusIn(
-                List.of("STAFF", "VISITOR"), List.of(STATUS_UNUSED, STATUS_ACTIVE));
+                List.of("STAFF", "VISITOR", "STUDENT"), List.of(STATUS_UNUSED, STATUS_ACTIVE));
         if (freeVouchers == null || freeVouchers.isEmpty()) return;
         OffsetDateTime startOfToday = clock != null ? clock.startOf(clock.today())
                 : java.time.LocalDate.now(java.time.ZoneOffset.UTC).atStartOfDay().atOffset(java.time.ZoneOffset.UTC);
@@ -145,6 +145,29 @@ public class VoucherExpirationWorker {
             if (Boolean.TRUE.equals(voucher.getSchoolHold())) continue;
             var tenant = voucher.getTenant();
             if (tenant == null || !tenant.isSchool()) continue;
+            if ("STUDENT".equals(voucher.getSchoolCategory())) {
+                if (!"SCHOOL_STUDENT_FREE".equals(voucher.getSaleType())) continue;
+                if (!tenant.isSchoolStudentFreeEnabled()) {
+                    holdSchoolVoucher(voucher, "student free study data disabled");
+                    continue;
+                }
+                Integer capMb = tenant.getSchoolStudentDailyFreeMb();
+                if (capMb != null && capMb > 0) {
+                    long capBytes = capMb.longValue() * 1024L * 1024L;
+                    var codes = new java.util.LinkedHashSet<String>();
+                    if (voucher.getPersonId() != null) {
+                        voucherRepository.findAllByTenantIdAndPersonIdAndSchoolCategory(tenant.getId(), voucher.getPersonId(), "STUDENT").stream()
+                                .filter(v -> "SCHOOL_STUDENT_FREE".equals(v.getSaleType()))
+                                .forEach(v -> codes.add(v.getCode()));
+                    }
+                    codes.add(voucher.getCode());
+                    long used = radAcctRepository.sumOctetsForUsernamesSince(codes, startOfToday);
+                    if (used >= capBytes) {
+                        holdSchoolVoucher(voucher, "student daily free study data cap (" + capMb + " MB) reached");
+                    }
+                }
+                continue;
+            }
             if ("STAFF".equals(voucher.getSchoolCategory())) {
                 if (!tenant.isSchoolStaffEnabled()) {
                     holdSchoolVoucher(voucher, "staff WiFi paused");
