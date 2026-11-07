@@ -13,28 +13,47 @@ interface SchoolSummary { name: string; active: boolean; students: number; staff
 interface Overview { settings: Settings; school: SchoolSummary; dashboardUrl: string }
 interface StaffException { id: string; fullName: string; identifiers: string; reason: string; requestedBy: string; requestedAt: string; status: string; decidedAt: string | null; decidedBy: string | null }
 interface VisitorPass { id: string; fullName: string; phone: string; reason: string; issuedBy: string; issuedAt: string; expiresAt: string; status: string; deviceMac: string | null }
+interface ActiveSession { radAcctId: number; username: string; framedIpAddress: string | null; callingStationId: string | null; nasIpAddress: string | null; acctSessionTime: number | null; totalOctets: number | null; category?: string | null; categoryLabel?: string | null; packageName?: string | null; customerName?: string | null }
 interface Page<T> { content: T[]; totalElements: number }
 
 const PASS_TONE: Record<string, "green" | "blue" | "amber" | "slate"> = { IN_USE: "green", UNUSED: "blue", EXPIRED: "slate", REVOKED: "amber" };
+const CAT_TONE: Record<string, "green" | "blue" | "amber" | "slate"> = { STUDENT: "green", STAFF: "blue", VISITOR: "amber", PAID_CUSTOMER: "slate" };
 
 export default function SchoolPage() {
   const overview = useApi<Overview>("/api/school");
   const exceptions = useApi<StaffException[]>("/api/school/staff-exceptions?status=PENDING");
   const passes = useApi<Page<VisitorPass>>("/api/school/visitor-passes");
+  const liveSessions = useApi<ActiveSession[]>("/api/sessions/active", 15000);
   const now = useNow();
   const school = overview.data?.school;
+  const connected = liveSessions.data ?? [];
+  const connectedStudents = connected.filter((s) => s.category === "STUDENT").length;
+  const connectedStaff = connected.filter((s) => s.category === "STAFF").length;
+  const connectedVisitors = connected.filter((s) => s.category === "VISITOR").length;
+  const connectedCustomers = connected.filter((s) => !s.category || s.category === "PAID_CUSTOMER").length;
 
   return (
     <PageContainer>
       <PageHeader title="School" description="Free access for staff and visitors, and who may get it. Students and their records are managed by the school's IT person." />
       {overview.error && <ErrorNotice text={`Couldn't load the school: ${overview.error}`} />}
       {school && !school.active && <ErrorNotice text="This school is paused by AirPairy. Students and staff can't sign in until it is reactivated." />}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <StatCard label="Connected devices now" value={liveSessions.loading && !liveSessions.data ? "—" : connected.length.toLocaleString()} icon={<CheckCircle />} tone="green" loading={liveSessions.loading && !liveSessions.data} hint={`${connectedStudents} student · ${connectedStaff} staff · ${connectedVisitors} visitor${connectedCustomers ? ` · ${connectedCustomers} walk-in` : ""}`} />
         <StatCard label="Students" value={school?.students.toLocaleString() ?? "—"} icon={<GraduationCap />} loading={overview.loading} hint="Registered by the school" />
         <StatCard label="Staff with free access" value={school?.staff.toLocaleString() ?? "—"} icon={<Users />} loading={overview.loading} hint="Renewed yearly by the school" />
         <StatCard label="Visitor passes today" value={school ? `${school.visitorPassesToday}${overview.data?.settings.visitorsEnabled ? ` / ${overview.data.settings.visitorDailyCap}` : ""}` : "—"} icon={<Ticket />} loading={overview.loading} hint={overview.data?.settings.visitorsEnabled ? "Of today's limit" : "Visitors are switched off"} />
         <StatCard label="Waiting for you" value={school?.pendingStaffExceptions.toLocaleString() ?? "—"} icon={<CheckCircle />} loading={overview.loading} hint="Staff exception requests" />
       </div>
+      <Card title="Live connected devices" description="Every device currently connected on the school network and where it belongs (Student, Staff, Visitor Pass, or Paid Customer)." bodyClassName="">
+        <Table rows={connected} loading={liveSessions.loading && !liveSessions.data} rowKey={(s) => String(s.radAcctId || s.username)} searchPlaceholder="Search voucher, category, MAC or IP…"
+          emptyIcon={<Users />} emptyTitle="No devices connected right now" emptyDescription="Devices appear here as students, staff, visitors or customers sign in."
+          columns={[
+            { label: "Category", render: (s) => <Badge tone={CAT_TONE[s.category || "PAID_CUSTOMER"] ?? "slate"} dot>{s.categoryLabel || "Paid Customer"}</Badge> },
+            { label: "Voucher / Plan", render: (s) => <span className="block"><span className="font-mono text-xs font-semibold text-[var(--fg)]">{s.username}</span><span className="block text-xs text-[var(--fg-muted)]">{s.packageName || "WiFi access"}</span></span> },
+            { label: "Device MAC", render: (s) => <span className="font-mono text-xs">{s.callingStationId || "—"}</span> },
+            { label: "IP Address", hideBelow: "sm", render: (s) => <span className="font-mono text-xs text-[var(--fg-muted)]">{s.framedIpAddress || "—"}</span> },
+          ]} />
+      </Card>
       <div className="grid gap-6 lg:grid-cols-2">
         {overview.data && <SettingsCard key={JSON.stringify(overview.data.settings)} settings={overview.data.settings} onSaved={() => { overview.load(); passes.load(); }} />}
         <Card title="Staff exception requests" description="Former students can only get free staff access if you approve. You see only what you need to decide." bodyClassName="">

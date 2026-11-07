@@ -31,4 +31,37 @@ public final class AccessState {
                 : v instanceof java.sql.Date d ? d.toLocalDate().atStartOfDay().atOffset(ZoneOffset.UTC)
                 : null;
     }
+
+    /** STUDENT, STAFF, VISITOR, or PAID_CUSTOMER for a voucher. */
+    public static String category(Voucher v) {
+        if (v == null) return "PAID_CUSTOMER";
+        if (v.getSchoolCategory() != null && !v.getSchoolCategory().isBlank()) return v.getSchoolCategory();
+        if ("SCHOOL_STAFF".equals(v.getSaleType())) return "STAFF";
+        if ("SCHOOL_VISITOR".equals(v.getSaleType())) return "VISITOR";
+        return "PAID_CUSTOMER";
+    }
+
+    /** Human-readable label for a voucher's connection category. */
+    public static String categoryLabel(Voucher v) {
+        return switch (category(v)) {
+            case "STUDENT" -> "Paid Student";
+            case "STAFF" -> "School Staff";
+            case "VISITOR" -> "Visitor Pass";
+            default -> "Paid Customer";
+        };
+    }
+
+    /** Display name for the connected user without exposing private student records. */
+    public static String displayName(Voucher v) {
+        if (v == null) return "Paid customer";
+        if (v.getCustomer() != null && v.getCustomer().getName() != null && !v.getCustomer().getName().isBlank()) {
+            return v.getCustomer().getName();
+        }
+        return switch (category(v)) {
+            case "STUDENT" -> "Paid Student";
+            case "STAFF" -> "School Staff";
+            case "VISITOR" -> "School Visitor";
+            default -> "Paid Customer";
+        };
+    }
 }

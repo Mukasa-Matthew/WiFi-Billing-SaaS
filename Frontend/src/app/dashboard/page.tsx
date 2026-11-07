@@ -26,6 +26,7 @@ interface DashboardStats {
   range: string; revenueSeries: SeriesPoint[]; dailyActiveUsers: SeriesPoint[]; registrations: SeriesPoint[];
   topDataUsers: TopDataUser[]; packagePerformance: PackagePerf[];
   dataMonthDownBytes: number; dataMonthUpBytes: number; totalCustomers: number; newCustomersThisWeek: number;
+  activeByCategory?: Record<string, number>;
 }
 // Tenant router list. The response also carries provisioning secrets; only these fields are read.
 interface RouterRec { id: number; name: string; status: string; lastSeen: string | null; cpuLoad: number | null; memoryUsage: number | null; hotspotReady: boolean | null; radiusReady: boolean | null; portalReady: boolean | null }
@@ -178,7 +179,17 @@ export default function TenantDashboardOverview() {
 
       {/* Live operational figures */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        <StatCard label="Online now" href="/dashboard/users" icon={<Radio />} tone="green" value={s ? s.activeUsers.toLocaleString() : "—"} hintText="Customers connected right now" />
+        <StatCard label="Online now" href="/dashboard/users" icon={<Radio />} tone="green" value={s ? s.activeUsers.toLocaleString() : "—"} hintText={(() => {
+          const cat = s?.activeByCategory;
+          if (!cat || (!cat.STUDENT && !cat.STAFF && !cat.VISITOR)) return "Customers connected right now";
+          const parts = [
+            cat.STUDENT ? `${cat.STUDENT} student${cat.STUDENT === 1 ? "" : "s"}` : "",
+            cat.STAFF ? `${cat.STAFF} staff` : "",
+            cat.VISITOR ? `${cat.VISITOR} visitor${cat.VISITOR === 1 ? "" : "s"}` : "",
+            cat.PAID_CUSTOMER ? `${cat.PAID_CUSTOMER} customer${cat.PAID_CUSTOMER === 1 ? "" : "s"}` : "",
+          ].filter(Boolean);
+          return parts.length ? parts.join(" · ") : "Customers connected right now";
+        })()} />
         <StatCard label="Customers" href="/dashboard/customers" icon={<Users />} value={s ? s.totalCustomers.toLocaleString() : "—"} hintText={s ? `+${s.newCustomersThisWeek.toLocaleString()} new this week` : undefined} />
         <StatCard label="Routers online" href="/dashboard/routers" icon={<CellTower />} tone={down.length ? "red" : degraded.length ? "amber" : "default"}
           value={routers.error ? "—" : <>{online}<span className="text-[var(--fg-faint)]">/{fleet.length}</span></>}

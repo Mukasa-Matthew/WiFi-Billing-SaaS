@@ -116,6 +116,11 @@ public class TenantDashboardService {
         // Sessions
         List<ActiveSessionDto> activeSessions = sessionService.getActiveSessions(tenantId, role);
         long activeUsers = activeSessions.size();
+        Map<String, Long> activeByCategory = new LinkedHashMap<>();
+        for (ActiveSessionDto s : activeSessions) {
+            String cat = s.category() != null ? s.category() : "PAID_CUSTOMER";
+            activeByCategory.merge(cat, 1L, Long::sum);
+        }
 
         // Per-router revenue: how much each site earns for this tenant
         Map<Long, BigDecimal[]> perRouter = new HashMap<>();
@@ -307,6 +312,7 @@ public class TenantDashboardService {
                 .dataMonthUpBytes(upMonth)
                 .totalCustomers(totalCustomers)
                 .newCustomersThisWeek(newThisWeek)
+                .activeByCategory(activeByCategory)
                 .revenueSeries(revenueSeries)
                 .dailyActiveUsers(dailyUsers)
                 .registrations(registrations)

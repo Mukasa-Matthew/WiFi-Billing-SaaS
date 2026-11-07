@@ -18,5 +18,9 @@ public record ActiveSessionDto(
     Long acctOutputOctets,
     Long totalOctets,
     String status,
-    String acctTerminateCause
+    String acctTerminateCause,
+    String category,
+    String categoryLabel,
+    String packageName,
+    String customerName
 ) {}
