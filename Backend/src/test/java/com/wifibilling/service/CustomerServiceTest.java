@@ -146,9 +146,9 @@ class CustomerServiceTest {
         when(accounting.customerVoucherUsage(eq(TENANT), any())).thenReturn(List.<Object[]>of(
                 new Object[]{"U1", 700L, now, 1L, now.minusHours(1)},
                 new Object[]{"OTHER", 9L, now, 0L, now}));
-        when(transactions.findAllByTenantIdAndVoucherCodeInAndStatusOrderByCreatedAtDesc(eq(TENANT), anyCollection(), eq("SUCCESSFUL")))
+        when(transactions.findForCustomer(eq(TENANT), anyCollection(), anyCollection(), anyString()))
                 .thenReturn(List.of(com.wifibilling.model.Transaction.builder().reference("PAY-1").amount(new BigDecimal("1000"))
-                        .network("MTN").voucherCode("U1").createdAt(now.minusHours(2)).build()));
+                        .network("MTN").status("SUCCESSFUL").voucherCode("U1").createdAt(now.minusHours(2)).build()));
 
         var h = service.history(TENANT, 4L).orElseThrow();
 

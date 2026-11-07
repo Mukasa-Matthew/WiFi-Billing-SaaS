@@ -1,14 +1,20 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
-import { useResource, Table, Badge, ErrorNotice, FilterTabs, date, PageHeader, StatCard, buttonGhost, humanize, ugx, useNow } from "@/components/BillingUI";
-import { Wallet, Money, CalendarBlank, Eye, EyeSlash, DownloadSimple, ArrowsClockwise, CreditCard, Phone } from "@/components/icons";
+import React, { Suspense, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useResource, useApi, Table, Badge, ErrorNotice, FilterTabs, Pager, date, PageHeader, StatCard, button, buttonGhost, field, panel, humanize, ugx, useNow } from "@/components/BillingUI";
+import { Wallet, Money, CalendarBlank, Eye, EyeSlash, DownloadSimple, ArrowsClockwise, CreditCard, Phone, MagnifyingGlass, X } from "@/components/icons";
 import { useToast } from "@/components/ui/Toast";
 
 interface Payment {
   id: number; reference: string; method: string; amount: number; status: string;
   phone: string; voucher: string | null; packageName: string | null; router: string | null;
-  createdAt: string; notes: string | null;
+  createdAt: string; notes: string | null; mobileMoneyId: string | null;
+}
+
+interface PhoneSearch {
+  phone: string; payments: Payment[]; page: number; totalPages: number; totalElements: number;
+  summary: { payments: number; successful: number; totalPaid: number; firstPaidAt: string | null; lastPaidAt: string | null };
 }
 
 type PaymentFilter = "ALL" | "SUCCESSFUL" | "PENDING" | "FAILED";
@@ -74,6 +80,8 @@ export default function PaymentsPage() {
         <StatCard label="This month" loading={loading} value={money(metrics.month)} icon={<Money />} hintText="Successful revenue since month start" />
       </div>
 
+      <Suspense><PaymentLookup money={money} /></Suspense>
+
       <ErrorNotice text={error} />
 
       <Table rows={visible} loading={loading} rowKey={(payment) => payment.id || payment.reference}
@@ -93,5 +101,63 @@ export default function PaymentsPage() {
 
       <div className="flex justify-end"><button onClick={exportCsv} disabled={!visible.length} className={buttonGhost}><DownloadSimple className="h-4 w-4" />Export current view</button></div>
     </div>
+  );
+}
+
+/**
+ * Every payment a phone number has ever made, searched on the server across all
+ * records (any date or status), so a customer's "I paid" can be checked.
+ */
+function PaymentLookup({ money }: { money: (value: number) => string }) {
+  // Opened from a customer's history as /dashboard/payments?phone=…
+  const initial = useSearchParams().get("phone") ?? "";
+  const [text, setText] = useState(initial);
+  const [phone, setPhone] = useState(initial);
+  const [page, setPage] = useState(0);
+  const url = phone ? `/api/finance/payments/search?phone=${encodeURIComponent(phone)}&page=${page}&size=25` : null;
+  const result = useApi<PhoneSearch>(url, 0, { keepPrevious: true });
+  const found = phone ? result.data : null;
+  const digits = text.replace(/\D/g, "");
+  const submit = (event: React.FormEvent) => { event.preventDefault(); if (digits.length >= 7) { setPhone(text.trim()); setPage(0); } };
+  const clear = () => { setText(""); setPhone(""); setPage(0); };
+
+  return (
+    <section className={panel}>
+      <form onSubmit={submit} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-end">
+        <label className="min-w-0 flex-1 text-xs font-semibold text-[var(--fg-muted)]">
+          Find payments by phone number
+          <input className={field} type="tel" inputMode="tel" value={text} onChange={(event) => setText(event.target.value)} placeholder="e.g. 0772 123456 or +256772123456" />
+        </label>
+        <div className="flex gap-2">
+          <button type="submit" className={button} disabled={digits.length < 7 || (result.refreshing && !!phone)}><MagnifyingGlass className="h-4 w-4" />Search all records</button>
+          {phone && <button type="button" onClick={clear} className={`${buttonGhost} px-3`} aria-label="Clear search"><X className="h-4 w-4" /></button>}
+        </div>
+      </form>
+      {phone && <div className="border-t border-[var(--border)]">
+        <ErrorNotice text={result.error} />
+        {result.loading && <p className="px-4 py-6 text-center text-[13px] text-[var(--fg-muted)]">Searching every payment…</p>}
+        {found && <>
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-3 bg-[var(--subtle)] px-4 py-3 sm:grid-cols-4">
+            <div><dt className="text-xs text-[var(--fg-muted)]">Number</dt><dd className="num text-[13px] font-semibold text-[var(--fg)]">{found.phone}</dd></div>
+            <div><dt className="text-xs text-[var(--fg-muted)]">Total paid</dt><dd className="num text-[13px] font-semibold text-[var(--fg)]">{money(found.summary.totalPaid)}</dd></div>
+            <div><dt className="text-xs text-[var(--fg-muted)]">Successful / all attempts</dt><dd className="num text-[13px] font-semibold text-[var(--fg)]">{found.summary.successful.toLocaleString()} / {found.summary.payments.toLocaleString()}</dd></div>
+            <div><dt className="text-xs text-[var(--fg-muted)]">Last successful payment</dt><dd className="num text-[13px] font-semibold text-[var(--fg)]">{found.summary.lastPaidAt ? date(found.summary.lastPaidAt) : "Never"}</dd></div>
+          </dl>
+          <Table bare searchable={false} paginated={false} rows={found.payments} rowKey={(payment) => payment.id}
+            emptyIcon={<Phone />} emptyTitle="No payments from this number" emptyDescription="Nothing was ever paid or attempted with this number on your network. Check the number with the customer."
+            columns={[
+              { label: "Date", render: (payment) => <span className="num">{date(payment.createdAt)}</span> },
+              { label: "Amount", align: "right", render: (payment) => <span className="num font-semibold text-[var(--fg)]">{money(Number(payment.amount))}</span> },
+              { label: "Status", render: (payment) => <Badge dot tone={statusTone(payment.status)}>{humanize(payment.status)}</Badge> },
+              { label: "Channel", render: (payment) => <Badge tone="slate">{humanize(payment.method)}</Badge> },
+              { label: "MoMo transaction ID", render: (payment) => payment.mobileMoneyId ? <span className="num text-xs">{payment.mobileMoneyId}</span> : <span className="text-[var(--fg-faint)]">—</span> },
+              { label: "Voucher & package", hideBelow: "md", render: (payment) => <span>{payment.voucher ? <span className="num block text-xs font-semibold">{payment.voucher}</span> : <span className="text-[var(--fg-faint)]">No voucher</span>}<span className="block text-[11px] text-[var(--fg-muted)]">{payment.packageName || "—"}</span></span> },
+              { label: "Reference", hideBelow: "lg", render: (payment) => <span className="num text-[11px] text-[var(--fg-muted)]">{payment.reference}</span> },
+            ]}
+          />
+          <Pager page={found.page} totalPages={found.totalPages} totalElements={found.totalElements} onPage={setPage} busy={result.refreshing} />
+        </>}
+      </div>}
+    </section>
   );
 }

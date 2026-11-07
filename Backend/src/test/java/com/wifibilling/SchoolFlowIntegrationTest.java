@@ -453,4 +453,108 @@ class SchoolFlowIntegrationTest {
         routerManagement.resyncChangedRules();
         assertEquals(before + 1, routerTasks.findAllByRouterIdOrderByCreatedAtDesc(router.getId()).size(), "an up-to-date router gets nothing new");
     }
+
+    @Autowired TransactionRepository transactions;
+
+    private String paidVoucher(Site site, String phone, String mac) throws Exception {
+        String body = "{\"token\":\"" + site.routerToken() + "\",\"packageId\":" + site.planId() + ",\"phone\":\"" + phone + "\",\"mac\":\"" + mac + "\"}";
+        String reference = JsonPath.read(mvc.perform(post("/api/payments/initiate").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andReturn().getResponse().getContentAsString(), "$.reference");
+        mvc.perform(post("/api/payments/webhook").header("X-Webhook-Secret", "school-test-webhook-secret").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"reference\":\"" + reference + "\",\"status\":\"SUCCESSFUL\"}")).andExpect(status().isOk());
+        var tx = transactions.findByReference(reference).orElseThrow();
+        tx.setProviderTransactionId("MP-55501236789");
+        transactions.save(tx);
+        return tx.getVoucherCode();
+    }
+    private String findVoucher(Site site, String phone, String mac) throws Exception {
+        return mvc.perform(get("/api/portal/find-voucher").param("token", site.routerToken()).param("phone", phone).param("mac", mac))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+    }
+    private org.springframework.test.web.servlet.ResultActions unlock(Site site, String phone, Number id, String proof) throws Exception {
+        return mvc.perform(post("/api/portal/find-voucher/unlock").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"token\":\"" + site.routerToken() + "\",\"phone\":\"" + phone + "\",\"id\":" + id + ",\"proof\":\"" + proof + "\"}"));
+    }
+
+    @Test
+    void findVoucherShowsCodesOnlyToThePayingDeviceOrWithTheSmsTransactionId() throws Exception {
+        Site shop = site("lookup-shop", false);
+        String code = paidVoucher(shop, "0770000021", PHONE_MAC);
+
+        // The phone that paid sees its code and can connect straight away, whatever format the number is typed in
+        String own = findVoucher(shop, "+256 770 000021", PHONE_MAC);
+        assertEquals(code, JsonPath.read(own, "$.vouchers[0].code"));
+        assertEquals(code, JsonPath.read(own, "$.voucherCode"));
+
+        // Anyone else typing the number sees the purchase, never the code
+        String other = findVoucher(shop, "0770000021", TABLET_MAC);
+        assertFalse(other.contains(code), "the code is not sent to another device");
+        assertEquals(true, JsonPath.read(other, "$.vouchers[0].locked"));
+        assertEquals(true, JsonPath.read(other, "$.vouchers[0].canUnlock"));
+        Number id = JsonPath.read(other, "$.vouchers[0].id");
+
+        // The last 4 digits of the MoMo Transaction ID unlock it; wrong digits do not
+        unlock(shop, "0770000021", id, "1234").andExpect(status().isBadRequest());
+        unlock(shop, "0770000021", id, "6789").andExpect(status().isOk()).andExpect(jsonPath("$.code").value(code));
+
+        // A different tenant's portal can't see or unlock it
+        Site elsewhere = site("lookup-elsewhere", false);
+        assertEquals(0, (int) JsonPath.read(findVoucher(elsewhere, "0770000021", PHONE_MAC), "$.vouchers.length()"));
+        unlock(elsewhere, "0770000021", id, "6789").andExpect(status().isBadRequest());
+
+        // Guessing is limited: after 5 wrong tries even the right digits are refused for a while
+        for (int i = 0; i < 5; i++) unlock(shop, "0770000021", id, "000" + i).andExpect(status().isBadRequest());
+        unlock(shop, "0770000021", id, "6789").andExpect(status().isTooManyRequests());
+    }
+
+    @Test
+    void ownerFindsEveryPaymentForANumberWhateverFormatOrStatus() throws Exception {
+        Site shop = site("payment-search-shop", false);
+        Site other = site("payment-search-other", false);
+        OffsetDateTime now = OffsetDateTime.now();
+        var shopPlan = plans.findById(shop.planId().longValue()).orElseThrow();
+        var otherPlan = plans.findById(other.planId().longValue()).orElseThrow();
+        var shopRouter = routerRepository.findAllByTenantId(shop.tenant().getId()).get(0);
+        var otherRouter = routerRepository.findAllByTenantId(other.tenant().getId()).get(0);
+        String[][] rows = {
+                {"+256770000031", "1000", "MTN", "SUCCESSFUL", "40"},
+                {"0770000031", "500", "AIRTEL", "FAILED", "30"},
+                {"0770 000 031", "2000", "CASH", "SUCCESSFUL", "20"},
+                {"256770000031", "1500", "MTN", "PENDING", "10"},
+                {"+256770000099", "9000", "MTN", "SUCCESSFUL", "5"}};
+        for (String[] r : rows) {
+            transactions.save(com.wifibilling.model.Transaction.builder().tenant(shop.tenant()).packagePlan(shopPlan).router(shopRouter).reference("SRCH-" + UUID.randomUUID())
+                    .phone(r[0]).amount(new java.math.BigDecimal(r[1])).network(r[2]).status(r[3])
+                    .providerTransactionId("MTN" + r[1]).createdAt(now.minusDays(Long.parseLong(r[4]))).build());
+        }
+        transactions.save(com.wifibilling.model.Transaction.builder().tenant(other.tenant()).packagePlan(otherPlan).router(otherRouter).reference("SRCH-" + UUID.randomUUID())
+                .phone("+256770000031").amount(new java.math.BigDecimal("7000")).network("MTN").status("SUCCESSFUL").build());
+
+        mvc.perform(get("/api/finance/payments/search").param("phone", "770000031").param("size", "3").header("Authorization", "Bearer " + shop.jwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.phone").value("0770000031"))
+                .andExpect(jsonPath("$.totalElements").value(4))
+                .andExpect(jsonPath("$.totalPages").value(2))
+                .andExpect(jsonPath("$.payments.length()").value(3))
+                .andExpect(jsonPath("$.payments[0].status").value("PENDING"))
+                .andExpect(jsonPath("$.payments[0].mobileMoneyId").value("MTN1500"))
+                .andExpect(jsonPath("$.summary.payments").value(4))
+                .andExpect(jsonPath("$.summary.successful").value(2))
+                .andExpect(jsonPath("$.summary.totalPaid").value(3000.0));
+        mvc.perform(get("/api/finance/payments/search").param("phone", "0770000031").param("size", "3").param("page", "1").header("Authorization", "Bearer " + shop.jwt()))
+                .andExpect(jsonPath("$.payments.length()").value(1))
+                .andExpect(jsonPath("$.payments[0].status").value("SUCCESSFUL"));
+        mvc.perform(get("/api/finance/payments/search").param("phone", "+256770000031").header("Authorization", "Bearer " + other.jwt()))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.summary.totalPaid").value(7000.0));
+        mvc.perform(get("/api/finance/payments/search").param("phone", "12").header("Authorization", "Bearer " + shop.jwt()))
+                .andExpect(status().isBadRequest());
+
+        // The customer's history shows the same payments, failed and pending included
+        Number customerId = JsonPath.read(authed(shop.jwt(), "/api/customers", "{\"name\":\"Brian\",\"phone\":\"0770000031\"}"), "$.id");
+        mvc.perform(get("/api/customers/" + customerId + "/history").header("Authorization", "Bearer " + shop.jwt()))
+                .andExpect(jsonPath("$.payments.length()").value(4))
+                .andExpect(jsonPath("$.payments[1].status").value("SUCCESSFUL"))
+                .andExpect(jsonPath("$.payments[2].status").value("FAILED"));
+    }
 }

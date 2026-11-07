@@ -76,6 +76,33 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
     List<Transaction> findAllByTenantIdAndPhoneInAndStatusOrderByCreatedAtDesc(
             Long tenantId, java.util.Collection<String> phones, String status);
 
+    /** Every transaction of a tenant for one phone number, any status and date (see PhoneMatch). */
+    @org.springframework.data.jpa.repository.Query("""
+            select t from Transaction t
+            where t.tenant.id = :tenantId and (t.phone in :phones or t.phone like :suffix)""")
+    org.springframework.data.domain.Page<Transaction> searchByPhone(Long tenantId, java.util.Collection<String> phones,
+                                                                   String suffix, org.springframework.data.domain.Pageable pageable);
+
+    /** For one phone number: [all transactions, successful ones, amount paid, first and last successful payment]. */
+    @org.springframework.data.jpa.repository.Query("""
+            select count(t),
+                   coalesce(sum(case when t.status = 'SUCCESSFUL' then 1 else 0 end), 0),
+                   coalesce(sum(case when t.status = 'SUCCESSFUL' then t.amount else 0 end), 0),
+                   min(case when t.status = 'SUCCESSFUL' then t.createdAt end),
+                   max(case when t.status = 'SUCCESSFUL' then t.createdAt end)
+            from Transaction t
+            where t.tenant.id = :tenantId and (t.phone in :phones or t.phone like :suffix)""")
+    List<Object[]> phoneSummary(Long tenantId, java.util.Collection<String> phones, String suffix);
+
+    /** A customer's transactions, any status: those for their vouchers plus any made from their phone. */
+    @org.springframework.data.jpa.repository.Query("""
+            select t from Transaction t
+            where t.tenant.id = :tenantId
+              and (t.voucherCode in :codes or t.phone in :phones or t.phone like :suffix)
+            order by t.createdAt desc, t.id desc""")
+    List<Transaction> findForCustomer(Long tenantId, java.util.Collection<String> codes,
+                                      java.util.Collection<String> phones, String suffix);
+
     boolean existsByRouterId(Long routerId);
 
     List<Transaction> findAllByTenantIdAndVoucherCodeInAndStatusOrderByCreatedAtDesc(
