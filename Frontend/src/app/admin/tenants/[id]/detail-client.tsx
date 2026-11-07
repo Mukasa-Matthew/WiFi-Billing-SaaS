@@ -16,6 +16,7 @@ import {
   bytes, date, field, humanize, message, relativeTime, shortDate, ugx, useApi, useNow, useResource,
 } from "@/components/BillingUI";
 import { Meter } from "@/components/charts";
+import { SchoolAdminPanel } from "@/components/admin/SchoolAdminPanel";
 import { duration, routerState, servicesState, sessionState, severityTone, type RouterStateInfo } from "@/lib/routerState";
 
 interface Tenant { id: number; name: string; email: string; phone: string; status: string; routerCount: number; voucherCount: number; createdAt: string }
@@ -54,7 +55,7 @@ const WITHDRAWAL_STATUS_TONE: Record<string, "green" | "blue" | "amber" | "red" 
 };
 interface Paged<T> { content: T[]; totalElements: number }
 
-const TABS = ["Overview", "Routers", "Live sessions", "Auth failures", "Billing"] as const;
+const TABS = ["Overview", "Routers", "Live sessions", "Auth failures", "Billing", "School"] as const;
 type Tab = typeof TABS[number];
 
 /** One request per router; partial failures are reported, not hidden. */
@@ -249,6 +250,7 @@ function TenantDetail() {
       {tab === "Live sessions" && <SessionsTab routers={reachable} now={now} />}
       {tab === "Auth failures" && <AuthTab routers={reachable} />}
       {tab === "Billing" && <BillingTab tenantId={tenantId} sub={sub ?? null} subsLoading={subs.loading} wallet={wallet ?? null} />}
+      {tab === "School" && <SchoolAdminPanel tenantId={tenantId} />}
     </div>
   );
 }
