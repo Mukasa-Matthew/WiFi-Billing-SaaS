@@ -72,6 +72,15 @@ class WinboxAccessServiceTest {
     }
 
     @Test
+    void firstSetupWithoutAWireGuardKeySkipsWinboxInsteadOfFailingSetup() {
+        router.setWgPublicKey(null);
+        routers.saveAndFlush(router);
+        assertThat(service.autoEnroll(router)).isNull();
+        assertThat(accesses.findByRouterId(router.getId())).isEmpty();
+        assertThat(routers.findById(router.getId())).isPresent();
+    }
+
+    @Test
     void winboxInstallationCannotRevokeOrAuthorizeWireGuardEnrollment() {
         var full = setups.issue(router, RouterSetupCode.Purpose.FULL);
         enable();
