@@ -478,7 +478,7 @@ function trySchoolResume() {
     .then(function(r){ return r.ok ? r.json() : null; })
     .then(function(res){
         if (!res) return;
-        if (res.action === 'CONNECT' && res.code) {
+        if ((res.action === 'CONNECT' && res.code) || res.action === 'BUY') {
             schoolResult(res);
         } else if (res.action === 'SIGN_IN' && res.message) {
             showMsg(escapeText(res.message), true);
@@ -548,7 +548,7 @@ function schoolResult(res) {
         SCHOOL.ticket = res.ticket;
         document.getElementById('school-signin').style.display = 'none';
         var welcome = document.getElementById('school-welcome');
-        welcome.textContent = 'Signed in as ' + (res.fullName || 'student') + '. ' +
+        welcome.textContent = (res.fullName ? 'Signed in as ' + res.fullName + '. ' : 'Welcome back. ') +
             (res.studentFreeAvailable ? 'Use your free daily study data or buy a full-internet package below.' : 'Choose a package below.');
         welcome.style.display = '';
         var freeBox = document.getElementById('school-student-free-box');
@@ -559,12 +559,9 @@ function schoolResult(res) {
             freeBox.style.display = '';
             var rem = Number(res.studentFreeRemainingMb || 0);
             var cap = Number(res.studentFreeDailyCapMb || 0);
-            var sites = (res.studentFreeAllowedSites || '').trim();
             if (rem > 0) {
                 freeTitle.textContent = '🎓 Free Daily Study Data (' + rem + ' MB of ' + cap + ' MB left today)';
-                freeDesc.textContent = sites
-                    ? 'Works on school-approved study websites (' + sites + '). For full unrestricted internet, purchase a package below.'
-                    : 'Entitles you to ' + cap + ' MB per day for school & study websites. For full unrestricted internet, purchase a package below.';
+                freeDesc.textContent = 'Works on the school\'s study websites only. Need full internet later? Open login.wifi in your browser and tap "Buy full internet", or buy a package below now.';
                 freeBtn.style.display = '';
                 freeBtn.textContent = '🎓 Connect with Free ' + rem + ' MB Study Data';
             } else {

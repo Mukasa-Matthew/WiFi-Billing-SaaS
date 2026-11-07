@@ -349,6 +349,7 @@ public class PortalController {
             content = content
                     .replace("PORTAL_THEME_PLACEHOLDER", "theme-" + theme)
                     .replace("ROUTER_TOKEN_PLACEHOLDER", router.getToken())
+                    .replace("SCHOOL_ONLY_DISPLAY", tenant.isSchool() ? "" : "none")
                     .replace("SERVER_BASE_URL_PLACEHOLDER", props.getPublicBaseUrl())
                     .replace("TENANT_NAME_PLACEHOLDER", escapeHtml(tenant.getName()))
                     .replace("TENANT_BRAND_COLOR_PLACEHOLDER",
