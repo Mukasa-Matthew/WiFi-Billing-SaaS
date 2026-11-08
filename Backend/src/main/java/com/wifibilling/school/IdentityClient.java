@@ -49,6 +49,10 @@ public class IdentityClient {
     public JsonNode resetAdminPassword(long tenantId, UUID admin) { return call("POST", school(tenantId, "/admins/" + admin + "/reset-password"), null); }
     public JsonNode resetAdminTotp(long tenantId, UUID admin) { return call("POST", school(tenantId, "/admins/" + admin + "/reset-totp"), null); }
     public JsonNode setAdminActive(long tenantId, UUID admin, boolean active) { return call("PATCH", school(tenantId, "/admins/" + admin), Map.of("active", active)); }
+    /** The tenant owner pausing or restoring an IT account; separate from the super admin's active switch. */
+    public JsonNode setAdminOwnerBlocked(long tenantId, UUID admin, boolean blocked) {
+        return call("POST", school(tenantId, "/admins/" + admin + "/owner-access"), Map.of("blocked", blocked));
+    }
     public JsonNode people(long tenantId, String query, int page) {
         return call("GET", school(tenantId, "/people?query=" + URLEncoder.encode(query == null ? "" : query, StandardCharsets.UTF_8) + "&page=" + page + "&size=20"), null);
     }

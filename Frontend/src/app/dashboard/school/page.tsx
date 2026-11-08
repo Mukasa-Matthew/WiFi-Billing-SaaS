@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import api from "@/lib/api";
-import { CheckCircle, GraduationCap, Ticket, Users, WarningCircle, XCircle } from "@/components/icons";
+import { CheckCircle, GraduationCap, Lock, ShieldCheck, Ticket, Users, WarningCircle, XCircle } from "@/components/icons";
 import {
   Badge, Card, ErrorNotice, PageContainer, PageHeader, Segmented, StatCard, Table,
   button, buttonGhost, bytes, field, hint, humanize, label, message, relativeTime, useApi, useNow,
@@ -35,6 +35,11 @@ interface SchoolSummary {
   activePeople: number;
   visitorPassesToday: number;
   pendingStaffExceptions: number;
+  itAdmins?: ItAccount[];
+}
+interface ItAccount {
+  id: string; email: string; fullName: string; role: "ADMIN" | "HELPDESK"; active: boolean;
+  ownerBlocked?: boolean; twoStepMethod?: "APP" | "EMAIL" | null; lastSignInAt: string | null;
 }
 interface Overview { settings: Settings; school: SchoolSummary; dashboardUrl: string }
 interface StaffException {
@@ -299,6 +304,7 @@ export default function SchoolPage() {
             </ul>
           )}
         </Card>
+        <ItAccountsCard accounts={school?.itAdmins} loading={overview.loading} now={now} onChanged={overview.load} />
         <NetworkSizeCard />
         </div>
       </div>
@@ -1205,6 +1211,76 @@ function SettingsCard({ settings, onSaved }: { settings: Settings; onSaved: () =
           </button>
         </div>
       </form>
+    </Card>
+  );
+}
+
+/**
+ * The people who run the school's identity dashboard. The owner can pause one at any time: they are signed out
+ * at once and can't sign in again until restored. They never see money either way.
+ */
+function ItAccountsCard({ accounts, loading, now, onChanged }: { accounts?: ItAccount[]; loading: boolean; now: number; onChanged: () => void }) {
+  const toast = useToast();
+  const { confirm, dialog } = useConfirmDialog();
+  const [busy, setBusy] = useState<string | null>(null);
+  const setBlocked = async (account: ItAccount, blocked: boolean) => {
+    setBusy(account.id);
+    try {
+      await api.post(`/api/school/it-accounts/${account.id}/access`, { blocked });
+      toast("success", blocked ? `${account.fullName} is signed out and can't sign in.` : `${account.fullName} can sign in again.`);
+      onChanged();
+    } catch (err) {
+      toast("error", message(err));
+    } finally {
+      setBusy(null);
+    }
+  };
+  const pause = (account: ItAccount) => confirm({
+    title: `Block ${account.fullName}?`,
+    body: "They are signed out of the school identity dashboard straight away and can't sign in until you allow them again. Students, staff and visitors stay connected.",
+    confirmLabel: "Block access",
+    onConfirm: () => setBlocked(account, true),
+  });
+  const list = accounts ?? [];
+  return (
+    <Card title="School IT accounts" description="Who can sign in to the school identity dashboard." bodyClassName="">
+      {loading && !accounts ? (
+        <p className="px-5 py-4 text-sm text-[var(--fg-muted)]">Loading…</p>
+      ) : list.length === 0 ? (
+        <p className="px-5 py-4 text-sm text-[var(--fg-muted)]">No IT accounts yet.</p>
+      ) : (
+        <ul className="divide-y divide-[var(--border-soft)]">
+          {list.map((account) => {
+            const blocked = !!account.ownerBlocked;
+            return (
+              <li key={account.id} className="flex items-center justify-between gap-3 px-5 py-3.5">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="truncate font-medium text-[var(--fg)]">{account.fullName}</span>
+                    {blocked ? <Badge tone="red" dot>Blocked</Badge> : !account.active ? <Badge tone="slate" dot>Disabled</Badge> : <Badge tone="green" dot>Allowed</Badge>}
+                  </div>
+                  <p className="mt-0.5 truncate text-xs text-[var(--fg-muted)]">
+                    {account.email} · {account.twoStepMethod ? <><ShieldCheck className="inline h-3 w-3" /> two-step on</> : "two-step off"}
+                    {account.lastSignInAt ? ` · signed in ${relativeTime(account.lastSignInAt, now)}` : " · never signed in"}
+                  </p>
+                </div>
+                {blocked ? (
+                  <button type="button" disabled={busy === account.id} onClick={() => setBlocked(account, false)} className={buttonGhost}>
+                    <CheckCircle className="h-4 w-4" />
+                    Allow
+                  </button>
+                ) : (
+                  <button type="button" disabled={busy === account.id || !account.active} onClick={() => pause(account)} className={buttonGhost}>
+                    <Lock className="h-4 w-4" />
+                    Block
+                  </button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {dialog}
     </Card>
   );
 }

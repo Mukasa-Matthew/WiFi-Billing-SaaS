@@ -54,6 +54,14 @@ public class SchoolController {
         return identity.staffExceptions(schools.school(principal.getTenantId()).getId(), status);
     }
 
+    public record ItAccess(@NotNull Boolean blocked) {}
+
+    /** Pauses or restores an IT person's sign-in to the identity dashboard. A pause signs them out at once. */
+    @PostMapping("/it-accounts/{id}/access")
+    public JsonNode itAccess(@AuthenticationPrincipal TenantPrincipal principal, @PathVariable UUID id, @Valid @RequestBody ItAccess body) {
+        return identity.setAdminOwnerBlocked(schools.school(principal.getTenantId()).getId(), id, body.blocked());
+    }
+
     public record Decision(@NotNull Boolean approve) {}
 
     @PostMapping("/staff-exceptions/{id}/decision")

@@ -2,6 +2,7 @@ package com.wifibilling.school;
 
 import com.wifibilling.model.IntegrationNonce;
 import com.wifibilling.repository.IntegrationNonceRepository;
+import com.wifibilling.service.EmailService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,11 +29,35 @@ public class IdentityIntegrationController {
     private static final long MAX_SKEW_SECONDS = 300;
     private final SchoolAccessService access;
     private final IntegrationNonceRepository nonces;
+    private final EmailService emailService;
     private final String secret;
     private final ObjectMapper mapper = new ObjectMapper();
 
-    public IdentityIntegrationController(SchoolAccessService access, IntegrationNonceRepository nonces, @Value("${identity.shared-secret:}") String secret) {
-        this.access = access; this.nonces = nonces; this.secret = secret;
+    public IdentityIntegrationController(SchoolAccessService access, IntegrationNonceRepository nonces,
+                                         EmailService emailService, @Value("${identity.shared-secret:}") String secret) {
+        this.access = access; this.nonces = nonces; this.emailService = emailService; this.secret = secret;
+    }
+
+    /** Sends an IT administrator's account email (sign-in, password reset and email-change codes) for the identity system. */
+    @PostMapping("/email")
+    public ResponseEntity<Map<String, Object>> sendEmail(@RequestBody(required = false) byte[] body, HttpServletRequest request,
+            @RequestHeader(value = "X-Timestamp", required = false) String timestamp,
+            @RequestHeader(value = "X-Nonce", required = false) String nonce,
+            @RequestHeader(value = "X-Signature", required = false) String signature) {
+        byte[] bytes = body == null ? new byte[0] : body;
+        if (!authentic(bytes, request, timestamp, nonce, signature)) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        JsonNode json = mapper.readTree(bytes);
+        String to = json.path("to").isString() ? json.path("to").asString().trim() : "";
+        String subject = json.path("subject").isString() ? json.path("subject").asString().trim() : "";
+        String html = json.path("html").isString() ? json.path("html").asString() : "";
+        if (to.isEmpty() || subject.isEmpty() || html.isEmpty() || to.length() > 254 || subject.length() > 200 || html.length() > 20_000) {
+            return ResponseEntity.badRequest().build();
+        }
+        // Sign-in codes must really arrive: without a mail account, say so rather than pretend.
+        if (!emailService.configured()) return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
+        try { emailService.send(to, subject, html); }
+        catch (EmailService.EmailDeliveryException failed) { return ResponseEntity.status(HttpStatus.BAD_GATEWAY).build(); }
+        return ResponseEntity.ok(Map.of("sent", true));
     }
 
     /** Ends the active sessions of a school person (until they sign in again) or of a cancelled visitor pass. */
