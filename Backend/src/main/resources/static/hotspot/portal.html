@@ -552,7 +552,7 @@ function schoolResult(res) {
         var atDeviceLimit = !!(res.paidDevices && res.paidDevices.length);
         welcome.textContent = (res.fullName ? 'Signed in as ' + res.fullName + '. ' : 'Welcome back. ') +
             (atDeviceLimit ? 'Your packages work on 2 devices at a time.'
-                : res.studentFreeAvailable ? 'Use your free daily study data or buy a full-internet package below.' : 'Choose a package below.');
+                : res.studentFreeAvailable ? 'Use free data or buy a full-internet package below.' : 'Choose a package below.');
         welcome.style.display = '';
         var freeBox = document.getElementById('school-student-free-box');
         var freeBtn = document.getElementById('school-student-free-btn');
@@ -561,16 +561,15 @@ function schoolResult(res) {
         if (res.studentFreeAvailable && res.studentFreeDailyCapMb > 0) {
             freeBox.style.display = '';
             var rem = Number(res.studentFreeRemainingMb || 0);
-            var cap = Number(res.studentFreeDailyCapMb || 0);
             if (rem > 0) {
-                freeTitle.textContent = '🎓 Free Daily Study Data (' + rem + ' MB of ' + cap + ' MB left today)';
+                freeTitle.textContent = '🎓 Free Data';
                 freeDesc.textContent = atDeviceLimit ? 'Works on the school\'s study websites only, on one device at a time.'
                     : 'Works on the school\'s study websites only. Need full internet later? Open login.wifi in your browser and tap "Buy full internet", or buy a package below now.';
                 freeBtn.style.display = '';
-                freeBtn.textContent = '🎓 Connect with Free ' + rem + ' MB Study Data';
+                freeBtn.textContent = '🎓 Connect with Free Data';
             } else {
-                freeTitle.textContent = '⌛ Daily Free Study Data Used Up (' + cap + ' MB / day)';
-                freeDesc.textContent = 'You have used your ' + cap + ' MB free daily study allowance for today (resets tomorrow). Purchase a package below for full internet access.';
+                freeTitle.textContent = '⌛ Free Data Used Up';
+                freeDesc.textContent = 'You have used your free data for today. It resets tomorrow, or you can purchase a package below for full internet access.';
                 freeBtn.style.display = 'none';
             }
         } else {

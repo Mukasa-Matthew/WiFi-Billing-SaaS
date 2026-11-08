@@ -483,7 +483,7 @@ public class SchoolAccessService {
         if (used >= capBytes) {
             if (live != null) holdAndDisconnect(live);
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
-                    "You have used all of your " + capMb + " MB free daily study data for today. Purchase a package below for full internet, or wait until tomorrow.");
+                    "You have used all of your free data for today. Purchase a package below for full internet, or wait until tomorrow.");
         }
         return capBytes - used;
     }
