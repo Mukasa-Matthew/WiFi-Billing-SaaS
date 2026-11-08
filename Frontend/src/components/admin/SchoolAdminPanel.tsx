@@ -6,7 +6,7 @@ import { GraduationCap, Key, MagnifyingGlass, UserPlus } from "@/components/icon
 import { Badge, Card, ErrorNotice, Field, Notice, button, buttonGhost, field, humanize, label, message, useApi } from "@/components/BillingUI";
 import { useToast } from "@/components/ui/Toast";
 
-interface ItAdmin { id: string; email: string; fullName: string; role: string; active: boolean; totpEnabled: boolean; mustChangePassword: boolean; lastSignInAt: string | null }
+interface ItAdmin { id: string; email: string; fullName: string; role: string; active: boolean; totpEnabled: boolean; twoStepMethod?: "APP" | "EMAIL" | null; ownerBlocked?: boolean; mustChangePassword: boolean; lastSignInAt: string | null }
 interface School { name: string; code: string; active: boolean; students: number; staff: number; activePeople: number; visitorsEnabled: boolean; visitorDailyCap: number; visitorPassesToday: number; pendingStaffExceptions: number; itAdmins: ItAdmin[] }
 interface Overview { school: School; dashboardUrl: string }
 interface Credentials { emailSent: boolean; temporaryPassword: string | null }
@@ -53,11 +53,11 @@ export function SchoolAdminPanel({ tenantId }: { tenantId: number }) {
           {school.itAdmins.map((admin) => (
             <li key={admin.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
               <span className="min-w-0"><span className="block font-medium text-[var(--fg)]">{admin.fullName}</span>
-                <span className="block text-xs text-[var(--fg-muted)]">{admin.email} · {humanize(admin.role)}{admin.mustChangePassword ? " · temporary password" : ""}{!admin.totpEnabled ? " · no authenticator yet" : ""}</span></span>
+                <span className="block text-xs text-[var(--fg-muted)]">{admin.email} · {humanize(admin.role)}{admin.mustChangePassword ? " · temporary password" : ""}{admin.twoStepMethod === "EMAIL" ? " · email codes" : admin.twoStepMethod === "APP" ? " · authenticator" : " · two-step off"}{admin.ownerBlocked ? " · blocked by owner" : ""}</span></span>
               <span className="flex flex-wrap gap-2">
                 {!admin.active && <Badge tone="slate">Disabled</Badge>}
                 <button className={buttonGhost} onClick={async () => { try { credentials(admin.fullName, (await api.post<Credentials>(`${base}/admins/${admin.id}/reset-password`)).data); overview.load(); } catch (err) { toast("error", message(err)); } }}><Key className="h-4 w-4" />Reset password</button>
-                {admin.totpEnabled && <button className={buttonGhost} onClick={() => run(() => api.post(`${base}/admins/${admin.id}/reset-totp`), `${admin.fullName} will set up a new authenticator at next sign-in.`)}>Reset authenticator</button>}
+                {(admin.twoStepMethod ?? (admin.totpEnabled ? "APP" : null)) && <button className={buttonGhost} onClick={() => run(() => api.post(`${base}/admins/${admin.id}/reset-totp`), `Two-step sign-in is off for ${admin.fullName}; they can turn it on again in Security.`)}>Reset two-step</button>}
                 <button className={buttonGhost} onClick={() => run(() => api.patch(`${base}/admins/${admin.id}`, { active: !admin.active }), admin.active ? `${admin.fullName} disabled.` : `${admin.fullName} enabled.`)}>{admin.active ? "Disable" : "Enable"}</button>
               </span>
             </li>

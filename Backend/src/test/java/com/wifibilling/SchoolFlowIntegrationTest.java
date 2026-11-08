@@ -55,6 +55,7 @@ class SchoolFlowIntegrationTest {
     static final String TABLET_MAC = "AA:BB:CC:00:00:02";
 
     @MockitoBean IdentityClient identity;
+    @MockitoBean com.wifibilling.service.EmailService emailService;
     @Autowired MockMvc mvc;
     @Autowired TenantRepository tenants;
     @Autowired VoucherRepository vouchers;
@@ -250,6 +251,45 @@ class SchoolFlowIntegrationTest {
         mvc.perform(post("/api/school/staff-exceptions/" + UUID.randomUUID() + "/decision").header("Authorization", "Bearer " + school.jwt())
                 .contentType(MediaType.APPLICATION_JSON).content("{\"approve\":true}")).andExpect(status().isOk());
         verify(identity).decideStaffException(eq(school.tenant().getId()), any(), eq(true), contains("settings-school@example.test"));
+    }
+
+    @Test
+    void ownersPauseAndRestoreItAccountsButOrdinaryTenantsCannot() throws Exception {
+        Site school = site("it-access-school", true);
+        Site shop = site("it-access-shop", false);
+        UUID admin = UUID.randomUUID();
+        when(identity.setAdminOwnerBlocked(school.tenant().getId(), admin, true)).thenReturn(json.createObjectNode().put("ownerBlocked", true));
+        mvc.perform(post("/api/school/it-accounts/" + admin + "/access").header("Authorization", "Bearer " + school.jwt())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"blocked\":true}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.ownerBlocked").value(true));
+        mvc.perform(post("/api/school/it-accounts/" + admin + "/access").header("Authorization", "Bearer " + school.jwt())
+                .contentType(MediaType.APPLICATION_JSON).content("{}")).andExpect(status().isBadRequest());
+        mvc.perform(post("/api/school/it-accounts/" + admin + "/access").header("Authorization", "Bearer " + shop.jwt())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"blocked\":true}")).andExpect(status().is4xxClientError());
+        verify(identity, never()).setAdminOwnerBlocked(eq(shop.tenant().getId()), any(), anyBoolean());
+    }
+
+    private MockHttpServletRequestBuilder signedEmail(String body, String secret) {
+        byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+        long timestamp = java.time.Instant.now().getEpochSecond();
+        String nonce = UUID.randomUUID().toString();
+        return post("/api/integrations/identity/email").contentType(MediaType.APPLICATION_JSON).content(bytes)
+                .header("X-Timestamp", timestamp).header("X-Nonce", nonce)
+                .header("X-Signature", IdentitySignature.sign(secret, IdentitySignature.FROM_IDENTITY, timestamp, nonce, "POST", "/api/integrations/identity/email", bytes));
+    }
+
+    @Test
+    void identitySendsAccountEmailOnlyWhenSignedAndOnlyWhenMailWorks() throws Exception {
+        String body = "{\"to\":\"it@school.test\",\"subject\":\"Your sign-in code: 123456\",\"html\":\"<p>123456</p>\"}";
+        mvc.perform(signedEmail(body, SECRET + "-wrong")).andExpect(status().isUnauthorized());
+        when(emailService.configured()).thenReturn(false);
+        mvc.perform(signedEmail(body, SECRET)).andExpect(status().isServiceUnavailable());
+        when(emailService.configured()).thenReturn(true);
+        mvc.perform(signedEmail(body, SECRET)).andExpect(status().isOk());
+        verify(emailService).send("it@school.test", "Your sign-in code: 123456", "<p>123456</p>");
+        org.mockito.Mockito.doThrow(new com.wifibilling.service.EmailService.EmailDeliveryException("down")).when(emailService).send(anyString(), anyString(), anyString());
+        mvc.perform(signedEmail(body, SECRET)).andExpect(status().isBadGateway());
+        mvc.perform(signedEmail("{\"to\":\"it@school.test\"}", SECRET)).andExpect(status().isBadRequest());
     }
 
     @Test
