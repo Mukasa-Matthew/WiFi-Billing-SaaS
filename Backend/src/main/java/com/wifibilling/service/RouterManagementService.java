@@ -122,7 +122,8 @@ public class RouterManagementService {
  /**
   * Re-sends school filter and anti-tethering rules to every router whose last task for them differs from
   * what the current release generates, so rule fixes reach routers on deploy without anyone pressing Save.
-  * Routers never configured for an action are left alone.
+  * Routers never configured for an action are left alone, except that every school router gets the school
+  * filter script, which also turns off the hotspot cookie (see RouterScriptGenerator.SCHOOL_LOGIN_BY).
   */
  @Transactional public int resyncChangedRules(){
   int queued=0;
@@ -130,7 +131,8 @@ public class RouterManagementService {
    if("DELETED".equalsIgnoreCase(r.getStatus())||r.getTenant()==null) continue;
    for(String action:List.of("SYNC_SCHOOL_FILTER","SYNC_TETHERING")){
     var latest=tasks.findAllByRouterIdOrderByCreatedAtDesc(r.getId()).stream().filter(t->action.equals(t.getAction())).findFirst();
-    if(latest.isPresent()&&!scriptFor(r,action).equals(latest.get().getScript())){ enqueue(r,action); queued++; }
+    boolean required="SYNC_SCHOOL_FILTER".equals(action)&&r.getTenant().isSchool();
+    if(latest.isPresent()?!scriptFor(r,action).equals(latest.get().getScript()):required){ enqueue(r,action); queued++; }
    }
   }
   return queued;

@@ -50,6 +50,8 @@ class RouterScriptGeneratorTest {
         assertTrue(school.contains("lease-time=30m"));
         assertTrue(school.contains("/ip/dhcp-server/network add address=10.10.0.0/21 gateway=10.10.0.1 dns-server=10.10.0.1"));
         assertTrue(school.contains("hotspot-address=10.10.0.1 dns-name=login.wifi"), "the router address and login page are unchanged");
+        assertTrue(school.contains("login-by=http-chap,http-pap html-directory"), "schools sign in without the cookie, so the portal decides each time");
+        assertTrue(ordinary.contains("login-by=http-chap,http-pap,cookie html-directory"), "other tenants keep the cookie");
 
         String enlarge = RouterScriptGenerator.largeNetworkScript();
         assertTrue(enlarge.contains("address=\"10.10.0.1/24\"]"), "only our own /24 address is changed");
@@ -204,6 +206,9 @@ class RouterScriptGeneratorTest {
         assertTrue(blockRules.contains("src-address-list=\"wb-staff-free\" protocol=tcp dst-port=853 action=reject"), "private DNS cannot bypass the router");
         assertTrue(blockRules.contains(":do { /ip/dns/static/remove [find where comment~\"^wb-school-filter\"] } on-error={}"), "old DNS entries are cleared first");
         assertFalse(generator.schoolFilterRules(false, "", "ALL", "", "https://app.qticket.dev").contains("/ip/dns/static/add"), "no filtering means no DNS entries");
+        String noFilter = generator.schoolFilterRules(false, "", "ALL", "", "https://app.qticket.dev");
+        assertTrue(noFilter.contains("/ip/hotspot/profile/set [find name=\"wb-hotspot-profile\"] login-by=http-chap,http-pap"), "existing school routers drop the cookie login");
+        assertTrue(noFilter.contains("/ip/hotspot/cookie/remove [find]"), "and forget cookies that would sign a phone back in on study data");
     }
 
 }
