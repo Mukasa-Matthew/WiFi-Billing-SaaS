@@ -456,6 +456,20 @@ class SchoolFlowIntegrationTest {
         assertEquals(before + 1, routerTasks.findAllByRouterIdOrderByCreatedAtDesc(router.getId()).size(), "an up-to-date router gets nothing new");
     }
 
+    @Test
+    void everySchoolRouterIsSentTheSchoolScriptSoPhonesStopSigningBackInOnStudyData() throws Exception {
+        Site school = site("cookie-school", true);
+        Site shop = site("cookie-shop", false);
+        var schoolRouter = routerRepository.findByToken(school.routerToken()).orElseThrow();
+        var shopRouter = routerRepository.findByToken(shop.routerToken()).orElseThrow();
+        int shopBefore = routerTasks.findAllByRouterIdOrderByCreatedAtDesc(shopRouter.getId()).size();
+        routerManagement.resyncChangedRules();
+        var latest = routerTasks.findAllByRouterIdOrderByCreatedAtDesc(schoolRouter.getId()).getFirst();
+        assertEquals("SYNC_SCHOOL_FILTER", latest.getAction(), "a school router that never had the script gets it");
+        assertTrue(latest.getScript().contains("/ip/hotspot/cookie/remove [find]"));
+        assertEquals(shopBefore, routerTasks.findAllByRouterIdOrderByCreatedAtDesc(shopRouter.getId()).size(), "ordinary routers are untouched");
+    }
+
     @Autowired TransactionRepository transactions;
 
     private String paidVoucher(Site site, String phone, String mac) throws Exception {

@@ -234,6 +234,20 @@ public class RouterScriptGenerator {
         return domains;
     }
 
+    /**
+     * Schools sign in without the hotspot cookie, so every new connection opens the portal. The portal then
+     * reconnects a device with a paid package (or staff/visitor access) by itself, and asks a student on study
+     * data whether to keep studying or buy a package. With the cookie the router silently signed the phone back
+     * in on study data, so the student never got the choice.
+     */
+    static final String SCHOOL_LOGIN_BY = "http-chap,http-pap";
+
+    /** Switches an already provisioned school router to {@link #SCHOOL_LOGIN_BY} and forgets the cookies it holds. */
+    static String noCookieLogin() {
+        return ":do { /ip/hotspot/profile/set [find name=" + q(HOTSPOT_PROFILE) + "] login-by=" + SCHOOL_LOGIN_BY + " } on-error={}\n"
+                + ":do { /ip/hotspot/cookie/remove [find] } on-error={}\n";
+    }
+
     /** The address list a site's learned and resolved addresses go into; shared by every group that names the site. */
     static String siteList(String domain) { return "wb-site-" + domain; }
 
@@ -280,6 +294,7 @@ public class RouterScriptGenerator {
 
         s.append(moveAboveRouterRules("^wb-school-filter"));
         s.append(applyNow());
+        s.append(noCookieLogin());
         return s.toString();
     }
 
@@ -468,7 +483,8 @@ public class RouterScriptGenerator {
         s.append("# --- 3. Hotspot, RADIUS (via tunnel) + CoA/Disconnect ---\n");
         s.append("/ip/hotspot/profile add name=").append(q(HOTSPOT_PROFILE))
                 .append(" hotspot-address=10.10.0.1 dns-name=login.wifi use-radius=yes radius-accounting=yes")
-                .append(" radius-interim-update=2m login-by=http-chap,http-pap,cookie html-directory=flash/hotspot\n");
+                .append(" radius-interim-update=2m login-by=").append(c.largeNetwork() ? SCHOOL_LOGIN_BY : "http-chap,http-pap,cookie")
+                .append(" html-directory=flash/hotspot\n");
         s.append("/ip/hotspot add name=").append(q(HOTSPOT_SERVER)).append(" interface=").append(q(BRIDGE_NAME))
                 .append(" address-pool=").append(q(POOL_NAME)).append(" profile=").append(q(HOTSPOT_PROFILE)).append(" disabled=no\n");
         s.append("/radius add address=").append(c.radiusServerIp())
