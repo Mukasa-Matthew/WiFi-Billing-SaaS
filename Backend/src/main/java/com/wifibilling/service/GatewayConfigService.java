@@ -29,6 +29,15 @@ public class GatewayConfigService {
     private final EncryptionService encryption;
     private final MarzPayClient marzPay;
 
+    // Lazy self-injection so internal calls still go through the tx proxy.
+    // Defaults to the raw instance so plain unit tests (no proxy) still work.
+    private GatewayConfigService self = this;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setSelf(@org.springframework.context.annotation.Lazy GatewayConfigService self) {
+        this.self = self;
+    }
+
     @Value("${marzpay.platform.api-key:}")
     private String platformApiKey;
     @Value("${marzpay.platform.api-secret:}")
@@ -128,17 +137,31 @@ public class GatewayConfigService {
         return configRepository.save(cfg);
     }
 
-    /** Live credential check against MarzPay (balance endpoint — read-only, no money movement). */
-    @Transactional
+    /** Live credential check against MarzPay (balance endpoint — read-only, no money movement).
+     *  Deliberately not transactional: the provider call runs with no transaction held. */
     public TenantGatewayConfig testConnection(Tenant tenant) {
-        TenantGatewayConfig cfg = configRepository.findByTenantId(tenant.getId())
+        var plan = self.loadGatewayForTest(tenant.getId());
+        boolean ok = marzPay.testConnection(plan.creds(), plan.country());
+        return self.recordConnectionTest(plan.cfgId(), ok);
+    }
+
+    @Transactional
+    public GatewayTestPlan loadGatewayForTest(Long tenantId) {
+        TenantGatewayConfig cfg = configRepository.findByTenantId(tenantId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Gateway not configured"));
         if (cfg.getApiKey() == null || cfg.getApiSecretEnc() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Save credentials before testing");
         }
-        boolean ok = marzPay.testConnection(
+        return new GatewayTestPlan(cfg.getId(),
                 new MarzPayClient.Credentials(cfg.getApiKey(), encryption.decrypt(cfg.getApiSecretEnc())),
                 cfg.getCountry());
+    }
+
+    record GatewayTestPlan(Long cfgId, MarzPayClient.Credentials creds, String country) {}
+
+    @Transactional
+    public TenantGatewayConfig recordConnectionTest(Long cfgId, boolean ok) {
+        TenantGatewayConfig cfg = configRepository.findById(cfgId).orElseThrow();
         cfg.setConnectionStatus(ok ? TenantGatewayConfig.CONN_CONNECTED : TenantGatewayConfig.CONN_FAILED);
         cfg.setConnectionError(ok ? null : "MarzPay rejected the credentials or they cannot read balances");
         cfg.setLastVerifiedAt(OffsetDateTime.now());

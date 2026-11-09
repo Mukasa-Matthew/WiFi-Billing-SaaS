@@ -32,6 +32,15 @@ public class OtpService {
     private final EmailTemplates templates;
     private final SecureRandom random = new SecureRandom();
 
+    // Lazy self-injection so internal calls still go through the tx proxy.
+    // Defaults to the raw instance so plain unit tests (no proxy) still work.
+    private OtpService self = this;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setSelf(@org.springframework.context.annotation.Lazy OtpService self) {
+        this.self = self;
+    }
+
     @Value("${otp.ttl-minutes:10}")
     private int ttlMinutes;
     @Value("${otp.max-attempts:5}")
@@ -47,8 +56,28 @@ public class OtpService {
      * Issue a code to an email. Returns the plaintext code ONLY when email
      * delivery is not configured (dev mode) — never expose it otherwise.
      */
-    @Transactional
+    /** Deliberately not transactional: the SMTP send must run with no
+     *  transaction held so it cannot sit idle-in-transaction on the network. */
     public String issue(String email, String purpose, Long tenantId, String businessName, String context) {
+        if (!emailService.configured() && !devFallbackEnabled) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "Email delivery is not configured on this server");
+        }
+        var prep = self.prepareOtp(email, purpose, tenantId, businessName, context);
+        if (!emailService.configured()) return prep.code(); // dev fallback
+        try {
+            emailService.send(prep.normalized(), prep.subject(), prep.html());
+        } catch (Exception e) {
+            // Don't leave a live code nobody received — same effect as the old rollback.
+            self.invalidateOtp(prep.otpId());
+            throw e;
+        }
+        return null;
+    }
+
+    /** Creates the OTP row and resolves the email content — the transactional part. */
+    @Transactional
+    public PreparedOtp prepareOtp(String email, String purpose, Long tenantId, String businessName, String context) {
         String normalized = email.trim().toLowerCase();
         var latest = otpRepository.findFirstByEmailAndPurposeOrderByIdDesc(normalized, purpose);
         if (latest.isPresent()) {
@@ -65,7 +94,7 @@ public class OtpService {
             }
         }
         String code = String.format("%06d", random.nextInt(1_000_000));
-        otpRepository.save(EmailOtp.builder()
+        EmailOtp otp = otpRepository.save(EmailOtp.builder()
                 .email(normalized).purpose(purpose).tenantId(tenantId)
                 .codeHash(hash(code))
                 .expiresAt(OffsetDateTime.now().plusMinutes(ttlMinutes))
@@ -76,16 +105,21 @@ public class OtpService {
         String html = EmailOtp.PURPOSE_PASSWORD_RESET.equals(purpose)
                 ? templates.passwordResetEmail(businessName, code, ttlMinutes)
                 : templates.otpEmail(businessName, code, ttlMinutes, context);
-        emailService.send(normalized, subject, html);
-        if (!emailService.configured()) {
-            if (!devFallbackEnabled) {
-                throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
-                        "Email delivery is not configured on this server");
-            }
-            return code;
-        }
-        return null;
+        return new PreparedOtp(otp.getId(), normalized, code, subject, html);
     }
+
+    /** Consumes an OTP whose delivery failed so it can never be redeemed. */
+    @Transactional
+    public void invalidateOtp(Long otpId) {
+        otpRepository.findById(otpId).ifPresent(otp -> {
+            if (otp.getConsumedAt() == null) {
+                otp.setConsumedAt(OffsetDateTime.now());
+                otpRepository.save(otp);
+            }
+        });
+    }
+
+    record PreparedOtp(Long otpId, String normalized, String code, String subject, String html) {}
 
     /** Verify and consume a code. Throws 400 on any mismatch — no detail leakage. */
     @Transactional

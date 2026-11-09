@@ -62,6 +62,15 @@ public class SubscriptionService {
     @Value("${app.public-base-url:http://localhost:3000}")
     private String publicBaseUrl;
 
+    // Lazy self-injection so internal calls still go through the tx proxy.
+    // Defaults to the raw instance so plain unit tests (no proxy) still work.
+    private SubscriptionService self = this;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setSelf(@org.springframework.context.annotation.Lazy SubscriptionService self) {
+        this.self = self;
+    }
+
     // ==========================================
     // 1. Automatic 7-Day Free Trial
     // ==========================================
@@ -233,8 +242,46 @@ public class SubscriptionService {
     // 3. Mobile Money Self-Service Checkout
     // ==========================================
 
-    @Transactional
+    /** Deliberately not transactional: the MarzPay collect call must run with
+     *  no transaction held so it cannot sit idle-in-transaction on the network. */
     public SubscriptionDto.CheckoutResponse initiateSubscriptionCheckout(Long tenantId, SubscriptionDto.CheckoutRequest req) {
+        var prep = self.prepareSubscriptionCheckout(tenantId, req);
+
+        String providerUuid = null;
+        try {
+            JsonNode resp = marzPay.collectMoney(
+                    prep.creds(),
+                    prep.amount(),
+                    prep.phoneE164(),
+                    prep.reference(),
+                    prep.country(),
+                    "AirPairy SaaS Subscription - " + prep.planName(),
+                    prep.callbackUrl()
+            );
+            if (resp != null) {
+                providerUuid = resp.path("transaction").path("provider_reference").asText(
+                        resp.path("data").path("transaction_id").asText(null));
+            }
+        } catch (Exception e) {
+            log.error("Failed to initiate Mobile Money collection for sub checkout {}: {}", prep.reference(), e.getMessage());
+            self.failSubscriptionCheckout(prep.checkoutId(), "Failed to initiate mobile money prompt: " + e.getMessage());
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Could not reach Mobile Money provider. Please try again.");
+        }
+
+        if (providerUuid != null) self.setCheckoutProviderUuid(prep.checkoutId(), providerUuid);
+
+        return new SubscriptionDto.CheckoutResponse(
+                prep.reference(),
+                SubscriptionCheckout.STATUS_PENDING,
+                prep.amount(),
+                prep.phoneE164(),
+                "A prompt has been sent to " + prep.phoneE164() + ". Enter your Mobile Money PIN to approve payment of UGX " + String.format("%,d", prep.amount()) + "."
+        );
+    }
+
+    /** Creates the pending checkout row and resolves the provider call inputs — the transactional part. */
+    @Transactional
+    public CheckoutPrep prepareSubscriptionCheckout(Long tenantId, SubscriptionDto.CheckoutRequest req) {
         Tenant tenant = tenants.findById(tenantId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tenant not found"));
 
@@ -251,54 +298,40 @@ public class SubscriptionService {
         String phoneE164 = toE164(req.phone());
         String reference = "SUB-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16).toUpperCase();
 
-        SubscriptionCheckout checkout = SubscriptionCheckout.builder()
+        SubscriptionCheckout checkout = checkouts.save(SubscriptionCheckout.builder()
                 .tenant(tenant)
                 .plan(plan)
                 .reference(reference)
                 .phone(phoneE164)
                 .amount(amount)
                 .status(SubscriptionCheckout.STATUS_PENDING)
-                .build();
-        checkout = checkouts.save(checkout);
+                .build());
 
-        try {
-            var creds = gatewayConfig.credentialsFor(tenant, TenantGatewayConfig.MODE_PLATFORM);
-            String country = gatewayConfig.countryFor(tenant, TenantGatewayConfig.MODE_PLATFORM);
-            String callbackUrl = publicBaseUrl.replaceAll("/+$", "") + "/api/payments/marzpay/callback";
-            JsonNode resp = marzPay.collectMoney(
-                    creds,
-                    amount,
-                    phoneE164,
-                    reference,
-                    country,
-                    "AirPairy SaaS Subscription - " + plan.getName(),
-                    callbackUrl
-            );
-
-            if (resp != null) {
-                String providerUuid = resp.path("transaction").path("provider_reference").asText(
-                        resp.path("data").path("transaction_id").asText(null));
-                if (providerUuid != null) {
-                    checkout.setProviderUuid(providerUuid);
-                    checkouts.save(checkout);
-                }
-            }
-
-            return new SubscriptionDto.CheckoutResponse(
-                    reference,
-                    SubscriptionCheckout.STATUS_PENDING,
-                    amount,
-                    phoneE164,
-                    "A prompt has been sent to " + phoneE164 + ". Enter your Mobile Money PIN to approve payment of UGX " + String.format("%,d", amount) + "."
-            );
-        } catch (Exception e) {
-            log.error("Failed to initiate Mobile Money collection for sub checkout {}: {}", reference, e.getMessage());
-            checkout.setStatus(SubscriptionCheckout.STATUS_FAILED);
-            checkout.setFailureReason("Failed to initiate mobile money prompt: " + e.getMessage());
-            checkouts.save(checkout);
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Could not reach Mobile Money provider. Please try again.");
-        }
+        var creds = gatewayConfig.credentialsFor(tenant, TenantGatewayConfig.MODE_PLATFORM);
+        String country = gatewayConfig.countryFor(tenant, TenantGatewayConfig.MODE_PLATFORM);
+        String callbackUrl = publicBaseUrl.replaceAll("/+$", "") + "/api/payments/marzpay/callback";
+        return new CheckoutPrep(checkout.getId(), reference, amount, phoneE164, plan.getName(), creds, country, callbackUrl);
     }
+
+    @Transactional
+    public void setCheckoutProviderUuid(Long checkoutId, String providerUuid) {
+        checkouts.findById(checkoutId).ifPresent(checkout -> {
+            checkout.setProviderUuid(providerUuid);
+            checkouts.save(checkout);
+        });
+    }
+
+    @Transactional
+    public void failSubscriptionCheckout(Long checkoutId, String reason) {
+        checkouts.findById(checkoutId).ifPresent(checkout -> {
+            checkout.setStatus(SubscriptionCheckout.STATUS_FAILED);
+            checkout.setFailureReason(reason);
+            checkouts.save(checkout);
+        });
+    }
+
+    record CheckoutPrep(Long checkoutId, String reference, long amount, String phoneE164, String planName,
+                        com.wifibilling.service.payment.MarzPayClient.Credentials creds, String country, String callbackUrl) {}
 
     @Transactional
     public boolean confirmSubscriptionCheckout(String reference, JsonNode payload) {

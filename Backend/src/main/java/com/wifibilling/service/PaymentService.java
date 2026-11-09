@@ -296,38 +296,61 @@ public class PaymentService {
      * any failure leaves the transaction PENDING for the next poll/webhook.
      */
     private void recheckProvider(Transaction tx) {
+        var plan = recheckPlan(tx);
+        if (plan != null) runProviderRecheck(plan);
+    }
+
+    /** What the provider lookup needs, resolved while the entity is still attached. */
+    record RecheckPlan(Long txId, String reference, String extRef,
+                       com.wifibilling.service.payment.MarzPayClient.Credentials creds) {}
+
+    /** Guards, throttle stamps and credential resolution — the transactional part of a recheck. */
+    private RecheckPlan recheckPlan(Transaction tx) {
         String extRef = tx.getExternalReference();
-        if (extRef == null || tx.getDispatchAt() == null || useMockGateway(tx.getGatewayMode())) return;
-        if (tx.getRecheckCount() != null && tx.getRecheckCount() >= MAX_RECHECKS) return;
+        if (extRef == null || tx.getDispatchAt() == null || useMockGateway(tx.getGatewayMode())) return null;
+        if (tx.getRecheckCount() != null && tx.getRecheckCount() >= MAX_RECHECKS) return null;
         OffsetDateTime now = OffsetDateTime.now();
         if (tx.getLastRecheckAt() != null
                 && tx.getLastRecheckAt().isAfter(now.minusSeconds(RECHECK_INTERVAL_SECONDS))) {
-            return; // throttled
+            return null; // throttled
         }
         tx.setLastRecheckAt(now);
         tx.setRecheckCount((tx.getRecheckCount() == null ? 0 : tx.getRecheckCount()) + 1);
         transactionRepository.save(tx);
+        var creds = gatewayConfig.credentialsFor(tx.getTenant(), tx.getGatewayMode());
+        return new RecheckPlan(tx.getId(), tx.getReference(), extRef, creds);
+    }
+
+    /** The provider HTTP call — callers run this with NO transaction held. */
+    private void runProviderRecheck(RecheckPlan plan) {
         try {
-            var creds = gatewayConfig.credentialsFor(tx.getTenant(), tx.getGatewayMode());
             // /transactions/{id} is documented to accept our merchant reference.
-            var status = marzPay.getTransaction(creds, extRef);
+            var status = marzPay.getTransaction(plan.creds(), plan.extRef());
             var payload = status.has("data") && status.get("data").isObject() ? status.get("data") : status;
-            processMarzPayCollection(payload);
+            self.processMarzPayCollection(payload);
         } catch (com.wifibilling.service.payment.MarzPayClient.MarzPayException e) {
             if (e.isNotFound()) {
                 // Provider has no record — outcome unresolved. Flag for manual
                 // review; NEVER auto-redispatch (visibility lag is possible).
-                tx.setNotes("Provider has no record of collection ref " + extRef
-                        + " — outcome unresolved, flagged for manual review");
-                transactionRepository.save(tx);
-                log.warn("Provider shows no record for tx {} (ref {}) — unresolved, no redispatch",
-                        tx.getReference(), extRef);
+                self.flagRecheckUnresolved(plan.txId(), plan.reference(), plan.extRef());
             } else {
-                log.warn("Provider recheck for {} failed: {}", tx.getReference(), e.getMessage());
+                log.warn("Provider recheck for {} failed: {}", plan.reference(), e.getMessage());
             }
         } catch (Exception e) {
-            log.warn("Provider recheck for {} failed: {}", tx.getReference(), e.getMessage());
+            log.warn("Provider recheck for {} failed: {}", plan.reference(), e.getMessage());
         }
+    }
+
+    /** Marks a recheck where the provider has no record of the collection. */
+    @Transactional
+    public void flagRecheckUnresolved(Long txId, String reference, String extRef) {
+        transactionRepository.findById(txId).ifPresent(tx -> {
+            tx.setNotes("Provider has no record of collection ref " + extRef
+                    + " — outcome unresolved, flagged for manual review");
+            transactionRepository.save(tx);
+        });
+        log.warn("Provider shows no record for tx {} (ref {}) — unresolved, no redispatch",
+                reference, extRef);
     }
 
     /** Dev fallback: the platform gateway has no credentials configured (sandbox/dev),
@@ -432,12 +455,20 @@ public class PaymentService {
         }
     }
 
-    /** Transactional per-transaction reconcile used by the sweep. */
-    @Transactional
+    /** Per-transaction reconcile used by the sweep. Deliberately not transactional:
+     *  the row lock/stamps commit in a short transaction, then the provider HTTP
+     *  call runs with no transaction held so it cannot sit idle-in-transaction. */
     public void reconcileTransaction(Long txId) {
+        var plan = self.planProviderRecheck(txId);
+        if (plan != null) runProviderRecheck(plan);
+    }
+
+    /** Locks the row, verifies it is still pending, and resolves what the provider lookup needs. */
+    @Transactional
+    public RecheckPlan planProviderRecheck(Long txId) {
         Transaction tx = transactionRepository.findByIdForUpdate(txId).orElse(null);
-        if (tx == null || !STATUS_PENDING.equals(tx.getStatus())) return;
-        recheckProvider(tx);
+        if (tx == null || !STATUS_PENDING.equals(tx.getStatus())) return null;
+        return recheckPlan(tx);
     }
 
     private void registerAfterCommit(Runnable r) {
