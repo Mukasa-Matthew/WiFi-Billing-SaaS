@@ -53,11 +53,13 @@ public class RouterManagementService {
  @Transactional public String installerForSetup(String code){Long id=setupService.redeem(code,com.wifibilling.model.RouterSetupCode.Purpose.MANAGEMENT);var r=routers.findById(id).orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND));r.setBindingsHash(null);routers.save(r);return RouterScriptGenerator.managementInstaller(props.getPublicBaseUrl(),r.getToken());}
  @Transactional public void acknowledgeBindings(String token,String hash){var r=resolve(token);if(hash(r).equals(hash)){r.setBindingsHash(hash);r.setBindingsSyncedAt(OffsetDateTime.now());routers.save(r);}}
  @Transactional public void acknowledgeTask(String token,Long id,boolean success){var r=resolve(token);var t=tasks.findByIdAndRouterId(id,r.getId()).orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND));if("PENDING".equals(t.getStatus())){t.setStatus(success?"APPLIED":"FAILED");t.setAppliedAt(OffsetDateTime.now());tasks.save(t);}}
- @Transactional(readOnly=true) public String script(String token){return script(token,0);}
+ public String script(String token){return script(token,0);}
  // Long-poll: when wait>0 the request is held until a task appears (checked
- // every 300ms) so router actions apply in near-real time. Postgres READ
- // COMMITTED gives each check a fresh snapshot.
- @Transactional(readOnly=true) public String script(String token,int waitSeconds){
+ // every 300ms) so router actions apply in near-real time. Deliberately NOT
+ // transactional: each repository check runs in its own read transaction, so
+ // every poll sees a fresh READ COMMITTED snapshot and the up-to-8s hold keeps
+ // no "idle in transaction" session (and no table locks) open.
+ public String script(String token,int waitSeconds){
   Router r=resolve(token);
   // Capped below RouterOS /tool fetch's ~10s idle timeout: a longer hold makes
   // the router abort (nginx 499) and fall back to importing its previous file.

@@ -50,11 +50,15 @@ class PlatformEarningsServiceTest {
         lenient().when(accounts.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
         lenient().when(ledger.save(any())).thenAnswer(i -> i.getArgument(0));
         lenient().when(reconLogs.save(any())).thenAnswer(i -> i.getArgument(0));
+        java.util.concurrent.atomic.AtomicReference<PlatformPayout> lastSavedPayout =
+                new java.util.concurrent.atomic.AtomicReference<>();
         lenient().when(payouts.save(any())).thenAnswer(i -> {
             PlatformPayout p = i.getArgument(0);
             if (p.getId() == null) p.setId(7L);
+            lastSavedPayout.set(p);
             return p;
         });
+        lenient().when(payouts.findById(any())).thenAnswer(i -> Optional.ofNullable(lastSavedPayout.get()));
         lenient().when(tenantWallets.findAll()).thenReturn(List.of());
         // Payouts enabled by default in tests; disable per-test as needed.
         ReflectionTestUtils.setField(service, "payoutsEnabled", true);

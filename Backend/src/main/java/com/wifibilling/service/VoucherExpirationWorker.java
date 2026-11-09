@@ -6,6 +6,7 @@ import com.wifibilling.radius.RadAcct;
 import com.wifibilling.radius.RadCheck;
 import com.wifibilling.repository.*;
 import com.wifibilling.util.Ipv4Subnet;
+import com.wifibilling.util.PostCommit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -229,8 +230,14 @@ public class VoucherExpirationWorker {
 
     /**
      * Disconnects any open sessions in radacct for this username.
+     * Deferred past the caller's commit: the RADIUS UDP wait must never run
+     * inside a transaction, where it would hold locks while blocked on the wire.
      */
     public void disconnectActiveSessions(String username) {
+        PostCommit.run(() -> runDisconnects(username));
+    }
+
+    private void runDisconnects(String username) {
         List<RadAcct> activeSessions = radAcctRepository.findAllByUsernameAndAcctStopTimeIsNull(username);
         for (RadAcct session : activeSessions) {
             String nasIp = Ipv4Subnet.stripPrefix(session.getNasIpAddress());

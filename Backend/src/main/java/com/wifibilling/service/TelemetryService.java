@@ -4,6 +4,7 @@ import com.wifibilling.config.PlatformProperties;
 import com.wifibilling.dto.TelemetryRequest;
 import com.wifibilling.model.Router;
 import com.wifibilling.repository.RouterRepository;
+import com.wifibilling.util.PostCommit;
 import com.wifibilling.util.RouterTokens;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -127,13 +128,20 @@ public class TelemetryService {
                 """.formatted(routerName, routerName, router.getWgIp() != null ? router.getWgIp() : "—",
                 router.getLastSeen() != null ? router.getLastSeen().toString() : "Unknown");
 
-        try {
-            emailService.send(recipient, subject, emailTemplates.shell("Router Offline Notice", body, ""));
-            // Also notify any additional comma-separated alert emails configured
-            sendAdditionalAlerts(router.getTenant().getNotifyEmails(), subject, body);
-        } catch (Exception e) {
-            log.warn("Failed sending offline alert email for router {}: {}", router.getId(), e.getMessage());
-        }
+        // Resolve lazy associations and build the message now; the SMTP call
+        // itself goes out after commit so no lock is held during network I/O.
+        String notifyEmails = router.getTenant().getNotifyEmails();
+        Long routerId = router.getId();
+        String html = emailTemplates.shell("Router Offline Notice", body, "");
+        PostCommit.run(() -> {
+            try {
+                emailService.send(recipient, subject, html);
+                // Also notify any additional comma-separated alert emails configured
+                sendAdditionalAlerts(notifyEmails, subject, body);
+            } catch (Exception e) {
+                log.warn("Failed sending offline alert email for router {}: {}", routerId, e.getMessage());
+            }
+        });
     }
 
     private void notifyRouterOnline(Router router) {
@@ -165,12 +173,17 @@ public class TelemetryService {
                 router.getActiveUsers() != null ? router.getActiveUsers() : 0,
                 router.getUptime() != null ? router.getUptime() : "Just started");
 
-        try {
-            emailService.send(recipient, subject, emailTemplates.shell("Router Restored Notice", body, ""));
-            sendAdditionalAlerts(router.getTenant().getNotifyEmails(), subject, body);
-        } catch (Exception e) {
-            log.warn("Failed sending online recovery email for router {}: {}", router.getId(), e.getMessage());
-        }
+        String notifyEmails = router.getTenant().getNotifyEmails();
+        Long routerId = router.getId();
+        String html = emailTemplates.shell("Router Restored Notice", body, "");
+        PostCommit.run(() -> {
+            try {
+                emailService.send(recipient, subject, html);
+                sendAdditionalAlerts(notifyEmails, subject, body);
+            } catch (Exception e) {
+                log.warn("Failed sending online recovery email for router {}: {}", routerId, e.getMessage());
+            }
+        });
     }
 
     private void sendAdditionalAlerts(String notifyEmails, String subject, String body) {

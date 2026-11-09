@@ -11,6 +11,7 @@ import com.wifibilling.repository.PlatformSettingRepository;
 import com.wifibilling.repository.TenantRepository;
 import com.wifibilling.repository.UserSessionRepository;
 import com.wifibilling.security.TenantPrincipal;
+import com.wifibilling.util.PostCommit;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -86,13 +87,17 @@ public class AdminSettingsService {
         tenant.setPendingNewEmail(targetEmail);
         tenantRepository.save(tenant);
 
-        // 1. Send verification OTP to current email
-        otpService.issue(tenant.getEmail(), EmailOtp.PURPOSE_EMAIL_CHANGE + "_CURRENT",
-                tenant.getId(), tenant.getName(), "Verify your request to change account email to " + targetEmail);
+        // Send the OTPs after this transaction commits — the SMTP call must
+        // never run while locks are held (idle-in-transaction blocks schema work).
+        Long tenantId = tenant.getId();
+        String tenantName = tenant.getName();
+        String currentEmail = tenant.getEmail();
+        PostCommit.run(() -> otpService.issue(currentEmail, EmailOtp.PURPOSE_EMAIL_CHANGE + "_CURRENT",
+                tenantId, tenantName, "Verify your request to change account email to " + targetEmail));
 
         // 2. Send verification OTP to new email
-        otpService.issue(targetEmail, EmailOtp.PURPOSE_EMAIL_CHANGE + "_NEW",
-                tenant.getId(), tenant.getName(), "Verify ownership of your new AirPairy email address");
+        PostCommit.run(() -> otpService.issue(targetEmail, EmailOtp.PURPOSE_EMAIL_CHANGE + "_NEW",
+                tenantId, tenantName, "Verify ownership of your new AirPairy email address"));
 
         recordAudit(tenant, "EMAIL_CHANGE_REQUESTED", "Initiated email change towards: " + targetEmail, request);
 

@@ -41,6 +41,15 @@ public class PlatformEarningsService {
     private final PlatformProperties props;
     private LeaderLockService leaderLockService = new LeaderLockService();
 
+    // Lazy self-injection so internal calls still go through the tx proxy.
+    // Defaults to the raw instance so plain unit tests (no proxy) still work.
+    private PlatformEarningsService self = this;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setSelf(@org.springframework.context.annotation.Lazy PlatformEarningsService self) {
+        this.self = self;
+    }
+
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     public void setLeaderLockService(LeaderLockService leaderLockService) {
         this.leaderLockService = leaderLockService;
@@ -103,30 +112,53 @@ public class PlatformEarningsService {
      * platform settled+reserved earnings + all tenant wallet liabilities.
      * Differences are logged and flagged — never auto-corrected.
      */
-    @Transactional
+    /** Runs the balance reconciliation. Deliberately not transactional: the
+     *  provider HTTP call must not hold locks while waiting on the network. */
     public ReconciliationLog reconcile() {
+        var in = self.reconcileInputs();
+        Long provider = null;
+        String error = null;
+        if (in.creds() != null) {
+            try {
+                JsonNode bal = marzPay.getBalance(in.creds(), "UG");
+                provider = bal.path("data").path("account").path("available_balance").path("raw").longValue();
+            } catch (Exception e) {
+                error = e.getMessage();
+            }
+        }
+        return self.applyReconcile(in.expected(), provider, error);
+    }
+
+    /** Snapshot of the books used for the compare — short transactional read. */
+    @Transactional
+    public ReconcileInputs reconcileInputs() {
         PlatformEarningsAccount a = accountForUpdate();
         long tenantLiability = tenantWallets.findAll().stream()
                 .mapToLong(w -> w.getAvailableBalance() + w.getReservedBalance()).sum();
         long expected = a.getSettledEarnings() + a.getReservedEarnings() + tenantLiability;
+        var creds = gatewayConfig.platformConfigured()
+                ? gatewayConfig.credentialsFor(null, TenantGatewayConfig.MODE_PLATFORM) : null;
+        return new ReconcileInputs(expected, creds);
+    }
 
-        if (!gatewayConfig.platformConfigured()) {
+    record ReconcileInputs(long expected, com.wifibilling.service.payment.MarzPayClient.Credentials creds) {}
+
+    /** Applies a fetched provider balance (or a fetch failure) in a short transaction. */
+    @Transactional
+    public ReconciliationLog applyReconcile(long expected, Long provider, String error) {
+        PlatformEarningsAccount a = accountForUpdate();
+        if (provider == null && error == null) {
             a.setReconcileStatus(PlatformEarningsAccount.RECON_UNVERIFIED);
             a.setReconcileNote("Platform MarzPay credentials not configured");
             return saveLog(null, expected, null, ReconciliationLog.FAILED, "Provider not configured");
         }
-        Long provider = null;
-        try {
-            var creds = gatewayConfig.credentialsFor(null, TenantGatewayConfig.MODE_PLATFORM);
-            JsonNode bal = marzPay.getBalance(creds, "UG");
-            provider = bal.path("data").path("account").path("available_balance").path("raw").longValue();
-            a.setLastProviderBalance(provider);
-            a.setLastSyncedAt(OffsetDateTime.now());
-        } catch (Exception e) {
+        if (error != null) {
             a.setReconcileStatus(PlatformEarningsAccount.RECON_UNVERIFIED);
-            a.setReconcileNote("Balance fetch failed: " + e.getMessage());
-            return saveLog(null, expected, null, ReconciliationLog.FAILED, e.getMessage());
+            a.setReconcileNote("Balance fetch failed: " + error);
+            return saveLog(null, expected, null, ReconciliationLog.FAILED, error);
         }
+        a.setLastProviderBalance(provider);
+        a.setLastSyncedAt(OffsetDateTime.now());
 
         long diff = provider - expected;
         if (Math.abs(diff) <= tolerance) {
@@ -148,12 +180,10 @@ public class PlatformEarningsService {
     }
 
     @Scheduled(fixedDelayString = "${platform.reconcile.interval-ms:300000}") // every 5 min
-    @Transactional
     public void scheduledReconcile() {
         if (!leaderLockService.executeIfLeader(LeaderLockService.JOB_PLATFORM_EARNINGS, 300, 30, this::doScheduledReconcile)) return;
     }
 
-    @Transactional
     public void doScheduledReconcile() {
         if (!gatewayConfig.platformConfigured()) return;
         try { reconcile(); } catch (Exception e) {
@@ -186,7 +216,9 @@ public class PlatformEarningsService {
 
     // ---------- payouts ----------
 
-    @Transactional
+    /** Deliberately not transactional: the provider calls (reconcile, payout
+     *  dispatch) must run with no transaction held so they cannot sit
+     *  idle-in-transaction on the network. */
     public PlatformPayout requestPayout(long amount, String phone, Long adminId) {
         if (!payoutsEnabled) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
@@ -195,13 +227,24 @@ public class PlatformEarningsService {
         if (amount <= 0 || amount > maxPayout) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Amount outside permitted range");
         }
-        PlatformEarningsAccount a = accountForUpdate();
 
         // Fresh reconciliation required — never pay out on stale numbers.
-        if (balanceStale(a)) {
-            reconcile();
-            a = accountForUpdate();
-        }
+        if (self.payoutReconcileStale()) reconcile();
+
+        PlatformPayout p = self.reservePayout(amount, phone, adminId);
+        dispatchPayout(p.getId());
+        return self.payoutById(p.getId());
+    }
+
+    @Transactional(readOnly = true)
+    public boolean payoutReconcileStale() {
+        return balanceStale(account());
+    }
+
+    /** Reserves the payout under the account lock — the transactional part. */
+    @Transactional
+    public PlatformPayout reservePayout(long amount, String phone, Long adminId) {
+        PlatformEarningsAccount a = accountForUpdate();
         if (PlatformEarningsAccount.RECON_DISCREPANCY.equals(a.getReconcileStatus())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Reconciliation discrepancy — " + (a.getReconcileNote() != null ? a.getReconcileNote() : "investigate before withdrawing"));
@@ -232,46 +275,78 @@ public class PlatformEarningsService {
         a.setReservedEarnings(a.getReservedEarnings() + p.getTotalDeduction());
         record(a, PlatformLedgerEntry.PAYOUT_RESERVE, p.getTotalDeduction(), "PRES:" + ref,
                 null, p.getId(), "Earnings payout reserved");
-
-        dispatchPayout(a, p);
         accounts.save(a);
         return p;
     }
 
-    private void dispatchPayout(PlatformEarningsAccount a, PlatformPayout p) {
+    @Transactional(readOnly = true)
+    public PlatformPayout payoutById(Long payoutId) {
+        return payouts.findById(payoutId).orElseThrow();
+    }
+
+    /** Provider send runs with no transaction held; the result applies in a fresh one. */
+    private void dispatchPayout(Long payoutId) {
+        var plan = self.payoutDispatchPlan(payoutId);
+        JsonNode res;
         try {
-            var creds = gatewayConfig.credentialsFor(null, TenantGatewayConfig.MODE_PLATFORM);
             String callbackUrl = props.getPublicBaseUrl() + "/api/payments/marzpay/callback";
-            JsonNode res = marzPay.sendMoney(creds, p.getAmount(), p.getPhone(), p.getPayoutRef(),
+            res = marzPay.sendMoney(plan.creds(), plan.amount(), plan.phone(), plan.payoutRef(),
                     "UG", "Platform subscription earnings payout", callbackUrl);
-            var txn = res.path("data").path("transaction");
-            if (!txn.path("uuid").isNull()) p.setProviderUuid(txn.path("uuid").asText());
-            var wd = res.path("data").path("withdrawal").isMissingNode()
-                    ? res.path("data").path("disbursement") : res.path("data").path("withdrawal");
-            var charge = wd.path("charge").path("raw");
-            if (charge.isNumber() && charge.longValue() != p.getFee()) {
-                long delta = charge.longValue() - p.getFee();
-                p.setFee(charge.longValue());
-                p.setTotalDeduction(p.getAmount() + p.getFee());
-                if (delta > 0) { // true-up the reservation
-                    a.setSettledEarnings(a.getSettledEarnings() - delta);
-                    a.setReservedEarnings(a.getReservedEarnings() + delta);
-                    record(a, PlatformLedgerEntry.PAYOUT_RESERVE, delta, "PRESADJ:" + p.getPayoutRef(),
-                            null, p.getId(), "Payout fee reconciliation");
-                } else {
-                    a.setReservedEarnings(a.getReservedEarnings() + delta); // delta negative
-                    a.setSettledEarnings(a.getSettledEarnings() - delta);
-                    record(a, PlatformLedgerEntry.PAYOUT_RELEASE, -delta, "PRESADJ:" + p.getPayoutRef(),
-                            null, p.getId(), "Payout fee reconciliation");
-                }
-            }
-            payouts.save(p);
         } catch (Exception e) {
             // A timeout may still have created the payout — never retry blindly.
-            p.setFailureReason("Dispatch error (" + e.getMessage() + ") — awaiting reconciliation");
-            payouts.save(p);
-            log.error("Platform payout {} dispatch failed: {}", p.getPayoutRef(), e.getMessage());
+            self.markPayoutDispatchError(payoutId, "Dispatch error (" + e.getMessage() + ") — awaiting reconciliation");
+            log.error("Platform payout {} dispatch failed: {}", plan.payoutRef(), e.getMessage());
+            return;
         }
+        self.applyPayoutDispatch(payoutId, res);
+    }
+
+    @Transactional
+    public PayoutDispatchPlan payoutDispatchPlan(Long payoutId) {
+        PlatformPayout p = payouts.findById(payoutId).orElseThrow();
+        var creds = gatewayConfig.credentialsFor(null, TenantGatewayConfig.MODE_PLATFORM);
+        return new PayoutDispatchPlan(p.getAmount(), p.getPhone(), p.getPayoutRef(), creds);
+    }
+
+    record PayoutDispatchPlan(Long amount, String phone, String payoutRef,
+                              com.wifibilling.service.payment.MarzPayClient.Credentials creds) {}
+
+    /** Applies the provider dispatch response: provider uuid + fee true-up. */
+    @Transactional
+    public void applyPayoutDispatch(Long payoutId, JsonNode res) {
+        PlatformPayout p = payouts.findById(payoutId).orElseThrow();
+        PlatformEarningsAccount a = accountForUpdate();
+        var txn = res.path("data").path("transaction");
+        if (!txn.path("uuid").isNull()) p.setProviderUuid(txn.path("uuid").asText());
+        var wd = res.path("data").path("withdrawal").isMissingNode()
+                ? res.path("data").path("disbursement") : res.path("data").path("withdrawal");
+        var charge = wd.path("charge").path("raw");
+        if (charge.isNumber() && charge.longValue() != p.getFee()) {
+            long delta = charge.longValue() - p.getFee();
+            p.setFee(charge.longValue());
+            p.setTotalDeduction(p.getAmount() + p.getFee());
+            if (delta > 0) { // true-up the reservation
+                a.setSettledEarnings(a.getSettledEarnings() - delta);
+                a.setReservedEarnings(a.getReservedEarnings() + delta);
+                record(a, PlatformLedgerEntry.PAYOUT_RESERVE, delta, "PRESADJ:" + p.getPayoutRef(),
+                        null, p.getId(), "Payout fee reconciliation");
+            } else {
+                a.setReservedEarnings(a.getReservedEarnings() + delta); // delta negative
+                a.setSettledEarnings(a.getSettledEarnings() - delta);
+                record(a, PlatformLedgerEntry.PAYOUT_RELEASE, -delta, "PRESADJ:" + p.getPayoutRef(),
+                        null, p.getId(), "Payout fee reconciliation");
+            }
+        }
+        payouts.save(p);
+        accounts.save(a);
+    }
+
+    @Transactional
+    public void markPayoutDispatchError(Long payoutId, String reason) {
+        payouts.findById(payoutId).ifPresent(p -> {
+            p.setFailureReason(reason);
+            payouts.save(p);
+        });
     }
 
     /** MarzPay disbursement callback for a platform payout. */
