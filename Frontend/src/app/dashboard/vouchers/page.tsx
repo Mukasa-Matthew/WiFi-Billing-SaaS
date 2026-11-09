@@ -118,7 +118,7 @@ export default function VouchersPage() {
 
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <StatCard label="Available inventory" loading={loading} value={totals.available.toLocaleString()} icon={<Ticket />} hintText="Ready to sell or assign" tone="green" />
-      <StatCard label="Currently in use" loading={loading} value={totals.inUse.toLocaleString()} icon={<Clock />} hintText="Activated hotspot sessions" />
+      <StatCard label="Currently in use" loading={loading} value={totals.inUse.toLocaleString()} icon={<Clock />} hintText="Vouchers being used right now" />
       <StatCard label="Sold vouchers" loading={loading} value={totals.sold.toLocaleString()} icon={<CheckCircle />} hintText="Online and walk-in sales" />
       <StatCard label="Available value" loading={loading} value={ugx(totals.value)} icon={<Money />} hintText="Face value of unsold inventory" />
     </div>

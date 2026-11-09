@@ -26,22 +26,22 @@ export default function Page(){
  });
  return <PageContainer>
   {dialog}
-  <PageHeader title="IP bindings" description="Manage device bypass access and automatic expiry." action={<Link href="/dashboard/bindings/new" className={button}><LinkSimple size={14}/>Bind IP</Link>}/>
+  <PageHeader title="Device access" description="Devices that get Wi-Fi without a voucher — staff machines, printers, CCTV or your own." action={<Link href="/dashboard/bindings/new" className={button}><LinkSimple size={14}/>Add a device</Link>}/>
   <Notice text={error||note}/>
   <div className="flex sm:justify-end">
    <FilterTabs loading={loading} value={tab} onChange={setTab} options={[{key:"ACTIVE",label:"Active"},{key:"EXPIRED",label:"Expired"},{key:"ALL",label:"All"}].map(t=>({...t,count:data.filter(b=>t.key==="ALL"||b.status===t.key).length}))}/>
   </div>
-  <Table key={tab} emptyTitle="No IP bindings" emptyDescription="Bindings for the selected status will appear here." rows={data.filter(b=>tab==="ALL"||b.status===tab)} loading={loading} columns={[
+  <Table key={tab} emptyTitle="No devices added" emptyDescription="Devices you give free access to will appear here." rows={data.filter(b=>tab==="ALL"||b.status===tab)} loading={loading} columns={[
    {label:"Name",render:b=><span className="font-medium">{b.name}</span>},
-   {label:"IP",render:b=>b.address?<span className="font-mono text-xs">{b.address}</span>:"MAC only"},
-   {label:"MAC",render:b=><span className="font-mono text-xs">{b.mac}</span>},
+   {label:"IP address",render:b=>b.address?<span className="font-mono text-xs">{b.address}</span>:"Device ID only"},
+   {label:"Device ID",render:b=><span className="font-mono text-xs">{b.mac}</span>},
    {label:"Router",render:b=>b.router},
-   {label:"Package",render:b=>b.packageName||"Free / internal"},
+   {label:"Plan",render:b=>b.packageName||"Free / internal"},
    {label:"Status",render:b=><Badge tone={b.status==="ACTIVE"?"green":"red"}>{b.status}</Badge>},
-   {label:"Router sync",render:b=><Badge tone={b.synced?"green":"amber"}>{b.synced?"Acknowledged":"Pending"}</Badge>},
-   {label:"Expiry",render:b=>b.expiresAt?date(b.expiresAt):"Never"},
+   {label:"On router",render:b=><Badge tone={b.synced?"green":"amber"}>{b.synced?"Applied":"Applying…"}</Badge>},
+   {label:"Access ends",render:b=>b.expiresAt?date(b.expiresAt):"Never"},
    {label:"",render:b=><button disabled={b.status==="REMOVED"} onClick={()=>remove(b)} className="text-xs font-medium text-red-600 hover:underline disabled:opacity-30">Remove</button>}
   ]}/>
-  <p className="text-xs text-[var(--fg-muted)]">Pending means the router has not confirmed this configuration. The management agent must be installed; physical enforcement is verified in the later router test.</p>
+  <p className="text-xs text-[var(--fg-muted)]">&ldquo;Applying…&rdquo; means the router hasn&apos;t confirmed the change yet — it updates itself about once a minute.</p>
  </PageContainer>;
 }

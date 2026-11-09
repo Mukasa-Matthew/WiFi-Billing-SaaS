@@ -137,7 +137,7 @@ export default function TenantActiveSessionsPage() {
         <div>
           <h1 className="text-xl font-bold tracking-tight text-[var(--fg)] flex items-center gap-2.5">
             <Radio className="w-6 h-6 text-emerald-500 animate-pulse" />
-            <span>Live Active Sessions</span>
+            <span>People online now</span>
           </h1>
           <p className="text-xs text-[var(--fg-muted)] mt-1">
             Customers currently connected through your routers, updating in real time.
@@ -184,7 +184,7 @@ export default function TenantActiveSessionsPage() {
 
         <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-sm flex items-center justify-between">
           <div className="space-y-1">
-            <span className="text-xs font-medium text-[var(--fg-muted)]">Total Live Download</span>
+            <span className="text-xs font-medium text-[var(--fg-muted)]">Data downloaded</span>
             <div className="text-2xl font-bold tabular-nums text-[var(--accent-text)]">
               {formatBytes(totalDownloadBytes)}
             </div>
@@ -196,7 +196,7 @@ export default function TenantActiveSessionsPage() {
 
         <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-sm flex items-center justify-between">
           <div className="space-y-1">
-            <span className="text-xs font-medium text-[var(--fg-muted)]">Total Live Upload</span>
+            <span className="text-xs font-medium text-[var(--fg-muted)]">Data uploaded</span>
             <div className="text-2xl font-bold tabular-nums text-amber-500">
               {formatBytes(totalUploadBytes)}
             </div>
@@ -251,11 +251,11 @@ export default function TenantActiveSessionsPage() {
               <tr className="border-b border-[var(--border)] bg-[var(--subtle)] text-[var(--fg-muted)] font-medium">
                 <th className="py-3 px-4">User / Voucher</th>
                 <th className="py-3 px-4">Category & Plan</th>
-                <th className="py-3 px-4">Assigned IP</th>
-                <th className="py-3 px-4">Device MAC</th>
+                <th className="py-3 px-4">IP address</th>
+                <th className="py-3 px-4">Device ID</th>
                 <th className="py-3 px-4">Router</th>
-                <th className="py-3 px-4">Session Uptime</th>
-                <th className="py-3 px-4">Data Usage (Down / Up)</th>
+                <th className="py-3 px-4">Connected for</th>
+                <th className="py-3 px-4">Data used (down / up)</th>
                 <th className="py-3 px-4">Started At</th>
                 <th className="py-3 px-4 text-right">Action</th>
               </tr>
@@ -346,35 +346,34 @@ export default function TenantActiveSessionsPage() {
 
       {/* Disconnect Modal */}
       {disconnectTarget && (
-        <Dialog title="Revoke user session" description="Immediately ends the customer's active hotspot session." onClose={() => { if (!disconnecting) setDisconnectTarget(null); }}>
+        <Dialog title="Disconnect user" description="Ends this customer's Wi-Fi connection right away." onClose={() => { if (!disconnecting) setDisconnectTarget(null); }}>
           <div className="space-y-5">
             <div className="flex items-center gap-3 text-red-500">
               <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/30">
                 <ShieldWarning className="w-6 h-6" />
               </div>
-              <p className="text-xs font-semibold text-red-600">This action interrupts the customer&apos;s connection.</p>
+              <p className="text-xs font-semibold text-red-600">This cuts the customer off immediately.</p>
             </div>
 
             <p className="text-xs text-[var(--fg-body)] leading-relaxed">
-              Are you sure you want to terminate connection for voucher{" "}
+              Are you sure you want to disconnect voucher{" "}
               <span className="font-mono font-bold text-[var(--fg)] bg-[var(--fill)] px-1.5 py-0.5 rounded">
                 {disconnectTarget.username}
               </span>
-              ? A disconnect request will be sent immediately to router{" "}
-              <span className="font-mono text-[var(--accent-text)]">{disconnectTarget.nasIpAddress || "10.9.0.x"}</span> to terminate this hotspot session.
+              ? The request goes to the router straight away and their internet will stop.
             </p>
 
             <div className="p-3 rounded-xl bg-[var(--canvas)] border border-[var(--border)] space-y-1.5 text-[11px] font-mono">
               <div className="flex justify-between text-[var(--fg-muted)]">
-                <span>Client IP:</span>
+                <span>IP address:</span>
                 <span className="text-[var(--fg)]">{disconnectTarget.framedIpAddress || "N/A"}</span>
               </div>
               <div className="flex justify-between text-[var(--fg-muted)]">
-                <span>Client MAC:</span>
+                <span>Device ID:</span>
                 <span className="text-[var(--fg)]">{disconnectTarget.callingStationId || "N/A"}</span>
               </div>
               <div className="flex justify-between text-[var(--fg-muted)]">
-                <span>Session Duration:</span>
+                <span>Time online:</span>
                 <span className="text-[var(--fg)]">{formatDuration(disconnectTarget.acctSessionTime)}</span>
               </div>
             </div>
@@ -393,7 +392,7 @@ export default function TenantActiveSessionsPage() {
                 disabled={disconnecting}
                 className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-semibold shadow-red-600/25 transition disabled:opacity-50"
               >
-                <BusyLabel busy={disconnecting} label="Disconnecting…">Terminate Session</BusyLabel>
+                <BusyLabel busy={disconnecting} label="Disconnecting…">Disconnect user</BusyLabel>
               </button>
             </div>
           </div>

@@ -105,10 +105,10 @@ export default function Page() {
     <div className="space-y-6">{dialog}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-[var(--fg)]">MikroTik routers</h1>
-          <p className="mt-1 text-sm text-[var(--fg-muted)]">To get started, add a MikroTik router by clicking 'Link a MikroTik'.</p>
+          <h1 className="text-xl font-bold tracking-tight text-[var(--fg)]">Routers</h1>
+          <p className="mt-1 text-sm text-[var(--fg-muted)]">The MikroTik boxes that run your Wi-Fi. To get started, click 'Add a router'.</p>
         </div>
-        <Link href="/dashboard/routers/new" className={button}>Link a MikroTik</Link>
+        <Link href="/dashboard/routers/new" className={button}>Add a router</Link>
       </div>
       <Notice text={error || note} />
       <FilterTabs loading={loading} options={tabs} value={tab} onChange={setTab} />
@@ -117,31 +117,28 @@ export default function Page() {
         rows={data.filter(r => tab === "ALL" || (tab === "ONLINE" && r.status === "online") || (tab === "OFFLINE" && r.status !== "online"))}
         columns={[
           { label: "Router", render: r => <Link href={`/dashboard/routers/${r.id}`} className="font-semibold text-[var(--fg)] hover:underline">{r.name}</Link> },
-          { label: "Provisioning", render: r => <Badge tone={r.status === "online" ? "green" : r.status === "degraded" ? "red" : "amber"}>{r.status === "online" ? "Verified" : r.status === "degraded" ? "Needs attention" : r.status === "provisioned" ? "Awaiting checks" : r.registered ? "Registered" : "Awaiting router"}</Badge> },
-          { label: "CPU", render: r => r.lastSeen ? `${r.cpuLoad || 0}%` : "—" },
-          { label: "Memory", render: r => r.lastSeen ? `${r.memoryUsage || 0}%` : "—" },
-          { label: "Status", render: r => <Badge tone={r.status === "online" ? "green" : "amber"}>{r.status}</Badge> },
-          { label: "Connection", render: r => r.wgIp ? <Badge tone="green">WireGuard</Badge> : <Badge tone="slate">Pending</Badge> },
-          { label: "Health", render: r => {
+          { label: "Status", render: r => {
             const flags = [r.hotspotReady, r.radiusReady, r.portalReady];
-            if (flags.every(f => f === true)) return <Badge tone="green">Healthy</Badge>;
-            if (flags.some(f => f === false)) return <Badge tone="red">Degraded</Badge>;
-            return <Badge tone={r.lastSeen ? "slate" : "amber"}>{r.lastSeen ? "Reporting" : "No data"}</Badge>;
+            const degraded = r.status === "degraded" || flags.some(f => f === false);
+            if (r.status === "online" && !degraded) return <Badge tone="green">Online</Badge>;
+            if (degraded) return <Badge tone="amber">Needs attention</Badge>;
+            if (r.status === "provisioned" || r.registered) return <Badge tone="amber">Setting up</Badge>;
+            return <Badge tone="red">Offline</Badge>;
           }},
-          { label: "Remote access", render: r => r.wgIp ? <Badge tone="green">Enabled</Badge> : <Badge tone="slate">Off</Badge> },
-          { label: "WinBox address", render: r => r.wgIp
-            ? <button title="Copy WinBox address" onClick={() => { void navigator.clipboard?.writeText(`${r.wgIp}`); toast("success", "WinBox address copied — connect via the WireGuard tunnel."); }} className="font-mono text-xs text-[var(--accent-text)] hover:underline">{r.wgIp}</button>
+          { label: "Uptime", render: r => r.lastSeen ? <span className="text-[var(--fg-muted)]">{r.uptime || "—"}</span> : "—" },
+          { label: "WinBox IP", render: r => r.wgIp
+            ? <button title="Copy WinBox address — open it in the WinBox app to manage the router" onClick={() => { void navigator.clipboard?.writeText(`${r.wgIp}`); toast("success", "WinBox address copied."); }} className="font-mono text-xs text-[var(--accent-text)] hover:underline">{r.wgIp}</button>
             : "—" },
-          { label: "Last telemetry", render: r => <span className="text-[var(--fg-muted)]">{date(r.lastSeen)}</span> },
+          { label: "Last check-in", render: r => <span className="text-[var(--fg-muted)]">{date(r.lastSeen)}</span> },
           {
             label: "", render: r => (
               <ActionMenu ariaLabel={`Actions for ${r.name}`}>
-                <ActionMenuItem icon={<Activity size={14} />} label="Monitor live" onClick={() => nav.push(`/dashboard/routers/${r.id}`)} />
-                <ActionMenuItem icon={<Eye size={14} />} label="View / manage" onClick={() => open(r)} />
-                <ActionMenuItem icon={<Terminal size={14} />} label="Reprovision command" onClick={() => showCommand(r)} />
-                <ActionMenuItem icon={<FileArrowDown size={14} />} label="Sync hotspot files" onClick={() => action(r, "SYNC_PORTAL")} />
-                <ActionMenuItem icon={<Clock size={14} />} label="Sync router time" onClick={() => action(r, "SYNC_TIME")} />
-                <ActionMenuItem icon={<ArrowClockwise size={14} />} label="Install mgmt agent" onClick={() => showCommand(r, true)} />
+                <ActionMenuItem icon={<Activity size={14} />} label="Open router" onClick={() => nav.push(`/dashboard/routers/${r.id}`)} />
+                <ActionMenuItem icon={<Eye size={14} />} label="Tasks &amp; WinBox" onClick={() => open(r)} />
+                <ActionMenuItem icon={<Terminal size={14} />} label="Setup command" onClick={() => showCommand(r)} />
+                <ActionMenuItem icon={<FileArrowDown size={14} />} label="Update login page" onClick={() => action(r, "SYNC_PORTAL")} />
+                <ActionMenuItem icon={<Clock size={14} />} label="Sync router clock" onClick={() => action(r, "SYNC_TIME")} />
+                <ActionMenuItem icon={<ArrowClockwise size={14} />} label="Re-enable management" onClick={() => showCommand(r, true)} />
                 <ActionMenuItem icon={<Trash size={14} />} label="Delete router" danger onClick={() => remove(r)} />
               </ActionMenu>
             )
@@ -155,7 +152,7 @@ export default function Page() {
             <button onClick={() => setSelected(null)} className="text-xs font-medium text-[var(--fg-muted)] hover:text-[var(--fg)]">Close</button>
           </div>
           <p className="text-xs leading-6 text-[var(--fg-muted)]">
-            WinBox over your routed WireGuard connection: <code className="text-[var(--accent-text)]">{selected.wgIp || "No tunnel IP"}:8291</code>. This is a private tunnel address, not a public remote-access endpoint.
+            To manage this router in the WinBox app, connect to <code className="text-[var(--accent-text)]">{selected.wgIp || "No tunnel IP"}:8291</code> — a private address that only works through AirPairy&apos;s secure tunnel.
           </p>
           {command && (
             <div>

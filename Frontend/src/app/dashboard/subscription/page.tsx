@@ -288,7 +288,7 @@ export default function SubscriptionHubPage() {
       {/* Page Title & Action Bar */}
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-[var(--fg)]">Subscription &amp; Billing Hub</h1>
+          <h1 className="text-2xl font-black tracking-tight text-[var(--fg)]">Your subscription</h1>
           <p className="mt-1 text-xs text-[var(--fg-muted)]">
             Review your SaaS subscription, track live renewal time, inspect billing history, and pay via Mobile Money.
           </p>
@@ -378,11 +378,11 @@ export default function SubscriptionHubPage() {
                 <p className="mt-0.5 text-xs font-bold text-[var(--fg)]">{d(sub.startDate)}</p>
               </div>
               <div>
-                <span className="text-[11px] font-medium text-[var(--fg-faint)]">Next Renewal / Expiry</span>
+                <span className="text-[11px] font-medium text-[var(--fg-faint)]">Renews / ends on</span>
                 <p className="mt-0.5 text-xs font-bold text-[var(--fg)]">{d(sub.expiresAt || sub.nextRenewalDate)}</p>
               </div>
               <div>
-                <span className="text-[11px] font-medium text-[var(--fg-faint)]">Grace Period Window</span>
+                <span className="text-[11px] font-medium text-[var(--fg-faint)]">Grace period ends</span>
                 <p className="mt-0.5 text-xs font-bold text-[var(--fg)]">{d(sub.graceUntil)}</p>
               </div>
             </div>

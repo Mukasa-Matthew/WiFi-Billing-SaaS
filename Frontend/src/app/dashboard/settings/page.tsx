@@ -447,14 +447,14 @@ export default function TenantSettingsPage() {
       <form onSubmit={save} className="space-y-6">
         {tab === "general" && (
           <section className={card}>
-            <h2 className="text-sm font-semibold text-[var(--fg)]">Your ISP Branding</h2>
+            <h2 className="text-sm font-semibold text-[var(--fg)]">Your business name &amp; look</h2>
             <p className="mb-5 mt-1 text-xs text-[var(--fg-muted)]">Configure your WiFi business branding and customer support details for {form.name}.</p>
             <div className="grid gap-5 sm:grid-cols-2">
               <AssetBox title="Your Logo" hintText="JPG, PNG, WebP or SVG. Large images are resized automatically. Appears on the login page."
                 has={form.hasLogo} uploading={uploading === "logo"} kind="logo" previewUrl={imagePreview.logo}
                 onPick={(f) => uploadAsset("logo", f)} onRemove={() => removeAsset("logo")} inputRef={logoRef} />
               <div>
-                <label className={label}>Your ISP / WiFi Business Name*</label>
+                <label className={label}>Your WiFi business name*</label>
                 <input required maxLength={120} value={form.name} onChange={(e) => set("name", e.target.value)} className={field} />
                 <p className={hint}>This name will appear on vouchers, SMS messages, and the captive portal.</p>
               </div>

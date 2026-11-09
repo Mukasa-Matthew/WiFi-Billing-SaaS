@@ -5,7 +5,7 @@ import { notify } from "@/components/ui/Toast";
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { Suspense, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import api from "@/lib/api";
 import WinboxAccessDialog from "@/components/router/WinboxAccessDialog";
 import {
@@ -47,6 +47,9 @@ interface Live { reachable: boolean; source: string; probedAt: string; hotspotUs
 interface Host { [k: string]: unknown }
 
 const TABS = ["Overview", "Live now", "Sessions", "Accounting", "Auth events", "Devices", "Provisioning", "Events", "Diagnostics"] as const;
+// Business owners get the essentials; RADIUS forensics, provisioning internals
+// and diagnostics stay in the platform NOC (scope "admin").
+const TENANT_TABS = ["Overview", "Live now", "Sessions", "Devices", "Events"] as const;
 type Tab = typeof TABS[number];
 
 const checkTone = (s: string) => s === "HEALTHY" ? "green" : s === "WARNING" ? "amber" : s === "CRITICAL" ? "red" : "slate";
@@ -152,17 +155,17 @@ function RouterDetailInner() {
                 {r?.name ?? (error ? "Router" : <><span aria-hidden className="inline-block h-[0.8em] w-40 max-w-full animate-pulse rounded bg-[var(--fill)] align-middle motion-reduce:animate-none" /><span className="sr-only">Loading router</span></>)}
                 {s && <span title={s.detail}><Badge tone={s.tone} dot>{s.label}</Badge></span>}
               </h1>
-              {r && (
+              {r && !tenant && (
                 <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-[var(--fg-muted)]">
-                  {tenant ? <span className="font-medium text-[var(--fg-body)]">{r.tenantName}</span> : <Link href={`/admin/tenants/${r.tenantId}`} className="font-medium text-[var(--fg-body)] hover:underline">{r.tenantName}</Link>}
+                  <Link href={`/admin/tenants/${r.tenantId}`} className="font-medium text-[var(--fg-body)] hover:underline">{r.tenantName}</Link>
                   <span aria-hidden>·</span><span className="font-mono text-xs">{r.wgIp || "No tunnel IP"}</span>
                   <span aria-hidden>·</span><span>{r.provisioningState}</span>
                 </p>
               )}
             </div>
           </div>
-          <button onClick={runProbe} disabled={liveBusy || !r} className={buttonGhost} title="Reads system resources over the tunnel. Makes no changes.">
-            <ArrowClockwise className={`h-4 w-4 ${liveBusy ? "animate-spin motion-reduce:animate-none" : ""}`} /><BusyLabel busy={liveBusy} label="Probing…">Run live probe</BusyLabel>
+          <button onClick={runProbe} disabled={liveBusy || !r} className={buttonGhost} title={tenant ? "Checks the router responds right now. Makes no changes." : "Reads system resources over the tunnel. Makes no changes."}>
+            <ArrowClockwise className={`h-4 w-4 ${liveBusy ? "animate-spin motion-reduce:animate-none" : ""}`} /><BusyLabel busy={liveBusy} label="Checking…">{tenant ? "Check router now" : "Run live probe"}</BusyLabel>
           </button>
         </div>
       </div>
@@ -172,15 +175,21 @@ function RouterDetailInner() {
       {winboxOpen && <WinboxAccessDialog base={tenant ? base.replace(/\/monitor$/, "") : base} onClose={() => setWinboxOpen(false)} />}
 
       {r && s && (
-        <section className="panel-shadow grid grid-cols-2 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] lg:grid-cols-5">
-          {[
+        <section className={`panel-shadow grid overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] ${tenant ? "grid-cols-3" : "grid-cols-2 lg:grid-cols-5"}`}>
+          {((tenant ? [
+            { label: "Status", value: s.label, sub: r.lastSeen ? `Checked in ${relativeTime(r.lastSeen, now)}` : "Never reported", title: r.lastSeen ? new Date(r.lastSeen).toLocaleString() : undefined },
+            { label: "People online", value: r.openSessions.toLocaleString(), sub: "connected right now" },
+            { label: "Uptime", value: r.uptime || "—", sub: "how long it has been running" },
+          ] : [
             { label: "Connectivity", value: s.label, sub: r.lastSeen ? `Last report ${relativeTime(r.lastSeen, now)}` : "Never reported", title: r.lastSeen ? new Date(r.lastSeen).toLocaleString() : undefined },
             { label: "Open sessions", value: r.openSessions.toLocaleString(), sub: telemetryCurrent && r.activeUsers != null ? `${r.activeUsers} hotspot users reported` : "RADIUS accounting" },
             { label: "CPU", node: telemetryCurrent ? <Meter value={r.cpuLoad} label="CPU load" /> : <span className="text-sm text-[var(--fg-faint)]">Out of date</span>, sub: telemetryCurrent ? "From last report" : `Last known ${r.cpuLoad ?? "—"}%` },
             { label: "Memory", node: telemetryCurrent ? <Meter value={r.memoryUsage} label="Memory usage" /> : <span className="text-sm text-[var(--fg-faint)]">Out of date</span>, sub: telemetryCurrent ? `Uptime ${r.uptime || "—"}` : `Last known ${r.memoryUsage ?? "—"}%` },
             { label: "Last accounting", value: relativeTime(detail.lastAccountingAt, now), sub: `NAS ${detail.radiusNasRegistered.toLowerCase()}`, title: detail.lastAccountingAt ? new Date(detail.lastAccountingAt).toLocaleString() : undefined },
-          ].map((c, i) => (
-            <div key={c.label} title={c.title} className={`border-[var(--border)] p-4 ${i % 2 === 0 ? "border-r" : ""} ${i < 4 ? "border-b lg:border-b-0" : "col-span-2 lg:col-span-1"} lg:border-r lg:last:border-r-0`}>
+          ]) as { label: string; value?: string; node?: ReactNode; sub: string; title?: string }[]).map((c, i) => (
+            <div key={c.label} title={c.title} className={tenant
+              ? `border-[var(--border)] p-4 ${i < 2 ? "border-r" : ""}`
+              : `border-[var(--border)] p-4 ${i % 2 === 0 ? "border-r" : ""} ${i < 4 ? "border-b lg:border-b-0" : "col-span-2 lg:col-span-1"} lg:border-r lg:last:border-r-0`}>
               <p className="text-xs font-medium text-[var(--fg-muted)]">{c.label}</p>
               <div className="mt-1.5 flex h-7 items-center text-lg font-semibold text-[var(--fg)]">{c.node ?? c.value}</div>
               <p className="mt-0.5 truncate text-[11.5px] text-[var(--fg-muted)]">{c.sub}</p>
@@ -191,20 +200,20 @@ function RouterDetailInner() {
 
       {live && (
         <section className={`flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border px-4 py-3 text-[13px] ${live.reachable ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-700"}`}>
-          <span className="font-semibold">{live.reachable ? "Router answered the live probe" : "Live probe failed"}</span>
-          {live.routerOsVersion && <span>RouterOS {live.routerOsVersion}</span>}
-          {live.boardName && <span>{live.boardName}</span>}
-          {live.cpuLoad != null && <span>CPU {live.cpuLoad}%</span>}
-          {live.memoryUsagePct != null && <span>RAM {live.memoryUsagePct}%</span>}
+          <span className="font-semibold">{live.reachable ? (tenant ? "Your router is responding" : "Router answered the live probe") : (tenant ? "The router didn't answer" : "Live probe failed")}</span>
+          {!tenant && live.routerOsVersion && <span>RouterOS {live.routerOsVersion}</span>}
+          {!tenant && live.boardName && <span>{live.boardName}</span>}
+          {!tenant && live.cpuLoad != null && <span>CPU {live.cpuLoad}%</span>}
+          {!tenant && live.memoryUsagePct != null && <span>RAM {live.memoryUsagePct}%</span>}
           {live.uptime && <span>Up {live.uptime}</span>}
-          {live.hotspotActive != null && <span>{live.hotspotActive} hotspot users</span>}
-          {live.wgHandshakeSecondsAgo != null && <span>Tunnel handshake {live.wgHandshakeSecondsAgo}s ago</span>}
+          {live.hotspotActive != null && <span>{live.hotspotActive} {tenant ? "people" : "hotspot users"}</span>}
+          {!tenant && live.wgHandshakeSecondsAgo != null && <span>Tunnel handshake {live.wgHandshakeSecondsAgo}s ago</span>}
           {live.error && <span>{live.error}</span>}
           {live.probedAt && <span className="ml-auto text-xs opacity-80">{date(live.probedAt)}</span>}
         </section>
       )}
 
-      <Tabs label="Router sections" tabs={TABS} value={tab} onChange={setTab} />
+      <Tabs label="Router sections" tabs={tenant ? TENANT_TABS : TABS} value={tab} onChange={setTab} />
 
       {tab === "Overview" && detail && <OverviewTab detail={detail} now={now} />}
       {tab === "Live now" && <LiveNowTab now={now} />}
@@ -221,7 +230,7 @@ function RouterDetailInner() {
 
 /* ---------------- Overview ---------------- */
 function OverviewTab({ detail, now }: { detail: Detail; now: number }) {
-  const { base } = useContext(RouterScope);
+  const { base, tenant } = useContext(RouterScope);
   const r = detail.router;
   const [usage, setUsage] = useState<UsagePoint[] | null>(null);
   const [usageErr, setUsageErr] = useState("");
@@ -240,7 +249,7 @@ function OverviewTab({ detail, now }: { detail: Detail; now: number }) {
   return (
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
       <div className="min-w-0 space-y-5 lg:col-span-2">
-        <Card title="Open incidents" description="Evaluated every minute from stored telemetry and task results" bodyClassName="">
+        <Card title={tenant ? "Alerts" : "Open incidents"} description={tenant ? undefined : "Evaluated every minute from stored telemetry and task results"} bodyClassName="">
           {incErr ? <p className="px-5 py-8 text-sm text-[var(--fg-muted)]">Incidents unavailable: {incErr}</p>
             : !incidents ? <ListSkeleton rows={2} avatar={false} />
             : open.length === 0 ? (
@@ -274,24 +283,44 @@ function OverviewTab({ detail, now }: { detail: Detail; now: number }) {
         </Card>
       </div>
       <div className="min-w-0 space-y-5">
-        <Card title="Service readiness" action={<Badge tone={svc.tone} dot>{svc.label}</Badge>} bodyClassName="px-5 py-1">
-          <dl className="divide-y divide-[var(--border-soft)]">
-            <Field label="Hotspot service">{flagDot(r.hotspotReady)}</Field>
-            <Field label="RADIUS client">{flagDot(r.radiusReady)}</Field>
-            <Field label="Captive portal files">{flagDot(r.portalReady)}</Field>
-            <Field label="FreeRADIUS NAS entry"><StatusDot tone={detail.radiusNasRegistered === "Registered" ? "green" : "amber"}>{detail.radiusNasRegistered}</StatusDot></Field>
-            <Field label="IP bindings">{r.bindingsSynced ? <StatusDot tone="green">Synced</StatusDot> : <StatusDot tone="amber">Pending sync</StatusDot>}</Field>
-          </dl>
-        </Card>
-        <Card title="Identity" bodyClassName="px-5 py-1">
-          <dl className="divide-y divide-[var(--border-soft)]">
-            <Field label="Router ID" mono>#{r.id}</Field>
-            <Field label="Tunnel IP" mono>{r.wgIp || "Unassigned"}</Field>
-            <Field label="Registered">{date(r.createdAt)}</Field>
-            <Field label="Host list pushed">{relativeTime(r.hostsSeenAt, now)}</Field>
-          </dl>
-          <p className="pb-4 pt-1 text-[11.5px] leading-relaxed text-[var(--fg-faint)]">Board model and RouterOS version aren&apos;t in telemetry; run a live probe to read them. Tokens, keys and RADIUS secrets are never shown.</p>
-        </Card>
+        {tenant ? (
+          <Card title="System health" action={<Badge tone={svc.tone} dot>{svc.label}</Badge>}>
+            {svc.tone === "green" ? (
+              <div className="flex items-center gap-3">
+                <CheckCircle className="h-5 w-5 shrink-0 text-emerald-600" />
+                <p className="text-sm text-[var(--fg-body)]">Everything is working. Customers can see your login page, sign in and pay.</p>
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {r.hotspotReady === false && <p className="text-sm text-[var(--fg-body)]">• The sign-in service on the router needs attention.</p>}
+                {r.radiusReady === false && <p className="text-sm text-[var(--fg-body)]">• Customer sign-in and payment verification need attention.</p>}
+                {r.portalReady === false && <p className="text-sm text-[var(--fg-body)]">• Your login page files need attention.</p>}
+                <p className="text-xs text-[var(--fg-muted)]">If this doesn&apos;t clear on its own, contact support.</p>
+              </div>
+            )}
+          </Card>
+        ) : (
+          <>
+            <Card title="Service readiness" action={<Badge tone={svc.tone} dot>{svc.label}</Badge>} bodyClassName="px-5 py-1">
+              <dl className="divide-y divide-[var(--border-soft)]">
+                <Field label="Hotspot service">{flagDot(r.hotspotReady)}</Field>
+                <Field label="RADIUS client">{flagDot(r.radiusReady)}</Field>
+                <Field label="Captive portal files">{flagDot(r.portalReady)}</Field>
+                <Field label="FreeRADIUS NAS entry"><StatusDot tone={detail.radiusNasRegistered === "Registered" ? "green" : "amber"}>{detail.radiusNasRegistered}</StatusDot></Field>
+                <Field label="IP bindings">{r.bindingsSynced ? <StatusDot tone="green">Synced</StatusDot> : <StatusDot tone="amber">Pending sync</StatusDot>}</Field>
+              </dl>
+            </Card>
+            <Card title="Identity" bodyClassName="px-5 py-1">
+              <dl className="divide-y divide-[var(--border-soft)]">
+                <Field label="Router ID" mono>#{r.id}</Field>
+                <Field label="Tunnel IP" mono>{r.wgIp || "Unassigned"}</Field>
+                <Field label="Registered">{date(r.createdAt)}</Field>
+                <Field label="Host list pushed">{relativeTime(r.hostsSeenAt, now)}</Field>
+              </dl>
+              <p className="pb-4 pt-1 text-[11.5px] leading-relaxed text-[var(--fg-faint)]">Board model and RouterOS version aren&apos;t in telemetry; run a live probe to read them. Tokens, keys and RADIUS secrets are never shown.</p>
+            </Card>
+          </>
+        )}
       </div>
     </div>
   );
