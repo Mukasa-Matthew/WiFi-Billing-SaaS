@@ -377,6 +377,14 @@ function showMsg(text, isError) {
     document.getElementById('msg-area').innerHTML =
         '<div class="status-msg ' + (isError ? 'error' : 'success') + '">' + text + '</div>';
 }
+/* Text colour that stays readable on top of the tenant-chosen primary colour. */
+function contrastOn(hex) {
+    var m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+    if (!m) return '#FFFFFF';
+    var n = parseInt(m[1], 16);
+    var r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+    return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.6 ? '#0F172A' : '#FFFFFF';
+}
 if (MT_ERROR && MT_ERROR.charAt(0) !== '$') {
     var _prevPurchase = loadPurchase();
     if (_prevPurchase) {
@@ -430,7 +438,17 @@ function renderSettings(settings) {
 
     // Portal design overrides
     if (settings.font) document.body.style.fontFamily = "'" + settings.font + "', -apple-system, 'Segoe UI', sans-serif";
-    if (settings.primaryColor) document.body.style.setProperty('--primary', settings.primaryColor);
+    // Schools treat their brand colour as the portal colour by default; any
+    // tenant can still override it with the explicit portal colour.
+    var primaryOverride = settings.primaryColor || (settings.school ? settings.brandColor : '');
+    if (primaryOverride) {
+        document.body.style.setProperty('--primary', primaryOverride);
+        document.body.style.setProperty('--header-bg', primaryOverride);
+        document.body.style.setProperty('--buy-bg', primaryOverride);
+        var onColor = contrastOn(primaryOverride);
+        document.body.style.setProperty('--header-text', onColor);
+        document.body.style.setProperty('--buy-text', onColor);
+    }
     if (settings.secondaryColor) document.body.style.setProperty('--bg-1', settings.secondaryColor);
     var iconEl = document.querySelector('.brand-icon');
     if (settings.logoUrl) {
