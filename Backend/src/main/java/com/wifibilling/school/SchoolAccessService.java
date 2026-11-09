@@ -259,7 +259,8 @@ public class SchoolAccessService {
         return transaction.execute(status -> {
             Voucher existing = vouchers.findAllByTenantIdAndVisitorPassIdAndStatusIn(tenant.getId(), passId, List.of("unused", "active")).stream().findFirst().orElse(null);
             Long remainingBytes = checkVisitorDataCap(tenant, passId, existing);
-            Voucher voucher = existing != null ? existing : issue(tenant, systemPlan(tenant, VISITOR_PLAN), router, mac, null, "VISITOR", passId, until);
+            Voucher voucher = existing != null ? existing : issue(tenant, systemPlan(tenant, VISITOR_PLAN), router, mac, null, "VISITOR", passId, until, fullName);
+            voucher.setPersonName(fullName);
             reprovision(voucher, router, mac, until, remainingBytes);
             return PortalResult.connect(voucher.getCode(), fullName, "VISITOR", until);
         });
@@ -276,9 +277,10 @@ public class SchoolAccessService {
         }
         OffsetDateTime hardLimit = endOf(t.accessUntil());
         return transaction.execute(status -> {
+            rememberName(tenant.getId(), t.personId(), t.fullName());
             Voucher existing = liveFreeStudent(tenant.getId(), t.personId());
             Long remainingBytes = checkStudentFreeDailyCap(tenant, t.personId(), existing);
-            Voucher voucher = existing != null ? existing : issueFreeStudent(tenant, router, mac, t.personId(), hardLimit);
+            Voucher voucher = existing != null ? existing : issueFreeStudent(tenant, router, mac, t.personId(), t.fullName(), hardLimit);
             reprovision(voucher, router, mac, hardLimit, remainingBytes);
             return PortalResult.connect(voucher.getCode(), null, "STUDENT_FREE", hardLimit);
         });
@@ -295,6 +297,7 @@ public class SchoolAccessService {
         LocalDate accessUntil = LocalDate.parse(verified.path("accessUntil").asString());
         OffsetDateTime hardLimit = endOf(accessUntil);
         return transaction.execute(status -> {
+            rememberName(tenant.getId(), personId, fullName);
             if ("STAFF".equals(category)) {
                 Voucher live = live(tenant.getId(), personId, category);
                 if (!tenant.isSchoolStaffEnabled()) {
@@ -302,7 +305,7 @@ public class SchoolAccessService {
                     throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Free staff WiFi is currently paused by the network owner.");
                 }
                 Long remainingBytes = checkStaffDailyCap(tenant, personId, live);
-                Voucher voucher = live != null ? live : issue(tenant, systemPlan(tenant, STAFF_PLAN), router, mac, personId, "STAFF", null, hardLimit);
+                Voucher voucher = live != null ? live : issue(tenant, systemPlan(tenant, STAFF_PLAN), router, mac, personId, "STAFF", null, hardLimit, fullName);
                 reprovision(voucher, router, mac, hardLimit, remainingBytes);
                 return PortalResult.connect(voucher.getCode(), fullName, category, voucher.getExpiresAt() != null ? voucher.getExpiresAt() : hardLimit);
             }
@@ -325,7 +328,7 @@ public class SchoolAccessService {
      */
     private PortalResult studentChoice(Tenant tenant, String personId, LocalDate accessUntil, String mac, String fullName, String category,
                                        List<Voucher> paid) {
-        String ticket = tickets.issue(new SchoolTickets.Ticket(tenant.getId(), personId, accessUntil, mac));
+        String ticket = tickets.issue(new SchoolTickets.Ticket(tenant.getId(), personId, accessUntil, mac, fullName));
         // At the device limit they can't buy here, only move one of their packages to this device.
         List<PaidDevice> movable = otherDevices(paid, mac).size() < MAX_PAID_STUDENT_DEVICES ? null
                 : otherDevices(paid, mac).stream().map(v -> new PaidDevice(v.getId(),
@@ -378,6 +381,8 @@ public class SchoolAccessService {
         }
         Voucher voucher = vouchers.findByCode(code).orElseThrow();
         voucher.setPersonId(tx.getPersonId());
+        voucher.setPersonName(tx.getPersonName() != null ? tx.getPersonName()
+                : vouchers.findPersonNames(tx.getTenant().getId(), tx.getPersonId()).stream().findFirst().orElse(null));
         voucher.setSchoolCategory("STUDENT");
         voucher.setHardExpiresAt(endOf(tx.getPersonAccessUntil()));
         if (tx.getClientMac() != null && !tx.getClientMac().isBlank()) {
@@ -388,6 +393,7 @@ public class SchoolAccessService {
         }
         vouchers.save(voucher);
         radCheck.save(RadCheck.builder().username(code).attribute("Expiration").op(":=").value(radiusTime(voucher.getHardExpiresAt())).build());
+        rememberName(tx.getTenant().getId(), tx.getPersonId(), voucher.getPersonName());
     }
 
     /** The identity system asked for sign-out: end sessions and block logins until a fresh ID and PIN check. */
@@ -413,6 +419,12 @@ public class SchoolAccessService {
             expiration.disconnectActiveSessions(voucher.getCode());
         }
         return held.size();
+    }
+
+    /** Stamps the verified name on all the person's school vouchers, so a connected device can be found by name. */
+    private void rememberName(Long tenantId, String personId, String fullName) {
+        if (personId == null || fullName == null || fullName.isBlank()) return;
+        vouchers.stampPersonName(tenantId, personId, fullName.trim());
     }
 
     private Voucher live(Long tenantId, String personId, String category) {
@@ -442,11 +454,12 @@ public class SchoolAccessService {
                 .orElse(null);
     }
 
-    private Voucher issue(Tenant tenant, PackagePlan plan, Router router, String mac, String personId, String category, String passId, OffsetDateTime hardLimit) {
+    private Voucher issue(Tenant tenant, PackagePlan plan, Router router, String mac, String personId, String category, String passId, OffsetDateTime hardLimit, String fullName) {
         String code = voucherService.generate(tenant.getId(), new GenerateVouchersRequest(plan.getId(), 1), mac, router.getWgIp()).getFirst().code();
         Voucher voucher = vouchers.findByCode(code).orElseThrow();
         voucher.setSaleType("SCHOOL_" + category);
         voucher.setPersonId(personId);
+        voucher.setPersonName(fullName);
         voucher.setSchoolCategory(category);
         voucher.setVisitorPassId(passId);
         voucher.setHardExpiresAt(hardLimit);
@@ -454,12 +467,13 @@ public class SchoolAccessService {
         return vouchers.save(voucher);
     }
 
-    private Voucher issueFreeStudent(Tenant tenant, Router router, String mac, String personId, OffsetDateTime hardLimit) {
+    private Voucher issueFreeStudent(Tenant tenant, Router router, String mac, String personId, String fullName, OffsetDateTime hardLimit) {
         PackagePlan plan = systemPlan(tenant, STUDENT_FREE_PLAN);
         String code = voucherService.generate(tenant.getId(), new GenerateVouchersRequest(plan.getId(), 1), mac, router.getWgIp()).getFirst().code();
         Voucher voucher = vouchers.findByCode(code).orElseThrow();
         voucher.setSaleType(SALE_STUDENT_FREE);
         voucher.setPersonId(personId);
+        voucher.setPersonName(fullName);
         voucher.setSchoolCategory("STUDENT");
         voucher.setHardExpiresAt(hardLimit);
         voucher.setClaimedMac(mac);

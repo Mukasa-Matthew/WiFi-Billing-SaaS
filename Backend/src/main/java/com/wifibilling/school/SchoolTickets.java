@@ -27,24 +27,25 @@ public class SchoolTickets {
         key = ("school-ticket:" + secret).getBytes(StandardCharsets.UTF_8);
     }
 
-    public record Ticket(long tenantId, String personId, LocalDate accessUntil, String mac) {}
+    public record Ticket(long tenantId, String personId, LocalDate accessUntil, String mac, String fullName) {}
 
     public String issue(Ticket ticket) {
         long expires = Instant.now().getEpochSecond() + LIFETIME_SECONDS;
-        String payload = ticket.tenantId() + "|" + ticket.personId() + "|" + ticket.accessUntil() + "|" + ticket.mac() + "|" + expires;
+        String name = ticket.fullName() == null ? "" : ticket.fullName().replace('|', ' ');
+        String payload = ticket.tenantId() + "|" + ticket.personId() + "|" + ticket.accessUntil() + "|" + ticket.mac() + "|" + expires + "|" + name;
         String encoded = Base64.getUrlEncoder().withoutPadding().encodeToString(payload.getBytes(StandardCharsets.UTF_8));
         return encoded + "." + mac(encoded);
     }
 
-    /** The ticket's student, if it is genuine, unexpired, and for this tenant and device. */
+    /** The ticket's student, if it is genuine, unexpired, and for this tenant and device. A name-less 5-field ticket from before the name rode along still works. */
     public Ticket require(String token, long tenantId, String mac) {
         if (token == null || token.length() > 600 || !token.matches("[A-Za-z0-9_-]+\\.[0-9a-f]{64}")) throw invalid();
         String[] parts = token.split("\\.");
         if (!MessageDigest.isEqual(mac(parts[0]).getBytes(StandardCharsets.US_ASCII), parts[1].getBytes(StandardCharsets.US_ASCII))) throw invalid();
         String[] fields = new String(Base64.getUrlDecoder().decode(parts[0]), StandardCharsets.UTF_8).split("\\|", -1);
-        if (fields.length != 5 || Long.parseLong(fields[4]) < Instant.now().getEpochSecond()
+        if ((fields.length != 5 && fields.length != 6) || Long.parseLong(fields[4]) < Instant.now().getEpochSecond()
                 || Long.parseLong(fields[0]) != tenantId || mac == null || !fields[3].equals(mac)) throw invalid();
-        return new Ticket(tenantId, fields[1], LocalDate.parse(fields[2]), fields[3]);
+        return new Ticket(tenantId, fields[1], LocalDate.parse(fields[2]), fields[3], fields.length == 6 && !fields[5].isEmpty() ? fields[5] : null);
     }
 
     private String mac(String data) {

@@ -144,6 +144,7 @@ class SchoolFlowIntegrationTest {
         String code = JsonPath.read(mvc.perform(get("/api/payments/status/" + reference)).andReturn().getResponse().getContentAsString(), "$.voucherCode");
         Voucher bought = vouchers.findByCode(code).orElseThrow();
         assertEquals("demo-0000aaaa", bought.getPersonId());
+        assertEquals("Amina Nakato", bought.getPersonName());
         assertEquals("STUDENT", bought.getSchoolCategory());
         assertNotNull(bought.getHardExpiresAt());
         assertTrue(radCheck.findFirstByUsernameAndAttribute(code, "Expiration").isPresent());
@@ -180,6 +181,7 @@ class SchoolFlowIntegrationTest {
         String code = JsonPath.read(first, "$.code");
         Voucher staff = vouchers.findByCode(code).orElseThrow();
         assertEquals("SCHOOL_STAFF", staff.getSaleType());
+        assertEquals("Amina Nakato", staff.getPersonName(), "the verified name rides onto the staff voucher");
         var staffPlan = plans.findFirstByTenantIdAndAvailabilityAndName(school.tenant().getId(), "SCHOOL", "School staff access").orElseThrow();
         assertEquals(0, staffPlan.getPrice().signum());
         assertEquals("4M/4M", staffPlan.getRateLimit());
@@ -219,6 +221,7 @@ class SchoolFlowIntegrationTest {
         String code = JsonPath.read(portal("visitor", body), "$.code");
         assertEquals(code, JsonPath.read(portal("visitor", body), "$.code"));
         assertEquals("SCHOOL_VISITOR", vouchers.findByCode(code).orElseThrow().getSaleType());
+        assertEquals("Guest Speaker", vouchers.findByCode(code).orElseThrow().getPersonName());
         mvc.perform(signedDisconnect("{\"tenantId\":" + school.tenant().getId() + ",\"visitorPassId\":\"" + passId + "\"}", SECRET,
                 Instant.now().getEpochSecond(), UUID.randomUUID().toString())).andExpect(status().isOk());
         assertEquals("revoked", vouchers.findByCode(code).orElseThrow().getStatus());
@@ -463,6 +466,7 @@ class SchoolFlowIntegrationTest {
         String freeCode = JsonPath.read(freeResp, "$.code");
         Voucher freeVoucher = vouchers.findByCode(freeCode).orElseThrow();
         assertEquals("SCHOOL_STUDENT_FREE", freeVoucher.getSaleType());
+        assertEquals("Amina Nakato", freeVoucher.getPersonName(), "the ticket carries the verified name onto the study voucher");
         assertEquals("wb-student-free",
                 radReply.findFirstByUsernameAndAttribute(freeCode, "Mikrotik-Address-List").orElseThrow().getValue(),
                 "student free session is placed in the wb-student-free firewall address list");
@@ -489,6 +493,8 @@ class SchoolFlowIntegrationTest {
         String paidCode = JsonPath.read(mvc.perform(get("/api/payments/status/" + reference)).andReturn().getResponse().getContentAsString(), "$.voucherCode");
 
         assertTrue(vouchers.findByCode(freeCode).orElseThrow().getSchoolHold(), "free study voucher is held once student upgrades to paid");
+        assertEquals("Amina Nakato", vouchers.findByCode(paidCode).orElseThrow().getPersonName(),
+                "a ticket without a name (resume path) still names the paid voucher from the student's other vouchers");
         assertFalse(radCheck.existsByUsername(freeCode));
         assertTrue(radReply.findFirstByUsernameAndAttribute(paidCode, "Mikrotik-Address-List").isEmpty(),
                 "paid student package has full unrestricted internet");

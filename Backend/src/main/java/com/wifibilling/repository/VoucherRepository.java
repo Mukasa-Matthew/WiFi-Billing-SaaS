@@ -41,6 +41,18 @@ public interface VoucherRepository extends JpaRepository<Voucher, Long> {
 
     List<Voucher> findAllByTenantIdAndPersonIdAndSchoolCategory(Long tenantId, String personId, String schoolCategory);
 
+    /** Stamps the person's current name on every one of their school vouchers that doesn't already carry it. */
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("update Voucher v set v.personName = :name where v.tenant.id = :tenantId and v.personId = :personId and (v.personName is null or v.personName <> :name)")
+    int stampPersonName(@org.springframework.data.repository.query.Param("tenantId") Long tenantId,
+            @org.springframework.data.repository.query.Param("personId") String personId,
+            @org.springframework.data.repository.query.Param("name") String name);
+
+    /** Any name already stamped on this person's vouchers — fills vouchers bound before the name was known. */
+    @org.springframework.data.jpa.repository.Query("select v.personName from Voucher v where v.tenant.id = :tenantId and v.personId = :personId and v.personName is not null")
+    List<String> findPersonNames(@org.springframework.data.repository.query.Param("tenantId") Long tenantId,
+            @org.springframework.data.repository.query.Param("personId") String personId);
+
     List<Voucher> findAllByTenantIdAndSchoolCategoryInAndStatusIn(Long tenantId, java.util.Collection<String> categories, java.util.Collection<String> statuses);
 
     List<Voucher> findAllBySchoolCategoryInAndStatusIn(java.util.Collection<String> categories, java.util.Collection<String> statuses);
