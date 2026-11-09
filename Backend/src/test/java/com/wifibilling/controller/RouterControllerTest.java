@@ -56,7 +56,6 @@ class RouterControllerTest {
     @Mock private NocIncidentRepository incidentRepository;
     @Mock private PortalFeedbackRepository feedbackRepository;
     @Mock private PackagePlanRepository packagePlanRepository;
-    @Mock private WinboxAccessRepository winboxAccessRepository;
     @InjectMocks private RouterController controller;
 
     private final JsonMapper json = JsonMapper.builder().build();

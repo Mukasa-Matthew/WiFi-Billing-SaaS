@@ -12,8 +12,6 @@ import java.util.Optional;
 public interface WinboxAccessRepository extends JpaRepository<WinboxAccess, Integer> {
     Optional<WinboxAccess> findByRouterId(Long routerId);
 
-    boolean existsByRouterId(Long routerId);
-
     /*
      * Router agents and the gateway report status every few seconds. Writing just their
      * own columns in one statement — instead of saving the whole row — keeps them from
