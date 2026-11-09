@@ -45,9 +45,13 @@ interface TenantSettings {
 }
 
 const TEMPLATES = [
-  { key: "midnight", name: "Midnight", blurb: "Dark glass card with blue accents" },
+  { key: "midnight", name: "Midnight", blurb: "White card with a navy header — the classic default" },
   { key: "daylight", name: "Daylight", blurb: "Clean light theme for bright storefronts" },
+  { key: "campus", name: "Campus", blurb: "White card with a green header — great for schools" },
+  { key: "royal", name: "Royal", blurb: "White card with a purple header" },
+  { key: "sunset", name: "Sunset", blurb: "White card with an orange header" },
   { key: "ember", name: "Ember", blurb: "Warm dark theme with gold accents" },
+  { key: "forest", name: "Forest", blurb: "Sleek dark theme with green accents" },
 ];
 
 const FONTS = ["Poppins", "Work Sans", "Inter", "Roboto", "Open Sans", "Lato", "Montserrat", "Nunito", "Raleway"];

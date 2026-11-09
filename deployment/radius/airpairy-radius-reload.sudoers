@@ -1,0 +1,5 @@
+# Allow the wifi-backend service user to restart FreeRADIUS after router
+# provisioning adds a nas-table client. Install:
+#   sudo install -m 755 deployment/radius/airpairy-radius-reload /usr/local/bin/
+#   sudo install -m 440 deployment/radius/airpairy-radius-reload.sudoers /etc/sudoers.d/airpairy-radius-reload
+matthew ALL=(root) NOPASSWD: /usr/local/bin/airpairy-radius-reload

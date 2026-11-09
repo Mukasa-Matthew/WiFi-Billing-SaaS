@@ -12,6 +12,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.net.URI;
@@ -49,6 +51,7 @@ public class ProvisioningService {
     private final PlatformProperties props;
     private final RouterSetupService setupService;
     private final WinboxAccessService winboxAccessService;
+    private final RadiusClientReloader radiusClientReloader;
 
     /**
      * Redeems a FULL setup code and builds its script in one transaction: if
@@ -183,6 +186,19 @@ public class ProvisioningService {
         String description = "WiFi-Billing router #" + router.getId() + " " + router.getName();
         nas.setDescription(description.length() > 200 ? description.substring(0, 200) : description);
         nasRepository.save(nas);
+        // FreeRADIUS only reads the nas table at startup, so restart it after
+        // this transaction commits — otherwise the new router is an "unknown
+        // client" and every captive-portal login fails.
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    radiusClientReloader.reload();
+                }
+            });
+        } else {
+            radiusClientReloader.reload();
+        }
     }
 
     private Set<String> walledGardenIps() {

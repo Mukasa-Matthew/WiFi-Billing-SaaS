@@ -29,6 +29,38 @@
             --input-bg: rgba(255,255,255,0.05); --buy-bg: #F59E0B; --buy-text: #1A0A00;
             --info-bg: rgba(251,191,36,0.08); --info-border: rgba(251,191,36,0.25); --info-text: #FBBF24;
         }
+        body.theme-campus {
+            --bg-1: #DCFCE7; --bg-2: #A7F3D0;
+            --card: #FFFFFF; --card-2: #F7FAFC;
+            --header-bg: #15803D; --header-text: #F8FAFC;
+            --text: #0F172A; --muted: #64748B; --border: #E2E8F0;
+            --input-bg: #F8FAFC; --buy-bg: #15803D; --buy-text: #FFFFFF;
+            --info-bg: #F0FDF4; --info-border: #BBF7D0; --info-text: #166534;
+        }
+        body.theme-royal {
+            --bg-1: #EDE9FE; --bg-2: #C4B5FD;
+            --card: #FFFFFF; --card-2: #F7FAFC;
+            --header-bg: #5B21B6; --header-text: #F8FAFC;
+            --text: #0F172A; --muted: #64748B; --border: #E2E8F0;
+            --input-bg: #F8FAFC; --buy-bg: #6D28D9; --buy-text: #FFFFFF;
+            --info-bg: #F5F3FF; --info-border: #DDD6FE; --info-text: #5B21B6;
+        }
+        body.theme-sunset {
+            --bg-1: #FFEDD5; --bg-2: #FDBA74;
+            --card: #FFFFFF; --card-2: #F7FAFC;
+            --header-bg: #C2410C; --header-text: #F8FAFC;
+            --text: #0F172A; --muted: #64748B; --border: #E2E8F0;
+            --input-bg: #F8FAFC; --buy-bg: #EA580C; --buy-text: #FFFFFF;
+            --info-bg: #FFF7ED; --info-border: #FED7AA; --info-text: #9A3412;
+        }
+        body.theme-forest {
+            --bg-1: #0C1A12; --bg-2: #10241A;
+            --card: #12271C; --card-2: #16301F;
+            --header-bg: #0C1A12; --header-text: #ECFDF5;
+            --text: #ECFDF5; --muted: #8FB8A3; --border: rgba(255,255,255,0.09);
+            --input-bg: rgba(255,255,255,0.05); --buy-bg: #22C55E; --buy-text: #052E16;
+            --info-bg: rgba(34,197,94,0.08); --info-border: rgba(34,197,94,0.25); --info-text: #4ADE80;
+        }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             --primary: TENANT_BRAND_COLOR_PLACEHOLDER;
@@ -104,6 +136,7 @@
         .pkg-name { font-size: 16.5px; font-weight: 700; }
         .pkg-featured { font-size: 9.5px; font-weight: 700; color: #B45309; background: #FEF3C7; border-radius: 6px; padding: 2px 6px; margin-left: 5px; vertical-align: middle; }
         body.theme-ember .pkg-featured { background: rgba(251,191,36,.15); color: #FBBF24; }
+        body.theme-forest .pkg-featured { background: rgba(34,197,94,.15); color: #4ADE80; }
         .pkg-meta { display: block; font-size: 13px; color: var(--muted); margin-top: 2px; }
         .pkg-right { display: flex; align-items: center; gap: 10px; }
         .pkg-price { font-size: 14.5px; font-weight: 600; color: var(--text); text-align: right; }
@@ -149,9 +182,9 @@
 
         .status-msg { font-size: 14.5px; padding: 10px 14px; border-radius: 10px; margin-bottom: 14px; }
         .status-msg.error { background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.3); color: #DC2626; }
-        body.theme-ember .status-msg.error { color: #FCA5A5; }
+        body.theme-ember .status-msg.error, body.theme-forest .status-msg.error { color: #FCA5A5; }
         .status-msg.success { background: rgba(16,185,129,.12); border: 1px solid rgba(16,185,129,.3); color: #059669; }
-        body.theme-ember .status-msg.success { color: #6EE7B7; }
+        body.theme-ember .status-msg.success, body.theme-forest .status-msg.success { color: #6EE7B7; }
 
         .voucher-result { display: none; text-align: center; padding: 14px; background: var(--card-2); border: 1px solid var(--border); border-radius: 14px; margin-top: 12px; }
         .voucher-result.show { display: block; }
