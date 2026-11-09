@@ -60,8 +60,59 @@ public class VoucherExpirationWorker {
     @Transactional
     public void doProcessVoucherLifecycle() {
         stampFirstLogins();
+        reconcileDeviceLocks();
         expireOverdueVouchers();
         enforceSchoolDataCaps();
+    }
+
+    /**
+     * Regular paid vouchers pin to the buyer's MAC via a Calling-Station-Id
+     * check — but phones regenerate that MAC whenever the network is forgotten
+     * or randomization rotates it, permanently locking the customer out of a
+     * still-valid voucher. The lock only needs to stop SIMULTANEOUS sharing,
+     * so: while a session is open the pin tracks whichever MAC holds it, and
+     * when no session is open the pin is released so any device (old or new)
+     * can claim the voucher next. School vouchers stay pinned — they are
+     * identity-bound, and moves go through the school move flow instead.
+     */
+    private void reconcileDeviceLocks() {
+        List<Voucher> regular = voucherRepository.findAllByStatus(STATUS_ACTIVE).stream()
+                .filter(v -> v.getSchoolCategory() == null)
+                .toList();
+        if (regular.isEmpty()) return;
+        List<String> codes = regular.stream().map(Voucher::getCode).toList();
+
+        var openMac = new java.util.HashMap<String, String>();
+        for (RadAcct session : radAcctRepository
+                .findAllByUsernameInAndAcctStopTimeIsNullOrderByAcctStartTimeDesc(codes)) {
+            if (session.getCallingStationId() != null) {
+                openMac.putIfAbsent(session.getUsername(), session.getCallingStationId());
+            }
+        }
+        var pins = new java.util.HashMap<String, String>();
+        for (RadCheck row : radCheckRepository.findAllByUsernameInAndAttribute(codes, "Calling-Station-Id")) {
+            pins.putIfAbsent(row.getUsername(), row.getValue());
+        }
+
+        for (Voucher voucher : regular) {
+            String code = voucher.getCode();
+            String mac = openMac.get(code);
+            String pin = pins.get(code);
+            if (mac != null) {
+                if (!mac.equalsIgnoreCase(pin)) {
+                    radCheckRepository.deleteAllByUsernameAndAttribute(code, "Calling-Station-Id");
+                    radCheckRepository.save(RadCheck.builder().username(code)
+                            .attribute("Calling-Station-Id").op("==").value(mac).build());
+                }
+                if (voucher.getClaimedMac() == null || !voucher.getClaimedMac().equalsIgnoreCase(mac)) {
+                    voucher.setClaimedMac(mac);
+                    voucherRepository.save(voucher);
+                }
+            } else if (pin != null) {
+                radCheckRepository.deleteAllByUsernameAndAttribute(code, "Calling-Station-Id");
+                log.info("Voucher '{}' device lock released: no open session, so a new device can claim it", code);
+            }
+        }
     }
 
     /**

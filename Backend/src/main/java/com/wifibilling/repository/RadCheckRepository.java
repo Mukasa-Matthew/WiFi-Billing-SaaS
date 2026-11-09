@@ -15,6 +15,8 @@ public interface RadCheckRepository extends JpaRepository<RadCheck, Long> {
 
     Optional<RadCheck> findFirstByUsernameAndAttribute(String username, String attribute);
 
+    List<RadCheck> findAllByUsernameInAndAttribute(java.util.Collection<String> usernames, String attribute);
+
     boolean existsByUsername(String username);
 
     @Transactional
