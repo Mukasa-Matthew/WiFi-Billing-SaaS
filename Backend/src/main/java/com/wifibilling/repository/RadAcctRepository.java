@@ -39,6 +39,13 @@ public interface RadAcctRepository extends JpaRepository<RadAcct, Long> {
     @Query("SELECT r FROM RadAcct r WHERE r.username = :username ORDER BY r.acctStartTime ASC LIMIT 1")
     Optional<RadAcct> findFirstSessionByUsername(@Param("username") String username);
 
+    /** Earliest session per username for a set of usernames — the batch form of
+     *  findFirstSessionByUsername so the lifecycle worker does not round-trip
+     *  once per unused voucher over a high-latency link. */
+    @Query("SELECT r FROM RadAcct r WHERE r.username IN :usernames AND r.acctStartTime = "
+            + "(SELECT MIN(r2.acctStartTime) FROM RadAcct r2 WHERE r2.username = r.username)")
+    List<RadAcct> findFirstSessionsByUsernameIn(@Param("usernames") Collection<String> usernames);
+
     /**
      * Tenant accounting rows whose session time (start, else stop) is at or
      * after fromTs. Same tenant scoping as the aggregates below; replaces
