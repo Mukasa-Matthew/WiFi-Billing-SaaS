@@ -520,20 +520,20 @@ export default function TenantSettingsPage() {
               <p className="mb-5 mt-1 text-xs text-[var(--fg-muted)]">Adjust the branding and appearance of your customer login page. Scroll down to choose a captive portal template.</p>
               <div className="grid gap-5 sm:grid-cols-2">
                 <div>
-                  <label className={label}>Portal colour (header &amp; buttons)</label>
+                  <label className={label}>Primary colour override</label>
                   <div className="flex items-center gap-3">
                     <input type="color" value={form.portalPrimaryColor || "#3B82F6"} onChange={(e) => set("portalPrimaryColor", e.target.value)} className="h-11 w-14 cursor-pointer rounded-lg border border-[var(--border-strong)] bg-[var(--canvas)]" />
                     <input pattern="#[0-9A-Fa-f]{6}|" value={form.portalPrimaryColor ?? ""} onChange={(e) => set("portalPrimaryColor", e.target.value || null)} className={`${field} font-mono`} placeholder="Template default" />
                   </div>
-                  <p className={hint}>Your main colour — paints the top bar and buttons. E.g. a school&apos;s green. Leave empty for the template default.</p>
+                  <p className={hint}>Leave empty to use the selected template colour.</p>
                 </div>
                 <div>
-                  <label className={label}>Page background colour</label>
+                  <label className={label}>Secondary colour override</label>
                   <div className="flex items-center gap-3">
                     <input type="color" value={form.portalSecondaryColor || "#BFD9F2"} onChange={(e) => set("portalSecondaryColor", e.target.value)} className="h-11 w-14 cursor-pointer rounded-lg border border-[var(--border-strong)] bg-[var(--canvas)]" />
                     <input pattern="#[0-9A-Fa-f]{6}|" value={form.portalSecondaryColor ?? ""} onChange={(e) => set("portalSecondaryColor", e.target.value || null)} className={`${field} font-mono`} placeholder="Template default" />
                   </div>
-                  <p className={hint}>Colours the page background behind the sign-in card. Leave empty for the template default.</p>
+                  <p className={hint}>Leave empty to use the selected template colour.</p>
                 </div>
                 <div>
                   <label className={label}>Logo size</label>
