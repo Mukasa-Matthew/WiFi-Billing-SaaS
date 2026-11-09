@@ -225,6 +225,31 @@ class SchoolFlowIntegrationTest {
     }
 
     @Test
+    void studentsRegisterFromThePortalOnlyWhileTheirSchoolOffersIt() throws Exception {
+        Site school = site("register-school", true);
+        Site shop = site("register-shop", false);
+        var years = json.createArrayNode().add(2027).add(2028);
+        var form = json.createObjectNode().put("open", true).put("schoolName", "Register High");
+        form.set("completionYears", years);
+        when(identity.registrationForm(school.tenant().getId())).thenReturn(form);
+        mvc.perform(get("/api/portal/school/registration").param("token", school.routerToken())).andExpect(status().isOk())
+                .andExpect(jsonPath("$.open").value(true)).andExpect(jsonPath("$.completionYears[1]").value(2028));
+        mvc.perform(get("/api/portal/school/registration").param("token", school.routerToken())).andExpect(jsonPath("$.open").value(true));
+        verify(identity, times(1)).registrationForm(school.tenant().getId());
+        mvc.perform(get("/api/portal/school/registration").param("token", shop.routerToken())).andExpect(status().isNotFound());
+
+        String body = "{\"token\":\"" + school.routerToken() + "\",\"fullName\":\"Amina Nakato\",\"registrationNumber\":\"S23/0412\",\"email\":\"amina@student.test\",\"completionYear\":2027,\"mac\":\"" + PHONE_MAC + "\"}";
+        mvc.perform(post("/api/portal/school/register").contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isAccepted()).andExpect(jsonPath("$.status").value("PENDING"));
+        verify(identity).register(school.tenant().getId(), "Amina Nakato", "S23/0412", "amina@student.test", 2027, PHONE_MAC.toUpperCase().replace('-', ':'));
+        when(identity.register(anyLong(), anyString(), anyString(), anyString(), anyInt(), anyString()))
+                .thenThrow(new IdentityException(409, "ALREADY_REGISTERED", "This registration number is already registered.", null));
+        mvc.perform(post("/api/portal/school/register").contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ALREADY_REGISTERED")).andExpect(jsonPath("$.message").value("This registration number is already registered."));
+        mvc.perform(post("/api/portal/school/register").contentType(MediaType.APPLICATION_JSON).content(body.replace("amina@student.test", "not-an-email"))).andExpect(status().isBadRequest());
+        mvc.perform(post("/api/portal/school/register").contentType(MediaType.APPLICATION_JSON).content(body.replace(school.routerToken(), shop.routerToken()))).andExpect(status().isNotFound());
+    }
+
+    @Test
     void unusedSchoolVouchersExpireAtTheirHardLimit() throws Exception {
         Site school = site("expiry-school", true);
         verified(school.tenant().getId(), "OK", "STAFF", "demo-0000dddd");

@@ -208,6 +208,43 @@ public class SchoolAccessService {
         return outcome(router, mac, identity.changePin(router.getTenant().getId(), pinChangeToken, newPin));
     }
 
+    /** What the portal needs to offer student self-registration. {@code open} is false whenever the identity system can't say otherwise. */
+    public record RegistrationForm(boolean open, String schoolName, List<Integer> completionYears) {
+        static final RegistrationForm CLOSED = new RegistrationForm(false, null, List.of());
+    }
+    private record CachedForm(RegistrationForm form, long fetchedAt) {}
+    private static final long REGISTRATION_FORM_TTL_MILLIS = 60_000;
+    private final java.util.concurrent.ConcurrentHashMap<Long, CachedForm> registrationForms = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** Every portal page load asks this, so the identity system's answer is kept for a minute per school. */
+    public RegistrationForm registrationForm(String routerToken) {
+        long tenantId = schoolRouter(routerToken).getTenant().getId();
+        long now = System.currentTimeMillis();
+        CachedForm cached = registrationForms.get(tenantId);
+        if (cached != null && now - cached.fetchedAt() < REGISTRATION_FORM_TTL_MILLIS) return cached.form();
+        RegistrationForm form;
+        try {
+            JsonNode found = identity.registrationForm(tenantId);
+            var years = new java.util.ArrayList<Integer>();
+            found.path("completionYears").forEach(year -> years.add(year.asInt()));
+            form = found.path("open").asBoolean() ? new RegistrationForm(true, found.path("schoolName").asString(), List.copyOf(years)) : RegistrationForm.CLOSED;
+        } catch (IdentityException unavailable) {
+            form = RegistrationForm.CLOSED;
+        }
+        registrationForms.put(tenantId, new CachedForm(form, now));
+        return form;
+    }
+
+    /** Drops the remembered answer so a change made here shows on the portal at once. */
+    public void forgetRegistrationForm(long tenantId) { registrationForms.remove(tenantId); }
+
+    /** Sends a student's self-registration to the identity system, where it waits for the school's IT person to approve it. */
+    public void register(String routerToken, String fullName, String registrationNumber, String email, int completionYear, String rawMac) {
+        Router router = schoolRouter(routerToken);
+        String mac = requireMac(rawMac);
+        identity.register(router.getTenant().getId(), fullName, registrationNumber, email, completionYear, mac);
+    }
+
     public PortalResult visitor(String routerToken, String code, String rawMac) {
         Router router = schoolRouter(routerToken);
         String mac = requireMac(rawMac);

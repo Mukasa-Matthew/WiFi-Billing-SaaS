@@ -200,6 +200,33 @@
                     <input class="form-input" id="school-pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" placeholder="4-digit PIN" required autocomplete="current-password">
                 </div>
                 <button type="submit" class="btn btn-dark" id="school-signin-btn">Continue</button>
+                <button type="button" class="btn btn-outline" id="school-register-btn" style="display:none" onclick="showSchoolRegister()">📝 &nbsp;New student? Register</button>
+            </form>
+            <form id="school-register-form" style="display:none" onsubmit="schoolRegister(event)">
+                <span class="section-label">Register as a student</span>
+                <p style="font-size:13px;color:var(--muted);margin:0 0 10px">Your school's IT office checks your details first. Once you're approved, your one-time PIN is emailed to you.</p>
+                <div class="input-wrap">
+                    <span class="icon">👤</span>
+                    <input class="form-input" id="school-reg-name" type="text" placeholder="Full name" required autocomplete="name" maxlength="200">
+                </div>
+                <div class="input-wrap">
+                    <span class="icon">🪪</span>
+                    <input class="form-input" id="school-reg-number" type="text" placeholder="Registration number" required autocomplete="off" autocapitalize="characters" maxlength="128">
+                </div>
+                <div class="input-wrap">
+                    <span class="icon">✉️</span>
+                    <input class="form-input" id="school-reg-email" type="email" placeholder="Email address" required autocomplete="email" maxlength="254">
+                </div>
+                <div class="input-wrap">
+                    <span class="icon">✉️</span>
+                    <input class="form-input" id="school-reg-email2" type="email" placeholder="Repeat email address" required autocomplete="email" maxlength="254">
+                </div>
+                <div class="input-wrap">
+                    <span class="icon">📅</span>
+                    <select class="form-input" id="school-reg-year" required><option value="">Year you complete your course</option></select>
+                </div>
+                <button type="submit" class="btn btn-dark" id="school-reg-submit">Send registration</button>
+                <button type="button" class="btn btn-outline" onclick="hideSchoolRegister()">Back to sign in</button>
             </form>
             <form id="school-pin-form" style="display:none" onsubmit="schoolChangePin(event)">
                 <span class="section-label">Choose your own PIN</span>
@@ -466,7 +493,61 @@ function applySchoolMode(settings) {
     if (!SCHOOL.resumed) {
         SCHOOL.resumed = true;
         trySchoolResume();
+        loadSchoolRegistration();
     }
+}
+/* Students can register themselves only while the school's IT person has it switched on.
+   The registration waits for IT's approval; the PIN arrives later by email. */
+function loadSchoolRegistration() {
+    fetch(BASE + '/api/portal/school/registration?token=' + encodeURIComponent(TOKEN))
+        .then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(form){
+            if (!form || !form.open || !form.completionYears || !form.completionYears.length) return;
+            var select = document.getElementById('school-reg-year');
+            form.completionYears.forEach(function(year){
+                var option = document.createElement('option'); option.value = year; option.textContent = year; select.appendChild(option);
+            });
+            document.getElementById('school-register-btn').style.display = '';
+        })
+        .catch(function(){});
+}
+function showSchoolRegister() {
+    document.getElementById('msg-area').innerHTML = '';
+    document.getElementById('school-signin').style.display = 'none';
+    document.getElementById('school-visitor-btn').style.display = 'none';
+    document.getElementById('school-register-form').style.display = '';
+    document.getElementById('school-reg-name').focus();
+}
+function hideSchoolRegister() {
+    document.getElementById('school-register-form').style.display = 'none';
+    document.getElementById('school-signin').style.display = '';
+    applySchoolMode(window.PORTAL_CFG || {});
+}
+function schoolRegister(ev) {
+    ev.preventDefault();
+    if (SCHOOL.busy) return;
+    var email = document.getElementById('school-reg-email').value.trim();
+    if (email.toLowerCase() !== document.getElementById('school-reg-email2').value.trim().toLowerCase()) { showMsg('The two email addresses don\'t match.', true); return; }
+    if (!schoolMac()) { showMsg('Connect to the school WiFi and open this page again.', true); return; }
+    SCHOOL.busy = true;
+    var button = document.getElementById('school-reg-submit');
+    button.disabled = true;
+    fetch(BASE + '/api/portal/school/register', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({
+        token: TOKEN, mac: schoolMac(), fullName: document.getElementById('school-reg-name').value.trim(),
+        registrationNumber: document.getElementById('school-reg-number').value.trim(), email: email,
+        completionYear: parseInt(document.getElementById('school-reg-year').value, 10) }) })
+        .then(function(r){ return r.json().then(function(res){ return { ok: r.ok, res: res }; }); })
+        .then(function(out){
+            SCHOOL.busy = false; button.disabled = false;
+            if (!out.ok) { showMsg(escapeText((out.res && out.res.message) || 'Your registration could not be sent. Please try again.'), true); return; }
+            document.getElementById('school-register-form').reset();
+            document.getElementById('school-register-form').style.display = 'none';
+            document.getElementById('school-signin').style.display = '';
+            document.getElementById('school-register-btn').style.display = 'none';
+            showMsg('Registration sent. Once IT approves you, your one-time PIN is emailed to ' + escapeText(email) +
+                '. Open it on mobile data or another device, then sign in here with your registration number and that PIN.', false);
+        })
+        .catch(function(){ SCHOOL.busy = false; button.disabled = false; showMsg('Could not reach the server. Check your connection and try again.', true); });
 }
 function schoolMac() { return (MT_MAC && MT_MAC.charAt(0) !== '$') ? MT_MAC : ''; }
 function trySchoolResume() {

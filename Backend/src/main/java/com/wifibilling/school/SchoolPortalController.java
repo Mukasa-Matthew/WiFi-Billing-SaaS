@@ -24,6 +24,11 @@ public class SchoolPortalController {
     public record Visitor(@NotBlank @Size(max = 128) String token, @NotBlank @Size(max = 16) String code, @Size(max = 24) String mac) {}
     public record Resume(@NotBlank @Size(max = 128) String token, @NotBlank @Size(max = 24) String mac) {}
     public record StudentFree(@NotBlank @Size(max = 128) String token, @NotBlank @Size(max = 600) String ticket, @NotBlank @Size(max = 24) String mac) {}
+    public record Register(@NotBlank @Size(max = 128) String token, @NotBlank @Size(max = 200) String fullName,
+                           @NotBlank @Size(max = 128) String registrationNumber, @NotBlank @jakarta.validation.constraints.Email @Size(max = 254) String email,
+                           @jakarta.validation.constraints.NotNull Integer completionYear, @NotBlank @Size(max = 24) String mac) {
+        @Override public String toString() { return "Register[redacted]"; }
+    }
     public record MovePackage(@NotBlank @Size(max = 128) String token, @NotBlank @Size(max = 600) String ticket,
                               @jakarta.validation.constraints.NotNull Long voucherId, @NotBlank @Size(max = 24) String mac) {}
 
@@ -50,6 +55,19 @@ public class SchoolPortalController {
     @PostMapping("/change-pin")
     public SchoolAccessService.PortalResult changePin(@Valid @RequestBody ChangePin body) {
         return access.changePin(body.token(), body.pinChangeToken(), body.newPin(), body.mac());
+    }
+
+    /** Whether this school's portal offers "Register as a student", with the completion years to choose from. */
+    @GetMapping("/registration")
+    public SchoolAccessService.RegistrationForm registration(@RequestParam String token) {
+        return access.registrationForm(token);
+    }
+
+    @PostMapping("/register")
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.ACCEPTED)
+    public java.util.Map<String, String> register(@Valid @RequestBody Register body) {
+        access.register(body.token(), body.fullName().trim(), body.registrationNumber().trim(), body.email().trim(), body.completionYear(), body.mac());
+        return java.util.Map.of("status", "PENDING");
     }
 
     @PostMapping("/visitor")

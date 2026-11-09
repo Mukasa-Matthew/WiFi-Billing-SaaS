@@ -16,7 +16,7 @@ import tools.jackson.databind.JsonNode;
 import java.util.Map;
 import java.util.UUID;
 
-/** Super-admin support for school tenants: link a school, manage its IT accounts, look people up and unlock them. */
+/** Super-admin support for school tenants: link a school, pause it or its self-registration, manage its IT accounts, look people up and unlock them. */
 @RestController
 @RequestMapping("/api/admin/tenants/{tenantId}/school")
 @Validated
@@ -24,14 +24,17 @@ public class AdminSchoolController {
     private final SchoolManagementService schools;
     private final IdentityClient identity;
     private final TenantRepository tenants;
+    private final SchoolAccessService access;
 
-    public AdminSchoolController(SchoolManagementService schools, IdentityClient identity, TenantRepository tenants) {
-        this.schools = schools; this.identity = identity; this.tenants = tenants;
+    public AdminSchoolController(SchoolManagementService schools, IdentityClient identity, TenantRepository tenants, SchoolAccessService access) {
+        this.schools = schools; this.identity = identity; this.tenants = tenants; this.access = access;
     }
 
     public record Link(@NotBlank @Email @Size(max = 254) String itAdminEmail, @NotBlank @Size(max = 200) String itAdminName) {}
     public record NewAdmin(@NotBlank @Email @Size(max = 254) String email, @NotBlank @Size(max = 200) String fullName, @NotNull @Pattern(regexp = "ADMIN|HELPDESK") String role) {}
     public record Active(@NotNull Boolean active) {}
+    /** Pausing the school, or forcing student self-registration off whatever the school's IT person has chosen. */
+    public record SchoolChanges(Boolean active, Boolean registrationBlocked) {}
 
     /** Turns an existing ordinary tenant into a school. */
     @PostMapping
@@ -46,8 +49,14 @@ public class AdminSchoolController {
     public Map<String, Object> overview(@PathVariable Long tenantId) { return schools.overview(schools.school(tenantId)); }
 
     @PatchMapping
-    public JsonNode setActive(@PathVariable Long tenantId, @Valid @RequestBody Active body) {
-        return identity.updateSchool(schools.school(tenantId).getId(), Map.of("active", body.active()));
+    public JsonNode update(@PathVariable Long tenantId, @RequestBody SchoolChanges body) {
+        var changes = new java.util.LinkedHashMap<String, Object>();
+        if (body.active() != null) changes.put("active", body.active());
+        if (body.registrationBlocked() != null) changes.put("registrationBlocked", body.registrationBlocked());
+        if (changes.isEmpty()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Nothing to change");
+        JsonNode school = identity.updateSchool(schools.school(tenantId).getId(), changes);
+        access.forgetRegistrationForm(tenantId);
+        return school;
     }
 
     @PostMapping("/admins")
