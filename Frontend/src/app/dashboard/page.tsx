@@ -130,9 +130,9 @@ export default function TenantDashboardOverview() {
           <WarningCircle className="mt-0.5 h-5 w-5 shrink-0" />
           <span className="min-w-0 flex-1 text-[13.5px]">
             <span className="font-semibold">
-              {down.length ? `${down.map((r) => r.name).slice(0, 2).join(", ")}${down.length > 2 ? ` and ${down.length - 2} more` : ""} ${down.length === 1 ? "is" : "are"} not reporting` : `${degraded.length} router${degraded.length === 1 ? " has" : "s have"} a service not ready`}
+              {down.length ? `${down.map((r) => r.name).slice(0, 2).join(", ")}${down.length > 2 ? ` and ${down.length - 2} more` : ""} ${down.length === 1 ? "is" : "are"} offline` : `${degraded.length} router${degraded.length === 1 ? " needs" : "s need"} attention`}
             </span>
-            <span className="block opacity-90">{down.length ? `Customers on ${down.length === 1 ? "that router" : "those routers"} may not be able to connect. Check ${down.length === 1 ? "its" : "their"} power and internet link.` : "Hotspot, login or portal files aren't ready on a router. Open Routers to see which."}</span>
+            <span className="block opacity-90">{down.length ? `Customers on ${down.length === 1 ? "that router" : "those routers"} may not be able to connect. Check ${down.length === 1 ? "its" : "their"} power and internet.` : "Part of your Wi-Fi setup isn't fully ready on a router. Open Routers to see which."}</span>
           </span>
           <ArrowRight className="mt-0.5 h-4 w-4 shrink-0" />
         </Link>
@@ -198,7 +198,7 @@ export default function TenantDashboardOverview() {
         <StatCard label="Customers" href="/dashboard/customers" icon={<Users />} value={s ? s.totalCustomers.toLocaleString() : "—"} hintText={s ? `+${s.newCustomersThisWeek.toLocaleString()} new this week` : undefined} />
         <StatCard label="Routers online" href="/dashboard/routers" icon={<CellTower />} tone={down.length ? "red" : degraded.length ? "amber" : "default"}
           value={routers.error ? "—" : <>{online}<span className="text-[var(--fg-faint)]">/{fleet.length}</span></>}
-          hintText={!fleet.length ? (routers.error ? "Router status unavailable" : routers.loading ? "Checking…" : "No router linked yet") : down.length ? `${down.length} not reporting` : degraded.length ? `${degraded.length} need attention` : "All reporting"} />
+          hintText={!fleet.length ? (routers.error ? "Router status unavailable" : routers.loading ? "Checking…" : "No router added yet") : down.length ? `${down.length} offline` : degraded.length ? `${degraded.length} need attention` : "All online"} />
         <StatCard label="Vouchers left" href="/dashboard/vouchers" icon={<Ticket />} value={s ? s.totalVouchers.toLocaleString() : "—"} hintText={s ? `${s.activeVouchers.toLocaleString()} in use now` : undefined} />
       </div>
 

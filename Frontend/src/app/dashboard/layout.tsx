@@ -73,18 +73,18 @@ function TenantDashboardLayoutInner({ children }: { children: React.ReactNode })
 
   const nav: NavItem[] = [
     { name: "Dashboard", href: "/dashboard", icon: SquaresFour, group: "" },
-    { name: "Active users", href: "/dashboard/users", icon: Radio, group: "Customers", badge: { value: stats?.activeUsers || 0, tone: "info", label: "online" } },
+    { name: "Who's online", href: "/dashboard/users", icon: Radio, group: "Customers", badge: { value: stats?.activeUsers || 0, tone: "info", label: "online" } },
     { name: "Customers", href: "/dashboard/customers", icon: Users, group: "Customers", badge: { value: stats?.totalCustomers || 0, tone: "neutral", label: "customers" } },
-    { name: "Expired users", href: "/dashboard/expired", icon: ClockCounterClockwise, group: "Customers" },
-    { name: "IP bindings", href: "/dashboard/bindings", icon: LinkSimple, group: "Customers" },
+    { name: "Expired customers", href: "/dashboard/expired", icon: ClockCounterClockwise, group: "Customers" },
+    { name: "Device access", href: "/dashboard/bindings", icon: LinkSimple, group: "Customers" },
     { name: "Feedback", href: "/dashboard/feedback", icon: ChatCircleText, group: "Customers" },
-    { name: "Packages", href: "/dashboard/packages", icon: Stack, group: "Sales" },
+    { name: "Plans", href: "/dashboard/packages", icon: Stack, group: "Sales" },
     { name: "Vouchers", href: "/dashboard/vouchers", icon: Ticket, group: "Sales", badge: { value: stats?.activeVouchers || 0, tone: "neutral", label: "active" } },
     { name: "Payments", href: "/dashboard/payments", icon: Money, group: "Sales" },
     { name: "Wallet", href: "/dashboard/wallet", icon: Wallet, group: "Sales" },
-    { name: "MikroTik routers", href: "/dashboard/routers", icon: RouterIcon, group: "Network", badge: { value: offlineRouters, tone: "danger", label: "offline" } },
-    { name: "Sessions", href: "/dashboard/sessions", icon: Activity, group: "Network" },
-    { name: "Accounting logs", href: "/dashboard/logs", icon: FileText, group: "Network" },
+    { name: "Routers", href: "/dashboard/routers", icon: RouterIcon, group: "Equipment", badge: { value: offlineRouters, tone: "danger", label: "offline" } },
+    { name: "Connected now", href: "/dashboard/sessions", icon: Activity, group: "Equipment" },
+    { name: "Connection logs", href: "/dashboard/logs", icon: FileText, group: "Equipment" },
     ...(schoolStatus?.school ? [{ name: "School", href: "/dashboard/school", icon: GraduationCap, group: "Account" }] : []),
     { name: "Subscription", href: "/dashboard/subscription", icon: CalendarCheck, group: "Account" },
     { name: "Settings", href: "/dashboard/settings", icon: GearSix, group: "Account" },
@@ -95,10 +95,10 @@ function TenantDashboardLayoutInner({ children }: { children: React.ReactNode })
       brand={{ title: user?.name || "Hotspot business", subtitle: "AirPairy workspace" }}
       nav={nav}
       extraRoutes={[
-        { name: "Add router", href: "/dashboard/routers/new", group: "Network" },
-        { name: "New package", href: "/dashboard/packages/new", group: "Sales" },
+        { name: "Add router", href: "/dashboard/routers/new", group: "Equipment" },
+        { name: "New plan", href: "/dashboard/packages/new", group: "Sales" },
         { name: "Generate vouchers", href: "/dashboard/vouchers/new", group: "Sales" },
-        { name: "New IP binding", href: "/dashboard/bindings/new", group: "Customers" },
+        { name: "New device access", href: "/dashboard/bindings/new", group: "Customers" },
         { name: "New customer", href: "/dashboard/customers/new", group: "Customers" },
         { name: "Router detail", href: "/dashboard/routers/", group: "Network" },
       ]}

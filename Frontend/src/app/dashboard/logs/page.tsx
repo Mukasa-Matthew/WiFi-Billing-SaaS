@@ -50,6 +50,19 @@ export default function TenantSessionLogsPage() {
     return () => { window.clearTimeout(initial); window.clearInterval(interval); };
   }, [fetchLogs]);
 
+  const causeLabel = (cause: string | null) => {
+    const map: Record<string, string> = {
+      "User-Request": "Logged out",
+      "Session-Timeout": "Time ran out",
+      "Admin-Reset": "Disconnected by you",
+      "Lost-Carrier": "Lost signal",
+      "Idle-Timeout": "Went idle",
+      "NAS-Error": "Router error",
+    };
+    if (!cause) return "Logged out";
+    return map[cause] || cause.replace(/-/g, " ").toLowerCase();
+  };
+
   const formatBytes = (bytes: number | null) => {
     if (!bytes || bytes === 0) return "0 MB";
     const k = 1024;
@@ -87,15 +100,15 @@ export default function TenantSessionLogsPage() {
   const exportCsv = () => {
     const headers = [
       "User / Voucher",
-      "Framed IP",
-      "Client MAC",
-      "Router NAS IP",
+      "IP Address",
+      "Device MAC",
+      "Router",
       "Start Time",
       "Stop Time",
       "Duration (Sec)",
       "Download (Bytes)",
       "Upload (Bytes)",
-      "Terminate Cause"
+      "Ended Because"
     ];
 
     const rows = filteredLogs.map((l) => [
@@ -131,10 +144,10 @@ export default function TenantSessionLogsPage() {
         <div>
           <h1 className="text-xl font-bold tracking-tight text-[var(--fg)] flex items-center gap-2.5">
             <FileText className="w-6 h-6 text-[var(--accent-text)]" />
-            <span>Accounting Logs</span>
+            <span>Connection Logs</span>
           </h1>
           <p className="text-xs text-[var(--fg-muted)] mt-1">
-            Historical session records — durations, disconnect causes, and data transferred.
+            Past connections — how long users stayed online, why they left, and how much data they used.
           </p>
         </div>
 
@@ -153,12 +166,12 @@ export default function TenantSessionLogsPage() {
       {/* Summary Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-sm">
-          <span className="text-xs font-medium text-[var(--fg-muted)]">Total Logged Sessions</span>
+          <span className="text-xs font-medium text-[var(--fg-muted)]">Past connections</span>
           <div className="text-2xl font-bold tabular-nums text-[var(--fg)] mt-1">{logs.length} Records</div>
         </div>
 
         <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-sm">
-          <span className="text-xs font-medium text-[var(--fg-muted)]">Historical Data Consumed</span>
+          <span className="text-xs font-medium text-[var(--fg-muted)]">Total data used</span>
           <div className="text-2xl font-bold tabular-nums text-[var(--accent-text)] mt-1">
             {formatBytes(totalHistoricalBytes)}
           </div>
@@ -171,7 +184,7 @@ export default function TenantSessionLogsPage() {
           <MagnifyingGlass className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--fg-muted)]" />
           <input
             type="text"
-            placeholder="Search code, IP, MAC, cause..."
+            placeholder="Search voucher code, IP, device…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-9 pr-4 py-2 rounded-xl bg-[var(--canvas)] border border-[var(--border)] text-xs text-[var(--fg)] placeholder-[var(--fg-muted)] focus:outline-none focus:border-indigo-500"
@@ -179,17 +192,23 @@ export default function TenantSessionLogsPage() {
         </div>
 
         <div className="flex items-center gap-1.5 p-1 rounded-xl bg-[var(--canvas)]/80 border border-[var(--border)] w-full sm:w-auto overflow-x-auto">
-          {["ALL", "User-Request", "Session-Timeout", "Admin-Reset", "Lost-Carrier"].map((cause) => (
+          {[
+            { key: "ALL", label: "All reasons" },
+            { key: "User-Request", label: "Logged out" },
+            { key: "Session-Timeout", label: "Time ran out" },
+            { key: "Admin-Reset", label: "Disconnected by you" },
+            { key: "Lost-Carrier", label: "Lost signal" },
+          ].map(({ key, label: causeLabel }) => (
             <button
-              key={cause}
-              onClick={() => setCauseFilter(cause)}
+              key={key}
+              onClick={() => setCauseFilter(key)}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition whitespace-nowrap cursor-pointer ${
-                causeFilter === cause
+                causeFilter === key
                   ? "bg-blue-700 text-white shadow-sm"
                   : "text-[var(--fg-muted)] hover:text-[var(--fg-body)]"
               }`}
             >
-              {cause === "ALL" ? "All Causes" : cause}
+              {causeLabel}
             </button>
           ))}
         </div>
@@ -204,11 +223,11 @@ export default function TenantSessionLogsPage() {
                 <th className="py-3 px-4">User / Code</th>
                 <th className="py-3 px-4">IP Address</th>
                 <th className="py-3 px-4">Device MAC</th>
-                <th className="py-3 px-4">Session Duration</th>
-                <th className="py-3 px-4">Data Transferred (Down / Up)</th>
-                <th className="py-3 px-4">Connected At</th>
-                <th className="py-3 px-4">Terminated At</th>
-                <th className="py-3 px-4">Terminate Reason</th>
+                <th className="py-3 px-4">Time online</th>
+                <th className="py-3 px-4">Data used (down / up)</th>
+                <th className="py-3 px-4">Connected</th>
+                <th className="py-3 px-4">Ended</th>
+                <th className="py-3 px-4">Why it ended</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border)]">
@@ -249,7 +268,7 @@ export default function TenantSessionLogsPage() {
                     <td className="py-3 px-4 text-[var(--fg-muted)]">{formatDateTime(log.acctStopTime)}</td>
                     <td className="py-3 px-4">
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[var(--fill)] border border-[var(--border-strong)] text-[var(--fg-body)]">
-                        {log.acctTerminateCause || "Normal-Logout"}
+                        {causeLabel(log.acctTerminateCause)}
                       </span>
                     </td>
                   </tr>

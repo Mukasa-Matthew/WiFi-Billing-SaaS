@@ -144,9 +144,9 @@ export default function AddRouterPage() {
   };
 
   const steps = [
-    { number: 1, label: "Connection", detail: "Basic device information" },
-    { number: 2, label: "Device Details", detail: "Provisioning command" },
-    { number: 3, label: "Service Setup", detail: "Configure Hotspot" },
+    { number: 1, label: "About your router", detail: "Name and internet port" },
+    { number: 2, label: "Connect it", detail: "Paste the setup command" },
+    { number: 3, label: "All done", detail: "Your Wi-Fi is ready" },
   ];
 
   return (
@@ -162,9 +162,9 @@ export default function AddRouterPage() {
         <div className="mb-2 flex items-center gap-2 text-xs text-[var(--fg-muted)]">
           <span>MikroTik</span><CaretRight className="h-3.5 w-3.5" /><span>Create</span>
         </div>
-        <h1 className="text-3xl font-bold tracking-tight text-[var(--fg)]">Add MikroTik Device</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-[var(--fg)]">Add a router</h1>
         <p className="mt-1 max-w-2xl text-sm text-[var(--fg-muted)]">
-          Connect your MikroTik router to enable automated provisioning, hotspot billing, and management.
+          Connect your MikroTik box so AirPairy can set it up, take payments, and let you manage it from here.
         </p>
       </div>
 
@@ -252,7 +252,7 @@ export default function AddRouterPage() {
               {attempt >= MAX_ATTEMPTS && !connected && <button className="text-xs text-[var(--accent-text)]" onClick={() => setAttempt(0)}>Polling timed out. Retry connection checks</button>}
               <div className="overflow-hidden rounded-xl border border-[var(--border-strong)] bg-[var(--canvas)]">
                 <div className="flex items-center justify-between border-b border-[var(--border-strong)] px-5 py-4">
-                  <span className="flex items-center gap-2 text-sm font-semibold text-[var(--fg)]"><Terminal className="h-4 w-4" /> Provisioning Command</span>
+                  <span className="flex items-center gap-2 text-sm font-semibold text-[var(--fg)]"><Terminal className="h-4 w-4" /> Setup command</span>
                   <button onClick={copyCommand} className="flex items-center gap-1.5 text-xs font-medium text-[var(--accent-text)] hover:text-blue-600">
                     {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}{copied ? "Copied" : "Click to copy"}
                   </button>
@@ -275,14 +275,14 @@ export default function AddRouterPage() {
                   {connected ? <CheckCircle className="h-6 w-6 text-emerald-500" /> : <CircleNotch className="h-6 w-6 animate-spin text-[var(--accent-text)]" />}
                   <div>
                     <p className={`font-mono text-sm font-semibold ${connected ? "text-emerald-500" : "text-[var(--fg)]"}`}>
-                      {connected ? "Router is verified and ready" : degraded ? "Router connected, but readiness checks failed" : "$ Paste the provisioning command in your MikroTik terminal to begin"}
+                      {connected ? "Router is connected and ready" : degraded ? "Router connected, but setup checks didn't pass" : "$ Paste the setup command in your MikroTik terminal to begin"}
                     </p>
                     <p className="mt-2 text-xs text-[var(--fg-muted)]">
                       {connected
-                        ? `Tunnel ${router.wgIp}, hotspot, RADIUS configuration and portal assets are reporting ready.`
+                        ? `Your Wi-Fi, login page and billing are all reporting ready on ${router.name}.`
                         : degraded
-                          ? "Review the router log and provisioning troubleshooting guide; the dashboard will keep checking."
-                          : "The system waits for configuration completion and a successful readiness report."}
+                          ? "Check the router's log or contact support — we'll keep checking in the meantime."
+                          : "We'll detect it automatically once the router finishes setting up — usually under a minute."}
                     </p>
                     {!connected && <p className="mt-3 text-xs text-[var(--fg-muted)]">Attempt {Math.min(attempt + 1, MAX_ATTEMPTS)} of {MAX_ATTEMPTS}</p>}
                   </div>
@@ -300,12 +300,12 @@ export default function AddRouterPage() {
             <div className="space-y-6">
               <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-6 text-center">
                 <CheckCircle className="mx-auto h-12 w-12 text-emerald-500" />
-                <h2 className="mt-3 text-xl font-bold text-[var(--fg)]">Router verified and ready</h2>
-                <p className="mt-2 text-sm text-[var(--fg-muted)]">{router.name} is reporting its managed hotspot, RADIUS configuration and captive portal assets as ready.</p>
+                <h2 className="mt-3 text-xl font-bold text-[var(--fg)]">Router connected and ready</h2>
+                <p className="mt-2 text-sm text-[var(--fg-muted)]">{router.name} is online — your Wi-Fi name, login page and billing are all set.</p>
               </div>
               <div className="grid gap-4 md:grid-cols-3">
-                <div className="rounded-xl border border-[var(--border)] bg-[var(--canvas)] p-4"><p className="text-xs text-[var(--fg-muted)]">WAN interface</p><p className="mt-1 font-mono text-sm text-[var(--fg)]">{router.wanInterface}</p></div>
-                <div className="rounded-xl border border-[var(--border)] bg-[var(--canvas)] p-4"><p className="text-xs text-[var(--fg-muted)]">Hotspot ports</p><p className="mt-1 font-mono text-sm text-[var(--fg)]">{router.hotspotInterfaces.length > 0 ? router.hotspotInterfaces.join(", ") : `All ports except ${router.wanInterface} (auto)`}</p></div>
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--canvas)] p-4"><p className="text-xs text-[var(--fg-muted)]">Internet port</p><p className="mt-1 font-mono text-sm text-[var(--fg)]">{router.wanInterface}</p></div>
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--canvas)] p-4"><p className="text-xs text-[var(--fg-muted)]">Wi-Fi ports</p><p className="mt-1 font-mono text-sm text-[var(--fg)]">{router.hotspotInterfaces.length > 0 ? router.hotspotInterfaces.join(", ") : `All ports except ${router.wanInterface} (auto)`}</p></div>
                 <div className="rounded-xl border border-[var(--border)] bg-[var(--canvas)] p-4"><p className="text-xs text-[var(--fg-muted)]">Wi-Fi name</p><p className="mt-1 flex items-center gap-2 text-sm text-[var(--fg)]"><WifiHigh className="h-4 w-4 text-[var(--accent-text)]" />{hasWireless ? router.wifiSsid : "Wireless disabled"}</p></div>
               </div>
               <div className="flex justify-end border-t border-[var(--border)] pt-5">
