@@ -201,6 +201,21 @@ public class TenantSettingsController {
         return toDto(portalAssets.store(load(principal.getTenantId()), kind, file.getBytes()));
     }
 
+    /** The owner's own logo or background, for the Settings preview (works before any router exists). */
+    @GetMapping("/assets/{kind}")
+    public ResponseEntity<byte[]> asset(@AuthenticationPrincipal TenantPrincipal principal, @PathVariable String kind) {
+        var asset = portalAssets.find(principal.getTenantId(), kind)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No " + kind + " image"));
+        var response = ResponseEntity.ok()
+                .cacheControl(org.springframework.http.CacheControl.noStore())
+                .contentType(MediaType.parseMediaType(asset.getContentType()))
+                .header("X-Content-Type-Options", "nosniff");
+        if ("image/svg+xml".equals(asset.getContentType())) {
+            response = response.header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; sandbox");
+        }
+        return response.body(asset.getData());
+    }
+
     @DeleteMapping("/assets/{kind}")
     @Transactional
     public TenantSettingsDto deleteAsset(@AuthenticationPrincipal TenantPrincipal principal,

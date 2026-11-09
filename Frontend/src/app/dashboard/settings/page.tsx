@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import axios from "axios";
 import api from "@/lib/api";
 import {
@@ -127,13 +127,29 @@ async function shrinkImage(file: File, kind: "logo" | "background"): Promise<Fil
   return new File([blob], `${kind}.${ext}`, { type: blob.type });
 }
 
-function AssetBox({ title, hintText, has, uploading, onPick, onRemove, inputRef }: {
+function AssetBox({ title, hintText, has, uploading, onPick, onRemove, inputRef, kind, previewUrl }: {
   title: string; hintText: string; has: boolean; uploading: boolean;
   onPick: (f: File) => void; onRemove: () => void; inputRef: React.RefObject<HTMLInputElement | null>;
+  kind: "logo" | "background"; previewUrl: string | null;
 }) {
   return (
     <div>
       <label className={label}>{title}</label>
+      {previewUrl && (
+        // A logo sits on a checkerboard so transparency is visible; a background shows as it fills the portal.
+        <div className={`relative mb-2 overflow-hidden rounded-xl border border-[var(--border-strong)] ${kind === "logo"
+          ? "flex h-28 items-center justify-center bg-[length:16px_16px] bg-[conic-gradient(#e2e8f0_25%,#fff_0_50%,#e2e8f0_0_75%,#fff_0)] p-3"
+          : "aspect-video bg-[var(--subtle)]"}`}>
+          {/* eslint-disable-next-line @next/next/no-img-element -- a local blob URL, not an optimisable asset */}
+          <img src={previewUrl} alt={kind === "logo" ? "Logo preview" : "Background preview"}
+            className={kind === "logo" ? "max-h-full max-w-full object-contain" : "h-full w-full object-cover"} />
+          {uploading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-white/60">
+              <CircleNotch size={20} className="animate-spin text-blue-600" />
+            </div>
+          )}
+        </div>
+      )}
       <button type="button" onClick={() => inputRef.current?.click()} disabled={uploading}
         className="flex h-24 w-full flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-[var(--border-strong)] bg-[var(--subtle)] text-xs text-[var(--fg-muted)] transition hover:border-blue-400 hover:bg-blue-50/40">
         {uploading ? <CircleNotch size={18} className="animate-spin text-blue-600" /> : <CloudArrowDown size={20} className="text-[var(--fg-faint)]" />}
@@ -265,6 +281,27 @@ export default function TenantSettingsPage() {
   const [uploading, setUploading] = useState<string | null>(null);
   const logoRef = useRef<HTMLInputElement>(null);
   const bgRef = useRef<HTMLInputElement>(null);
+  // Local object URLs of the logo/background shown in their upload boxes.
+  const [imagePreview, setImagePreview] = useState<{ logo: string | null; background: string | null }>({ logo: null, background: null });
+  const previewUrls = useRef<{ logo: string | null; background: string | null }>({ logo: null, background: null });
+
+  /** Shows {@code url} for {@code kind}, releasing the previous object URL unless told to keep it. */
+  const showImage = useCallback((kind: "logo" | "background", url: string | null, keepPrevious = false) => {
+    const previous = previewUrls.current[kind];
+    if (previous && previous !== url && !keepPrevious) URL.revokeObjectURL(previous);
+    previewUrls.current[kind] = url;
+    setImagePreview((p) => ({ ...p, [kind]: url }));
+  }, []);
+
+  /** Loads the saved image through the authenticated API (an <img> can't send the bearer token). */
+  const loadImage = useCallback((kind: "logo" | "background") =>
+    api.get<Blob>(`/api/settings/assets/${kind}`, { responseType: "blob" })
+      .then((r) => showImage(kind, URL.createObjectURL(r.data)))
+      .catch(() => showImage(kind, null)), [showImage]);
+
+  useEffect(() => () => {
+    Object.values(previewUrls.current).forEach((u) => { if (u) URL.revokeObjectURL(u); });
+  }, []);
   const normalizedPreviewMac = previewMac.trim().toUpperCase().replaceAll("-", ":");
   const previewMacError = normalizedPreviewMac && !/^([0-9A-F]{2}:){5}[0-9A-F]{2}$/.test(normalizedPreviewMac)
     ? "Enter a complete MAC address, for example F2:D9:9E:5C:FC:4B."
@@ -272,9 +309,13 @@ export default function TenantSettingsPage() {
 
   useEffect(() => {
     api.get<TenantSettings>("/api/settings")
-      .then((r) => setForm(r.data))
+      .then((r) => {
+        setForm(r.data);
+        if (r.data.hasLogo) void loadImage("logo");
+        if (r.data.hasBackground) void loadImage("background");
+      })
       .catch(() => setError("Could not load settings"));
-  }, []);
+  }, [loadImage]);
 
   /* Fetch the authenticated preview with the dashboard bearer token, then render
      it as a document. A direct iframe request cannot carry that token. */
@@ -335,14 +376,20 @@ export default function TenantSettingsPage() {
   const uploadAsset = async (kind: "logo" | "background", file: File) => {
     setUploading(kind);
     setError(null);
+    const previous = previewUrls.current[kind];
     try {
+      const image = await shrinkImage(file, kind);
+      // Show the chosen picture straight away; the old one comes back if the upload fails.
+      showImage(kind, URL.createObjectURL(image), true);
       const data = new FormData();
-      data.append("file", await shrinkImage(file, kind));
+      data.append("file", image);
       const r = await api.post<TenantSettings>(`/api/settings/assets/${kind}`, data,
         { headers: { "Content-Type": "multipart/form-data" } });
+      if (previous) URL.revokeObjectURL(previous);
       setForm(r.data);
       setPreviewKey((k) => k + 1);
     } catch (e) {
+      showImage(kind, previous);
       setError(`Couldn't upload the ${kind}: ${message(e)}`);
     } finally {
       setUploading(null);
@@ -352,6 +399,7 @@ export default function TenantSettingsPage() {
   const removeAsset = async (kind: "logo" | "background") => {
     try {
       const r = await api.delete<TenantSettings>(`/api/settings/assets/${kind}`);
+      showImage(kind, null);
       setForm(r.data);
       setPreviewKey((k) => k + 1);
     } catch (e) {
@@ -403,7 +451,7 @@ export default function TenantSettingsPage() {
             <p className="mb-5 mt-1 text-xs text-[var(--fg-muted)]">Configure your WiFi business branding and customer support details for {form.name}.</p>
             <div className="grid gap-5 sm:grid-cols-2">
               <AssetBox title="Your Logo" hintText="JPG, PNG, WebP or SVG. Large images are resized automatically. Appears on the login page."
-                has={form.hasLogo} uploading={uploading === "logo"}
+                has={form.hasLogo} uploading={uploading === "logo"} kind="logo" previewUrl={imagePreview.logo}
                 onPick={(f) => uploadAsset("logo", f)} onRemove={() => removeAsset("logo")} inputRef={logoRef} />
               <div>
                 <label className={label}>Your ISP / WiFi Business Name*</label>
@@ -510,7 +558,7 @@ export default function TenantSettingsPage() {
                 <div>
                   <label className={label}>Portal background</label>
                   <AssetBox title="" hintText="Optional JPG, PNG or WebP photo. Large photos are resized automatically so the portal loads fast."
-                    has={form.hasBackground} uploading={uploading === "background"}
+                    has={form.hasBackground} uploading={uploading === "background"} kind="background" previewUrl={imagePreview.background}
                     onPick={(f) => uploadAsset("background", f)} onRemove={() => removeAsset("background")} inputRef={bgRef} />
                 </div>
               </div>
