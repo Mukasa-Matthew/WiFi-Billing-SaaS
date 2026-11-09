@@ -74,6 +74,12 @@ public class IdentityClient {
         return call("POST", school(tenantId, "/portal/visitor"), Map.of("code", code, "deviceMac", mac));
     }
 
+    public JsonNode registrationForm(long tenantId) { return call("GET", school(tenantId, "/portal/registration"), null); }
+    public JsonNode register(long tenantId, String fullName, String registrationNumber, String email, int completionYear, String mac) {
+        return call("POST", school(tenantId, "/portal/register"), Map.of("fullName", fullName, "registrationNumber", registrationNumber, "email", email,
+                "completionYear", completionYear, "deviceMac", mac));
+    }
+
     private static String school(long tenantId, String suffix) { return BASE_PATH + "/" + tenantId + suffix; }
 
     private JsonNode call(String method, String pathAndQuery, Object payload) {

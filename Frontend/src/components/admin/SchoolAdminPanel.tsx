@@ -7,7 +7,7 @@ import { Badge, Card, ErrorNotice, Field, Notice, button, buttonGhost, field, hu
 import { useToast } from "@/components/ui/Toast";
 
 interface ItAdmin { id: string; email: string; fullName: string; role: string; active: boolean; totpEnabled: boolean; twoStepMethod?: "APP" | "EMAIL" | null; ownerBlocked?: boolean; mustChangePassword: boolean; lastSignInAt: string | null }
-interface School { name: string; code: string; active: boolean; students: number; staff: number; activePeople: number; visitorsEnabled: boolean; visitorDailyCap: number; visitorPassesToday: number; pendingStaffExceptions: number; itAdmins: ItAdmin[] }
+interface School { name: string; code: string; active: boolean; students: number; staff: number; activePeople: number; visitorsEnabled: boolean; visitorDailyCap: number; visitorPassesToday: number; pendingStaffExceptions: number; itAdmins: ItAdmin[]; registrationEnabled?: boolean; registrationBlocked?: boolean; pendingRegistrations?: number }
 interface Overview { school: School; dashboardUrl: string }
 interface Credentials { emailSent: boolean; temporaryPassword: string | null }
 interface Person { id: string; fullName: string; groupName: string; category: string; effectiveStatus: string; identifiers: { raw: string }[] }
@@ -41,7 +41,11 @@ export function SchoolAdminPanel({ tenantId }: { tenantId: number }) {
         <Field label="Staff">{school.staff.toLocaleString()}</Field>
         <Field label="Visitor passes">{school.visitorsEnabled ? `${school.visitorPassesToday} of ${school.visitorDailyCap} today` : "Switched off by the owner"}</Field>
         <Field label="Staff exceptions waiting">{school.pendingStaffExceptions}</Field>
-        <div className="flex justify-end py-4">
+        <Field label="Student self-registration">{school.registrationBlocked ? "Forced off by you" : school.registrationEnabled ? `On · ${school.pendingRegistrations ?? 0} waiting for IT approval` : "Off (the school's IT person can turn it on)"}</Field>
+        <div className="flex flex-wrap justify-end gap-2 py-4">
+          <button className={buttonGhost} onClick={() => run(() => api.patch(base, { registrationBlocked: !school.registrationBlocked }), school.registrationBlocked ? "The school's IT person can use self-registration again." : "Student self-registration is forced off for this school.")}>
+            {school.registrationBlocked ? "Allow self-registration" : "Force self-registration off"}
+          </button>
           <button className={buttonGhost} onClick={() => run(() => api.patch(base, { active: !school.active }), school.active ? "School paused: IT and student sign-in stopped." : "School reactivated.")}>
             {school.active ? "Pause school sign-in" : "Reactivate school"}
           </button>
