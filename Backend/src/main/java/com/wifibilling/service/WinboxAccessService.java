@@ -16,12 +16,14 @@ import java.security.SecureRandom;
 import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service @RequiredArgsConstructor
 @Transactional
 public class WinboxAccessService {
     private final WinboxAccessRepository accesses;
     private final RouterRepository routers;
+    private final TenantRepository tenants;
     private final RouterOperationsService authorization;
     private final EncryptionService encryption;
     private final RouterSetupService setup;
@@ -191,8 +193,10 @@ public class WinboxAccessService {
 
     public Routes routes(String bearer) {
         gateway(bearer);
+        List<WinboxAccess> all = accesses.findAll();
+        preloadRouters(all);
         List<Route> result = new ArrayList<>();
-        for (WinboxAccess a : accesses.findAll()) {
+        for (WinboxAccess a : all) {
             revokeIfInvalid(a);
             if (config.configured() && a.isEnabled() && active(a.getRouter()) && bound(a)
                     && a.getAppliedRevision() == a.getRevision() && "APPLIED".equals(a.getRouterResult())
@@ -205,16 +209,26 @@ public class WinboxAccessService {
     public void checked(String bearer, List<Check> checks) {
         gateway(bearer);
         if (checks == null || checks.size() > 1000) throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+        List<WinboxAccess> all = accesses.findAll();
+        preloadRouters(all);
+        Map<Long, WinboxAccess> byRouter = new HashMap<>();
+        for (WinboxAccess a : all) byRouter.put(a.getRouter().getId(), a);
         for (Check check : checks) {
             if (check == null || check.routerId() == null || check.routerId() <= 0 || check.revision() <= 0 || check.result() == null
                     || !Set.of("READY", "OFFLINE", "FORWARDING_FAILED", "DNS_FAILED", "CHECK_FAILED").contains(check.result()))
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
-            WinboxAccess a = accesses.findByRouterId(check.routerId()).orElse(null);
+            WinboxAccess a = byRouter.get(check.routerId());
             if (a == null || check.revision() != a.getRevision() || !a.isEnabled() || !active(a.getRouter()) || !bound(a)) continue;
             OffsetDateTime now = OffsetDateTime.now();
             accesses.recordGatewayCheck(a.getPort(), check.revision(), check.result(), now,
                     "READY".equals(check.result()) ? now : null);
         }
+    }
+
+    private void preloadRouters(List<WinboxAccess> all) {
+        List<Router> rs = routers.findAllById(all.stream().map(a -> a.getRouter().getId()).collect(Collectors.toSet()));
+        tenants.findAllById(rs.stream().map(Router::getTenant).filter(Objects::nonNull)
+                .map(Tenant::getId).collect(Collectors.toSet()));
     }
 
     public void revokeTenant(Long tenantId) {
