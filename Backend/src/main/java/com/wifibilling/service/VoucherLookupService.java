@@ -70,7 +70,9 @@ public class VoucherLookupService {
             PackagePlan plan = tx.getPackagePlan() != null ? tx.getPackagePlan() : v != null ? v.getPackagePlan() : null;
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("id", tx.getId());
-            item.put("code", reveal ? code : null);
+            // "" rather than null: login pages still cached on routers build their Connect
+            // button by string concatenation, and turned null into a "null" login.
+            item.put("code", reveal ? code : "");
             item.put("packageName", plan != null ? plan.getName() : "WiFi Package");
             item.put("price", tx.getAmount() != null ? tx.getAmount() : plan != null ? plan.getPrice() : null);
             item.put("durationSeconds", plan != null ? plan.getSessionTimeout() : null);

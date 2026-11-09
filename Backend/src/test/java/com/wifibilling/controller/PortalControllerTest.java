@@ -98,6 +98,33 @@ class PortalControllerTest {
         assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
     }
 
+    /**
+     * Contract: every file a router script downloads from /api/portal/templates must be
+     * servable. portal-sync.rsc was fetched by every router for weeks and always 404'd,
+     * which left stale login pages on routers; this fails the build if that recurs.
+     */
+    @Test
+    void everyTemplateTheRouterScriptsDownloadIsServed() {
+        Tenant tenantA = Tenant.builder().id(10L).name("Shop").build();
+        Router routerA = Router.builder().id(100L).token("tok_A1234567").tenant(tenantA).build();
+        when(routerRepository.findByToken("tok_A1234567")).thenReturn(Optional.of(routerA));
+        when(platformProperties.getPublicBaseUrl()).thenReturn("https://app.example.com");
+
+        String scripts = com.wifibilling.service.RouterScriptGenerator.portalSyncScript("https://app.example.com", "tok_A1234567")
+                + com.wifibilling.service.RouterScriptGenerator.portalSyncBootstrap("https://app.example.com", "tok_A1234567");
+        java.util.Set<String> files = new java.util.TreeSet<>();
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("/api/portal/templates/([^?\"]+)\\?token=").matcher(scripts);
+        while (m.find()) files.add(m.group(1));
+
+        assertTrue(files.containsAll(java.util.List.of("login.html", "status.html", "portal-sync.rsc")), "found: " + files);
+        for (String file : files) {
+            ResponseEntity<String> response = controller.getTemplate(file, "tok_A1234567");
+            assertEquals(HttpStatus.OK, response.getStatusCode(), file + " is downloaded by routers but not served");
+            assertNotNull(response.getBody(), file);
+            assertFalse(response.getBody().isBlank(), file + " is empty");
+        }
+    }
+
     /** Routers' 30-minute wb-portal-sync scheduler imports this; it used to 404, so routers kept stale login pages. */
     @Test
     void getTemplate_ServesThePortalSyncScriptRoutersPullEveryThirtyMinutes() {

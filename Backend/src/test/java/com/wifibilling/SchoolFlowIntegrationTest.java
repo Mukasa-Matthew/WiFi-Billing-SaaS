@@ -545,6 +545,8 @@ class SchoolFlowIntegrationTest {
         // Anyone else typing the number sees the purchase, never the code
         String other = findVoucher(shop, "0770000021", TABLET_MAC);
         assertFalse(other.contains(code), "the code is not sent to another device");
+        assertEquals("", JsonPath.read(other, "$.vouchers[0].code"),
+                "a locked code is empty, never null, so older router login pages can't turn it into a \"null\" login");
         assertEquals(true, JsonPath.read(other, "$.vouchers[0].locked"));
         assertEquals(true, JsonPath.read(other, "$.vouchers[0].canUnlock"));
         Number id = JsonPath.read(other, "$.vouchers[0].id");
