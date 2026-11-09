@@ -1,0 +1,7 @@
+#!/bin/bash
+# Re-read RADIUS clients (nas table) so newly provisioned routers can
+# authenticate immediately. FreeRADIUS reads SQL clients only at startup,
+# and SIGHUP is ignored when no config file changed, so a full restart is
+# required. Installed to /usr/local/bin with a passwordless sudoers entry
+# (see airpairy-radius-reload.sudoers).
+exec /bin/systemctl restart freeradius
