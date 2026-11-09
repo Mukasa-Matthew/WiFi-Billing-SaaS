@@ -86,6 +86,17 @@ public interface VoucherRepository extends JpaRepository<Voucher, Long> {
     /** Look up a small set of vouchers by code (dashboard joins, active sessions). */
     List<Voucher> findAllByCodeIn(java.util.Collection<String> codes);
 
+    /** Lightweight (code, tenant, person, pass, category, sale_type) rows for every
+     *  voucher tied to a school person or visitor pass — used to build cap-sharing
+     *  groups without loading entities or querying per voucher. Expired rows are
+     *  included on purpose: their usage still counts toward a shared cap. */
+    @org.springframework.data.jpa.repository.Query(value = """
+            SELECT code, tenant_id, person_id, visitor_pass_id, school_category, sale_type
+            FROM vouchers
+            WHERE person_id IS NOT NULL OR visitor_pass_id IS NOT NULL
+            """, nativeQuery = true)
+    List<Object[]> allSchoolGroupCodes();
+
     /** Voucher registrations bucketed per period for the dashboard charts. */
     @org.springframework.data.jpa.repository.Query(value = """
             SELECT date_trunc(:grain, created_at) AS d, COUNT(*)

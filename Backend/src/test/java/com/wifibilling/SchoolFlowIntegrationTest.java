@@ -38,6 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect",
         "spring.jpa.hibernate.ddl-auto=create-drop",
         "jwt.secret=test-only-jwt-secret-with-at-least-32-characters",
+        "portal.rate-limit.enabled=false",
         "wireguard.server.endpoint=203.0.113.10:443",
         "wireguard.server.public-key=yoay+E/LyCqRq0xxqsIRJdRoqe8XjRVmkMe3nDx5wEc=",
         "wireguard.server.subnet=10.9.0.0/16",

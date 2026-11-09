@@ -166,6 +166,26 @@ public interface RadAcctRepository extends JpaRepository<RadAcct, Long> {
             """)
     long sumOctetsForUsernames(@Param("usernames") Collection<String> usernames);
 
+    /** Per-username octet totals since a timestamp — batched school cap enforcement. */
+    @Query("""
+            SELECT r.username, COALESCE(SUM(COALESCE(r.acctInputOctets, 0) + COALESCE(r.acctOutputOctets, 0)), 0)
+            FROM RadAcct r
+            WHERE r.username IN :usernames
+              AND COALESCE(r.acctStartTime, r.acctStopTime) >= :fromTs
+            GROUP BY r.username
+            """)
+    List<Object[]> sumOctetsByUsernameSince(@Param("usernames") Collection<String> usernames,
+                                            @Param("fromTs") OffsetDateTime fromTs);
+
+    /** Per-username octet totals over all time — batched visitor-pass cap enforcement. */
+    @Query("""
+            SELECT r.username, COALESCE(SUM(COALESCE(r.acctInputOctets, 0) + COALESCE(r.acctOutputOctets, 0)), 0)
+            FROM RadAcct r
+            WHERE r.username IN :usernames
+            GROUP BY r.username
+            """)
+    List<Object[]> sumOctetsByUsername(@Param("usernames") Collection<String> usernames);
+
     /** Per-username aggregates for the user directory: first login, total octets, live device count. */
     @Query(value = """
             SELECT username, MIN(acctstarttime),
