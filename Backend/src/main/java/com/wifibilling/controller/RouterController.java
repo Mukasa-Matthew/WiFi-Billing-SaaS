@@ -40,6 +40,10 @@ public class RouterController {
     private final com.wifibilling.repository.RouterSetupCodeRepository setupCodeRepository;
     private final com.wifibilling.service.SubscriptionService subscriptionService;
     private final com.wifibilling.service.WinboxAccessService winboxAccess;
+    private final com.wifibilling.repository.NocIncidentRepository incidentRepository;
+    private final com.wifibilling.repository.PortalFeedbackRepository feedbackRepository;
+    private final com.wifibilling.repository.PackagePlanRepository packagePlanRepository;
+    private final com.wifibilling.repository.WinboxAccessRepository winboxAccessRepository;
 
     @GetMapping
     public List<RouterDto.Response> list(@AuthenticationPrincipal TenantPrincipal principal) {
@@ -151,8 +155,11 @@ public class RouterController {
             wireGuardPeerService.removePeer(publicKey);
         }
 
-        // If payments, bindings, or packages exist, soft-delete so financial history remains valid
-        if (transactionRepository.existsByRouterId(router.getId()) || bindingRepository.existsByRouterId(id)) {
+        // If payments, bindings, or any other records still reference this router,
+        // soft-delete so their history remains valid.
+        if (transactionRepository.existsByRouterId(router.getId()) || bindingRepository.existsByRouterId(id)
+                || incidentRepository.existsByRouterId(id) || feedbackRepository.existsByRouterId(id)
+                || packagePlanRepository.existsByRouterId(id) || winboxAccessRepository.existsByRouterId(id)) {
             router.setStatus("DELETED");
             router.setWgPublicKey(null);
             router.setCpuLoad(0);
