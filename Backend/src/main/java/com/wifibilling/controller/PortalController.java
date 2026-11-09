@@ -35,6 +35,7 @@ public class PortalController {
     private final com.wifibilling.service.VoucherLookupService voucherLookup;
     private final com.wifibilling.repository.PortalFeedbackRepository feedbackRepository;
     private final PlatformProperties props;
+    private final com.wifibilling.service.PortalAssetService portalAssets;
 
     private List<PortalPackageResponse> portalPackages(Router router) {
         if (!Boolean.TRUE.equals(router.getTenant().getPortalShowPackages())) return List.of();
@@ -58,10 +59,11 @@ public class PortalController {
         var tenant = router.getTenant();
         var packages = portalPackages(router);
         String base = props.getPublicBaseUrl();
+        // ?v= changes whenever the image is replaced, so phones never show a cached old one.
         String logoUrl = tenant.getPortalLogoFile() != null
-                ? base + "/api/portal/assets/" + token + "/logo" : null;
+                ? base + "/api/portal/assets/" + token + "/logo?v=" + tenant.getPortalLogoFile() : null;
         String bgUrl = tenant.getPortalBackgroundFile() != null
-                ? base + "/api/portal/assets/" + token + "/background" : null;
+                ? base + "/api/portal/assets/" + token + "/background?v=" + tenant.getPortalBackgroundFile() : null;
         var settings = new PortalConfigResponse.PortalSettings(
                 tenant.getName(), tenant.getSupportPhone(), tenant.getSupportPhone2(),
                 tenant.getSupportEmail(), tenant.getWhatsappPhone(),
@@ -136,6 +138,27 @@ public class PortalController {
      * "Already bought? Find your voucher": the number's recent vouchers. Codes are only
      * included for the device that paid; see {@link com.wifibilling.service.VoucherLookupService}.
      */
+    /**
+     * The tenant's logo or background for the captive portal. Public (customers load it
+     * before signing in) but scoped to the router token's tenant. URLs are versioned by
+     * content, so they are cached for a week; SVG logos are sandboxed against scripts.
+     */
+    @GetMapping("/assets/{token}/{kind}")
+    public ResponseEntity<byte[]> portalAsset(@PathVariable String token, @PathVariable String kind) {
+        Router router = resolveRouter(token);
+        var asset = portalAssets.find(router.getTenant().getId(), kind)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No " + kind + " image"));
+        var response = ResponseEntity.ok()
+                .cacheControl(CacheControl.maxAge(java.time.Duration.ofDays(7)).cachePublic())
+                .eTag("\"" + asset.getSha256() + "\"")
+                .contentType(MediaType.parseMediaType(asset.getContentType()))
+                .header("X-Content-Type-Options", "nosniff");
+        if ("image/svg+xml".equals(asset.getContentType())) {
+            response = response.header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; sandbox");
+        }
+        return response.body(asset.getData());
+    }
+
     @GetMapping(value = "/find-voucher", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<java.util.Map<String, Object>> findVoucher(
             @RequestParam("token") String token,

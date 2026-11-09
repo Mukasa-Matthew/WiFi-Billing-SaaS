@@ -27,6 +27,7 @@ public class TenantSettingsController {
     private final RouterRepository routerRepository;
     private final RouterManagementService managementService;
     private final com.wifibilling.service.OtpService otpService;
+    private final com.wifibilling.service.PortalAssetService portalAssets;
 
     public record EmailChangeRequest(String newEmail, String otp) {}
     public record OtpResponse(boolean sent, String devCode) {}
@@ -191,46 +192,19 @@ public class TenantSettingsController {
                 t.getPortalBackgroundFile() != null);
     }
 
-    /** Upload a tenant branding image (logo or portal background). */
+    /** Upload a tenant branding image (logo or portal background). Stored in the database. */
     @PostMapping(value = "/assets/{kind}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Transactional
     public TenantSettingsDto uploadAsset(@AuthenticationPrincipal TenantPrincipal principal,
             @PathVariable String kind,
             @RequestParam("file") org.springframework.web.multipart.MultipartFile file) throws java.io.IOException {
-        if (!kind.equals("logo") && !kind.equals("background")) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "kind must be logo or background");
-        }
-        String type = file.getContentType() != null ? file.getContentType() : "";
-        String ext = switch (type) {
-            case "image/png" -> ".png";
-            case "image/jpeg" -> ".jpg";
-            case "image/svg+xml" -> kind.equals("logo") ? ".svg" : null;
-            case "image/webp" -> ".webp";
-            default -> null;
-        };
-        if (ext == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only PNG, JPG" + (kind.equals("logo") ? ", SVG" : "") + " or WebP images are allowed");
-        long max = kind.equals("background") ? 500_000 : 1_000_000;
-        if (file.getSize() > max) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "File too large (max " + max / 1000 + " KB)");
-        Tenant tenant = load(principal.getTenantId());
-        java.nio.file.Path dir = java.nio.file.Path.of("uploads", "tenants", String.valueOf(tenant.getId()));
-        java.nio.file.Files.createDirectories(dir);
-        String filename = kind + ext;
-        java.nio.file.Files.copy(file.getInputStream(), dir.resolve(filename),
-                java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-        if (kind.equals("logo")) tenant.setPortalLogoFile(filename); else tenant.setPortalBackgroundFile(filename);
-        return toDto(tenantRepository.save(tenant));
+        return toDto(portalAssets.store(load(principal.getTenantId()), kind, file.getBytes()));
     }
 
     @DeleteMapping("/assets/{kind}")
     @Transactional
     public TenantSettingsDto deleteAsset(@AuthenticationPrincipal TenantPrincipal principal,
             @PathVariable String kind) {
-        Tenant tenant = load(principal.getTenantId());
-        String file = kind.equals("logo") ? tenant.getPortalLogoFile() : kind.equals("background") ? tenant.getPortalBackgroundFile() : null;
-        if (file == null) return toDto(tenant);
-        try { java.nio.file.Files.deleteIfExists(java.nio.file.Path.of("uploads", "tenants", String.valueOf(tenant.getId()), file)); }
-        catch (java.io.IOException ignored) {}
-        if (kind.equals("logo")) tenant.setPortalLogoFile(null); else tenant.setPortalBackgroundFile(null);
-        return toDto(tenantRepository.save(tenant));
+        return toDto(portalAssets.remove(load(principal.getTenantId()), kind));
     }
 }

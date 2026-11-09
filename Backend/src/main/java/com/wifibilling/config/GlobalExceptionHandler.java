@@ -68,6 +68,15 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.status(status).headers(headers).body(errorBody(status, message, path(request), null));
     }
 
+    /** Uploads above the server's multipart limit (portal images) get a plain explanation. */
+    @Override
+    protected ResponseEntity<Object> handleMaxUploadSizeExceededException(
+            org.springframework.web.multipart.MaxUploadSizeExceededException ex, HttpHeaders headers,
+            HttpStatusCode status, WebRequest request) {
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(errorBody(HttpStatus.PAYLOAD_TOO_LARGE,
+                "The image is too large (max 1000 KB). Try a smaller picture.", path(request), null));
+    }
+
     /** Method-level security (@PreAuthorize) denials stay 403, not 500. */
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<Object> handleAccessDenied(AccessDeniedException ex, HttpServletRequest request) {
