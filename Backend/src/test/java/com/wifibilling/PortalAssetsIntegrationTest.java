@@ -157,6 +157,28 @@ class PortalAssetsIntegrationTest {
                 .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("too large")));
     }
 
+    @Test
+    void ownersPreviewTheirOwnImagesInSettingsOnly() throws Exception {
+        Site a = site("preview-a");
+        Site b = site("preview-b");
+        mvc.perform(get("/api/settings/assets/logo").header("Authorization", "Bearer " + a.jwt())).andExpect(status().isNotFound());
+
+        upload(a, "logo", PNG, "image/png").andExpect(status().isOk());
+        byte[] own = mvc.perform(get("/api/settings/assets/logo").header("Authorization", "Bearer " + a.jwt()))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType("image/png"))
+                .andExpect(header().string("Cache-Control", org.hamcrest.Matchers.containsString("no-store")))
+                .andReturn().getResponse().getContentAsByteArray();
+        assertArrayEquals(PNG, own);
+
+        // Another business sees only its own (none), and signing in is required.
+        mvc.perform(get("/api/settings/assets/logo").header("Authorization", "Bearer " + b.jwt())).andExpect(status().isNotFound());
+        mvc.perform(get("/api/settings/assets/logo")).andExpect(status().is4xxClientError());
+
+        mvc.perform(delete("/api/settings/assets/logo").header("Authorization", "Bearer " + a.jwt())).andExpect(status().isOk());
+        mvc.perform(get("/api/settings/assets/logo").header("Authorization", "Bearer " + a.jwt())).andExpect(status().isNotFound());
+    }
+
     private static byte[] bytes(int... values) {
         byte[] b = new byte[values.length];
         for (int i = 0; i < values.length; i++) b[i] = (byte) values[i];
