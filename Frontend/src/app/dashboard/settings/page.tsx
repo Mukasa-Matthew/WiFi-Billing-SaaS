@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import axios from "axios";
 import api from "@/lib/api";
 import {
   CheckCircle, CircleNotch, FloppyDisk, GearSix, Globe, FileText,
@@ -51,6 +52,14 @@ const TEMPLATES = [
 
 const FONTS = ["Poppins", "Work Sans", "Inter", "Roboto", "Open Sans", "Lato", "Montserrat", "Nunito", "Raleway"];
 const LANGUAGES = ["English", "Swahili", "Luganda", "French"];
+
+function apiErrorMessage(error: unknown, fallback: string): string {
+  if (!axios.isAxiosError(error)) return fallback;
+  const data: unknown = error.response?.data;
+  if (typeof data === "string") return data;
+  if (data && typeof data === "object" && "message" in data && typeof data.message === "string") return data.message;
+  return fallback;
+}
 
 const field = "w-full rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--fg)] outline-none transition focus:border-blue-500";
 const label = "mb-2 block text-sm font-semibold text-[var(--fg)]";
@@ -124,8 +133,8 @@ function EmailChange({ currentEmail, onChanged }: { currentEmail: string; onChan
       setSent(true);
       setDevCode(r.data.devCode ?? null);
       setMsg({ kind: "ok", text: `Code sent to ${currentEmail} — enter it below to confirm.` });
-    } catch (e: any) {
-      setMsg({ kind: "err", text: e?.response?.data?.message || e?.response?.data || "Could not send code" });
+    } catch (e: unknown) {
+      setMsg({ kind: "err", text: apiErrorMessage(e, "Could not send code") });
     } finally {
       setBusy(false);
     }
@@ -138,8 +147,8 @@ function EmailChange({ currentEmail, onChanged }: { currentEmail: string; onChan
       onChanged(r.data.email);
       setOpen(false); setNewEmail(""); setOtp(""); setSent(false); setDevCode(null);
       setMsg({ kind: "ok", text: "Account email updated. Use it to sign in from now on." });
-    } catch (e: any) {
-      setMsg({ kind: "err", text: e?.response?.data?.message || e?.response?.data || "Email change failed" });
+    } catch (e: unknown) {
+      setMsg({ kind: "err", text: apiErrorMessage(e, "Email change failed") });
     } finally {
       setBusy(false);
     }
@@ -211,6 +220,8 @@ export default function TenantSettingsPage() {
   const [tab, setTab] = useState<TabKey>("general");
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(true);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewMac, setPreviewMac] = useState("");
   const [previewKey, setPreviewKey] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -218,6 +229,10 @@ export default function TenantSettingsPage() {
   const [uploading, setUploading] = useState<string | null>(null);
   const logoRef = useRef<HTMLInputElement>(null);
   const bgRef = useRef<HTMLInputElement>(null);
+  const normalizedPreviewMac = previewMac.trim().toUpperCase().replaceAll("-", ":");
+  const previewMacError = normalizedPreviewMac && !/^([0-9A-F]{2}:){5}[0-9A-F]{2}$/.test(normalizedPreviewMac)
+    ? "Enter a complete MAC address, for example F2:D9:9E:5C:FC:4B."
+    : null;
 
   useEffect(() => {
     api.get<TenantSettings>("/api/settings")
@@ -225,26 +240,37 @@ export default function TenantSettingsPage() {
       .catch(() => setError("Could not load settings"));
   }, []);
 
-  /* The preview is the real router-served portal (/api/portal/page), the same
-     HTML customers get on the hotspot. Needs one router for its token. */
-  const [routerToken, setRouterToken] = useState<string | null>(null);
+  /* Fetch the authenticated preview with the dashboard bearer token, then render
+     it as a document. A direct iframe request cannot carry that token. */
   useEffect(() => {
-    // The portal preview needs the router's public portal id (it authorizes nothing sensitive).
-    api.get<{ id: number }[]>("/api/routers")
-      .then((r) => r.data[0] ? api.get<{ portalId: string }>(`/api/routers/${r.data[0].id}/portal-id`) : null)
-      .then((p) => setRouterToken(p?.data.portalId ?? null))
-      .catch(() => setRouterToken(null));
-  }, []);
-
-  useEffect(() => {
-    if (!form || !routerToken) return;
+    if (!form) return;
+    if (previewMacError) return;
+    let objectUrl: string | null = null;
+    let cancelled = false;
     const timer = window.setTimeout(() => {
-      const q = new URLSearchParams({ token: routerToken, template: form.portalTemplate });
       setPreviewLoading(true);
-      setPreviewSrc(`/api/portal/page?${q.toString()}`);
+      setPreviewError(null);
+      api.get<string>("/api/settings/portal-preview", {
+        params: { template: form.portalTemplate, mac: normalizedPreviewMac || undefined },
+        responseType: "text",
+      }).then((response) => {
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(new Blob([response.data], { type: "text/html" }));
+        setPreviewSrc(objectUrl);
+      }).catch(() => {
+        if (!cancelled) {
+          setPreviewSrc(null);
+          setPreviewError("Could not load the live portal preview.");
+          setPreviewLoading(false);
+        }
+      });
     }, 350);
-    return () => window.clearTimeout(timer);
-  }, [form, routerToken, previewKey]);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [form, normalizedPreviewMac, previewKey, previewMacError]);
 
   const set = <K extends keyof TenantSettings>(key: K, value: TenantSettings[K]) =>
     setForm((f) => (f ? { ...f, [key]: value } : f));
@@ -394,7 +420,7 @@ export default function TenantSettingsPage() {
                 <label className={label}>Tethering protection</label>
                 <select value={form.tetheringProtection} onChange={(e) => set("tetheringProtection", e.target.value)} className={field}>
                   <option value="OFF">Off — allow customers to share their connection</option>
-                  <option value="LOG">Detect only — log tethered devices, don't block</option>
+                  <option value="LOG">Detect only — log tethered devices, don&apos;t block</option>
                   <option value="BLOCK">Block — stop devices sharing WiFi via mobile hotspot</option>
                 </select>
                 <p className={hint}>Applies to all your routers — pushed automatically within a minute.</p>
@@ -470,7 +496,7 @@ export default function TenantSettingsPage() {
 
             <section className={card}>
               <h2 className="mb-1 text-sm font-semibold text-[var(--fg)]">Portal template</h2>
-              <p className="mb-5 text-xs text-[var(--fg-muted)]">Pick the design customers see on your captive portal. The preview shows your branding.</p>
+              <p className="mb-5 text-xs text-[var(--fg-muted)]">Pick the design customers see on your captive portal. The preview is interactive, so you can test packages, voucher lookup, and feedback yourself.</p>
               <div className="grid gap-6 lg:grid-cols-2">
                 <div className="space-y-3">
                   {TEMPLATES.map((t) => (
@@ -504,12 +530,20 @@ export default function TenantSettingsPage() {
                         </a>
                       )}
                     </div>
-                    <div className="relative h-[420px]">
-                      {!routerToken && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-[var(--canvas)] px-6 text-center text-xs text-[var(--fg-muted)]">
-                          Link a router to preview your portal exactly as customers see it.
-                        </div>
-                      )}
+                    <div className="border-b border-[var(--border)] bg-[var(--subtle)] px-3 py-2">
+                      <label htmlFor="preview-device-mac" className="mb-1 block text-[10px] font-semibold text-[var(--fg-muted)]">
+                        Customer device MAC (optional)
+                      </label>
+                      <input
+                        id="preview-device-mac"
+                        value={previewMac}
+                        onChange={(e) => setPreviewMac(e.target.value.toUpperCase())}
+                        placeholder="Example: F2:D9:9E:5C:FC:4B"
+                        className="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-2.5 py-1.5 font-mono text-[11px] text-[var(--fg)] outline-none focus:border-blue-500"
+                      />
+                      <p className="mt-1 text-[10px] text-[var(--fg-muted)]">Enter the client&apos;s MAC to reproduce whether their bought voucher is revealed or locked.</p>
+                    </div>
+                    <div className="relative h-[620px]">
                       {previewSrc && (
                         <iframe
                           key={previewKey}
@@ -519,7 +553,12 @@ export default function TenantSettingsPage() {
                           className="h-full w-full bg-[var(--surface)]"
                         />
                       )}
-                      {previewLoading && (
+                      {(previewMacError || previewError) && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-[var(--canvas)] px-6 text-center text-xs text-red-600">
+                          {previewMacError || previewError}
+                        </div>
+                      )}
+                      {previewLoading && !previewMacError && (
                         <div className="absolute inset-0 flex items-center justify-center bg-[var(--canvas)] text-xs text-[var(--fg-muted)]">
                           <CircleNotch size={16} className="mr-2 animate-spin" />Rendering preview…
                         </div>

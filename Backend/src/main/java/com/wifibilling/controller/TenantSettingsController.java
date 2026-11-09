@@ -1,6 +1,5 @@
 package com.wifibilling.controller;
 
-import com.wifibilling.config.PlatformProperties;
 import com.wifibilling.dto.TenantSettingsDto;
 import com.wifibilling.model.Router;
 import com.wifibilling.model.Tenant;
@@ -27,7 +26,6 @@ public class TenantSettingsController {
     private final TenantRepository tenantRepository;
     private final RouterRepository routerRepository;
     private final RouterManagementService managementService;
-    private final PlatformProperties props;
     private final com.wifibilling.service.OtpService otpService;
 
     public record EmailChangeRequest(String newEmail, String otp) {}
@@ -141,18 +139,23 @@ public class TenantSettingsController {
     @Transactional(readOnly = true)
     public ResponseEntity<String> preview(
             @AuthenticationPrincipal TenantPrincipal principal,
-            @RequestParam(value = "template", required = false) String template) {
+            @RequestParam(value = "template", required = false) String template,
+            @RequestParam(value = "mac", required = false) String mac) {
         Tenant tenant = load(principal.getTenantId());
         String tpl = template != null && template.matches("[a-z0-9-]{1,40}") ? template : null;
         String html = PortalController.renderPortal(tenant, tpl);
         // Give the page a real router token when available so package listing works.
-        // srcdoc iframes have no query string and location.origin is "null", so
-        // bake both values in instead of a replaceState hack that throws.
+        // The dashboard loads this response into a blob document. Keep API calls on
+        // the dashboard origin so they pass through its same-origin /api proxy.
         String token = routerRepository.findAllByTenantId(tenant.getId()).stream()
                 .findFirst().map(Router::getToken).orElse("preview");
+        String deviceMac = mac == null ? "" : mac.trim().toUpperCase().replace('-', ':');
+        if (!deviceMac.isEmpty() && !deviceMac.matches("([0-9A-F]{2}:){5}[0-9A-F]{2}")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Enter a valid device MAC address");
+        }
         html = html
                 .replace("var TOKEN = Q.get('token') || '';", "var TOKEN = '" + token + "';")
-                .replace("var BASE = location.origin;", "var BASE = '" + props.getPublicBaseUrl() + "';");
+                .replace("var MT_MAC = Q.get('mac') || '';", "var MT_MAC = '" + deviceMac + "';");
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(html);
     }
 
