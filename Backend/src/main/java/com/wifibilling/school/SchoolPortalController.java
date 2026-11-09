@@ -10,8 +10,12 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/portal/school")
 public class SchoolPortalController {
     private final SchoolAccessService access;
+    private final com.wifibilling.service.PortalRateLimiter rateLimiter;
 
-    public SchoolPortalController(SchoolAccessService access) { this.access = access; }
+    public SchoolPortalController(SchoolAccessService access, com.wifibilling.service.PortalRateLimiter rateLimiter) {
+        this.access = access;
+        this.rateLimiter = rateLimiter;
+    }
 
     public record Verify(@NotBlank @Size(max = 128) String token, @NotBlank @Size(max = 128) String identifier,
                          @NotBlank @Size(max = 8) String pin, @Size(max = 24) String mac) {
@@ -34,26 +38,31 @@ public class SchoolPortalController {
 
     @PostMapping("/resume")
     public SchoolAccessService.PortalResult resume(@Valid @RequestBody Resume body) {
+        rateLimiter.check("resume", body.mac());
         return access.resume(body.token(), body.mac());
     }
 
     @PostMapping("/student-free")
     public SchoolAccessService.PortalResult studentFree(@Valid @RequestBody StudentFree body) {
+        rateLimiter.check("student-free", body.mac());
         return access.studentFree(body.token(), body.ticket(), body.mac());
     }
 
     @PostMapping("/move-package")
     public SchoolAccessService.PortalResult movePackage(@Valid @RequestBody MovePackage body) {
+        rateLimiter.check("move-package", body.mac());
         return access.movePaidPackage(body.token(), body.ticket(), body.voucherId(), body.mac());
     }
 
     @PostMapping("/verify")
     public SchoolAccessService.PortalResult verify(@Valid @RequestBody Verify body) {
+        rateLimiter.check("verify", body.mac());
         return access.verify(body.token(), body.identifier(), body.pin(), body.mac());
     }
 
     @PostMapping("/change-pin")
     public SchoolAccessService.PortalResult changePin(@Valid @RequestBody ChangePin body) {
+        rateLimiter.check("change-pin", body.mac());
         return access.changePin(body.token(), body.pinChangeToken(), body.newPin(), body.mac());
     }
 
@@ -66,12 +75,14 @@ public class SchoolPortalController {
     @PostMapping("/register")
     @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.ACCEPTED)
     public java.util.Map<String, String> register(@Valid @RequestBody Register body) {
+        rateLimiter.check("register", body.mac());
         access.register(body.token(), body.fullName().trim(), body.registrationNumber().trim(), body.email().trim(), body.completionYear(), body.mac());
         return java.util.Map.of("status", "PENDING");
     }
 
     @PostMapping("/visitor")
     public SchoolAccessService.PortalResult visitor(@Valid @RequestBody Visitor body) {
+        rateLimiter.check("visitor", body.mac());
         return access.visitor(body.token(), body.code(), body.mac());
     }
 }

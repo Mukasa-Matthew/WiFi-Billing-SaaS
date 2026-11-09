@@ -142,6 +142,11 @@ public class VoucherExpirationWorker {
     /**
      * Enforces school staff daily data caps, visitor pass data caps, and pause
      * switches for active/unused free school vouchers.
+     *
+     * Caps are shared per person (staff/student) or per visitor pass, and an
+     * expired code's usage still counts toward the shared total — so every
+     * group is built once from all school voucher codes, then usage is fetched
+     * with two grouped aggregate queries instead of two queries per voucher.
      */
     private void enforceSchoolDataCaps() {
         List<Voucher> freeVouchers = voucherRepository.findAllBySchoolCategoryInAndStatusIn(
@@ -149,11 +154,38 @@ public class VoucherExpirationWorker {
         if (freeVouchers == null || freeVouchers.isEmpty()) return;
         OffsetDateTime startOfToday = clock != null ? clock.startOf(clock.today())
                 : java.time.LocalDate.now(java.time.ZoneOffset.UTC).atStartOfDay().atOffset(java.time.ZoneOffset.UTC);
+
+        record PersonKey(long tenantId, String category, String personId) {}
+        record PassKey(long tenantId, String passId) {}
+        java.util.Map<PersonKey, java.util.Set<String>> personCodes = new java.util.HashMap<>();
+        java.util.Map<PassKey, java.util.Set<String>> passCodes = new java.util.HashMap<>();
+        for (Object[] row : voucherRepository.allSchoolGroupCodes()) {
+            String code = (String) row[0];
+            long tenantId = ((Number) row[1]).longValue();
+            String personId = (String) row[2];
+            String passId = (String) row[3];
+            String category = (String) row[4];
+            String saleType = (String) row[5];
+            if (personId != null && ("STAFF".equals(category) || "VISITOR".equals(category)
+                    || ("STUDENT".equals(category) && "SCHOOL_STUDENT_FREE".equals(saleType)))) {
+                personCodes.computeIfAbsent(new PersonKey(tenantId, category, personId),
+                        k -> new java.util.LinkedHashSet<>()).add(code);
+            }
+            if (passId != null) {
+                passCodes.computeIfAbsent(new PassKey(tenantId, passId),
+                        k -> new java.util.LinkedHashSet<>()).add(code);
+            }
+        }
+
+        var dailyUsage = usageByCode(flatten(personCodes.values()), startOfToday);
+        var lifetimeUsage = usageByCode(flatten(passCodes.values()), null);
+
         for (Voucher voucher : freeVouchers) {
             if (Boolean.TRUE.equals(voucher.getSchoolHold())) continue;
             var tenant = voucher.getTenant();
             if (tenant == null || !tenant.isSchool()) continue;
-            if ("STUDENT".equals(voucher.getSchoolCategory())) {
+            String category = voucher.getSchoolCategory();
+            if ("STUDENT".equals(category)) {
                 if (!"SCHOOL_STUDENT_FREE".equals(voucher.getSaleType())) continue;
                 if (!tenant.isSchoolStudentFreeEnabled()) {
                     holdSchoolVoucher(voucher, "student free study data disabled");
@@ -161,56 +193,38 @@ public class VoucherExpirationWorker {
                 }
                 Integer capMb = tenant.getSchoolStudentDailyFreeMb();
                 if (capMb != null && capMb > 0) {
-                    long capBytes = capMb.longValue() * 1024L * 1024L;
-                    var codes = new java.util.LinkedHashSet<String>();
-                    if (voucher.getPersonId() != null) {
-                        voucherRepository.findAllByTenantIdAndPersonIdAndSchoolCategory(tenant.getId(), voucher.getPersonId(), "STUDENT").stream()
-                                .filter(v -> "SCHOOL_STUDENT_FREE".equals(v.getSaleType()))
-                                .forEach(v -> codes.add(v.getCode()));
-                    }
-                    codes.add(voucher.getCode());
-                    long used = radAcctRepository.sumOctetsForUsernamesSince(codes, startOfToday);
-                    if (used >= capBytes) {
+                    long used = groupUsage(personCodes.get(
+                            new PersonKey(tenant.getId(), category, voucher.getPersonId())),
+                            voucher.getCode(), dailyUsage);
+                    if (used >= capMb.longValue() * 1024L * 1024L) {
                         holdSchoolVoucher(voucher, "student daily free study data cap (" + capMb + " MB) reached");
                     }
                 }
-                continue;
-            }
-            if ("STAFF".equals(voucher.getSchoolCategory())) {
+            } else if ("STAFF".equals(category)) {
                 if (!tenant.isSchoolStaffEnabled()) {
                     holdSchoolVoucher(voucher, "staff WiFi paused");
                     continue;
                 }
                 Integer capMb = tenant.getSchoolStaffDailyDataCapMb();
                 if (capMb != null && capMb > 0) {
-                    long capBytes = capMb.longValue() * 1024L * 1024L;
-                    var codes = new java.util.LinkedHashSet<String>();
-                    if (voucher.getPersonId() != null) {
-                        voucherRepository.findAllByTenantIdAndPersonIdAndSchoolCategory(tenant.getId(), voucher.getPersonId(), "STAFF")
-                                .forEach(v -> codes.add(v.getCode()));
-                    }
-                    codes.add(voucher.getCode());
-                    long used = radAcctRepository.sumOctetsForUsernamesSince(codes, startOfToday);
-                    if (used >= capBytes) {
+                    long used = groupUsage(personCodes.get(
+                            new PersonKey(tenant.getId(), category, voucher.getPersonId())),
+                            voucher.getCode(), dailyUsage);
+                    if (used >= capMb.longValue() * 1024L * 1024L) {
                         holdSchoolVoucher(voucher, "staff daily data cap (" + capMb + " MB) reached");
                     }
                 }
-            } else if ("VISITOR".equals(voucher.getSchoolCategory())) {
+            } else if ("VISITOR".equals(category)) {
                 if (Boolean.FALSE.equals(tenant.getSchoolVisitorsEnabled())) {
                     holdSchoolVoucher(voucher, "visitor WiFi disabled");
                     continue;
                 }
                 Integer capMb = tenant.getSchoolVisitorDataCapMb();
                 if (capMb != null && capMb > 0) {
-                    long capBytes = capMb.longValue() * 1024L * 1024L;
-                    var codes = new java.util.LinkedHashSet<String>();
-                    if (voucher.getVisitorPassId() != null) {
-                        voucherRepository.findAllByTenantIdAndVisitorPassId(tenant.getId(), voucher.getVisitorPassId())
-                                .forEach(v -> codes.add(v.getCode()));
-                    }
-                    codes.add(voucher.getCode());
-                    long used = radAcctRepository.sumOctetsForUsernames(codes);
-                    if (used >= capBytes) {
+                    long used = groupUsage(passCodes.get(
+                            new PassKey(tenant.getId(), voucher.getVisitorPassId())),
+                            voucher.getCode(), lifetimeUsage);
+                    if (used >= capMb.longValue() * 1024L * 1024L) {
                         voucher.setStatus(STATUS_EXPIRED);
                         voucherRepository.save(voucher);
                         radCheckRepository.deleteAllByUsername(voucher.getCode());
@@ -221,6 +235,33 @@ public class VoucherExpirationWorker {
                 }
             }
         }
+    }
+
+    private static java.util.Set<String> flatten(java.util.Collection<java.util.Set<String>> groups) {
+        var all = new java.util.HashSet<String>();
+        groups.forEach(all::addAll);
+        return all;
+    }
+
+    /** (username → total octets) for the given codes; null since = all time. */
+    private java.util.Map<String, Long> usageByCode(java.util.Set<String> codes, OffsetDateTime since) {
+        if (codes.isEmpty()) return java.util.Map.of();
+        var rows = since != null
+                ? radAcctRepository.sumOctetsByUsernameSince(codes, since)
+                : radAcctRepository.sumOctetsByUsername(codes);
+        var usage = new java.util.HashMap<String, Long>(rows.size() * 2);
+        for (Object[] row : rows) usage.put((String) row[0], ((Number) row[1]).longValue());
+        return usage;
+    }
+
+    /** Sums the group's codes (plus the voucher's own code) from the usage map. */
+    private static long groupUsage(java.util.Set<String> group, String ownCode, java.util.Map<String, Long> usage) {
+        long used = usage.getOrDefault(ownCode, 0L);
+        if (group != null) {
+            for (String code : group) used += usage.getOrDefault(code, 0L);
+            if (group.contains(ownCode)) used -= usage.getOrDefault(ownCode, 0L);
+        }
+        return used;
     }
 
     private void holdSchoolVoucher(Voucher voucher, String reason) {
