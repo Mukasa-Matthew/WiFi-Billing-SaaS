@@ -57,6 +57,10 @@ public class Voucher {
     @Column(name = "school_category", length = 8)
     private String schoolCategory;
 
+    /** School tenants: the identity person's name, so the owner can find a connected device by name. */
+    @Column(name = "person_name", length = 200)
+    private String personName;
+
     @Column(name = "visitor_pass_id", length = 36)
     private String visitorPassId;
 

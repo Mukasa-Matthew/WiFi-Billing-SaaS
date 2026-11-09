@@ -54,7 +54,7 @@ interface ActiveSession {
   radAcctId: number; username: string; framedIpAddress: string | null; callingStationId: string | null;
   nasIpAddress: string | null; acctSessionTime: number | null; acctInputOctets?: number | null;
   acctOutputOctets?: number | null; totalOctets: number | null; category?: string | null;
-  categoryLabel?: string | null; packageName?: string | null; customerName?: string | null; rateLimit?: string | null;
+  categoryLabel?: string | null; packageName?: string | null; customerName?: string | null; personName?: string | null; rateLimit?: string | null;
 }
 interface CategoryDataItem {
   category: string; label: string; free: boolean; downBytes: number; upBytes: number; totalBytes: number; users: number;
@@ -319,7 +319,7 @@ export default function SchoolPage() {
           rows={connected}
           loading={liveSessions.loading && !liveSessions.data}
           rowKey={(s) => String(s.radAcctId || s.username)}
-          searchPlaceholder="Search voucher, category, MAC or IP…"
+          searchPlaceholder="Search name, voucher, category, MAC or IP…"
           emptyIcon={<Users />}
           emptyTitle="No devices connected right now"
           emptyDescription="Devices appear here as students, staff, visitors or customers sign in."
@@ -337,6 +337,7 @@ export default function SchoolPage() {
               render: (s) => (
                 <span className="block">
                   <span className="font-mono text-xs font-semibold text-[var(--fg)]">{s.username}</span>
+                  {s.personName && <span className="block text-xs font-medium text-[var(--fg)]">{s.personName}</span>}
                   <span className="block text-xs text-[var(--fg-muted)]">{s.packageName || "WiFi access"}</span>
                 </span>
               ),

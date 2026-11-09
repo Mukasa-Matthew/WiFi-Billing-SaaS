@@ -196,7 +196,7 @@ public class PaymentService {
                         ? router.getTenant().activePlatformFeeBps() : 0)
                 .createdAt(OffsetDateTime.now());
         if (student != null) {
-            builder.personId(student.personId()).personAccessUntil(student.accessUntil());
+            builder.personId(student.personId()).personAccessUntil(student.accessUntil()).personName(student.fullName());
         }
         if (!mock) {
             // MarzPay collection reference committed WITH the row — the provider

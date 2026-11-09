@@ -57,6 +57,7 @@ public final class AccessState {
         if (v.getCustomer() != null && v.getCustomer().getName() != null && !v.getCustomer().getName().isBlank()) {
             return v.getCustomer().getName();
         }
+        if (v.getPersonName() != null && !v.getPersonName().isBlank()) return v.getPersonName();
         return switch (category(v)) {
             case "STUDENT" -> "Paid Student";
             case "STAFF" -> "School Staff";

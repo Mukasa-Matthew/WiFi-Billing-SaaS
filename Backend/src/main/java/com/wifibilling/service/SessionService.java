@@ -107,6 +107,7 @@ public class SessionService {
                 .categoryLabel(AccessState.categoryLabel(v))
                 .packageName(v != null && v.getPackagePlan() != null ? v.getPackagePlan().getName() : null)
                 .customerName(AccessState.displayName(v))
+                .personName(v != null ? v.getPersonName() : null)
                 .rateLimit(v != null && v.getPackagePlan() != null ? v.getPackagePlan().getRateLimit() : null)
                 .build();
     }

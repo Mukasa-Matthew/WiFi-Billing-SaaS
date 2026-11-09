@@ -122,6 +122,10 @@ public class Transaction {
     @Column(name = "person_access_until")
     private java.time.LocalDate personAccessUntil;
 
+    /** The verified student's name, carried to the voucher so the owner can find their device by name. */
+    @Column(name = "person_name", length = 200)
+    private String personName;
+
     @Column(name = "created_at")
     @Builder.Default
     private OffsetDateTime createdAt = OffsetDateTime.now();
