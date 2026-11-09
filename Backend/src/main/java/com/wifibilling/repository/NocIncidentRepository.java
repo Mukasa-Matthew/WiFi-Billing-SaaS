@@ -17,4 +17,6 @@ public interface NocIncidentRepository extends JpaRepository<NocIncident, Long> 
     List<NocIncident> findTop50ByRouterIdOrderByOpenedAtDesc(Long routerId);
 
     long countByResolvedAtIsNull();
+
+    boolean existsByRouterId(Long routerId);
 }

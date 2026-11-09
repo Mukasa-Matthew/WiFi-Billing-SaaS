@@ -7,4 +7,5 @@ import java.util.List;
 public interface PortalFeedbackRepository extends JpaRepository<PortalFeedback, Long> {
     List<PortalFeedback> findAllByTenantIdOrderByCreatedAtDesc(Long tenantId);
     long countByTenantId(Long tenantId);
+    boolean existsByRouterId(Long routerId);
 }

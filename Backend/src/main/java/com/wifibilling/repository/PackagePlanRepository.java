@@ -17,4 +17,6 @@ public interface PackagePlanRepository extends JpaRepository<PackagePlan, Long> 
 
     /** Tenant-scoped lookup so one tenant can never reference another tenant's package by ID. */
     Optional<PackagePlan> findByIdAndTenantId(Long id, Long tenantId);
+
+    boolean existsByRouterId(Long routerId);
 }
