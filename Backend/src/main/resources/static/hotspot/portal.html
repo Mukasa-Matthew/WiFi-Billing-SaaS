@@ -650,6 +650,7 @@ function hidePay(){ document.getElementById('pay-modal').classList.remove('show'
 
 
 function selectFoundVoucher(code) {
+    code = realCode(code);
     if (!code) return;
     purchasedCode = code;
     document.getElementById('voucher-code-display').textContent = code;
@@ -862,6 +863,11 @@ function clearCheckout() {
    $(error) after a failed auto-login, we offer "Retry Connection" instead of
    losing the purchase. Cleared after 7 days; never triggers a new payment. */
 var PURCHASE_KEY = 'wb_purchase_' + TOKEN;
+/* A voucher code, or '' for anything that isn't one — older portal builds could turn a
+   missing code into the text "null", which then failed as a login. */
+function realCode(code) {
+    return typeof code === 'string' && code.trim() && code !== 'null' && code !== 'undefined' ? code.trim() : '';
+}
 function savePurchase(code) {
     try { localStorage.setItem(PURCHASE_KEY, JSON.stringify({ code: code, t: Date.now() })); } catch (e) {}
 }
@@ -870,7 +876,7 @@ function loadPurchase() {
         var raw = localStorage.getItem(PURCHASE_KEY);
         if (!raw) return null;
         var p = JSON.parse(raw);
-        if (p && p.code && (Date.now() - p.t) < 7 * 86400000) return p;
+        if (p && realCode(p.code) && (Date.now() - p.t) < 7 * 86400000) return p;
     } catch (e) {}
     return null;
 }
@@ -1002,6 +1008,7 @@ function finishSuccess(reference, codeFromPoll) {
 }
 
 function applySuccess(code) {
+    code = realCode(code);
     cancelPaymentPolling();
     clearCheckout();
     if (code) savePurchase(code);

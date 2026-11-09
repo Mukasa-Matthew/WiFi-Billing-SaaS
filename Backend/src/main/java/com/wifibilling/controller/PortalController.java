@@ -218,6 +218,15 @@ public class PortalController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid filename");
         }
 
+        // Every router's wb-portal-sync scheduler fetches and imports this every 30
+        // minutes. It is generated rather than a file: without it routers only ever got
+        // portal changes from a manual sync, and kept serving a stale login page.
+        if ("portal-sync.rsc".equals(filename)) {
+            return ResponseEntity.ok()
+                    .cacheControl(CacheControl.noStore())
+                    .body(com.wifibilling.service.RouterScriptGenerator.portalSyncScript(props.getPublicBaseUrl(), router.getToken()));
+        }
+
         // Retained for backward compatibility and emergency diagnostics. Current
         // portals never authorize purchases from this potentially stale snapshot.
         if ("packages.json".equals(filename)) {

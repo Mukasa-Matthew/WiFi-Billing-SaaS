@@ -98,6 +98,24 @@ class PortalControllerTest {
         assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
     }
 
+    /** Routers' 30-minute wb-portal-sync scheduler imports this; it used to 404, so routers kept stale login pages. */
+    @Test
+    void getTemplate_ServesThePortalSyncScriptRoutersPullEveryThirtyMinutes() {
+        Tenant tenantA = Tenant.builder().id(10L).build();
+        Router routerA = Router.builder().id(100L).token("tok_A1234567").tenant(tenantA).build();
+        when(routerRepository.findByToken("tok_A1234567")).thenReturn(Optional.of(routerA));
+        when(platformProperties.getPublicBaseUrl()).thenReturn("https://app.example.com");
+
+        ResponseEntity<String> response = controller.getTemplate("portal-sync.rsc", "tok_A1234567");
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        String script = response.getBody();
+        assertNotNull(script);
+        assertTrue(script.contains("https://app.example.com/api/portal/templates/login.html?token=tok_A1234567"));
+        assertTrue(script.contains("dst-path=\"flash/hotspot/login.html\""));
+        assertTrue(script.contains("/api/portal/templates/status.html?token=tok_A1234567"));
+    }
+
     @Test
     void getTemplate_SubstitutesPlaceholdersInLoginHtml() {
         Tenant tenantA = Tenant.builder().id(10L).build();
