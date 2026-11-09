@@ -8,7 +8,7 @@ import {
   Bell, Ticket, CloudArrowDown, Trash, CreditCard, ArrowSquareOut,
 } from "@/components/icons";
 import PaymentGatewaySettings from "@/components/PaymentGatewaySettings";
-import { panel } from "@/components/BillingUI";
+import { panel, message } from "@/components/BillingUI";
 import { FormSkeleton, BusyLabel, useSingleFlight } from "@/components/LoadingUI";
 
 interface TenantSettings {
@@ -89,6 +89,42 @@ function Toggle({ on, onChange, title, desc }: { on: boolean; onChange: (v: bool
       </span>
     </div>
   );
+}
+
+/** Largest side, in pixels, an uploaded image is scaled down to before upload. */
+const MAX_IMAGE_SIDE = { logo: 512, background: 1600 } as const;
+/** The server accepts up to 1,000 KB; stay well under it. */
+const TARGET_BYTES = 900_000;
+
+/**
+ * Phone photos are often several MB, more than the server accepts and far more than a
+ * captive portal should download. Scale the image down and re-encode it in the browser;
+ * logos keep their transparency. SVGs and files the browser can't decode are sent as is,
+ * and the server explains if it can't use them.
+ */
+async function shrinkImage(file: File, kind: "logo" | "background"): Promise<File> {
+  if (file.type === "image/svg+xml") return file;
+  let bitmap: ImageBitmap;
+  try { bitmap = await createImageBitmap(file); } catch { return file; }
+  const scale = Math.min(1, MAX_IMAGE_SIDE[kind] / Math.max(bitmap.width, bitmap.height));
+  if (scale === 1 && file.size <= TARGET_BYTES) { bitmap.close(); return file; }
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  canvas.getContext("2d")?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  const encode = (type: string, quality?: number) =>
+    new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type, quality));
+  let blob: Blob | null = null;
+  for (const quality of [0.85, 0.75, 0.6, 0.45]) {
+    blob = await encode("image/webp", quality);
+    // Browsers without WebP encoding return PNG: fall back to a format that keeps the image.
+    if (blob && blob.type !== "image/webp") blob = await encode(kind === "logo" ? "image/png" : "image/jpeg", quality);
+    if (blob && blob.size <= TARGET_BYTES) break;
+  }
+  if (!blob) return file;
+  const ext = blob.type === "image/webp" ? "webp" : blob.type === "image/png" ? "png" : "jpg";
+  return new File([blob], `${kind}.${ext}`, { type: blob.type });
 }
 
 function AssetBox({ title, hintText, has, uploading, onPick, onRemove, inputRef }: {
@@ -301,13 +337,13 @@ export default function TenantSettingsPage() {
     setError(null);
     try {
       const data = new FormData();
-      data.append("file", file);
+      data.append("file", await shrinkImage(file, kind));
       const r = await api.post<TenantSettings>(`/api/settings/assets/${kind}`, data,
         { headers: { "Content-Type": "multipart/form-data" } });
       setForm(r.data);
       setPreviewKey((k) => k + 1);
-    } catch {
-      setError(`Failed to upload ${kind} image`);
+    } catch (e) {
+      setError(`Couldn't upload the ${kind}: ${message(e)}`);
     } finally {
       setUploading(null);
     }
@@ -318,8 +354,8 @@ export default function TenantSettingsPage() {
       const r = await api.delete<TenantSettings>(`/api/settings/assets/${kind}`);
       setForm(r.data);
       setPreviewKey((k) => k + 1);
-    } catch {
-      setError(`Failed to remove ${kind} image`);
+    } catch (e) {
+      setError(`Couldn't remove the ${kind}: ${message(e)}`);
     }
   };
 
@@ -366,7 +402,7 @@ export default function TenantSettingsPage() {
             <h2 className="text-sm font-semibold text-[var(--fg)]">Your ISP Branding</h2>
             <p className="mb-5 mt-1 text-xs text-[var(--fg-muted)]">Configure your WiFi business branding and customer support details for {form.name}.</p>
             <div className="grid gap-5 sm:grid-cols-2">
-              <AssetBox title="Your Logo" hintText="Upload a JPG, PNG, or SVG logo. Appears on the login page."
+              <AssetBox title="Your Logo" hintText="JPG, PNG, WebP or SVG. Large images are resized automatically. Appears on the login page."
                 has={form.hasLogo} uploading={uploading === "logo"}
                 onPick={(f) => uploadAsset("logo", f)} onRemove={() => removeAsset("logo")} inputRef={logoRef} />
               <div>
@@ -473,7 +509,7 @@ export default function TenantSettingsPage() {
                 </div>
                 <div>
                   <label className={label}>Portal background</label>
-                  <AssetBox title="" hintText="Optional JPG, PNG or WebP, maximum 500 KB. Keep it light for fast portal loading."
+                  <AssetBox title="" hintText="Optional JPG, PNG or WebP photo. Large photos are resized automatically so the portal loads fast."
                     has={form.hasBackground} uploading={uploading === "background"}
                     onPick={(f) => uploadAsset("background", f)} onRemove={() => removeAsset("background")} inputRef={bgRef} />
                 </div>
