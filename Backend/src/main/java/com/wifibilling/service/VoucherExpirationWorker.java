@@ -15,7 +15,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Background worker driven by FreeRADIUS accounting data (radacct):
@@ -70,10 +69,18 @@ public class VoucherExpirationWorker {
      */
     private void stampFirstLogins() {
         List<Voucher> unusedVouchers = voucherRepository.findAllByStatus(STATUS_UNUSED);
+        if (unusedVouchers.isEmpty()) return;
+        // One query for every voucher instead of one per voucher: each
+        // round trip costs tens of ms over the Tailscale link, so the
+        // per-voucher form kept this transaction open for minutes.
+        var firstSessions = new java.util.HashMap<String, RadAcct>();
+        for (RadAcct session : radAcctRepository.findFirstSessionsByUsernameIn(
+                unusedVouchers.stream().map(Voucher::getCode).toList())) {
+            firstSessions.putIfAbsent(session.getUsername(), session);
+        }
         for (Voucher voucher : unusedVouchers) {
-            Optional<RadAcct> sessionOpt = radAcctRepository.findFirstSessionByUsername(voucher.getCode());
-            if (sessionOpt.isPresent()) {
-                RadAcct session = sessionOpt.get();
+            RadAcct session = firstSessions.get(voucher.getCode());
+            if (session != null) {
                 OffsetDateTime loginTime = session.getAcctStartTime() != null ? session.getAcctStartTime() : OffsetDateTime.now();
                 voucher.setFirstLogin(loginTime);
                 voucher.setStatus(STATUS_ACTIVE);
