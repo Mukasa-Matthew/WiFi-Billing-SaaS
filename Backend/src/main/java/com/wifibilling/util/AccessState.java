@@ -43,6 +43,7 @@ public final class AccessState {
 
     /** Human-readable label for a voucher's connection category. */
     public static String categoryLabel(Voucher v) {
+        if (v != null && "GIVEAWAY".equals(v.getSaleType())) return "Giveaway";
         return switch (category(v)) {
             case "STUDENT" -> "Paid Student";
             case "STAFF" -> "School Staff";
@@ -58,6 +59,7 @@ public final class AccessState {
             return v.getCustomer().getName();
         }
         if (v.getPersonName() != null && !v.getPersonName().isBlank()) return v.getPersonName();
+        if ("GIVEAWAY".equals(v.getSaleType())) return "Giveaway";
         return switch (category(v)) {
             case "STUDENT" -> "Paid Student";
             case "STAFF" -> "School Staff";
