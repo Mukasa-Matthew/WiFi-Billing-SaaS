@@ -55,7 +55,8 @@ public class NocService {
 
     @Transactional(readOnly = true)
     public NocDto.Overview overview() {
-        List<Router> all = routers.findAll();
+        List<Router> all = routers.findAll().stream()
+                .filter(r -> !"DELETED".equalsIgnoreCase(r.getStatus())).toList();
         long online = all.stream().filter(r -> "online".equalsIgnoreCase(r.getStatus())).count();
         long offline = all.stream().filter(r -> "offline".equalsIgnoreCase(r.getStatus())).count();
         long attention = all.stream().filter(this::needsAttention).count();
@@ -90,6 +91,7 @@ public class NocService {
     @Transactional(readOnly = true)
     public List<NocDto.TenantItem> tenantItems() {
         Map<Long, List<Router>> byTenant = routers.findAll().stream()
+                .filter(r -> !"DELETED".equalsIgnoreCase(r.getStatus()))
                 .collect(Collectors.groupingBy(r -> r.getTenant().getId()));
         return tenants.findAll().stream()
                 .filter(t -> !"ROLE_SUPERADMIN".equals(t.getRole()))
