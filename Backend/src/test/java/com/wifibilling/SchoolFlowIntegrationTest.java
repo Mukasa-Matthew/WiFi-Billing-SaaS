@@ -519,13 +519,13 @@ class SchoolFlowIntegrationTest {
                 .script("/ip/firewall/filter/add comment=\"wb-school-filter: rules from an older release\"").status("APPLIED").build());
         int before = routerTasks.findAllByRouterIdOrderByCreatedAtDesc(router.getId()).size();
         assertTrue(routerManagement.resyncChangedRules() >= 1);
-        var latest = routerTasks.findAllByRouterIdOrderByCreatedAtDesc(router.getId()).getFirst();
-        assertEquals("SYNC_SCHOOL_FILTER", latest.getAction());
-        assertEquals("PENDING", latest.getStatus());
-        assertTrue(latest.getScript().contains("/ip/firewall/filter/move [find where comment~\"^wb-school-filter\"]"));
-        assertEquals(before + 1, routerTasks.findAllByRouterIdOrderByCreatedAtDesc(router.getId()).size());
+        var queued = routerTasks.findAllByRouterIdOrderByCreatedAtDesc(router.getId());
+        var filterTask = queued.stream().filter(t -> "SYNC_SCHOOL_FILTER".equals(t.getAction())).findFirst().orElseThrow();
+        assertEquals("PENDING", filterTask.getStatus());
+        assertTrue(filterTask.getScript().contains("/ip/firewall/filter/move [find where comment~\"^wb-school-filter\"]"));
+        assertEquals(before + 2, routerTasks.findAllByRouterIdOrderByCreatedAtDesc(router.getId()).size());
         routerManagement.resyncChangedRules();
-        assertEquals(before + 1, routerTasks.findAllByRouterIdOrderByCreatedAtDesc(router.getId()).size(), "an up-to-date router gets nothing new");
+        assertEquals(before + 2, routerTasks.findAllByRouterIdOrderByCreatedAtDesc(router.getId()).size(), "an up-to-date router gets nothing new");
     }
 
     @Test
@@ -536,10 +536,12 @@ class SchoolFlowIntegrationTest {
         var shopRouter = routerRepository.findByToken(shop.routerToken()).orElseThrow();
         int shopBefore = routerTasks.findAllByRouterIdOrderByCreatedAtDesc(shopRouter.getId()).size();
         routerManagement.resyncChangedRules();
-        var latest = routerTasks.findAllByRouterIdOrderByCreatedAtDesc(schoolRouter.getId()).getFirst();
-        assertEquals("SYNC_SCHOOL_FILTER", latest.getAction(), "a school router that never had the script gets it");
-        assertTrue(latest.getScript().contains("/ip/hotspot/cookie/remove [find]"));
-        assertEquals(shopBefore, routerTasks.findAllByRouterIdOrderByCreatedAtDesc(shopRouter.getId()).size(), "ordinary routers are untouched");
+        var filterTask = routerTasks.findAllByRouterIdOrderByCreatedAtDesc(schoolRouter.getId()).stream()
+                .filter(t -> "SYNC_SCHOOL_FILTER".equals(t.getAction())).findFirst().orElseThrow();
+        assertTrue(filterTask.getScript().contains("/ip/hotspot/cookie/remove [find]"), "a school router that never had the script gets it");
+        var shopTasks = routerTasks.findAllByRouterIdOrderByCreatedAtDesc(shopRouter.getId());
+        assertEquals(shopBefore + 1, shopTasks.size(), "ordinary routers only get the script-body patch");
+        assertEquals("PATCH_SCRIPTS", shopTasks.getFirst().getAction());
     }
 
     @Autowired TransactionRepository transactions;

@@ -8,12 +8,8 @@ final class WinboxScripts {
 
     static String installer(WinboxAccess a, String agent, String base) {
         String name = "ap-winbox-agent-" + a.getRouter().getId();
-        String auth = "Authorization: Bearer " + agent;
         String state = "apWinboxRevision" + a.getRouter().getId();
-        String body = ":global " + state + "; :do { :local response [/tool/fetch url=" + q(base + "/api/router/winbox/" + a.getRouter().getId() + "/config.rsc")
-                + " http-header-field=" + q(auth) + " check-certificate=yes output=user as-value];"
-                + " :local apply [:parse ($response->\"data\")]; $apply } on-error={ :set " + state + " \"\"; " + disable(a)
-                + "; :log warning \"AirPairy WinBox agent unavailable; dedicated access disabled\" }";
+        String body = agentScriptBody(a, agent, base);
         return "/system/scheduler/remove [find name=" + q(name) + "]\n"
                 + "/system/script/remove [find name=" + q(name) + "]\n"
                 + "/system/script/add name=" + q(name) + " policy=read,write,policy,password,sensitive,test source=" + q(body) + "\n"
@@ -25,7 +21,7 @@ final class WinboxScripts {
     static String configure(WinboxAccess a, boolean enabled, String password, String hub, String base, String agent) {
         String user = q(a.getUsername());
         String tag = q("ap-winbox:" + a.getRouter().getId());
-        String auth = " http-header-field=" + q("Authorization: Bearer " + agent) + " check-certificate=yes http-method=post output=none";
+        String auth = " http-header-field=" + q("Authorization: Bearer " + agent) + " check-certificate=yes http-method=post output=none duration=15s";
         String ack = base + "/api/router/winbox/" + a.getRouter().getId() + "/ack?revision=" + a.getRevision();
         String changes = disable(a) + ";\n";
         if (enabled) {
@@ -57,6 +53,15 @@ final class WinboxScripts {
         return ":global " + state + "; :do {\n:if ($" + state + " != " + marker + ") do={\n" + changes
                 + ":set " + state + " " + marker + "\n}\n/tool/fetch url=" + q(ack + "&success=true") + auth
                 + "\n} on-error={ :set " + state + " \"\"; " + disable(a) + "; /tool/fetch url=" + q(ack + "&success=false") + auth + "; :error \"WinBox configuration failed\" }\n";
+    }
+
+    static String agentScriptBody(WinboxAccess a, String agent, String base) {
+        String auth = "Authorization: Bearer " + agent;
+        String state = "apWinboxRevision" + a.getRouter().getId();
+        return ":global " + state + "; :do { :local response [/tool/fetch url=" + q(base + "/api/router/winbox/" + a.getRouter().getId() + "/config.rsc")
+                + " http-header-field=" + q(auth) + " check-certificate=yes output=user as-value duration=15s];"
+                + " :local apply [:parse ($response->\"data\")]; $apply } on-error={ :set " + state + " \"\"; " + disable(a)
+                + "; :log warning \"AirPairy WinBox agent unavailable; dedicated access disabled\" }";
     }
 
     private static String firstRule(String path, String tag, String options) {
