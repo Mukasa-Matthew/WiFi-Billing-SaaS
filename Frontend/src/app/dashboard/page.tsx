@@ -636,7 +636,7 @@ function MoneyBreakdownCard({
               <dd className="num mt-0.5 truncate text-[13.5px] font-semibold text-[var(--fg)]">{money(gross)}</dd>
             </div>
             <div className="px-3 py-2.5 sm:px-4">
-              <dt className="text-[11px] text-[var(--fg-muted)]">Gateway &amp; platform fees</dt>
+              <dt className="text-[11px] text-[var(--fg-muted)]">Gateway fees</dt>
               <dd className="num mt-0.5 truncate text-[13.5px] font-semibold text-[var(--fg-body)]">{money(totalFees)}</dd>
             </div>
             <div className="px-3 py-2.5 sm:px-4">
