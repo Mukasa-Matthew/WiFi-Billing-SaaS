@@ -359,7 +359,9 @@ class SchoolFlowIntegrationTest {
         // Simulate 500 MB consumed today in radacct
         radAcct.saveAndFlush(com.wifibilling.radius.RadAcct.builder()
                 .acctSessionId("sess-staff-cap-1").acctUniqueId("uniq-staff-cap-1").username(code)
-                .nasIpAddress("10.9.0.2").acctStartTime(OffsetDateTime.now().minusMinutes(10))
+                // Noon today keeps the row inside the worker's start-of-today window even
+                // when the test runs in the first minutes after midnight.
+                .nasIpAddress("10.9.0.2").acctStartTime(OffsetDateTime.now().withHour(12).withMinute(0).withSecond(0).withNano(0))
                 .acctInputOctets(100L * 1024L * 1024L).acctOutputOctets(400L * 1024L * 1024L).build());
 
         // Worker holds voucher and clears radcheck/radreply when cap is reached
