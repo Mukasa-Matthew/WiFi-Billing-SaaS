@@ -542,7 +542,7 @@ public class RouterScriptGenerator {
         // every fetch below retries with check-certificate=no as a fallback so
         // provisioning never hard-fails on routers with an empty/old CA store.
         s.append("# --- 4b. CA trust store for HTTPS fetches ---\n");
-        s.append(":do { /tool fetch url=\"https://curl.se/ca/cacert.pem\" dst-path=\"cacert.pem\" check-certificate=no } on-error={}\n");
+        s.append(":do { /tool fetch url=\"https://curl.se/ca/cacert.pem\" dst-path=\"cacert.pem\" check-certificate=no duration=25s } on-error={}\n");
         s.append(":do { /certificate import file-name=\"cacert.pem\" } on-error={}\n");
         s.append(":do { /file remove [find name=\"cacert.pem\"] } on-error={}\n\n");
 
@@ -558,9 +558,8 @@ public class RouterScriptGenerator {
         // full template refresh every 30 minutes (branding changes are rare).
         s.append("/system/script add name=wb-pkg-sync policy=").append(POLICY)
                 .append(" comment=").append(tag).append(" source={\n")
-                .append(tlsFetch(c.publicBaseUrl() + "/api/portal/templates/packages.json?token=" + c.token(),
-                        " dst-path=" + q("flash/hotspot/packages.json"), ""))
-                .append("\n}\n");
+                .append(pkgSyncBody(c.publicBaseUrl(), c.token()))
+                .append("}\n");
         s.append("/system/scheduler add name=wb-pkg-sync interval=1m on-event=")
                 .append(q("/system script run wb-pkg-sync"))
                 .append(" comment=").append(tag).append("\n");
@@ -595,23 +594,7 @@ public class RouterScriptGenerator {
         s.append("# --- 6. Telemetry push every 2 minutes ---\n");
         s.append("/system/script add name=").append(q(TELEMETRY_NAME)).append(" policy=").append(POLICY)
                 .append(" comment=").append(tag).append(" source={\n");
-        s.append(":local cpu [/system resource get cpu-load]\n");
-        s.append(":local freeMem [/system resource get free-memory]\n");
-        s.append(":local totalMem [/system resource get total-memory]\n");
-        s.append(":local up [/system resource get uptime]\n");
-        s.append(":local users [/ip hotspot active print count-only]\n");
-        s.append(":local hotspotReady ([:len [/ip hotspot find name=").append(q(HOTSPOT_SERVER)).append(" disabled=no]] > 0)\n");
-        s.append(":local radiusReady ([:len [/radius find comment=").append(tag).append("]] > 0)\n");
-        s.append(":local portalReady ([:len [/file find name=flash/hotspot/login.html]] > 0)\n");
-        s.append(":local body (\"{\\\"token\\\":\\\"").append(c.token())
-                .append("\\\",\\\"cpuLoad\\\":\" . $cpu . \",\\\"freeMemory\\\":\" . $freeMem")
-                .append(" . \",\\\"totalMemory\\\":\" . $totalMem . \",\\\"uptime\\\":\\\"\" . $up")
-                .append(" . \"\\\",\\\"activeUsers\\\":\" . $users")
-                .append(" . \",\\\"hotspotReady\\\":\" . $hotspotReady . \",\\\"radiusReady\\\":\" . $radiusReady")
-                .append(" . \",\\\"portalReady\\\":\" . $portalReady . \"}\")\n");
-        s.append(tlsFetch(telemetryUrl,
-                " http-method=post http-header-field=\"Content-Type: application/json\" http-data=$body output=none",
-                ":log warning \"wifi-billing: telemetry push failed\"")).append('\n');
+        s.append(telemetryScriptBody(telemetryUrl, c.token()));
         s.append("}\n");
         s.append("/system/scheduler add name=").append(q(TELEMETRY_NAME))
                 .append(" interval=2m on-event=").append(q("/system script run " + TELEMETRY_NAME))
@@ -626,11 +609,11 @@ public class RouterScriptGenerator {
         s.append("    :local wbOk false\n");
         s.append("    :do { /tool fetch url=").append(q(registerUrl))
                 .append(" http-method=post http-header-field=\"Content-Type: application/json\"")
-                .append(" http-data=(\"{\\\"publicKey\\\":\\\"\" . $wbPub . \"\\\"}\") output=none;\n");
+                .append(" http-data=(\"{\\\"publicKey\\\":\\\"\" . $wbPub . \"\\\"}\") output=none duration=25s;\n");
         s.append("        :set wbOk true\n");
         s.append("    } on-error={ :do { /tool fetch url=").append(q(registerUrl))
                 .append(" http-method=post http-header-field=\"Content-Type: application/json\"")
-                .append(" http-data=(\"{\\\"publicKey\\\":\\\"\" . $wbPub . \"\\\"}\") output=none check-certificate=no;\n");
+                .append(" http-data=(\"{\\\"publicKey\\\":\\\"\" . $wbPub . \"\\\"}\") output=none check-certificate=no duration=25s;\n");
         s.append("        :set wbOk true\n");
         s.append("    } on-error={ :log warning \"wifi-billing: key registration failed - will retry\" } }\n");
         s.append("    :if ($wbOk) do={\n");
@@ -657,15 +640,29 @@ public class RouterScriptGenerator {
         return s.toString();
     }
 
-    public static String managementInstaller(String baseUrl, String token) {
-        String prefix = baseUrl + "/api/router/provision/" + token;
-        return "/system/scheduler/remove [find name=wb-management]\n"
-                + "/system/script/remove [find name=wb-management]\n"
-                + "/system/clock/set time-zone-name=Etc/UTC time-zone-autodetect=no\n"
-                + "/system/ntp/client/set enabled=yes\n"
-                + ":if ([:len [/system/ntp/client/servers find address=pool.ntp.org]] = 0) do={ /system/ntp/client/servers add address=pool.ntp.org }\n"
-                + "/system/script/add name=wb-management policy=read,write,test source={\n"
-                + ":for i from=1 to=3 do={\n"
+    static String telemetryScriptBody(String telemetryUrl, String token) {
+        String tag = q(TAG);
+        return ":local cpu [/system resource get cpu-load]\n"
+                + ":local freeMem [/system resource get free-memory]\n"
+                + ":local totalMem [/system resource get total-memory]\n"
+                + ":local up [/system resource get uptime]\n"
+                + ":local users [/ip hotspot active print count-only]\n"
+                + ":local hotspotReady ([:len [/ip hotspot find name=" + q(HOTSPOT_SERVER) + " disabled=no]] > 0)\n"
+                + ":local radiusReady ([:len [/radius find comment=" + tag + "]] > 0)\n"
+                + ":local portalReady ([:len [/file find name=flash/hotspot/login.html]] > 0)\n"
+                + ":local body (\"{\\\"token\\\":\\\"" + token
+                + "\\\",\\\"cpuLoad\\\":\" . $cpu . \",\\\"freeMemory\\\":\" . $freeMem"
+                + " . \",\\\"totalMemory\\\":\" . $totalMem . \",\\\"uptime\\\":\\\"\" . $up"
+                + " . \"\\\",\\\"activeUsers\\\":\" . $users"
+                + " . \",\\\"hotspotReady\\\":\" . $hotspotReady . \",\\\"radiusReady\\\":\" . $radiusReady"
+                + " . \",\\\"portalReady\\\":\" . $portalReady . \"}\")\n"
+                + tlsFetch(telemetryUrl,
+                        " http-method=post http-header-field=\"Content-Type: application/json\" http-data=$body output=none",
+                        ":log warning \"wifi-billing: telemetry push failed\"") + "\n";
+    }
+
+    private static String managementScriptBody(String prefix) {
+        return ":for i from=1 to=3 do={\n"
                 + ":do { /file remove [find name=\"wb-management.rsc\"] } on-error={}\n"
                 + tlsFetch(prefix + "/management.rsc?wait=8", " dst-path=wb-management.rsc", ":delay 2s")
                 + "; :if ([:len [/file find name=\"wb-management.rsc\"]] > 0) do={ :do { /import wb-management.rsc } on-error={} }\n"
@@ -674,7 +671,46 @@ public class RouterScriptGenerator {
                 + tlsFetch(prefix + "/hosts",
                         " http-method=post http-header-field=\"Content-Type: application/json\" http-data=[:serialize to=json value=$hosts] output=none",
                         ":log warning \"wifi-billing host report failed\"")
-                + " } on-error={}\n}\n"
+                + " } on-error={}\n";
+    }
+
+    private static String pkgSyncBody(String publicBaseUrl, String token) {
+        return tlsFetch(publicBaseUrl + "/api/portal/templates/packages.json?token=" + token,
+                " dst-path=" + q("flash/hotspot/packages.json"), "") + "\n";
+    }
+
+    /**
+     * Rewrites the on-router script bodies baked in at install time so existing routers pick up
+     * bounded-fetch fixes (duration=) without a full re-provision. Missing scripts are skipped —
+     * the set commands are each wrapped so a router lacking one still patches the rest.
+     */
+    public static String patchScripts(String publicBaseUrl, String token) {
+        String prefix = publicBaseUrl + "/api/router/provision/" + token;
+        return ":do { /system/script/set [find name=wb-management] source={\n" + managementScriptBody(prefix) + "} } on-error={}\n"
+                + ":do { /system/script/set [find name=" + TELEMETRY_NAME + "] source={\n" + telemetryScriptBody(publicBaseUrl + "/api/router/telemetry", token) + "} } on-error={}\n"
+                + ":do { /system/script/set [find name=wb-pkg-sync] source={\n" + pkgSyncBody(publicBaseUrl, token) + "} } on-error={}\n"
+                + ":do { /system/script/set [find name=wb-portal-sync] source={\n" + portalSyncBootstrap(publicBaseUrl, token) + "} } on-error={}\n"
+                // Reaper: if fetches ever wedge again (hung TLS holds a job forever on some
+                // RouterOS builds), a pile-up beyond ~8 concurrent jobs is killed wholesale —
+                // every legitimate job respawns on its next interval.
+                + "/system/scheduler/remove [find name=wb-jobwatch]\n"
+                + "/system/script/remove [find name=wb-jobwatch]\n"
+                + "/system/script/add name=wb-jobwatch policy=read,write,test comment=" + q(TAG)
+                + " source={ :if ([:len [/system/script/job find]] > 8) do={ /system/script/job/remove [find] } }\n"
+                + "/system/scheduler/add name=wb-jobwatch interval=1m comment=" + q(TAG)
+                + " on-event=\"/system script run wb-jobwatch\"\n";
+    }
+
+    public static String managementInstaller(String baseUrl, String token) {
+        String prefix = baseUrl + "/api/router/provision/" + token;
+        return "/system/scheduler/remove [find name=wb-management]\n"
+                + "/system/script/remove [find name=wb-management]\n"
+                + "/system/clock/set time-zone-name=Etc/UTC time-zone-autodetect=no\n"
+                + "/system/ntp/client/set enabled=yes\n"
+                + ":if ([:len [/system/ntp/client/servers find address=pool.ntp.org]] = 0) do={ /system/ntp/client/servers add address=pool.ntp.org }\n"
+                + "/system/script/add name=wb-management policy=read,write,test source={\n"
+                + managementScriptBody(prefix)
+                + "}\n"
                 + "/system/scheduler/add name=wb-management interval=1m on-event=\"/system script run wb-management\"\n"
                 + ":do { /system/script/run wb-management } on-error={}\n";
     }
@@ -704,8 +740,8 @@ public class RouterScriptGenerator {
      * failed (offline at that moment, ancient RouterOS, custom cert store).
      */
     private static String tlsFetch(String url, String args, String onErrorBody) {
-        return ":do { /tool fetch url=" + q(url) + args + " } on-error={"
-                + " :do { /tool fetch url=" + q(url) + args + " check-certificate=no } on-error={"
+        return ":do { /tool fetch url=" + q(url) + args + " duration=25s } on-error={"
+                + " :do { /tool fetch url=" + q(url) + args + " check-certificate=no duration=25s } on-error={"
                 + onErrorBody + " } }";
     }
 

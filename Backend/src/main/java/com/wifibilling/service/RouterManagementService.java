@@ -17,6 +17,7 @@ import static com.wifibilling.service.RouterScriptGenerator.q;
 @Service @RequiredArgsConstructor
 public class RouterManagementService {
  private final RouterRepository routers; private final IpBindingRepository bindings; private final RouterTaskRepository tasks; private final PlatformProperties props; private final RouterSetupService setupService;
+ private final WinboxAccessRepository winboxAccess; private final EncryptionService encryption;
  private boolean active(IpBinding v){return !Boolean.TRUE.equals(v.getRemoved())&&(v.getExpiresAt()==null||v.getExpiresAt().isAfter(OffsetDateTime.now()));}
  private String hash(Router r){
   String data=bindings.findAllByRouterId(r.getId()).stream().filter(this::active).sorted(Comparator.comparing(IpBinding::getId)).map(v->v.getId()+":"+v.getMac()+":"+v.getAddress()+":"+v.getExpiresAt()+":"+(v.getPackagePlan()==null?"":v.getPackagePlan().getRateLimit())).reduce("",(a,b)->a+"|"+b);
@@ -89,10 +90,10 @@ public class RouterManagementService {
     if(v.getAddress()!=null)s.append(" address=").append(q(v.getAddress()));
     s.append('\n');
    }
-   s.append("/tool/fetch url=").append(q(base(r)+"/bindings-ack?hash="+hash)).append(" http-method=post output=none\n} on-error={ :log error \"wifi-billing: binding sync failed\" }\n");
+   s.append("/tool/fetch url=").append(q(base(r)+"/bindings-ack?hash="+hash)).append(" http-method=post output=none duration=15s\n} on-error={ :log error \"wifi-billing: binding sync failed\" }\n");
   }
   tasks.findFirstByRouterIdAndStatusOrderByIdAsc(r.getId(),"PENDING").ifPresent(t->{
-   s.append(":do {\n").append("SYNC_TIME".equals(t.getAction()) ? timeScript() : t.getScript()).append("\n/tool/fetch url=").append(q(base(r)+"/tasks/"+t.getId()+"/ack?success=true")).append(" http-method=post output=none\n} on-error={ /tool/fetch url=").append(q(base(r)+"/tasks/"+t.getId()+"/ack?success=false")).append(" http-method=post output=none }\n");
+   s.append(":do {\n").append("SYNC_TIME".equals(t.getAction()) ? timeScript() : t.getScript()).append("\n/tool/fetch url=").append(q(base(r)+"/tasks/"+t.getId()+"/ack?success=true")).append(" http-method=post output=none duration=15s\n} on-error={ /tool/fetch url=").append(q(base(r)+"/tasks/"+t.getId()+"/ack?success=false")).append(" http-method=post output=none duration=15s }\n");
   });
   return s.toString();
  }
@@ -131,9 +132,10 @@ public class RouterManagementService {
   int queued=0;
   for(Router r:routers.findAll()){
    if("DELETED".equalsIgnoreCase(r.getStatus())||r.getTenant()==null) continue;
-   for(String action:List.of("SYNC_SCHOOL_FILTER","SYNC_TETHERING")){
+   for(String action:List.of("SYNC_SCHOOL_FILTER","SYNC_TETHERING","PATCH_SCRIPTS")){
     var latest=tasks.findAllByRouterIdOrderByCreatedAtDesc(r.getId()).stream().filter(t->action.equals(t.getAction())).findFirst();
-    boolean required="SYNC_SCHOOL_FILTER".equals(action)&&r.getTenant().isSchool();
+    boolean required="SYNC_SCHOOL_FILTER".equals(action)&&r.getTenant().isSchool()
+        ||"PATCH_SCRIPTS".equals(action);
     if(latest.isPresent()?!scriptFor(r,action).equals(latest.get().getScript()):required){ enqueue(r,action); queued++; }
    }
   }
@@ -150,6 +152,18 @@ public class RouterManagementService {
         + "/system/script/set [find name=wb-portal-sync] source={\n"
         + RouterScriptGenerator.portalSyncBootstrap(props.getPublicBaseUrl(), r.getToken())
         + "}\n";
+  }else if("PATCH_SCRIPTS".equals(action)){
+   StringBuilder patch=new StringBuilder(RouterScriptGenerator.patchScripts(props.getPublicBaseUrl(), r.getToken()));
+   // The WinBox agent body embeds its bearer token, so it can only be refreshed here where
+   // the ciphertext can be decrypted — routers without an agent get the wb-* updates only.
+   winboxAccess.findByRouterId(r.getId()).ifPresent(a->{
+    if(a.getAgentCiphertext()!=null&&!a.getAgentCiphertext().isBlank()){
+     patch.append(":do { /system/script/set [find name=").append(q("ap-winbox-agent-"+r.getId())).append("] source={\n")
+         .append(WinboxScripts.agentScriptBody(a,encryption.decrypt(a.getAgentCiphertext()),props.getPublicBaseUrl()))
+         .append("} } on-error={}\n");
+    }
+   });
+   script=patch.toString();
   }else if("SYNC_TIME".equals(action)){
    script=timeScript();
   }else if("SYNC_TETHERING".equals(action)){
