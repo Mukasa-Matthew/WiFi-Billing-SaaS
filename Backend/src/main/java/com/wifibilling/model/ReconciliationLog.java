@@ -16,6 +16,7 @@ public class ReconciliationLog {
     public static final String CLEAN = "CLEAN";
     public static final String DISCREPANCY = "DISCREPANCY";
     public static final String EXTERNAL_DEBIT = "EXTERNAL_DEBIT";
+    public static final String SURPLUS = "SURPLUS";
     public static final String FAILED = "FAILED";
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
