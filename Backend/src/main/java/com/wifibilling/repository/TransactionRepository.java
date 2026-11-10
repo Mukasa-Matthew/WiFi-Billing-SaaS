@@ -75,24 +75,24 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             WHERE (:status IS NULL OR t.status = :status)
               AND (:tenantId IS NULL OR t.tenant.id = :tenantId)
               AND (:q IS NULL
-                   OR (:digits IS NOT NULL AND t.phone LIKE CONCAT('%', :digits, '%'))
-                   OR LOWER(t.voucherCode) = LOWER(:q)
-                   OR LOWER(t.reference) = LOWER(:q)
-                   OR LOWER(t.externalReference) = LOWER(:q)
-                   OR LOWER(t.providerTransactionId) = LOWER(:q)
-                   OR LOWER(t.checkoutRef) = LOWER(:q))
+                   OR (:digits IS NOT NULL AND t.phone LIKE CONCAT('%', CAST(:digits AS String), '%'))
+                   OR LOWER(t.voucherCode) = LOWER(CAST(:q AS String))
+                   OR LOWER(t.reference) = LOWER(CAST(:q AS String))
+                   OR LOWER(t.externalReference) = LOWER(CAST(:q AS String))
+                   OR LOWER(t.providerTransactionId) = LOWER(CAST(:q AS String))
+                   OR LOWER(t.checkoutRef) = LOWER(CAST(:q AS String)))
             ORDER BY t.createdAt DESC""",
             countQuery = """
             SELECT count(t) FROM Transaction t
             WHERE (:status IS NULL OR t.status = :status)
               AND (:tenantId IS NULL OR t.tenant.id = :tenantId)
               AND (:q IS NULL
-                   OR (:digits IS NOT NULL AND t.phone LIKE CONCAT('%', :digits, '%'))
-                   OR LOWER(t.voucherCode) = LOWER(:q)
-                   OR LOWER(t.reference) = LOWER(:q)
-                   OR LOWER(t.externalReference) = LOWER(:q)
-                   OR LOWER(t.providerTransactionId) = LOWER(:q)
-                   OR LOWER(t.checkoutRef) = LOWER(:q))""")
+                   OR (:digits IS NOT NULL AND t.phone LIKE CONCAT('%', CAST(:digits AS String), '%'))
+                   OR LOWER(t.voucherCode) = LOWER(CAST(:q AS String))
+                   OR LOWER(t.reference) = LOWER(CAST(:q AS String))
+                   OR LOWER(t.externalReference) = LOWER(CAST(:q AS String))
+                   OR LOWER(t.providerTransactionId) = LOWER(CAST(:q AS String))
+                   OR LOWER(t.checkoutRef) = LOWER(CAST(:q AS String)))""")
     org.springframework.data.domain.Page<Transaction> searchAdmin(
             @org.springframework.data.repository.query.Param("q") String q,
             @org.springframework.data.repository.query.Param("digits") String digits,
