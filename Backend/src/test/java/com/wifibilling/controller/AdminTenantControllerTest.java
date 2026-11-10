@@ -4,6 +4,7 @@ import com.wifibilling.dto.AdminTenantDto;
 import com.wifibilling.model.Tenant;
 import com.wifibilling.model.Router;
 import com.wifibilling.repository.*;
+import com.wifibilling.security.JwtService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -68,7 +69,8 @@ class AdminTenantControllerTest {
                 subscriptionService,
                 mock(com.wifibilling.service.WinboxAccessService.class),
                 auditLogRepository,
-                gatewayConfig
+                gatewayConfig,
+                new JwtService("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", 24)
         );
     }
 

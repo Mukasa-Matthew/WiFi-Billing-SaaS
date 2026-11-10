@@ -2,7 +2,7 @@
 import { prefetchTenantEssential } from "@/lib/dashboardPrefetch";
 
 import Link from "next/link";
-import React, { Suspense, useEffect } from "react";
+import React, { Suspense, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import AppShell, { type NavItem } from "@/components/AppShell";
@@ -67,6 +67,25 @@ function TenantDashboardLayoutInner({ children }: { children: React.ReactNode })
     }
   }, [user, loading, router]);
 
+  // Superadmin impersonation: our own session is parked in wb_impersonation while
+  // a tenant-scoped token drives this dashboard. Exit restores it.
+  const [impersonatedTenant, setImpersonatedTenant] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("wb_impersonation");
+      if (raw) setImpersonatedTenant(JSON.parse(raw).tenantName || "this business");
+    } catch { /* no impersonation */ }
+  }, []);
+  const exitImpersonation = () => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("wb_impersonation") || "null");
+      if (saved?.token) localStorage.setItem("wb_token", saved.token);
+      if (saved?.user) localStorage.setItem("wb_user", saved.user);
+      localStorage.removeItem("wb_impersonation");
+    } catch { /* fall through to admin home */ }
+    window.location.href = "/admin";
+  };
+
   const ready = !loading && !!user && !user.mustChangePassword;
   const isSuperadmin = user?.role === "ROLE_SUPERADMIN";
   const offlineRouters = routers.filter((r) => { const st = routerState(r, now).state; return st === "offline" || st === "stale"; }).length;
@@ -115,8 +134,15 @@ function TenantDashboardLayoutInner({ children }: { children: React.ReactNode })
           </Link>
         </div>
       )}
+      headerActions={impersonatedTenant && (
+        <div className="flex items-center gap-2.5 rounded-full border border-amber-400/50 bg-amber-50 py-1 pl-3 pr-1.5 text-xs font-semibold text-amber-800">
+          <ShieldCheck className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          <span className="max-w-40 truncate">Viewing as {impersonatedTenant}</span>
+          <button onClick={exitImpersonation} className="rounded-full bg-amber-600 px-2.5 py-1 text-[11px] font-bold text-white transition hover:bg-amber-700">Exit</button>
+        </div>
+      )}
       user={user}
-      roleLabel={isSuperadmin ? "Superadmin" : "Business admin"}
+      roleLabel={impersonatedTenant ? "Support view" : isSuperadmin ? "Superadmin" : "Business admin"}
       settingsHref="/dashboard/settings"
       onLogout={logout}
       ready={ready}

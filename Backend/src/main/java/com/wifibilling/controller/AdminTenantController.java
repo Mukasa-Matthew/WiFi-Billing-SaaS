@@ -36,6 +36,7 @@ public class AdminTenantController {
     private final com.wifibilling.service.WinboxAccessService winboxAccess;
     private final AuditLogRepository auditLogRepository;
     private final com.wifibilling.service.GatewayConfigService gatewayConfig;
+    private final com.wifibilling.security.JwtService jwtService;
 
     @Value("${app.public-base-url:http://localhost:3000}")
     private String publicBaseUrl;
@@ -303,6 +304,39 @@ public class AdminTenantController {
     @GetMapping("/tenants/{id}/platform-fee")
     public PlatformFeeView platformFee(@PathVariable Long id) {
         return platformFeeView(findBusinessTenant(id));
+    }
+
+    /**
+     * Issues a 2h impersonation token so the superadmin can open the tenant's own
+     * dashboard and operate it directly (support, troubleshooting, acting on the
+     * client's behalf). The sensitive paths stay closed anyway: password/2FA/email
+     * changes need the tenant's password, and withdrawals need an OTP that goes to
+     * the tenant's email — not to the impersonator. Every use is audit-logged.
+     */
+    @PostMapping("/tenants/{id}/impersonate")
+    public java.util.Map<String, Object> impersonate(@PathVariable Long id,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal
+            com.wifibilling.security.TenantPrincipal principal) {
+        Tenant tenant = tenantRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tenant not found"));
+        if ("ROLE_SUPERADMIN".equals(tenant.getRole())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot impersonate the platform account");
+        }
+        String actor = principal != null ? principal.getEmail() : null;
+        String token = jwtService.generateImpersonationToken(tenant.getId(), tenant.getEmail(), tenant.getRole(), actor);
+        auditLogRepository.save(com.wifibilling.model.AuditLog.builder()
+                .tenantId(tenant.getId())
+                .actorEmail(actor)
+                .action("TENANT_IMPERSONATED")
+                .details("Superadmin opened " + tenant.getName() + "'s dashboard")
+                .build());
+        return java.util.Map.of(
+                "token", token,
+                "tenantId", tenant.getId(),
+                "name", tenant.getName() != null ? tenant.getName() : "",
+                "email", tenant.getEmail(),
+                "role", tenant.getRole(),
+                "mustChangePassword", false);
     }
 
     /**
