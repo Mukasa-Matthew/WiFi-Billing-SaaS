@@ -64,6 +64,7 @@ export {
   Plug as Plugs,
   Plus,
   Radio,
+  Receipt,
   RefreshCw as ArrowClockwise,
   RefreshCw as ArrowsClockwise,
   Router,

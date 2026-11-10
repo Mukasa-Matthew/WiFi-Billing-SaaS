@@ -68,6 +68,38 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
     /** Newest-first page of a tenant's transactions, for callers that only need the latest few. */
     List<Transaction> findByTenantIdOrderByCreatedAtDesc(Long tenantId, org.springframework.data.domain.Pageable pageable);
 
+    /** Platform-wide support lookup: "this client paid" → find it by phone
+     *  (digits substring), voucher code, our reference, or the telco/gateway ids. */
+    @org.springframework.data.jpa.repository.Query(value = """
+            SELECT t FROM Transaction t JOIN FETCH t.tenant LEFT JOIN FETCH t.router
+            WHERE (:status IS NULL OR t.status = :status)
+              AND (:tenantId IS NULL OR t.tenant.id = :tenantId)
+              AND (:q IS NULL
+                   OR (:digits IS NOT NULL AND t.phone LIKE CONCAT('%', :digits, '%'))
+                   OR LOWER(t.voucherCode) = LOWER(:q)
+                   OR LOWER(t.reference) = LOWER(:q)
+                   OR LOWER(t.externalReference) = LOWER(:q)
+                   OR LOWER(t.providerTransactionId) = LOWER(:q)
+                   OR LOWER(t.checkoutRef) = LOWER(:q))
+            ORDER BY t.createdAt DESC""",
+            countQuery = """
+            SELECT count(t) FROM Transaction t
+            WHERE (:status IS NULL OR t.status = :status)
+              AND (:tenantId IS NULL OR t.tenant.id = :tenantId)
+              AND (:q IS NULL
+                   OR (:digits IS NOT NULL AND t.phone LIKE CONCAT('%', :digits, '%'))
+                   OR LOWER(t.voucherCode) = LOWER(:q)
+                   OR LOWER(t.reference) = LOWER(:q)
+                   OR LOWER(t.externalReference) = LOWER(:q)
+                   OR LOWER(t.providerTransactionId) = LOWER(:q)
+                   OR LOWER(t.checkoutRef) = LOWER(:q))""")
+    org.springframework.data.domain.Page<Transaction> searchAdmin(
+            @org.springframework.data.repository.query.Param("q") String q,
+            @org.springframework.data.repository.query.Param("digits") String digits,
+            @org.springframework.data.repository.query.Param("status") String status,
+            @org.springframework.data.repository.query.Param("tenantId") Long tenantId,
+            org.springframework.data.domain.Pageable pageable);
+
     List<Transaction> findAllByTenantIdAndStatusOrderByCreatedAtDesc(Long tenantId, String status);
 
     Optional<Transaction> findFirstByTenantIdAndPhoneAndStatusOrderByCreatedAtDesc(
