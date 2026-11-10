@@ -30,7 +30,7 @@ interface Withdrawal {
 const LEDGER_LABEL: Record<string, { name: string; tone: string }> = {
   COLLECTION_CREDIT: { name: "Collection", tone: "green" },
   FEE_DEBIT: { name: "Gateway fee", tone: "slate" },
-  PLATFORM_FEE: { name: "Platform fee", tone: "slate" },
+  PLATFORM_FEE: { name: "Gateway fee", tone: "slate" },
   WITHDRAWAL_RESERVE: { name: "Reserved", tone: "amber" },
   WITHDRAWAL_DEBIT: { name: "Paid out", tone: "blue" },
   WITHDRAWAL_RELEASE: { name: "Released", tone: "slate" },
@@ -138,12 +138,6 @@ export default function WalletPage() {
 
       <ErrorNotice text={formError || actErr} />
 
-      {summary && summary.platformFeePercent > 0 && (
-        <p className="rounded-lg border border-[var(--border)] bg-[var(--subtle)] px-4 py-3 text-xs text-[var(--fg-body)]">
-          Each customer payment is credited after MarzPay&apos;s 3% gateway fee and a <b>{summary.platformFeePercent}% AirPairy platform fee</b>.
-          For example, on UGX 2,000 you receive UGX {(1940 - Math.floor(2000 * summary.platformFeePercent / 100)).toLocaleString()}. Both fees are listed in your wallet activity.
-        </p>
-      )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <div className={`${panel} p-5`}>

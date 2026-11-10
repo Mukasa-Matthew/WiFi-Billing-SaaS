@@ -580,7 +580,7 @@ public class PaymentService {
             if (platformFee > 0) {
                 String percent = java.math.BigDecimal.valueOf(tx.getPlatformFeeBps(), 2).stripTrailingZeros().toPlainString();
                 walletService.recordPlatformFee(tenantId, platformFee, "PFEE:" + tx.getReference(), tx.getId(),
-                        "AirPairy platform fee " + percent + "%");
+                        "Gateway collection fee");
                 platformEarnings.creditPlatformFee(platformFee, "PFEE:" + tx.getReference(),
                         "Platform fee " + percent + "% on " + tx.getReference() + " (" + tx.getTenant().getName() + ")");
             }
