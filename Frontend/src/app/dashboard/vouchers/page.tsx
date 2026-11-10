@@ -123,7 +123,7 @@ export default function VouchersPage() {
       <StatCard label="Available value" loading={loading} value={ugx(totals.value)} icon={<Money />} hintText="Face value of unsold inventory" />
     </div>
 
-    <div className="overflow-x-auto pb-1"><FilterTabs loading={loading} value={tab} onChange={(next) => { setTab(next); setSelected([]); setSelectedPackage("ALL"); }} options={tabs.map((key) => ({ key, label: key === "WALK_IN" ? "Walk-in" : humanize(key), count: data.filter((voucher) => matches(voucher, key)).length }))} /></div>
+    <div className="overflow-x-auto pb-1"><FilterTabs loading={loading} value={tab} onChange={(next) => { setTab(next); setSelected([]); setSelectedPackage("ALL"); }} options={tabs.map((key) => ({ key, label: key === "WALK_IN" ? "Walk-in" : key === "ONLINE" ? "Sold online" : humanize(key), count: data.filter((voucher) => matches(voucher, key)).length }))} /></div>
 
     {packageOptions.length > 0 && (
       <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-2">
