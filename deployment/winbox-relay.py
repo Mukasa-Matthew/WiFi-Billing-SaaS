@@ -88,9 +88,17 @@ class Relay:
         return await asyncio.to_thread(read)
 
     async def dns_matches(self, hostname):
-        records = await asyncio.get_running_loop().getaddrinfo(hostname, None, family=socket.AF_UNSPEC)
-        addresses = {r[4][0] for r in records}
-        return addresses == {self.public_ip}
+        # Retry before judging: a single transient resolver miss (or an
+        # exception) must not flap the route state or withdraw live bindings.
+        for attempt in range(3):
+            try:
+                records = await asyncio.get_running_loop().getaddrinfo(hostname, None, family=socket.AF_UNSPEC)
+            except OSError:
+                records = ()
+            if {r[4][0] for r in records} == {self.public_ip}:
+                return True
+            await asyncio.sleep(0.5)
+        return False
 
     async def probe(self, route):
         reader, writer = await asyncio.wait_for(asyncio.open_connection(route.tunnel_ip, 8291,
@@ -134,7 +142,11 @@ class Relay:
                 try:
                     await self.probe(route)
                 except (OSError, asyncio.TimeoutError):
-                    return "OFFLINE"
+                    await asyncio.sleep(0.3)
+                    try:
+                        await self.probe(route)
+                    except (OSError, asyncio.TimeoutError):
+                        return "OFFLINE"
                 try:
                     if route.port not in self.servers:
                         self.servers[route.port] = await asyncio.start_server(lambda r, w, p=route.port: self.connect(p, r, w), self.bind_ip, route.port)
