@@ -108,6 +108,14 @@ public class RouterManagementService {
   var now=OffsetDateTime.now(ZoneOffset.UTC);
   return "/system/clock/set time-zone-autodetect=no time-zone-name=Etc/UTC date="+now.toLocalDate()+" time="+now.format(DateTimeFormatter.ofPattern("HH:mm:ss"));
  }
+ /** Self-healing: telemetry reports portal files missing -> re-push them. Deduped so a
+  *  persistent failure retries at most once per 15m instead of flooding the task queue. */
+ @Transactional public boolean enqueuePortalSyncIfUnhealthy(Router r){
+  if(tasks.findFirstByRouterIdAndActionAndStatusOrderByIdAsc(r.getId(),"SYNC_PORTAL","PENDING").isPresent())return false;
+  var recent=tasks.findFirstByRouterIdAndActionOrderByCreatedAtDesc(r.getId(),"SYNC_PORTAL");
+  if(recent.isPresent()&&recent.get().getCreatedAt()!=null&&recent.get().getCreatedAt().isAfter(OffsetDateTime.now().minusMinutes(15)))return false;
+  enqueue(r,"SYNC_PORTAL");return true;
+ }
  @Transactional public RouterTask enqueue(Router r,String action){
   String script=scriptFor(r,action);
   // Idempotent: a pending task for the same action already covers this change —

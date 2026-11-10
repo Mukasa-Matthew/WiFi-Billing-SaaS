@@ -29,6 +29,12 @@ public class TelemetryService {
     private final PlatformProperties props;
     private final EmailService emailService;
     private final EmailTemplates emailTemplates;
+    private RouterManagementService routerManagementService;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setRouterManagementService(RouterManagementService routerManagementService) {
+        this.routerManagementService = routerManagementService;
+    }
     private LeaderLockService leaderLockService = new LeaderLockService();
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
@@ -76,6 +82,18 @@ public class TelemetryService {
         if (wasOffline && (STATUS_ONLINE.equals(newStatus) || STATUS_DEGRADED.equals(newStatus))) {
             router.setOfflineNotifiedAt(null);
             notifyRouterOnline(router);
+        }
+
+        // Self-heal: the router found its portal files missing — push a fresh copy
+        // without waiting for a human to notice the Degraded flag.
+        if (Boolean.FALSE.equals(req.portalReady()) && routerManagementService != null) {
+            try {
+                if (routerManagementService.enqueuePortalSyncIfUnhealthy(router)) {
+                    log.info("Auto-queued SYNC_PORTAL for router {} (portalReady=false)", router.getId());
+                }
+            } catch (Exception e) {
+                log.warn("Failed to auto-queue SYNC_PORTAL for router {}: {}", router.getId(), e.getMessage());
+            }
         }
     }
 

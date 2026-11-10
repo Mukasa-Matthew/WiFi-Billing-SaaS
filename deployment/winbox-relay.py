@@ -90,14 +90,18 @@ class Relay:
     async def dns_matches(self, hostname):
         # Retry before judging: a single transient resolver miss (or an
         # exception) must not flap the route state or withdraw live bindings.
+        last = "no result"
         for attempt in range(3):
             try:
                 records = await asyncio.get_running_loop().getaddrinfo(hostname, None, family=socket.AF_UNSPEC)
-            except OSError:
+                last = repr(sorted({r[4][0] for r in records}))
+            except OSError as e:
                 records = ()
+                last = repr(e)
             if {r[4][0] for r in records} == {self.public_ip}:
                 return True
             await asyncio.sleep(0.5)
+        print(f"winbox-relay: DNS check for {hostname} returned {last}, expected {self.public_ip}", flush=True)
         return False
 
     async def probe(self, route):
