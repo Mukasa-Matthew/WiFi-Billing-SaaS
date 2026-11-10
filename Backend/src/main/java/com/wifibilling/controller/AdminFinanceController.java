@@ -33,6 +33,7 @@ public class AdminFinanceController {
     private final MarzPayClient marzPay;
     private final TenantRepository tenantRepository;
     private final com.wifibilling.service.PlatformEarningsService platformEarnings;
+    private final PlatformLedgerEntryRepository ledgerRepo;
     private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
     @GetMapping("/overview")
@@ -179,6 +180,13 @@ public class AdminFinanceController {
         out.put("safeWithdrawable", platformEarnings.safeWithdrawable());
         out.put("safetyBuffer", platformEarnings.safetyBuffer());
         out.put("payoutsEnabled", platformEarnings.payoutsEnabled());
+        // Earnings split by source for the "your earnings" card: the 3% platform
+        // fee on customer payments vs subscription receipts (MoMo vs external).
+        Map<String, Long> byType = new java.util.HashMap<>();
+        ledgerRepo.sumByType().forEach(r -> byType.put((String) r[0], ((Number) r[1]).longValue()));
+        out.put("feeEarnings", byType.getOrDefault(PlatformLedgerEntry.EARNING_PLATFORM_FEE, 0L));
+        out.put("subscriptionEarnings", byType.getOrDefault(PlatformLedgerEntry.EARNING_MARZPAY, 0L));
+        out.put("externalSubscriptionEarnings", byType.getOrDefault(PlatformLedgerEntry.EARNING_EXTERNAL, 0L));
         return out;
     }
 
