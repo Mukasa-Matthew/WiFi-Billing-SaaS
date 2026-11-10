@@ -51,6 +51,9 @@ public class AdminTransactionsController {
         String digits = null;
         if (q != null) {
             String d = q.replaceAll("[^0-9]", "");
+            // Ugandan numbers get typed as 07xx but stored as +2567xx (or the
+            // reverse) — the last 9 digits are the significant part either way.
+            if (d.length() > 9) d = d.substring(d.length() - 9);
             if (d.length() >= 3) digits = d;
         }
         String st = (status == null || status.isBlank()) ? null : status.trim().toUpperCase();
