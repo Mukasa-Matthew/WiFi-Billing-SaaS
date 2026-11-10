@@ -1,5 +1,6 @@
 "use client";
 import React, { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/api";
 import { Badge, ErrorNotice, PageHeader, Table, buttonGhost, date, field, hint, label, message, panel } from "@/components/BillingUI";
@@ -25,7 +26,9 @@ const money = (v?: number | null) => v == null ? "—" : `UGX ${v.toLocaleString
 
 export default function AdminTransactionsPage() {
   const toast = useToast();
-  const [query, setQuery] = useState("");
+  // A support lookup started from the command center arrives as ?q=…
+  const searchParams = useSearchParams();
+  const [query, setQuery] = useState(() => searchParams.get("q") ?? "");
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(0);
   const [data, setData] = useState<TxPage | null>(null);
