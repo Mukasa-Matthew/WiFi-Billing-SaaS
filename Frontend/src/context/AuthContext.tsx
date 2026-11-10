@@ -68,6 +68,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const login = (data: UserSession) => {
     resetQueryCache();
+    localStorage.removeItem("wb_impersonation");
     localStorage.setItem("wb_token", data.token);
     localStorage.setItem("wb_user", JSON.stringify(data));
     setUser(data);
@@ -91,6 +92,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const logout = () => {
     resetQueryCache();
+    localStorage.removeItem("wb_impersonation");
     localStorage.removeItem("wb_token");
     localStorage.removeItem("wb_user");
     setUser(null);

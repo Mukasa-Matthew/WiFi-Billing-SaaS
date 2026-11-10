@@ -50,6 +50,23 @@ public class JwtService {
     }
 
     /**
+     * Issues a short-lived (2 h) impersonation token so a superadmin can operate a
+     * tenant's dashboard. Carries an "imp" claim identifying who impersonated, and
+     * deliberately no sessionId so it never appears as one of the tenant's sessions.
+     */
+    public String generateImpersonationToken(Long tenantId, String email, String role, String impersonatorEmail) {
+        Instant now = Instant.now();
+        return Jwts.builder()
+                .subject(email)
+                .claim("tenantId", tenantId)
+                .claim("role", role)
+                .claim("imp", impersonatorEmail)
+                .issuedAt(Date.from(now))
+                .expiration(Date.from(now.plus(2, ChronoUnit.HOURS)))
+                .signWith(key).compact();
+    }
+
+    /**
      * Issues a short-lived (5 min) restricted challenge token used strictly to complete 2FA.
      */
     public String generate2faChallengeToken(Long tenantId, String email) {

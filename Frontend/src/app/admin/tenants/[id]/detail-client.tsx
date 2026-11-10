@@ -91,6 +91,31 @@ function TenantDetail() {
   const sub = subs.data.find((s) => s.tenantId === tenantId);
   const wallet = wallets.data.find((w) => w.tenantId === tenantId);
 
+  // Impersonation: stash our own session, swap in a 2h tenant-scoped token, and
+  // land on their real dashboard — full support access without their password.
+  const [impersonating, setImpersonating] = useState(false);
+  const toast = useToast();
+  const impersonate = async (t: Tenant) => {
+    setImpersonating(true);
+    try {
+      const res = await api.post<{ token: string; tenantId: number; name: string; email: string; role: string }>(`/api/admin/tenants/${t.id}/impersonate`);
+      localStorage.setItem("wb_impersonation", JSON.stringify({
+        token: localStorage.getItem("wb_token"),
+        user: localStorage.getItem("wb_user"),
+        tenantName: res.data.name || t.name,
+      }));
+      localStorage.setItem("wb_token", res.data.token);
+      localStorage.setItem("wb_user", JSON.stringify({
+        token: res.data.token, tenantId: res.data.tenantId, name: res.data.name || t.name,
+        email: res.data.email, role: res.data.role, mustChangePassword: false,
+      }));
+      window.location.href = "/dashboard";
+    } catch (err) {
+      toast("error", message(err));
+      setImpersonating(false);
+    }
+  };
+
   // Live vs silent sessions and 24h auth failures, counted per router from RADIUS.
   const [radius, setRadius] = useState<{ live: number; stale: number; rejects24h: number; failed: number } | null>(null);
   const reachable = useMemo(() => routers.filter((r) => r.wgIp), [routers]);
@@ -155,6 +180,7 @@ function TenantDetail() {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            <button onClick={() => void impersonate(tenant)} disabled={impersonating} className={button}><CheckCircle className="h-4 w-4" /><span className="hidden sm:inline">{impersonating ? "Opening…" : "Open their dashboard"}</span><span className="sm:hidden">Open</span></button>
             <a href={`mailto:${tenant.email}`} className={buttonGhost}><EnvelopeSimple className="h-4 w-4" />Email</a>
             <button onClick={() => actions.resendCredentials(tenant)} className={buttonGhost}><Key className="h-4 w-4" /><span className="hidden sm:inline">Resend password</span><span className="sm:hidden">Password</span></button>
             <span className="rounded-lg border border-[var(--border-strong)]"><ActionMenu ariaLabel="More tenant actions">{actions.menuItems(tenant)}</ActionMenu></span>
