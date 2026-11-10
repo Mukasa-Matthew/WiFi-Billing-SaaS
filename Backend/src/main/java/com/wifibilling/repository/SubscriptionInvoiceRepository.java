@@ -12,4 +12,7 @@ public interface SubscriptionInvoiceRepository extends JpaRepository<Subscriptio
     List<SubscriptionInvoice> findAllByTenantIdAndStatus(Long tenantId, String status);
     List<SubscriptionInvoice> findAllByStatusAndPeriodEndLessThanEqual(String status, LocalDate date);
     long countByStatus(String status);
+
+    @org.springframework.data.jpa.repository.Query("select coalesce(sum(i.amountDue), 0) from SubscriptionInvoice i where i.status = 'UNPAID'")
+    long sumUnpaid();
 }

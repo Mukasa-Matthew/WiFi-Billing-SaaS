@@ -68,6 +68,8 @@ public class AdminSubscriptionController {
                 Map.entry("trialing", trialing),
                 Map.entry("grace", grace),
                 Map.entry("suspended", suspended),
+                Map.entry("overdue", grace + suspended),
+                Map.entry("outstanding", invoices.sumUnpaid()),
                 Map.entry("expiringSoon", expiringSoon),
                 Map.entry("monthRevenue", monthRevenue),
                 Map.entry("platformFeeMonth", platformFeeMonth),

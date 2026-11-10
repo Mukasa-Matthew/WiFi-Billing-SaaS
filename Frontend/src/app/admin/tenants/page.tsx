@@ -3,6 +3,7 @@ import { BusyLabel, useSingleFlight } from "@/components/LoadingUI";
 
 import Link from "next/link";
 import React, { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import api from "@/lib/api";
 import { Dialog } from "@/components/ui/Dialog";
 import { ActionMenu } from "@/components/ui/ActionMenu";
@@ -36,7 +37,9 @@ export default function AdminTenantsPage() {
   const actions = useTenantActions(tenants.load);
   const now = useNow();
   const [filter, setFilter] = useState<StatusFilter>("ALL");
-  const [creating, setCreating] = useState(false);
+  // "Add business" on the command center links here with ?new=1.
+  const searchParams = useSearchParams();
+  const [creating, setCreating] = useState(() => searchParams.get("new") === "1");
 
   const netBy = useMemo(() => {
     const groups = new Map<number, FleetRouter[]>();

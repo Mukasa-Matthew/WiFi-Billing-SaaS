@@ -64,6 +64,7 @@ export function prefetchSuperAdminEssential() {
   qc.prefetchQuery({ queryKey: [scope, "/api/admin/finance/overview"], queryFn: fetcher("/api/admin/finance/overview") });
   qc.prefetchQuery({ queryKey: [scope, "/api/admin/finance/platform"], queryFn: fetcher("/api/admin/finance/platform") });
   qc.prefetchQuery({ queryKey: [scope, "/api/admin/noc/routers"], queryFn: fetcher("/api/admin/noc/routers") });
+  qc.prefetchQuery({ queryKey: [scope, "/api/admin/analytics/overview?days=30"], queryFn: fetcher("/api/admin/analytics/overview?days=30") });
 }
 
 export function prefetchRouteData(href: string, role?: string, tenantId?: number) {

@@ -240,4 +240,16 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             select t from Transaction t join fetch t.tenant
              where t.platformFee > 0 and t.status = 'SUCCESSFUL' order by t.completedAt desc""")
     List<Transaction> findRecentPlatformFees(org.springframework.data.domain.Pageable page);
+
+    /** Platform-wide analytics rows since an instant: (tenantId, status, amount, platformFee, network, createdAt). */
+    @org.springframework.data.jpa.repository.Query("""
+            select t.tenant.id, t.status, t.amount, t.platformFee, t.network, t.createdAt
+              from Transaction t where t.createdAt >= :since""")
+    List<Object[]> platformAnalyticsRows(@org.springframework.data.repository.query.Param("since") OffsetDateTime since);
+
+    /** Last successful sale per tenant: (tenantId, max createdAt). */
+    @org.springframework.data.jpa.repository.Query("""
+            select t.tenant.id, max(t.createdAt) from Transaction t
+             where t.status = 'SUCCESSFUL' group by t.tenant.id""")
+    List<Object[]> lastSaleByTenant();
 }
