@@ -174,9 +174,13 @@ public class PlatformEarningsService {
             return saveLog(provider, expected, diff, ReconciliationLog.EXTERNAL_DEBIT,
                     "Provider shortfall " + (-diff));
         }
-        a.setReconcileStatus(PlatformEarningsAccount.RECON_DISCREPANCY);
-        a.setReconcileNote("Provider balance is UGX " + diff + " ABOVE expected — unrecorded credit. Classify before paying out.");
-        return saveLog(provider, expected, diff, ReconciliationLog.DISCREPANCY, "Excess " + diff);
+        // Provider holds MORE than our books — an external credit (other apps
+        // sharing this gateway, a refund, a manual top-up). Extra provider
+        // funds can't overspend tenant liabilities, so it never blocks
+        // payouts; we just log it for the audit trail.
+        a.setReconcileStatus(PlatformEarningsAccount.RECON_CLEAN);
+        a.setReconcileNote("Provider balance is UGX " + diff + " above expected — external credit, not an AirPairy liability.");
+        return saveLog(provider, expected, diff, ReconciliationLog.SURPLUS, "Excess " + diff);
     }
 
     @Scheduled(fixedDelayString = "${platform.reconcile.interval-ms:300000}") // every 5 min
