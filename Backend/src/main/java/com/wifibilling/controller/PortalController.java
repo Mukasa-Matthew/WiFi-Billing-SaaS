@@ -21,6 +21,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.OffsetDateTime;
 import java.util.HexFormat;
 import java.util.List;
 
@@ -36,6 +37,8 @@ public class PortalController {
     private final com.wifibilling.repository.PortalFeedbackRepository feedbackRepository;
     private final PlatformProperties props;
     private final com.wifibilling.service.PortalAssetService portalAssets;
+    private final com.wifibilling.repository.VoucherRepository voucherRepository;
+    private final com.wifibilling.service.PortalRateLimiter rateLimiter;
 
     private List<PortalPackageResponse> portalPackages(Router router) {
         if (!Boolean.TRUE.equals(router.getTenant().getPortalShowPackages())) return List.of();
@@ -177,6 +180,39 @@ public class PortalController {
         Router router = resolveRouter(req.token());
         String code = voucherLookup.unlock(router.getTenant().getId(), req.phone(), req.id(), req.proof());
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(java.util.Map.of("code", code));
+    }
+
+    public record ResumeRequest(String token, String mac) {}
+
+    /**
+     * Zero-touch reconnect for hotspot customers: when a device's MAC already
+     * holds a live voucher, hand the code back so the portal can sign the
+     * device in itself. This covers returning customers whose MikroTik login
+     * cookie was dropped (browser privacy, new OS, cleared data) — they must
+     * never be asked to buy again while their voucher is still running.
+     * School tenants keep their own resume flow with caps and categories.
+     */
+    @PostMapping(value = "/resume", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<java.util.Map<String, Object>> resume(@RequestBody ResumeRequest req) {
+        Router router = resolveRouter(req.token());
+        if (router.getTenant().isSchool()) {
+            return ResponseEntity.ok(java.util.Map.of());
+        }
+        String mac = req.mac() == null ? "" : req.mac().trim().toUpperCase(java.util.Locale.ROOT).replace('-', ':');
+        if (!mac.matches("([0-9A-F]{2}:){5}[0-9A-F]{2}")) {
+            return ResponseEntity.ok(java.util.Map.of());
+        }
+        rateLimiter.check("resume", mac);
+        OffsetDateTime now = OffsetDateTime.now();
+        return voucherRepository.findLiveHotspotByTenantIdAndClaimedMac(router.getTenant().getId(), mac).stream()
+                .filter(v -> (v.getExpiresAt() == null || v.getExpiresAt().isAfter(now))
+                        && (v.getHardExpiresAt() == null || v.getHardExpiresAt().isAfter(now))
+                        && !Boolean.TRUE.equals(v.getSchoolHold()))
+                .findFirst()
+                .map(v -> ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                        .body(java.util.Map.<String, Object>of("code", (Object) v.getCode())))
+                .orElseGet(() -> ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                        .body(java.util.Map.<String, Object>of()));
     }
 
     /**

@@ -35,6 +35,12 @@ public interface VoucherRepository extends JpaRepository<Voucher, Long> {
     List<Voucher> findLiveByTenantIdAndClaimedMac(@org.springframework.data.repository.query.Param("tenantId") Long tenantId,
             @org.springframework.data.repository.query.Param("mac") String mac);
 
+    /** Hotspot (non-school) vouchers claimed by a client MAC — lets a returning device auto-reconnect. */
+    @org.springframework.data.jpa.repository.Query("select v from Voucher v where v.tenant.id = :tenantId and upper(v.claimedMac) = :mac "
+            + "and v.schoolCategory is null and v.status in ('unused', 'active') order by v.createdAt desc")
+    List<Voucher> findLiveHotspotByTenantIdAndClaimedMac(@org.springframework.data.repository.query.Param("tenantId") Long tenantId,
+            @org.springframework.data.repository.query.Param("mac") String mac);
+
     List<Voucher> findAllByTenantIdAndVisitorPassIdAndStatusIn(Long tenantId, String visitorPassId, java.util.Collection<String> statuses);
 
     List<Voucher> findAllByTenantIdAndVisitorPassId(Long tenantId, String visitorPassId);
