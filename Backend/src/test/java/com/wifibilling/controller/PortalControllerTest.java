@@ -50,7 +50,8 @@ class PortalControllerTest {
     void setUp() {
         controller = new PortalController(routerRepository, packagePlanRepository,
                 new com.wifibilling.service.VoucherLookupService(transactionRepository, voucherRepository), feedbackRepository, platformProperties,
-                org.mockito.Mockito.mock(com.wifibilling.service.PortalAssetService.class));
+                org.mockito.Mockito.mock(com.wifibilling.service.PortalAssetService.class), voucherRepository,
+                org.mockito.Mockito.mock(com.wifibilling.service.PortalRateLimiter.class));
     }
 
     @Test
