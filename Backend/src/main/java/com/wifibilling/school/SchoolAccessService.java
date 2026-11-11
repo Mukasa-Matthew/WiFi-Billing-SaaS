@@ -778,5 +778,7 @@ public class SchoolAccessService {
         return RadCheck.builder().username(username).attribute(attribute).op(":=").value(value).build();
     }
 
-    private static String radiusTime(OffsetDateTime at) { return at.withOffsetSameInstant(ZoneOffset.UTC).format(RADIUS_EXPIRATION); }
+    // FreeRADIUS parses Expiration with mktime() in the RADIUS host's local
+    // timezone — emit host-local time, not UTC, or access ends early by the offset.
+    private static String radiusTime(OffsetDateTime at) { return at.toInstant().atZone(java.time.ZoneId.systemDefault()).format(RADIUS_EXPIRATION); }
 }
