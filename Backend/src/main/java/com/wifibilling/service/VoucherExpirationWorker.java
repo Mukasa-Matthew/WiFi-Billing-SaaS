@@ -148,14 +148,19 @@ public class VoucherExpirationWorker {
                         if (voucher.getHardExpiresAt().isBefore(voucher.getExpiresAt())) voucher.setExpiresAt(voucher.getHardExpiresAt());
                         radCheckRepository.deleteAllByUsernameAndAttribute(voucher.getCode(), "Expiration");
                     }
-                    String expiry = voucher.getExpiresAt().withOffsetSameInstant(java.time.ZoneOffset.UTC)
+                    // FreeRADIUS parses Expiration with mktime() in the RADIUS host's
+                    // local timezone — never emit UTC or every voucher dies early by
+                    // the UTC offset (3h on EAT). Keep this aligned with the host TZ.
+                    String expiry = voucher.getExpiresAt().toInstant()
+                            .atZone(java.time.ZoneId.systemDefault())
                             .format(java.time.format.DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm:ss",java.util.Locale.ENGLISH));
                     radCheckRepository.save(RadCheck.builder().username(voucher.getCode())
                             .attribute("Expiration").op(":=").value(expiry).build());
                 } else if (voucher.getHardExpiresAt() != null) {
                     voucher.setExpiresAt(voucher.getHardExpiresAt());
                     radCheckRepository.deleteAllByUsernameAndAttribute(voucher.getCode(), "Expiration");
-                    String expiry = voucher.getHardExpiresAt().withOffsetSameInstant(java.time.ZoneOffset.UTC)
+                    String expiry = voucher.getHardExpiresAt().toInstant()
+                            .atZone(java.time.ZoneId.systemDefault())
                             .format(java.time.format.DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm:ss",java.util.Locale.ENGLISH));
                     radCheckRepository.save(RadCheck.builder().username(voucher.getCode())
                             .attribute("Expiration").op(":=").value(expiry).build());
