@@ -220,6 +220,7 @@ jobs:
           # sudo -n -l only checks the rule; it executes nothing.
           for c in "deploy-service-control restart backend-$TARGET" "deploy-service-control restart frontend-$TARGET" \
                    "deploy-service-control stop backend-$TARGET" "deploy-service-control stop frontend-$TARGET" \
+                   "deploy-service-control restart worker" \
                    "deploy-nginx-control switch-slot $TARGET"; do
             sudo -n -l /usr/local/bin/$c >/dev/null 2>&1 || fail "no passwordless sudo rule for: $c"
           done
@@ -271,6 +272,27 @@ jobs:
           fi
           echo "Release failed before a verified cutover (active slot: ${ACTIVE_BEFORE} -> ${ACTIVE_AFTER}). Live traffic was not switched to ${COMMIT}." >&2
           exit "${RC}"
+
+      - name: Update Scheduled-Job Worker
+        timeout-minutes: 5
+        run: |
+          COMMIT="${{ steps.parse_sha.outputs.commit }}"
+          # wifi-worker runs every scheduled job (reconciliation, voucher lifecycle,
+          # school caps, telemetry) from a fixed unit path outside the blue/green
+          # slots. Copy the just-deployed jar into it and restart so scheduled
+          # logic can never drift behind the web backends — a stale worker has
+          # caused real production incidents before.
+          ssh prod 'bash -s' <<EOF_WORKER
+            set -e
+            WD=\$(systemctl show wifi-worker -p WorkingDirectory --value)
+            [ -n "\$WD" ] || { echo "wifi-worker has no WorkingDirectory"; exit 1; }
+            SRC="/var/www/wifi-billing/releases/release-${COMMIT}/Backend/target/api-0.0.1-SNAPSHOT.jar"
+            [ -f "\$SRC" ] || { echo "deployed jar not found: \$SRC"; exit 1; }
+            cp "\$SRC" "\$WD/target/api-0.0.1-SNAPSHOT.jar"
+            sudo -n /usr/local/bin/deploy-service-control restart worker
+            sleep 5
+            systemctl is-active --quiet wifi-worker && echo "wifi-worker updated to ${COMMIT} and running"
+          EOF_WORKER
 
       - name: Remove Remote Staging Directory
         if: always() && steps.release.outcome != 'skipped'
