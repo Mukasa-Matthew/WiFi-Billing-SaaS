@@ -159,7 +159,7 @@ export default function LoginPage() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder={process.env.NEXT_PUBLIC_SUPPORT_EMAIL || "name@company.com"}
-                      className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-sm text-[var(--fg)] placeholder-[var(--fg-muted)] focus:outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-600/15 transition-all"
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-sm text-[var(--fg)] placeholder-[var(--fg-muted)] focus:outline-none focus:border-blue-700 transition-all"
                     />
                   </div>
                 </div>
@@ -181,7 +181,7 @@ export default function LoginPage() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••••••"
-                      className="w-full pl-10 pr-11 py-2.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-sm text-[var(--fg)] placeholder-[var(--fg-muted)] focus:outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-600/15 transition-all"
+                      className="w-full pl-10 pr-11 py-2.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-sm text-[var(--fg)] placeholder-[var(--fg-muted)] focus:outline-none focus:border-blue-700 transition-all"
                     />
                     <button
                       type="button"
@@ -257,7 +257,7 @@ export default function LoginPage() {
                       value={totpCode}
                       onChange={(e) => setTotpCode(e.target.value.toUpperCase())}
                       placeholder={isRecoveryCode ? "XXXX-XXXX" : "123456"}
-                      className="w-full pl-10 pr-4 py-2.5 font-mono text-center tracking-widest text-base rounded-xl bg-[var(--surface)] border border-[var(--border)] text-[var(--fg)] placeholder-[var(--fg-muted)] focus:outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-600/15 transition-all"
+                      className="w-full pl-10 pr-4 py-2.5 font-mono text-center tracking-widest text-base rounded-xl bg-[var(--surface)] border border-[var(--border)] text-[var(--fg)] placeholder-[var(--fg-muted)] focus:outline-none focus:border-blue-700 transition-all"
                     />
                   </div>
                 </div>

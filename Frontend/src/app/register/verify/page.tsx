@@ -147,7 +147,7 @@ function VerifyRegistration() {
             onChange={(e) => onCodeChange(e.target.value)}
             placeholder="000000"
             aria-describedby="verify-code-hint"
-            className="w-full py-4 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-center font-mono text-3xl font-semibold tracking-[0.5em] pl-[0.5em] text-[var(--fg)] placeholder-[var(--fg-faint)] focus:outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-600/15 transition-all"
+            className="w-full py-4 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-center font-mono text-3xl font-semibold tracking-[0.5em] pl-[0.5em] text-[var(--fg)] placeholder-[var(--fg-faint)] focus:outline-none focus:border-blue-700 transition-all"
           />
           <p id="verify-code-hint" className="mt-1.5 text-center text-[11px] text-[var(--fg-muted)]">Codes expire after a few minutes.</p>
         </div>

@@ -45,7 +45,7 @@ export default function ChangePasswordPage() {
 
   if (loading || !user || !user.mustChangePassword) return null;
 
-  const input = "w-full pl-10 pr-4 py-2.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-sm text-[var(--fg)] focus:outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-600/15";
+  const input = "w-full pl-10 pr-4 py-2.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-sm text-[var(--fg)] focus:outline-none focus:border-blue-700";
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-[var(--canvas)]">
       <div className="w-full max-w-md">
