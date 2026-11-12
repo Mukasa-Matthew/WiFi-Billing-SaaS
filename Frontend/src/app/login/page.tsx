@@ -314,12 +314,12 @@ export default function LoginPage() {
           href="https://thewtontechnologies.netlify.app/"
           target="_blank"
           rel="noopener"
-          className="flex items-center justify-center gap-1.5 text-[11px] text-[var(--fg-faint)] mt-3 hover:text-[var(--fg-muted)] transition-colors"
+          className="flex items-center justify-center gap-2 text-sm text-[var(--fg-muted)] mt-4 hover:text-[var(--fg-body)] transition-colors"
         >
           <span>AirPairy is a product by</span>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logos/thewton-mark-buff.svg" alt="" className="h-3.5 w-auto" />
-          <span className="font-semibold text-[var(--fg-muted)]">Thewton</span>
+          <img src="/logos/thewton-mark-buff.svg" alt="" className="h-6 w-auto" />
+          <span className="font-semibold text-[var(--fg)]">Thewton</span>
         </a>
       </div>
     </div>
