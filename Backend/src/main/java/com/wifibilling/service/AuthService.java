@@ -35,6 +35,7 @@ public class AuthService {
     private final OtpService otpService;
     private final TotpService totpService;
     private final EncryptionService encryptionService;
+    private final SubscriptionService subscriptionService;
 
     @Transactional
     public AuthResponse login(AuthRequest req, HttpServletRequest servletRequest) {
@@ -44,6 +45,11 @@ public class AuthService {
 
         if ("DISABLED".equalsIgnoreCase(tenant.getStatus()) || "SUSPENDED".equalsIgnoreCase(tenant.getStatus())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Account is " + tenant.getStatus().toLowerCase() + ". Please contact administrator.");
+        }
+
+        if (Boolean.FALSE.equals(tenant.getEmailVerified())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Please verify your email first. Check your inbox for the code we sent to " + email + ".");
         }
 
         if (!passwordEncoder.matches(req.password(), tenant.getPasswordHash())) {
@@ -144,6 +150,82 @@ public class AuthService {
         String token = jwtService.generateToken(tenant.getId(), tenant.getEmail(), tenant.getRole(), sessionId);
         return new AuthResponse(token, tenant.getId(), tenant.getName(), tenant.getEmail(), tenant.getRole(),
                 Boolean.TRUE.equals(tenant.getMustChangePassword()));
+    }
+
+    /**
+     * Self-service signup for hotspot owners. Creates the tenant unverified and
+     * sends a 6-digit code; logging in is blocked until verifyRegistration passes.
+     * Re-registering over an unverified account just updates the details and sends
+     * a fresh code — the owner still cannot get in without the inbox.
+     */
+    @Transactional
+    public void register(String name, String email, String phone, String password) {
+        String normalized = email == null ? "" : email.trim().toLowerCase();
+        if (name == null || name.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Business name is required");
+        }
+        if (phone == null || phone.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Phone number is required");
+        }
+        if (password == null || password.length() < 8) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password must be at least 8 characters");
+        }
+
+        var existing = tenantRepository.findByEmailIgnoreCase(normalized);
+        Tenant tenant;
+        if (existing.isPresent()) {
+            tenant = existing.get();
+            if (!Boolean.FALSE.equals(tenant.getEmailVerified())) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "An account with this email already exists. Sign in instead.");
+            }
+            tenant.setName(name.trim());
+            tenant.setPhone(phone.trim());
+            tenant.setPasswordHash(passwordEncoder.encode(password));
+        } else {
+            tenant = Tenant.builder()
+                    .name(name.trim())
+                    .email(normalized)
+                    .phone(phone.trim())
+                    .passwordHash(passwordEncoder.encode(password))
+                    .role("ROLE_ADMIN")
+                    .status("ACTIVE")
+                    .emailVerified(false)
+                    .build();
+            tenant = tenantRepository.save(tenant);
+            if (subscriptionService != null) {
+                subscriptionService.grantTrialIfEligible(tenant);
+            }
+        }
+        tenantRepository.save(tenant);
+        otpService.issue(normalized, com.wifibilling.model.EmailOtp.PURPOSE_REGISTRATION,
+                tenant.getId(), tenant.getName(), "Verify your new AirPairy account");
+    }
+
+    /**
+     * Completes self-registration: consumes the email OTP and signs the owner
+     * straight in, so the response is the same shape as a normal login.
+     */
+    @Transactional
+    public AuthResponse verifyRegistration(String email, String code, HttpServletRequest servletRequest) {
+        String normalized = email == null ? "" : email.trim().toLowerCase();
+        Tenant tenant = tenantRepository.findByEmailIgnoreCase(normalized)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid or expired code"));
+        otpService.verify(normalized, com.wifibilling.model.EmailOtp.PURPOSE_REGISTRATION, code);
+        tenant.setEmailVerified(true);
+        tenantRepository.save(tenant);
+        return createAuthenticatedSession(tenant, servletRequest);
+    }
+
+    /** Resends the registration code. No-op for unknown or verified emails. */
+    @Transactional
+    public void resendRegistrationCode(String email) {
+        String normalized = email == null ? "" : email.trim().toLowerCase();
+        tenantRepository.findByEmailIgnoreCase(normalized)
+                .filter(t -> Boolean.FALSE.equals(t.getEmailVerified()))
+                .ifPresent(t -> otpService.issue(normalized,
+                        com.wifibilling.model.EmailOtp.PURPOSE_REGISTRATION,
+                        t.getId(), t.getName(), "Verify your new AirPairy account"));
     }
 
     /**

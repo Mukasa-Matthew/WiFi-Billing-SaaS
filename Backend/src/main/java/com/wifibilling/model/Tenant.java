@@ -42,6 +42,13 @@ public class Tenant {
     @Builder.Default
     private String status = "ACTIVE"; // ACTIVE, SUSPENDED, DISABLED
 
+    /**
+     * FALSE = self-registered account still waiting on the email OTP and not
+     * allowed to log in. NULL = pre-feature rows, treated as verified.
+     */
+    @Column(name = "email_verified")
+    private Boolean emailVerified;
+
     // ---- Two-Factor Authentication (TOTP) ----
     @Column(name = "totp_enabled")
     @Builder.Default

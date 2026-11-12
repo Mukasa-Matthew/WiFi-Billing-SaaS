@@ -9,6 +9,7 @@ import { notify, useToast } from "@/components/ui/Toast";
 import { useBusyAction } from "@/components/LoadingUI";
 import { ActionMenu, ActionMenuItem } from "@/components/ui/ActionMenu";
 import { useResource, Table, Badge, Notice, FilterTabs, button, date, message, panel } from "@/components/BillingUI";
+import { FirstRouterCard } from "@/components/router/FirstRouterCard";
 import { Eye, ArrowClockwise, FileArrowDown, Clock, Terminal, Trash, Activity } from "@/components/icons";
 
 interface RouterRec { id: number; name: string; wgIp: string; registered: boolean; cpuLoad: number; memoryUsage: number; status: string; lastSeen: string | null; uptime: string | null; hotspotReady: boolean | null; radiusReady: boolean | null; portalReady: boolean | null }
@@ -111,6 +112,7 @@ export default function Page() {
         <Link href="/dashboard/routers/new" className={button}>Add a router</Link>
       </div>
       <Notice text={error || note} />
+      {!loading && !error && data.length === 0 ? <FirstRouterCard /> : <>
       <FilterTabs loading={loading} options={tabs} value={tab} onChange={setTab} />
       <Table
         loading={loading}
@@ -145,6 +147,7 @@ export default function Page() {
           },
         ]}
       />
+      </>}
       {selected && (
         <section className={`${panel} space-y-5 p-5`}>
           <div className="flex justify-between">

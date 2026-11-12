@@ -6,12 +6,12 @@ import { mutateCache } from "@/lib/cacheInvalidation";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/lib/api";
+import { SetupTroubleshooting } from "@/components/router/SetupTroubleshooting";
 import {
   ArrowLeft,
   Check,
   CheckCircle,
   CaretRight,
-  WarningCircle,
   Copy,
   CircleNotch,
   CellTower as RouterIcon,
@@ -264,10 +264,6 @@ export default function AddRouterPage() {
                     <button onClick={() => router && void issueSetupCode(router.id)} className="font-medium text-[var(--accent-text)] hover:underline">Generate a new command</button>
                   </div>
                 )}
-                <div className="flex gap-3 border-t border-[var(--border)] bg-[var(--surface)] px-5 py-4 text-xs text-[var(--fg-muted)]">
-                  <WarningCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                  <p>If the router reports <strong className="text-[var(--fg-body)]">device mode not allowed</strong>, run <code className="text-blue-600">/system/device-mode/update mode=advanced</code>, power-cycle the router, and retry the command.</p>
-                </div>
               </div>
 
               <div className={`rounded-xl border p-5 ${connected ? "border-emerald-500/30 bg-emerald-500/10" : "border-[var(--border)] bg-[var(--subtle)]"}`}>
@@ -288,6 +284,10 @@ export default function AddRouterPage() {
                   </div>
                 </div>
               </div>
+
+              {!connected && (
+                <SetupTroubleshooting wanInterface={router.wanInterface} onNewCommand={() => void issueSetupCode(router.id)} />
+              )}
 
               <div className="flex justify-between border-t border-[var(--border)] pt-5">
                 <button onClick={() => setStep(1)} disabled={connected} className="rounded-lg border border-[var(--border-strong)] px-4 py-2 text-sm text-[var(--fg-body)] hover:bg-[var(--fill)] disabled:opacity-40">Back</button>

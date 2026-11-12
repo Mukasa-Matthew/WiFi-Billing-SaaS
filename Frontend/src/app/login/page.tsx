@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
 import { Lock, EnvelopeSimple, Radio, WarningCircle, ArrowRight, Eye, EyeSlash, ShieldCheck, Key } from "@/components/icons";
@@ -12,6 +13,19 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  // Set when the account exists but its email was never confirmed.
+  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("reason") !== "idle") return;
+    const id = window.setTimeout(
+      () => setNotice("You were signed out after 30 minutes of inactivity. Please sign in again."),
+      0
+    );
+    window.history.replaceState({}, "", "/login");
+    return () => window.clearTimeout(id);
+  }, []);
 
   // Two-Factor Challenge State
   const [requires2fa, setRequires2fa] = useState(false);
@@ -22,6 +36,7 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setUnverifiedEmail(null);
     setLoading(true);
 
     try {
@@ -44,6 +59,9 @@ export default function LoginPage() {
         const axErr = err as { response?: { status?: number; data?: { message?: string } } };
         if (axErr.response?.status === 401) {
           setError("Invalid email address or password.");
+        } else if (axErr.response?.status === 403 && /verify your email/i.test(axErr.response.data?.message || "")) {
+          setError("Please confirm your email before signing in. Check your inbox for the 6-digit code we sent.");
+          setUnverifiedEmail(email.trim());
         } else if (axErr.response?.status === 403) {
           setError("Your account is suspended or disabled. Please contact Superadmin.");
         } else {
@@ -83,18 +101,18 @@ export default function LoginPage() {
   return (
     <div className="relative min-h-screen flex items-center justify-center p-4 bg-[var(--canvas)] overflow-hidden">
       <div className="relative w-full max-w-md">
-        {/* Header branding */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[#122B49] mb-4">
+        {/* Header branding — links back to the public site */}
+        <a href="https://airpairy.com" className="block text-center mb-8 group">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[#122B49] mb-4 transition-transform group-hover:scale-105">
             <Radio className="w-7 h-7 text-white" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-[var(--fg)]">
+          <h1 className="text-2xl font-bold tracking-tight text-[var(--fg)] group-hover:text-[var(--accent-text)] transition-colors">
             AirPairy
           </h1>
           <p className="text-sm text-[var(--fg-muted)] mt-1">
             Connecting WiFi. Simplifying Business.
           </p>
-        </div>
+        </a>
 
         {/* Card */}
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-8 shadow-sm">
@@ -104,10 +122,27 @@ export default function LoginPage() {
                 <h2 className="text-lg font-semibold text-[var(--fg)]">Account Sign In</h2>
               </div>
 
+              {notice && (
+                <div className="mb-6 p-3.5 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-3 text-amber-700 text-sm">
+                  <WarningCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                  <span>{notice}</span>
+                </div>
+              )}
+
               {error && (
                 <div className="mb-6 p-3.5 rounded-xl bg-red-50 border border-red-200 flex items-start gap-3 text-red-600 text-sm">
                   <WarningCircle className="w-5 h-5 shrink-0 mt-0.5" />
-                  <span>{error}</span>
+                  <span>
+                    {error}
+                    {unverifiedEmail && (
+                      <>
+                        {" "}
+                        <Link href={`/register/verify?email=${encodeURIComponent(unverifiedEmail)}`} className="font-semibold underline">
+                          Enter verification code
+                        </Link>
+                      </>
+                    )}
+                  </span>
                 </div>
               )}
 
@@ -177,6 +212,13 @@ export default function LoginPage() {
                   )}
                 </button>
               </form>
+
+              <p className="mt-6 text-center text-xs text-[var(--fg-muted)]">
+                New to AirPairy?{" "}
+                <Link href="/register" className="font-semibold text-[var(--accent-text)] hover:underline">
+                  Create an account
+                </Link>
+              </p>
             </>
           ) : (
             <>
@@ -268,9 +310,17 @@ export default function LoginPage() {
             </>
           )}
         </div>
-        <p className="text-center text-[11px] text-[var(--fg-faint)] mt-3">
-          AirPairy is a product by Thewton.
-        </p>
+        <a
+          href="https://thewtontechnologies.netlify.app/"
+          target="_blank"
+          rel="noopener"
+          className="flex items-center justify-center gap-1.5 text-[11px] text-[var(--fg-faint)] mt-3 hover:text-[var(--fg-muted)] transition-colors"
+        >
+          <span>AirPairy is a product by</span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logos/thewton-mark-buff.svg" alt="" className="h-3.5 w-auto" />
+          <span className="font-semibold text-[var(--fg-muted)]">Thewton</span>
+        </a>
       </div>
     </div>
   );

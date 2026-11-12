@@ -37,8 +37,40 @@ public class AuthController {
         return authService.verifyTwoFactorLogin(req, servletRequest);
     }
 
+    public record RegisterRequest(
+            @jakarta.validation.constraints.NotBlank String name,
+            @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Email String email,
+            @jakarta.validation.constraints.NotBlank String phone,
+            @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(min = 8) String password) {}
+    public record RegisterVerifyRequest(
+            @jakarta.validation.constraints.NotBlank String email,
+            @jakarta.validation.constraints.NotBlank String code) {}
+    public record RegisterResendRequest(@jakarta.validation.constraints.NotBlank String email) {}
     public record ForgotRequest(String email) {}
     public record ResetRequest(String email, String code, String newPassword) {}
+
+    /**
+     * Self-service signup for hotspot owners. Creates an unverified account and
+     * emails a 6-digit code — the owner cannot sign in until it is verified.
+     */
+    @PostMapping("/register")
+    public Map<String, String> register(@Valid @RequestBody RegisterRequest req) {
+        authService.register(req.name(), req.email(), req.phone(), req.password());
+        return Map.of("message", "We sent a 6-digit verification code to " + req.email().trim() + ".");
+    }
+
+    /** Verifies the registration OTP; returns a normal login response. */
+    @PostMapping("/register/verify")
+    public AuthResponse verifyRegistration(@Valid @RequestBody RegisterVerifyRequest req, HttpServletRequest servletRequest) {
+        return authService.verifyRegistration(req.email(), req.code(), servletRequest);
+    }
+
+    /** Always returns OK — never reveals whether the email is registered. */
+    @PostMapping("/register/resend")
+    public Map<String, String> resendRegistration(@Valid @RequestBody RegisterResendRequest req) {
+        authService.resendRegistrationCode(req.email());
+        return Map.of("message", "If that email has an unverified account, a new code is on its way.");
+    }
     public record ChangePasswordRequest(String currentPassword, String newPassword) {}
 
     /** Always returns OK — never reveals whether the email is registered. */

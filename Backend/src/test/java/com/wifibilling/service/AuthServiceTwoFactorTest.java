@@ -42,6 +42,8 @@ class AuthServiceTwoFactorTest {
     private TotpService totpService;
     @Mock
     private EncryptionService encryptionService;
+    @Mock
+    private SubscriptionService subscriptionService;
 
     private AuthService authService;
 
@@ -55,7 +57,8 @@ class AuthServiceTwoFactorTest {
                 jwtService,
                 otpService,
                 totpService,
-                encryptionService
+                encryptionService,
+                subscriptionService
         );
     }
 

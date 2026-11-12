@@ -97,6 +97,7 @@ public class AdminTenantController {
                 .mustChangePassword(true)
                 .role("ROLE_ADMIN")
                 .status("ACTIVE")
+                .emailVerified(true)
                 .build();
 
         tenant = tenantRepository.save(tenant);

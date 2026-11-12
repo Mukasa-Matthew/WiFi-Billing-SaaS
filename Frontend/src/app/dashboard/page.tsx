@@ -12,6 +12,7 @@ import {
 } from "@/components/BillingUI";
 import { BarChart, DonutChart, Meter, MiniBars, StatusBar } from "@/components/charts";
 import { routerState, servicesState } from "@/lib/routerState";
+import { FirstRouterCard } from "@/components/router/FirstRouterCard";
 
 interface SeriesPoint { date: string; label: string; revenue?: number; transactions?: number; users?: number; registrations?: number }
 interface WeeklySale { date: string; day: string; revenue: number; transactions: number }
@@ -269,13 +270,7 @@ export default function TenantDashboardOverview() {
         <Card title="Router health" description="Latest report from each location" action={fleet.length > 0 && <CardLink href="/dashboard/routers">Routers</CardLink>} bodyClassName="flex flex-col">
           {routers.error && !fleet.length ? <p className="px-5 py-12 text-center text-sm text-[var(--fg-muted)]">Router status unavailable.</p>
             : routers.loading && !fleet.length ? <ListSkeleton rows={2} />
-            : fleet.length === 0 ? (
-              <div className="flex flex-col items-center gap-3 px-5 py-10 text-center">
-                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--fill)] text-[var(--fg-faint)]"><CellTower className="h-5 w-5" /></span>
-                <p className="text-sm text-[var(--fg-muted)]">Link a MikroTik router to start selling WiFi.</p>
-                <Link href="/dashboard/routers/new" className={button}><Plus className="h-4 w-4" />Add router</Link>
-              </div>
-            ) : (
+            : fleet.length === 0 ? <FirstRouterCard compact /> : (
               <ul className="divide-y divide-[var(--border-soft)]">
                 {fleet.map((r) => {
                   const current = r.st.state === "online" || r.st.state === "degraded";
