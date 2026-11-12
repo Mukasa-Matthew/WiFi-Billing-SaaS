@@ -26,6 +26,7 @@ interface WithdrawalRow {
 
 interface PlatformView {
   settledEarnings: number; externalEarnings: number; reservedEarnings: number;
+  feeEarnings: number; subscriptionEarnings: number; externalSubscriptionEarnings: number;
   totalEarned: number; totalFees: number; totalWithdrawn: number;
   providerBalance: number; lastSyncedAt: string;
   reconcileStatus: string; reconcileNote: string; balanceStale: boolean;
@@ -213,12 +214,15 @@ export default function AdminFinancePage() {
           <div className="grid gap-4 lg:grid-cols-3">
             <div className={panel}>
               <div className="border-b border-[var(--border-soft)] px-5 py-4">
-                <h2 className="text-sm font-bold text-[var(--fg)]">Platform earnings</h2>
-                <p className="mt-0.5 text-xs text-[var(--fg-muted)]">SaaS subscription revenue — owned by the platform.</p>
+                <h2 className="text-sm font-bold text-[var(--fg)]">Your earnings</h2>
+                <p className="mt-0.5 text-xs text-[var(--fg-muted)]">What AirPairy has earned — the platform's cut of every sale plus client subscriptions.</p>
               </div>
               <dl className="space-y-2.5 px-5 py-4 text-sm">
-                <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Settled earnings (provider-backed)</dt><dd className="font-bold">{money(plat.settledEarnings)}</dd></div>
-                <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">External earnings (cash/bank)</dt><dd className="font-semibold">{money(plat.externalEarnings)}</dd></div>
+                <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">From customer payments (3%)</dt><dd className="font-semibold">{money(plat.feeEarnings)}</dd></div>
+                <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">From subscriptions (mobile money)</dt><dd className="font-semibold">{money(plat.subscriptionEarnings)}</dd></div>
+                <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">From subscriptions (external)</dt><dd>{money(plat.externalSubscriptionEarnings)}</dd></div>
+                <div className="flex justify-between border-t border-[var(--border-soft)] pt-2.5"><dt className="text-[var(--fg-muted)]">Available to withdraw</dt><dd className="font-bold text-emerald-700">{money(plat.settledEarnings)}</dd></div>
+                <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">External (cash/bank, not in wallet)</dt><dd>{money(plat.externalEarnings)}</dd></div>
                 <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Reserved (in-flight payouts)</dt><dd>{money(plat.reservedEarnings)}</dd></div>
                 <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Total earned</dt><dd>{money(plat.totalEarned)}</dd></div>
                 <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Provider fees</dt><dd>{money(plat.totalFees)}</dd></div>
