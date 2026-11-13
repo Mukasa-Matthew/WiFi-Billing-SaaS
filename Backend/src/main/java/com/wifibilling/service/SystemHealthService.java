@@ -29,7 +29,6 @@ public class SystemHealthService {
 
     private final JdbcTemplate jdbc;
     private final PlatformProperties props;
-    private final VoucherExpirationWorker voucherWorker;
 
     public Report probe() {
         var components = new ArrayList<ComponentHealth>();
@@ -84,12 +83,21 @@ public class SystemHealthService {
     }
 
     private ComponentHealth voucherWorker() {
-        Instant last = voucherWorker.getLastHeartbeat();
-        if (last == null) return new ComponentHealth("worker", "DOWN", "worker has not run yet");
-        long age = Instant.now().getEpochSecond() - last.getEpochSecond();
-        return age < 120
-                ? new ComponentHealth("worker", "UP", "last ran " + age + "s ago")
-                : new ComponentHealth("worker", "DOWN", "last ran " + age + "s ago — expected every ~30s");
+        // The lifecycle pass runs in the dedicated wifi-worker process (scheduling is off on the API slots),
+        // so freshness comes from the shared lease row it updates every cycle, not from anything in-process.
+        try {
+            java.sql.Timestamp last = jdbc.query("SELECT last_cycle_start FROM app_job_leases WHERE job_name = 'VOUCHER_EXPIRATION'",
+                    (rs, i) -> rs.getTimestamp(1)).stream().findFirst().orElse(null);
+            if (last == null) return new ComponentHealth("worker", "DOWN", "no lease row — worker has never run");
+            long age = Instant.now().getEpochSecond() - last.toInstant().getEpochSecond();
+            String service = exec("systemctl", "is-active", "wifi-worker");
+            if (age < 120) {
+                return new ComponentHealth("worker", "UP", "service " + service + " · last cycle " + age + "s ago");
+            }
+            return new ComponentHealth("worker", "DOWN", "service " + service + " · last cycle " + age + "s ago — expected every ~30s");
+        } catch (Exception e) {
+            return new ComponentHealth("worker", "UNKNOWN", "lease check failed: " + e.getMessage());
+        }
     }
 
     private String execSudo(String binary, String... args) {

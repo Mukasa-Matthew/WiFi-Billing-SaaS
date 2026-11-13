@@ -41,10 +41,6 @@ public class VoucherExpirationWorker {
     private LeaderLockService leaderLockService = new LeaderLockService();
     private ReportingClock clock;
 
-    /** Last time the lifecycle pass ran — read by the admin health probe. */
-    private volatile java.time.Instant lastHeartbeat;
-    public java.time.Instant getLastHeartbeat() { return lastHeartbeat; }
-
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     public void setLeaderLockService(LeaderLockService leaderLockService) {
         this.leaderLockService = leaderLockService;
@@ -58,7 +54,6 @@ public class VoucherExpirationWorker {
     @Scheduled(fixedDelayString = "PT30S", initialDelayString = "PT10S")
     @Transactional
     public void processVoucherLifecycle() {
-        lastHeartbeat = java.time.Instant.now();
         if (!leaderLockService.executeIfLeader(LeaderLockService.JOB_VOUCHER_EXPIRATION, 120, 15, this::doProcessVoucherLifecycle)) return;
     }
 
