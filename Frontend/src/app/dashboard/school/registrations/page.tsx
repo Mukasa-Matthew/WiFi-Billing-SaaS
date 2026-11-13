@@ -2,10 +2,10 @@
 
 import React, { useState } from "react";
 import api from "@/lib/api";
-import { CheckCircle, Copy, XCircle } from "@/components/icons";
+import { CheckCircle, Copy, NotePencil, XCircle } from "@/components/icons";
 import {
   Card, ErrorNotice, PageContainer, PageHeader, Segmented, Table,
-  buttonGhost, message, relativeTime, useApi, useNow,
+  button, buttonGhost, field, label, message, relativeTime, useApi, useNow,
 } from "@/components/BillingUI";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -37,7 +37,39 @@ export default function SchoolRegistrationsPage() {
   const registrations = useApi<Page<Registration>>(`/api/school/registrations?status=${status}&page=${page}`);
   const [busy, setBusy] = useState<string | null>(null);
   const [unsent, setUnsent] = useState<{ id: string; name: string; identifier: string; pin: string }[]>([]);
+  const [editing, setEditing] = useState<Registration | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editCourseEnds, setEditCourseEnds] = useState("");
+  const [editBusy, setEditBusy] = useState(false);
   const now = useNow();
+
+  const startEdit = (reg: Registration) => {
+    setEditing(reg);
+    setEditName(reg.fullName);
+    setEditCourseEnds(reg.courseEnds || "");
+  };
+  const saveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editing) return;
+    const changes: { fullName?: string; accessUntil?: string } = {};
+    if (editName.trim() && editName.trim() !== editing.fullName) changes.fullName = editName.trim();
+    if (editCourseEnds && editCourseEnds !== editing.courseEnds) {
+      const [y, m] = editCourseEnds.split("-").map(Number);
+      changes.accessUntil = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10); // last day of that month
+    }
+    if (!changes.fullName && !changes.accessUntil) { setEditing(null); return; }
+    setEditBusy(true);
+    try {
+      await api.patch(`/api/school/registrations/${editing.id}`, changes);
+      toast("success", "Registration updated.");
+      setEditing(null);
+      registrations.load();
+    } catch (err) {
+      toast("error", message(err));
+    } finally {
+      setEditBusy(false);
+    }
+  };
 
   const decide = async (reg: Registration, approve: boolean) => {
     setBusy(reg.id);
@@ -114,6 +146,27 @@ export default function SchoolRegistrationsPage() {
         }
         bodyClassName=""
       >
+        {editing && (
+          <form onSubmit={saveEdit} className="space-y-3 border-b border-[var(--border-soft)] px-5 py-4">
+            <p className="text-xs font-medium text-[var(--fg-muted)]">
+              Correcting <span className="text-[var(--fg)]">{editing.fullName}</span> · {editing.registrationNumber}
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className={label}>Full name</label>
+                <input className={field} value={editName} onChange={(e) => setEditName(e.target.value)} required maxLength={200} />
+              </div>
+              <div>
+                <label className={label}>Course ends</label>
+                <input className={field} type="month" value={editCourseEnds} onChange={(e) => setEditCourseEnds(e.target.value)} required />
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button type="submit" disabled={editBusy} className={button}>{editBusy ? "Saving…" : "Save correction"}</button>
+              <button type="button" className={buttonGhost} onClick={() => setEditing(null)}>Cancel</button>
+            </div>
+          </form>
+        )}
         <Table
           rows={data?.content ?? []}
           loading={registrations.loading && !data}
@@ -149,6 +202,10 @@ export default function SchoolRegistrationsPage() {
               label: "",
               render: (r: Registration) => (
                 <div className="flex items-center justify-end gap-2">
+                  <button type="button" disabled={busy === r.id} onClick={() => startEdit(r)} className={buttonGhost}>
+                    <NotePencil className="h-4 w-4" />
+                    Edit
+                  </button>
                   <button type="button" disabled={busy === r.id} onClick={() => decide(r, true)} className={buttonGhost}>
                     <CheckCircle className="h-4 w-4" />
                     Approve
