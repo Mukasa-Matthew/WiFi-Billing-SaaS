@@ -28,6 +28,7 @@ import {
   FileText,
   Activity,
   GraduationCap,
+  Tray,
 } from "@/components/icons";
 
 interface SidebarStats {
@@ -104,7 +105,10 @@ function TenantDashboardLayoutInner({ children }: { children: React.ReactNode })
     { name: "Routers", href: "/dashboard/routers", icon: RouterIcon, group: "Equipment", badge: { value: offlineRouters, tone: "danger", label: "offline" } },
     { name: "Connected now", href: "/dashboard/sessions", icon: Activity, group: "Equipment" },
     { name: "Connection logs", href: "/dashboard/logs", icon: FileText, group: "Equipment" },
-    ...(schoolStatus?.school ? [{ name: "School", href: "/dashboard/school", icon: GraduationCap, group: "Account" }] : []),
+    ...(schoolStatus?.school ? [
+      { name: "School", href: "/dashboard/school", icon: GraduationCap, group: "Account" },
+      { name: "Registrations", href: "/dashboard/school/registrations", icon: Tray, group: "Account" },
+    ] : []),
     { name: "Subscription", href: "/dashboard/subscription", icon: CalendarCheck, group: "Account" },
     { name: "Settings", href: "/dashboard/settings", icon: GearSix, group: "Account" },
   ];
