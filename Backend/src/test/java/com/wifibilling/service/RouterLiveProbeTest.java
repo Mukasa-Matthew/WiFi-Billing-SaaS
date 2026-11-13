@@ -54,12 +54,15 @@ class RouterLiveProbeTest {
     }
 
     @Test
-    void routerWithoutAManagementChannelIsUnavailableWithoutRunningAnything() {
+    void routerWithoutASshTargetIsProbedDirectlyOverTheTunnel() {
         when(props.getPeerManagementSshTarget()).thenReturn("");
         Router router = Router.builder().id(5L).wgIp("10.9.0.5").radiusSecret("RADIUS_SECRET_MARKER").build();
         var r = probe.probe(router);
+        // No SSH hop is needed when the backend runs on the WireGuard hub: the
+        // probe curls the router's tunnel IP locally and reports its outcome.
         assertThat(r.reachable()).isFalse();
-        assertThat(r.error()).isEqualTo("management channel not configured");
+        assertThat(r.error()).isEqualTo("router REST unreachable or unauthorised");
+        assertThat(r.toString()).doesNotContain("RADIUS_SECRET_MARKER");
     }
 
     @Test
