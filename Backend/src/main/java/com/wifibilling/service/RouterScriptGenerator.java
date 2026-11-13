@@ -24,7 +24,7 @@ import java.util.Set;
 public class RouterScriptGenerator {
 
     /** Bump only for a deliberate, reviewed RouterOS infrastructure migration. */
-    public static final String PROVISIONING_VERSION = "2026.10.5";
+    public static final String PROVISIONING_VERSION = "2026.11.13";
 
     private static final String IFACE_NAME = "wg-billing";
     private static final String TELEMETRY_NAME = "wb-telemetry";
@@ -637,7 +637,40 @@ public class RouterScriptGenerator {
             s.append("\n# --- 8. AirPairy Remote WinBox agent ---\n");
             s.append(c.winboxInstaller().strip()).append('\n');
         }
-        return s.toString();
+        return hardenTopLevel(s.toString(), c.publicBaseUrl() + "/z/prov-" + c.setupCode() + "-ERR-");
+    }
+
+    /**
+     * Routers are provisioned remotely: when /import aborts there is nobody at
+     * the console to read the failing line, and a single unguarded command
+     * kills the whole run. Every bare top-level "/..." command is therefore
+     * wrapped in :do/on-error, and the error branch GETs a numbered throwaway
+     * URL under /z/ — it 404s but lands in the nginx access log, so the exact
+     * failing command is visible server-side. Lines starting with ':' are left
+     * alone: :if/:error guards are deliberate aborts, and :do/:local can't
+     * meaningfully fail. Lines inside source={ } bodies are script text, not
+     * executed now, so they are skipped. Commands ending in '{' (the
+     * multi-line /system/script add source={ openers) can't be wrapped
+     * line-wise and are also left alone.
+     */
+    static String hardenTopLevel(String script, String beaconPrefix) {
+        StringBuilder out = new StringBuilder(script.length() + 8192);
+        int depth = 0, n = 0;
+        for (String line : script.split("\n", -1)) {
+            String t = line.trim();
+            boolean bare = depth == 0 && !t.isEmpty() && t.charAt(0) == '/' && !t.endsWith("{");
+            if (bare) {
+                n++;
+                out.append(":do { ").append(line).append(" } on-error={ :do { /tool fetch url=")
+                        .append(q(beaconPrefix + n)).append(" output=none check-certificate=no duration=8s")
+                        .append(" } on-error={ :log warning \"wifi-billing: step ").append(n).append(" failed\" } }\n");
+            } else {
+                out.append(line).append('\n');
+            }
+            if (t.endsWith("source={")) depth++;
+            else if (depth > 0 && t.equals("}")) depth--;
+        }
+        return out.toString();
     }
 
     static String telemetryScriptBody(String telemetryUrl, String token) {
