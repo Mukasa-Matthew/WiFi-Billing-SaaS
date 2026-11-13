@@ -33,14 +33,17 @@ public class RouterManagementService {
  public void triggerPortalSync(Router r) {
   try {
    String ip = com.wifibilling.util.Ipv4Subnet.stripPrefix(r.getWgIp());
-   String sshTarget = props.getPeerManagementSshTarget();
-   if (ip == null || ip.isBlank() || sshTarget == null || sshTarget.isBlank()) return;
+   if (ip == null || ip.isBlank()) return;
    String remote = "curl -sS --max-time 4 -u " + shellQuote("wb-api:" + r.getRadiusSecret())
        + " -X POST http://" + ip + "/rest/system/script/run"
        + " -H 'Content-Type: application/json'"
        + " -d '{\"numbers\":\"wb-pkg-sync\"}'";
-   List<String> cmd = List.of("ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5",
-       "-o", "StrictHostKeyChecking=accept-new", sshTarget, remote);
+   String sshTarget = props.getPeerManagementSshTarget();
+   // On the hub host the router is reachable directly; only SSH when a separate target is set.
+   List<String> cmd = sshTarget != null && !sshTarget.isBlank()
+       ? List.of("ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5",
+           "-o", "StrictHostKeyChecking=accept-new", sshTarget, remote)
+       : List.of("bash", "-c", remote);
    Process p = new ProcessBuilder(cmd).redirectErrorStream(true).start();
    if (!p.waitFor(10, java.util.concurrent.TimeUnit.SECONDS)) p.destroyForcibly();
   } catch (Exception ignored) {}

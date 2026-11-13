@@ -88,8 +88,7 @@ public class RouterLiveProbe {
 
     private LiveResult doProbe(Router r) {
         String ip = Ipv4Subnet.stripPrefix(r.getWgIp());
-        String sshTarget = props.getPeerManagementSshTarget();
-        if (ip == null || ip.isBlank() || sshTarget == null || sshTarget.isBlank()) {
+        if (ip == null || ip.isBlank()) {
             return unavailable("management channel not configured");
         }
         if (!ip.matches("\\d{1,3}(\\.\\d{1,3}){3}")) return unavailable("router tunnel address is invalid");
@@ -99,8 +98,13 @@ public class RouterLiveProbe {
             String remote = "(" + base + "http://" + ip + "/rest/system/resource; echo '\u0001';"
                     + base + "http://" + ip + "/rest/ip/hotspot/active; echo '\u0001';"
                     + base + "http://" + ip + "/rest/interface/wireguard/peers)";
-            List<String> cmd = List.of("ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=6",
-                    "-o", "StrictHostKeyChecking=accept-new", sshTarget, remote);
+            String sshTarget = props.getPeerManagementSshTarget();
+            // Post-migration the backend runs on the WireGuard hub itself, so the router is
+            // reachable directly over the tunnel — no SSH hop needed when no target is set.
+            List<String> cmd = sshTarget != null && !sshTarget.isBlank()
+                    ? List.of("ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=6",
+                            "-o", "StrictHostKeyChecking=accept-new", sshTarget, remote)
+                    : List.of("bash", "-c", remote);
             p = new ProcessBuilder(cmd).redirectErrorStream(true).start();
             // Read on another thread: readAllBytes() blocks until the process
             // exits, so reading first would make the timeout below dead code.
