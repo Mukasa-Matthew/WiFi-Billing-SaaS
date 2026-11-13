@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import api from "@/lib/api";
-import { CheckCircle, GraduationCap, Lock, ShieldCheck, Ticket, Users, WarningCircle, XCircle } from "@/components/icons";
+import { CheckCircle, Copy, GraduationCap, Lock, ShieldCheck, Ticket, UserPlus, Users, WarningCircle, XCircle } from "@/components/icons";
 import {
   Badge, Card, ErrorNotice, PageContainer, PageHeader, Segmented, StatCard, Table,
   button, buttonGhost, bytes, field, hint, humanize, label, message, relativeTime, useApi, useNow,
@@ -49,6 +49,16 @@ interface StaffException {
 interface VisitorPass {
   id: string; fullName: string; phone: string; reason: string;
   issuedBy: string; issuedAt: string; expiresAt: string; status: string; deviceMac: string | null;
+}
+interface Registration {
+  id: string; fullName: string; registrationNumber: string; email: string; courseEnds: string | null;
+  accessUntil: string | null; source: string | null; status: string; submittedAt: string;
+  decidedAt: string | null; decidedBy: string | null; personId: string | null;
+}
+interface RegistrationDecision {
+  approved: number; rejected: number;
+  failed: { id: string; fullName: string | null; code: string; message: string }[];
+  unsent: { id: string; name: string; identifier: string; pin: string }[];
 }
 interface ActiveSession {
   radAcctId: number; username: string; framedIpAddress: string | null; callingStationId: string | null;
@@ -304,6 +314,7 @@ export default function SchoolPage() {
             </ul>
           )}
         </Card>
+        <RegistrationsCard now={now} onChanged={overview.load} />
         <ItAccountsCard accounts={school?.itAdmins} loading={overview.loading} now={now} onChanged={overview.load} />
         <NetworkSizeCard />
         </div>
@@ -1217,6 +1228,117 @@ function SettingsCard({ settings, onSaved }: { settings: Settings; onSaved: () =
 }
 
 /**
+ * Student self-registrations the school's IT person normally approves. The owner sees the same pending
+ * list here and can approve or reject when IT is unavailable; decisions are recorded under the owner's name.
+ */
+function RegistrationsCard({ now, onChanged }: { now: number; onChanged: () => void }) {
+  const toast = useToast();
+  const { confirm, dialog } = useConfirmDialog();
+  const [status, setStatus] = useState<"PENDING" | "APPROVED" | "REJECTED">("PENDING");
+  const registrations = useApi<Page<Registration>>(`/api/school/registrations?status=${status}`);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [unsent, setUnsent] = useState<{ id: string; name: string; identifier: string; pin: string }[]>([]);
+
+  const decide = async (reg: Registration, approve: boolean) => {
+    setBusy(reg.id);
+    try {
+      const { data } = await api.post<RegistrationDecision>("/api/school/registrations/decision", { ids: [reg.id], approve });
+      const decided = approve ? data.approved : data.rejected;
+      if (decided > 0) toast("success", approve ? `${reg.fullName} approved — their PIN is on its way by email.` : `${reg.fullName} rejected.`);
+      for (const f of data.failed ?? []) toast("error", `${f.fullName || "That registration"}: ${f.message}`);
+      if (data.unsent?.length) setUnsent((prev) => [...prev, ...data.unsent]);
+      registrations.load();
+      onChanged();
+    } catch (err) {
+      toast("error", message(err));
+    } finally {
+      setBusy(null);
+    }
+  };
+  const reject = (reg: Registration) => confirm({
+    title: `Reject ${reg.fullName}?`,
+    body: `Registration number ${reg.registrationNumber}. They are emailed that their registration was not approved.`,
+    confirmLabel: "Reject",
+    onConfirm: () => decide(reg, false),
+  });
+
+  const list = registrations.data?.content ?? [];
+  return (
+    <Card
+      title="School registrations"
+      description="Students who signed themselves up. Normally the IT office approves these — you can stand in when they are busy."
+      bodyClassName=""
+      action={
+        <Segmented
+          label="Registration status"
+          value={status}
+          onChange={(v) => setStatus(v as typeof status)}
+          options={[
+            { key: "PENDING", label: "Waiting" },
+            { key: "APPROVED", label: "Approved" },
+            { key: "REJECTED", label: "Rejected" },
+          ]}
+        />
+      }
+    >
+      {unsent.length > 0 && (
+        <div className="mx-5 mt-4 rounded-lg border border-[var(--status-warn)]/40 bg-[var(--status-warn)]/10 p-4">
+          <p className="text-sm font-medium text-[var(--fg)]">PINs that could not be emailed — give these to the students yourself:</p>
+          <ul className="mt-2 space-y-1">
+            {unsent.map((u) => (
+              <li key={u.id} className="flex items-center gap-2 text-xs text-[var(--fg-body)]">
+                <span className="truncate">{u.name} ({u.identifier})</span>
+                <code className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-mono">{u.pin}</code>
+                <button type="button" className={buttonGhost} onClick={() => navigator.clipboard?.writeText(u.pin)}>
+                  <Copy className="h-3.5 w-3.5" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {registrations.error ? (
+        <p className="p-5 text-sm text-red-600">{registrations.error}</p>
+      ) : !list.length ? (
+        <p className="p-5 text-sm text-[var(--fg-muted)]">
+          {registrations.loading ? "Loading…" : status === "PENDING" ? "No registrations waiting for approval." : `No ${status.toLowerCase()} registrations.`}
+        </p>
+      ) : (
+        <ul className="divide-y divide-[var(--border)]">
+          {list.map((reg) => (
+            <li key={reg.id} className="flex items-center justify-between gap-3 px-5 py-3.5">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="truncate font-medium text-[var(--fg)]">{reg.fullName}</span>
+                  <span className="text-xs text-[var(--fg-muted)]">{reg.registrationNumber}</span>
+                </div>
+                <p className="mt-0.5 truncate text-xs text-[var(--fg-muted)]">
+                  {reg.email} · {reg.courseEnds ? `course ends ${reg.courseEnds}` : "no leaving date"} · {relativeTime(reg.submittedAt, now)}
+                  {reg.decidedBy ? ` · decided by ${reg.decidedBy}` : ""}
+                </p>
+              </div>
+              {status === "PENDING" && (
+                <div className="flex shrink-0 items-center gap-2">
+                  <button type="button" disabled={busy === reg.id} onClick={() => decide(reg, true)} className={buttonGhost}>
+                    <CheckCircle className="h-4 w-4" />
+                    Approve
+                  </button>
+                  <button type="button" disabled={busy === reg.id} onClick={() => reject(reg)} className={buttonGhost}>
+                    <XCircle className="h-4 w-4" />
+                    Reject
+                  </button>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      {dialog}
+    </Card>
+  );
+}
+
+/**
  * The people who run the school's identity dashboard. The owner can pause one at any time: they are signed out
  * at once and can't sign in again until restored. They never see money either way.
  */
@@ -1224,6 +1346,30 @@ function ItAccountsCard({ accounts, loading, now, onChanged }: { accounts?: ItAc
   const toast = useToast();
   const { confirm, dialog } = useConfirmDialog();
   const [busy, setBusy] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState<"ADMIN" | "HELPDESK">("ADMIN");
+  const [created, setCreated] = useState<{ fullName: string; temporaryPassword: string } | null>(null);
+  const add = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const { data } = await api.post<{ admin?: { fullName?: string }; temporaryPassword?: string }>(
+        "/api/school/it-accounts",
+        { email: email.trim(), fullName: fullName.trim(), role },
+      );
+      setCreated({ fullName: data.admin?.fullName || fullName.trim(), temporaryPassword: data.temporaryPassword || "" });
+      setAdding(false);
+      setFullName(""); setEmail(""); setRole("ADMIN");
+      onChanged();
+    } catch (err) {
+      toast("error", message(err));
+    } finally {
+      setSaving(false);
+    }
+  };
   const setBlocked = async (account: ItAccount, blocked: boolean) => {
     setBusy(account.id);
     try {
@@ -1280,6 +1426,58 @@ function ItAccountsCard({ accounts, loading, now, onChanged }: { accounts?: ItAc
             );
           })}
         </ul>
+      )}
+      {created && (
+        <div className="mx-5 mb-4 rounded-lg border border-[var(--status-good)]/40 bg-[var(--status-good)]/10 p-4">
+          <p className="text-sm font-medium text-[var(--fg)]">{created.fullName} is added.</p>
+          <p className="mt-1 text-xs text-[var(--fg-muted)]">
+            Give them this one-time password now — it is only shown once. They will set their own password at first sign-in.
+          </p>
+          <div className="mt-2 flex items-center gap-2">
+            <code className="rounded bg-[var(--surface-2)] px-2 py-1 font-mono text-sm text-[var(--fg)]">{created.temporaryPassword}</code>
+            <button
+              type="button"
+              className={buttonGhost}
+              onClick={() => { navigator.clipboard?.writeText(created.temporaryPassword); toast("success", "Copied."); }}
+            >
+              <Copy className="h-4 w-4" />
+              Copy
+            </button>
+            <button type="button" className={buttonGhost} onClick={() => setCreated(null)}>Done</button>
+          </div>
+        </div>
+      )}
+      {!adding ? (
+        <div className="border-t border-[var(--border-soft)] px-5 py-3.5">
+          <button type="button" className={buttonGhost} onClick={() => setAdding(true)}>
+            <UserPlus className="h-4 w-4" />
+            Add IT account
+          </button>
+        </div>
+      ) : (
+        <form onSubmit={add} className="space-y-3 border-t border-[var(--border-soft)] px-5 py-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className={label}>Full name</label>
+              <input className={field} value={fullName} onChange={(e) => setFullName(e.target.value)} required maxLength={200} placeholder="e.g. Sarah Namono" />
+            </div>
+            <div>
+              <label className={label}>Email</label>
+              <input className={field} type="email" value={email} onChange={(e) => setEmail(e.target.value)} required maxLength={254} placeholder="they@school.ac.ug" />
+            </div>
+          </div>
+          <div>
+            <label className={label}>Role</label>
+            <select className={field} value={role} onChange={(e) => setRole(e.target.value as "ADMIN" | "HELPDESK")}>
+              <option value="ADMIN">Administrator — full control, can approve registrations</option>
+              <option value="HELPDESK">Helpdesk — view people and registrations, cannot approve</option>
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <button type="submit" disabled={saving} className={button}>{saving ? "Adding…" : "Add IT account"}</button>
+            <button type="button" className={buttonGhost} onClick={() => setAdding(false)}>Cancel</button>
+          </div>
+        </form>
       )}
       {dialog}
     </Card>

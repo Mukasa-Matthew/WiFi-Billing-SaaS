@@ -2,12 +2,13 @@ package com.wifibilling.school;
 
 import com.wifibilling.security.TenantPrincipal;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.*;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import tools.jackson.databind.JsonNode;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -56,6 +57,16 @@ public class SchoolController {
 
     public record ItAccess(@NotNull Boolean blocked) {}
 
+    public record NewItAccount(@NotBlank @Email @Size(max = 254) String email,
+                               @NotBlank @Size(max = 200) String fullName,
+                               @NotNull @Pattern(regexp = "ADMIN|HELPDESK") String role) {}
+
+    /** Adds another IT account so the owner isn't dependent on the existing IT person. Returns its one-time temporary password. */
+    @PostMapping("/it-accounts")
+    public JsonNode addItAccount(@AuthenticationPrincipal TenantPrincipal principal, @Valid @RequestBody NewItAccount body) {
+        return identity.addAdmin(schools.school(principal.getTenantId()).getId(), body.email(), body.fullName(), body.role());
+    }
+
     /** Pauses or restores an IT person's sign-in to the identity dashboard. A pause signs them out at once. */
     @PostMapping("/it-accounts/{id}/access")
     public JsonNode itAccess(@AuthenticationPrincipal TenantPrincipal principal, @PathVariable UUID id, @Valid @RequestBody ItAccess body) {
@@ -68,5 +79,21 @@ public class SchoolController {
     public JsonNode decide(@AuthenticationPrincipal TenantPrincipal principal, @PathVariable UUID id, @Valid @RequestBody Decision body) {
         var tenant = schools.school(principal.getTenantId());
         return identity.decideStaffException(tenant.getId(), id, body.approve(), principal.getName() + " (" + principal.getUsername() + ")");
+    }
+
+    /** Students waiting for IT's approval, so the owner can stand in when IT is busy. */
+    @GetMapping("/registrations")
+    public JsonNode registrations(@AuthenticationPrincipal TenantPrincipal principal,
+            @RequestParam(defaultValue = "PENDING") @Pattern(regexp = "PENDING|APPROVED|REJECTED") String status,
+            @RequestParam(defaultValue = "0") @Min(0) int page) {
+        return identity.registrations(schools.school(principal.getTenantId()).getId(), status, page);
+    }
+
+    public record RegistrationDecision(@NotEmpty @Size(max = 500) List<@NotNull UUID> ids, @NotNull Boolean approve) {}
+
+    @PostMapping("/registrations/decision")
+    public JsonNode decideRegistrations(@AuthenticationPrincipal TenantPrincipal principal, @Valid @RequestBody RegistrationDecision body) {
+        var tenant = schools.school(principal.getTenantId());
+        return identity.decideRegistrations(tenant.getId(), body.ids(), body.approve(), principal.getName() + " (" + principal.getUsername() + ")");
     }
 }

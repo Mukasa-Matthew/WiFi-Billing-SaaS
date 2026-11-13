@@ -64,6 +64,12 @@ public class IdentityClient {
     public JsonNode decideStaffException(long tenantId, UUID request, boolean approve, String decidedBy) {
         return call("POST", school(tenantId, "/staff-exceptions/" + request + "/decision"), Map.of("approve", approve, "decidedBy", decidedBy));
     }
+    public JsonNode registrations(long tenantId, String status, int page) {
+        return call("GET", school(tenantId, "/registrations?status=" + URLEncoder.encode(status, StandardCharsets.UTF_8) + "&page=" + Math.max(0, page) + "&size=50"), null);
+    }
+    public JsonNode decideRegistrations(long tenantId, java.util.List<UUID> ids, boolean approve, String decidedBy) {
+        return call("POST", school(tenantId, "/registrations/decision"), Map.of("ids", ids, "approve", approve, "decidedBy", decidedBy));
+    }
     public JsonNode verify(long tenantId, String identifier, String pin, String mac) {
         return call("POST", school(tenantId, "/portal/verify"), mac == null ? Map.of("identifier", identifier, "pin", pin) : Map.of("identifier", identifier, "pin", pin, "deviceMac", mac));
     }
