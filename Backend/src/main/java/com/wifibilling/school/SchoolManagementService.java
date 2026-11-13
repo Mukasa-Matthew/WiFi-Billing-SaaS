@@ -118,6 +118,7 @@ public class SchoolManagementService {
                                   @jakarta.validation.constraints.Size(max = 30) String studentFreeRateLimit,
                                   @jakarta.validation.constraints.Size(max = 4000) String studentAllowedSites,
                                   @jakarta.validation.constraints.Pattern(regexp = "OFF|LOG|BLOCK") String tetheringProtection,
+                                  @jakarta.validation.constraints.Size(max = 50) java.util.List<String> registrationPrefixes,
                                   Boolean applyImmediately) {}
 
     /** Visitor changes go to the identity system first, so the IT dashboard never disagrees with AirPairy. */
@@ -125,6 +126,7 @@ public class SchoolManagementService {
         var visitorChanges = new LinkedHashMap<String, Object>();
         if (req.visitorsEnabled() != null) visitorChanges.put("visitorsEnabled", req.visitorsEnabled());
         if (req.visitorDailyCap() != null) visitorChanges.put("visitorDailyCap", req.visitorDailyCap());
+        if (req.registrationPrefixes() != null) visitorChanges.put("registrationPrefixes", req.registrationPrefixes());
         if (!visitorChanges.isEmpty()) {
             JsonNode school = identity.updateSchool(tenant.getId(), visitorChanges);
             tenant.setSchoolVisitorsEnabled(school.path("visitorsEnabled").asBoolean());

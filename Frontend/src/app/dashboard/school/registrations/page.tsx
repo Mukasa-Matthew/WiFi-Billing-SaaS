@@ -33,6 +33,24 @@ export default function SchoolRegistrationsPage() {
   const [status, setStatus] = useState<Status>("PENDING");
   const [page, setPage] = useState(0);
   const registrations = useApi<Page<Registration>>(`/api/school/registrations?status=${status}&page=${page}`);
+  const overview = useApi<{ school?: { registrationPrefixes?: string[] } }>("/api/school");
+  const storedPrefixes = overview.data?.school?.registrationPrefixes ?? [];
+  const [prefixInput, setPrefixInput] = useState<string | null>(null);
+  const [prefixBusy, setPrefixBusy] = useState(false);
+  const prefixValue = prefixInput ?? storedPrefixes.join(", ");
+  const savePrefixes = async () => {
+    setPrefixBusy(true);
+    try {
+      await api.put("/api/school/settings", { registrationPrefixes: prefixValue.split(",").map((p) => p.trim()).filter(Boolean) });
+      toast("success", "Registration number prefixes saved.");
+      setPrefixInput(null);
+      overview.load();
+    } catch (err) {
+      toast("error", message(err));
+    } finally {
+      setPrefixBusy(false);
+    }
+  };
   const [busy, setBusy] = useState<string | null>(null);
   const [unsent, setUnsent] = useState<{ id: string; name: string; identifier: string; pin: string }[]>([]);
   const [editing, setEditing] = useState<Registration | null>(null);
@@ -132,6 +150,25 @@ export default function SchoolRegistrationsPage() {
           </ul>
         </Card>
       )}
+
+      <Card
+        title="Registration number prefixes"
+        description="Students' registration numbers must start with one of these (from their admission letters). Numbers with a different prefix are turned away at the form with a clear message. Leave empty to accept every number."
+      >
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            aria-label="Registration number prefixes"
+            placeholder="SNAHP, CPH, MER, OPM, DOT"
+            className={`${field} font-mono`}
+            value={prefixValue}
+            disabled={prefixBusy}
+            onChange={(e) => setPrefixInput(e.target.value)}
+          />
+          <button type="button" className={button} disabled={prefixBusy || prefixValue === storedPrefixes.join(", ")} onClick={savePrefixes}>
+            {prefixBusy ? "Saving…" : "Save prefixes"}
+          </button>
+        </div>
+      </Card>
 
       <Card
         title={status === "PENDING" ? "Waiting for a decision" : status === "APPROVED" ? "Approved" : "Rejected"}
