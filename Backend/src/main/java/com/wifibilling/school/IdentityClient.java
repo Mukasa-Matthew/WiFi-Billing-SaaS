@@ -67,8 +67,13 @@ public class IdentityClient {
     public JsonNode registrations(long tenantId, String status, int page) {
         return call("GET", school(tenantId, "/registrations?status=" + URLEncoder.encode(status, StandardCharsets.UTF_8) + "&page=" + Math.max(0, page) + "&size=50"), null);
     }
-    public JsonNode decideRegistrations(long tenantId, java.util.List<UUID> ids, boolean approve, String decidedBy) {
-        return call("POST", school(tenantId, "/registrations/decision"), Map.of("ids", ids, "approve", approve, "decidedBy", decidedBy));
+    public JsonNode decideRegistrations(long tenantId, java.util.List<UUID> ids, boolean approve, String reason, String decidedBy) {
+        var body = new java.util.HashMap<String, Object>();
+        body.put("ids", ids);
+        body.put("approve", approve);
+        if (reason != null && !reason.isBlank()) body.put("reason", reason.trim());
+        body.put("decidedBy", decidedBy);
+        return call("POST", school(tenantId, "/registrations/decision"), body);
     }
     public void correctRegistration(long tenantId, UUID id, String fullName, String registrationNumber, java.time.LocalDate accessUntil, String decidedBy) {
         var body = new java.util.HashMap<String, Object>();

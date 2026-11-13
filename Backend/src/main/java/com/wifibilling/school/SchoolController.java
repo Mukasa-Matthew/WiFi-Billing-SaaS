@@ -89,12 +89,12 @@ public class SchoolController {
         return identity.registrations(schools.school(principal.getTenantId()).getId(), status, page);
     }
 
-    public record RegistrationDecision(@NotEmpty @Size(max = 500) List<@NotNull UUID> ids, @NotNull Boolean approve) {}
+    public record RegistrationDecision(@NotEmpty @Size(max = 500) List<@NotNull UUID> ids, @NotNull Boolean approve, @Size(max = 500) String reason) {}
 
     @PostMapping("/registrations/decision")
     public JsonNode decideRegistrations(@AuthenticationPrincipal TenantPrincipal principal, @Valid @RequestBody RegistrationDecision body) {
         var tenant = schools.school(principal.getTenantId());
-        return identity.decideRegistrations(tenant.getId(), body.ids(), body.approve(), principal.getName() + " (" + principal.getUsername() + ")");
+        return identity.decideRegistrations(tenant.getId(), body.ids(), body.approve(), body.reason(), principal.getName() + " (" + principal.getUsername() + ")");
     }
 
     /** Fixes a waiting registration's name, registration number or leaving date, the same correction IT can make before approving. */

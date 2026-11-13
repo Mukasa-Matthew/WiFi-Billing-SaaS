@@ -8,7 +8,6 @@ import {
   button, buttonGhost, field, label, message, relativeTime, useApi, useNow,
 } from "@/components/BillingUI";
 import { useToast } from "@/components/ui/Toast";
-import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 interface Registration {
   id: string; fullName: string; registrationNumber: string; email: string; courseEnds: string | null;
@@ -31,7 +30,6 @@ type Status = "PENDING" | "APPROVED" | "REJECTED";
  */
 export default function SchoolRegistrationsPage() {
   const toast = useToast();
-  const { confirm, dialog } = useConfirmDialog();
   const [status, setStatus] = useState<Status>("PENDING");
   const [page, setPage] = useState(0);
   const registrations = useApi<Page<Registration>>(`/api/school/registrations?status=${status}&page=${page}`);
@@ -73,14 +71,15 @@ export default function SchoolRegistrationsPage() {
     }
   };
 
-  const decide = async (reg: Registration, approve: boolean) => {
+  const decide = async (reg: Registration, approve: boolean, reason?: string) => {
     setBusy(reg.id);
     try {
-      const { data } = await api.post<RegistrationDecision>("/api/school/registrations/decision", { ids: [reg.id], approve });
+      const { data } = await api.post<RegistrationDecision>("/api/school/registrations/decision", { ids: [reg.id], approve, ...(reason ? { reason } : {}) });
       const decided = approve ? data.approved : data.rejected;
       if (decided > 0) toast("success", approve ? `${reg.fullName} approved — their PIN is on its way by email.` : `${reg.fullName} rejected.`);
       for (const f of data.failed ?? []) toast("error", `${f.fullName || "That registration"}: ${f.message}`);
       if (data.unsent?.length) setUnsent((prev) => [...prev, ...data.unsent]);
+      setRejecting(null);
       registrations.load();
     } catch (err) {
       toast("error", message(err));
@@ -88,12 +87,9 @@ export default function SchoolRegistrationsPage() {
       setBusy(null);
     }
   };
-  const reject = (reg: Registration) => confirm({
-    title: `Reject ${reg.fullName}?`,
-    body: `Registration number ${reg.registrationNumber}. They are emailed that their registration was not approved.`,
-    confirmLabel: "Reject",
-    onConfirm: () => decide(reg, false),
-  });
+  const [rejecting, setRejecting] = useState<Registration | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const startReject = (reg: Registration) => { setRejecting(reg); setRejectReason(""); };
 
   const data = registrations.data;
   const switchStatus = (v: Status) => { setStatus(v); setPage(0); };
@@ -141,7 +137,7 @@ export default function SchoolRegistrationsPage() {
         title={status === "PENDING" ? "Waiting for a decision" : status === "APPROVED" ? "Approved" : "Rejected"}
         description={
           status === "PENDING"
-            ? "Approving creates the student's account and emails them their one-time PIN. Rejecting emails them that it wasn't approved."
+            ? "Approving creates the student's account and emails them their one-time PIN. Rejecting asks for a reason, which is emailed to them."
             : status === "APPROVED"
               ? "Students let in, with who approved them."
               : "Registrations that were turned down, with who decided."
@@ -176,7 +172,9 @@ export default function SchoolRegistrationsPage() {
               label: "Registration no.",
               render: (r) => editing?.id === r.id
                 ? <input className={`${field} font-mono`} value={editRegNumber} onChange={(e) => setEditRegNumber(e.target.value)} maxLength={128} />
-                : <span className="font-mono text-xs">{r.registrationNumber}</span>,
+                : rejecting?.id === r.id
+                  ? <input className={field} value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} maxLength={500} placeholder="Reason, e.g. not a student here" autoFocus />
+                  : <span className="font-mono text-xs">{r.registrationNumber}</span>,
             },
             {
               label: "Course ends",
@@ -201,6 +199,11 @@ export default function SchoolRegistrationsPage() {
                   <button type="button" disabled={editBusy} onClick={saveEdit} className={button}>{editBusy ? "Saving…" : "Save"}</button>
                   <button type="button" className={buttonGhost} onClick={() => setEditing(null)}>Cancel</button>
                 </div>
+              ) : rejecting?.id === r.id ? (
+                <div className="flex items-center justify-end gap-2">
+                  <button type="button" disabled={busy === r.id || !rejectReason.trim()} onClick={() => decide(r, false, rejectReason.trim())} className={button}>{busy === r.id ? "Rejecting…" : "Reject"}</button>
+                  <button type="button" className={buttonGhost} onClick={() => setRejecting(null)}>Cancel</button>
+                </div>
               ) : (
                 <div className="flex items-center justify-end gap-2">
                   <button type="button" disabled={busy === r.id} onClick={() => startEdit(r)} className={buttonGhost}>
@@ -211,7 +214,7 @@ export default function SchoolRegistrationsPage() {
                     <CheckCircle className="h-4 w-4" />
                     Approve
                   </button>
-                  <button type="button" disabled={busy === r.id} onClick={() => reject(r)} className={buttonGhost}>
+                  <button type="button" disabled={busy === r.id} onClick={() => startReject(r)} className={buttonGhost}>
                     <XCircle className="h-4 w-4" />
                     Reject
                   </button>
@@ -230,7 +233,6 @@ export default function SchoolRegistrationsPage() {
           </div>
         )}
       </Card>
-      {dialog}
     </PageContainer>
   );
 }
