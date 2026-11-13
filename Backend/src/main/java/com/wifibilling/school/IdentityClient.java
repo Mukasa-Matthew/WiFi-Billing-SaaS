@@ -70,10 +70,11 @@ public class IdentityClient {
     public JsonNode decideRegistrations(long tenantId, java.util.List<UUID> ids, boolean approve, String decidedBy) {
         return call("POST", school(tenantId, "/registrations/decision"), Map.of("ids", ids, "approve", approve, "decidedBy", decidedBy));
     }
-    public void correctRegistration(long tenantId, UUID id, String fullName, java.time.LocalDate accessUntil, String decidedBy) {
+    public void correctRegistration(long tenantId, UUID id, String fullName, String registrationNumber, java.time.LocalDate accessUntil, String decidedBy) {
         var body = new java.util.HashMap<String, Object>();
         body.put("decidedBy", decidedBy);
         if (fullName != null) body.put("fullName", fullName);
+        if (registrationNumber != null) body.put("registrationNumber", registrationNumber);
         if (accessUntil != null) body.put("accessUntil", accessUntil.toString());
         call("PATCH", school(tenantId, "/registrations/" + id), body);
     }

@@ -97,16 +97,16 @@ public class SchoolController {
         return identity.decideRegistrations(tenant.getId(), body.ids(), body.approve(), principal.getName() + " (" + principal.getUsername() + ")");
     }
 
-    /** Fixes a waiting registration's name or leaving date, the same correction IT can make before approving. */
-    public record RegistrationCorrection(@Size(max = 200) String fullName, java.time.LocalDate accessUntil) {}
+    /** Fixes a waiting registration's name, registration number or leaving date, the same correction IT can make before approving. */
+    public record RegistrationCorrection(@Size(max = 200) String fullName, @Size(max = 128) String registrationNumber, java.time.LocalDate accessUntil) {}
 
     @PatchMapping("/registrations/{id}")
     @ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
     public void correctRegistration(@AuthenticationPrincipal TenantPrincipal principal, @PathVariable UUID id, @Valid @RequestBody RegistrationCorrection body) {
         var tenant = schools.school(principal.getTenantId());
-        if (body.fullName() == null && body.accessUntil() == null) {
+        if (body.fullName() == null && body.registrationNumber() == null && body.accessUntil() == null) {
             throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "Nothing to change");
         }
-        identity.correctRegistration(tenant.getId(), id, body.fullName(), body.accessUntil(), principal.getName() + " (" + principal.getUsername() + ")");
+        identity.correctRegistration(tenant.getId(), id, body.fullName(), body.registrationNumber(), body.accessUntil(), principal.getName() + " (" + principal.getUsername() + ")");
     }
 }

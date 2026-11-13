@@ -39,6 +39,7 @@ export default function SchoolRegistrationsPage() {
   const [unsent, setUnsent] = useState<{ id: string; name: string; identifier: string; pin: string }[]>([]);
   const [editing, setEditing] = useState<Registration | null>(null);
   const [editName, setEditName] = useState("");
+  const [editRegNumber, setEditRegNumber] = useState("");
   const [editCourseEnds, setEditCourseEnds] = useState("");
   const [editBusy, setEditBusy] = useState(false);
   const now = useNow();
@@ -46,18 +47,19 @@ export default function SchoolRegistrationsPage() {
   const startEdit = (reg: Registration) => {
     setEditing(reg);
     setEditName(reg.fullName);
+    setEditRegNumber(reg.registrationNumber);
     setEditCourseEnds(reg.courseEnds || "");
   };
-  const saveEdit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const saveEdit = async () => {
     if (!editing) return;
-    const changes: { fullName?: string; accessUntil?: string } = {};
+    const changes: { fullName?: string; registrationNumber?: string; accessUntil?: string } = {};
     if (editName.trim() && editName.trim() !== editing.fullName) changes.fullName = editName.trim();
+    if (editRegNumber.trim() && editRegNumber.trim() !== editing.registrationNumber) changes.registrationNumber = editRegNumber.trim();
     if (editCourseEnds && editCourseEnds !== editing.courseEnds) {
       const [y, m] = editCourseEnds.split("-").map(Number);
       changes.accessUntil = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10); // last day of that month
     }
-    if (!changes.fullName && !changes.accessUntil) { setEditing(null); return; }
+    if (!changes.fullName && !changes.registrationNumber && !changes.accessUntil) { setEditing(null); return; }
     setEditBusy(true);
     try {
       await api.patch(`/api/school/registrations/${editing.id}`, changes);
@@ -146,27 +148,6 @@ export default function SchoolRegistrationsPage() {
         }
         bodyClassName=""
       >
-        {editing && (
-          <form onSubmit={saveEdit} className="space-y-3 border-b border-[var(--border-soft)] px-5 py-4">
-            <p className="text-xs font-medium text-[var(--fg-muted)]">
-              Correcting <span className="text-[var(--fg)]">{editing.fullName}</span> · {editing.registrationNumber}
-            </p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label className={label}>Full name</label>
-                <input className={field} value={editName} onChange={(e) => setEditName(e.target.value)} required maxLength={200} />
-              </div>
-              <div>
-                <label className={label}>Course ends</label>
-                <input className={field} type="month" value={editCourseEnds} onChange={(e) => setEditCourseEnds(e.target.value)} required />
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <button type="submit" disabled={editBusy} className={button}>{editBusy ? "Saving…" : "Save correction"}</button>
-              <button type="button" className={buttonGhost} onClick={() => setEditing(null)}>Cancel</button>
-            </div>
-          </form>
-        )}
         <Table
           rows={data?.content ?? []}
           loading={registrations.loading && !data}
@@ -179,15 +160,30 @@ export default function SchoolRegistrationsPage() {
           columns={[
             {
               label: "Student",
-              render: (r) => (
+              render: (r) => editing?.id === r.id ? (
+                <div className="min-w-0">
+                  <input className={field} value={editName} onChange={(e) => setEditName(e.target.value)} maxLength={200} placeholder="Full name" />
+                  <div className="mt-1 truncate text-xs text-[var(--fg-muted)]">{r.email}</div>
+                </div>
+              ) : (
                 <div className="min-w-0">
                   <div className="truncate font-medium text-[var(--fg)]">{r.fullName}</div>
                   <div className="truncate text-xs text-[var(--fg-muted)]">{r.email}</div>
                 </div>
               ),
             },
-            { label: "Registration no.", render: (r) => <span className="font-mono text-xs">{r.registrationNumber}</span> },
-            { label: "Course ends", render: (r) => <span className="text-xs">{r.courseEnds || "—"}</span> },
+            {
+              label: "Registration no.",
+              render: (r) => editing?.id === r.id
+                ? <input className={`${field} font-mono`} value={editRegNumber} onChange={(e) => setEditRegNumber(e.target.value)} maxLength={128} />
+                : <span className="font-mono text-xs">{r.registrationNumber}</span>,
+            },
+            {
+              label: "Course ends",
+              render: (r) => editing?.id === r.id
+                ? <input className={field} type="month" value={editCourseEnds} onChange={(e) => setEditCourseEnds(e.target.value)} />
+                : <span className="text-xs">{r.courseEnds || "—"}</span>,
+            },
             { label: "Submitted", render: (r) => <span className="text-xs text-[var(--fg-muted)]">{relativeTime(r.submittedAt, now)}</span> },
             ...(status === "PENDING" ? [] : [{
               label: "Decided",
@@ -200,7 +196,12 @@ export default function SchoolRegistrationsPage() {
             }]),
             ...(status === "PENDING" ? [{
               label: "",
-              render: (r: Registration) => (
+              render: (r: Registration) => editing?.id === r.id ? (
+                <div className="flex items-center justify-end gap-2">
+                  <button type="button" disabled={editBusy} onClick={saveEdit} className={button}>{editBusy ? "Saving…" : "Save"}</button>
+                  <button type="button" className={buttonGhost} onClick={() => setEditing(null)}>Cancel</button>
+                </div>
+              ) : (
                 <div className="flex items-center justify-end gap-2">
                   <button type="button" disabled={busy === r.id} onClick={() => startEdit(r)} className={buttonGhost}>
                     <NotePencil className="h-4 w-4" />
