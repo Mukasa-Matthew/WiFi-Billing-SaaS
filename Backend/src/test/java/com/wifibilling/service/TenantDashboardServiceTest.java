@@ -203,8 +203,8 @@ class TenantDashboardServiceTest {
         assertThat(s.periodTransactions()).isEqualTo(2);
         assertThat(s.revenueByChannel()).extracting(m -> m.get("key")).containsExactly("MTN", "AIRTEL", "WALK_IN");
         assertThat(s.revenueByGroup()).extracting(m -> m.get("key")).containsExactly("STUDENT", "PAID_CUSTOMER", "WALK_IN");
-        assertThat(s.dataByCategory()).extracting(m -> m.get("category")).containsExactly("STUDENT", "STAFF", "VISITOR", "PAID_CUSTOMER");
+        assertThat(s.dataByCategory()).extracting(m -> m.get("category")).containsExactly("STUDENT", "STUDENT_FREE", "STAFF", "VISITOR", "PAID_CUSTOMER");
         assertThat(s.dataByCategory().get(0)).containsEntry("totalBytes", 1000L).containsEntry("free", false);
-        assertThat(s.dataByCategory().get(1)).containsEntry("totalBytes", 500L).containsEntry("free", true);
+        assertThat(s.dataByCategory().get(2)).containsEntry("totalBytes", 500L).containsEntry("free", true);
     }
 }
