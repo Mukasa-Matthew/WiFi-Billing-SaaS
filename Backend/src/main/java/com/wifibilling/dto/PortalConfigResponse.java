@@ -28,6 +28,7 @@ public record PortalConfigResponse(
             boolean showDeviceLimits,
             boolean showDeviceMac,
             boolean showPackageTime,
+            boolean showPackageSpeed,
             boolean allowPurchases,
             boolean buyForOther,
             boolean showFeedback,

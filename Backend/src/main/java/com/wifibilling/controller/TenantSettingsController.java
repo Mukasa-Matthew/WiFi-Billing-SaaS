@@ -111,6 +111,7 @@ public class TenantSettingsController {
         if (req.portalShowDeviceLimits() != null) tenant.setPortalShowDeviceLimits(req.portalShowDeviceLimits());
         if (req.portalShowDeviceMac() != null) tenant.setPortalShowDeviceMac(req.portalShowDeviceMac());
         if (req.portalShowPackageTime() != null) tenant.setPortalShowPackageTime(req.portalShowPackageTime());
+        if (req.portalShowPackageSpeed() != null) tenant.setPortalShowPackageSpeed(req.portalShowPackageSpeed());
         if (req.portalAllowPurchases() != null) tenant.setPortalAllowPurchases(req.portalAllowPurchases());
         if (req.portalBuyForOther() != null) tenant.setPortalBuyForOther(req.portalBuyForOther());
         if (req.portalShowFeedback() != null) tenant.setPortalShowFeedback(req.portalShowFeedback());
@@ -185,6 +186,7 @@ public class TenantSettingsController {
                 Boolean.TRUE.equals(t.getPortalShowDeviceLimits()),
                 Boolean.TRUE.equals(t.getPortalShowDeviceMac()),
                 !Boolean.FALSE.equals(t.getPortalShowPackageTime()),
+                !Boolean.FALSE.equals(t.getPortalShowPackageSpeed()),
                 !Boolean.FALSE.equals(t.getPortalAllowPurchases()),
                 !Boolean.FALSE.equals(t.getPortalBuyForOther()),
                 !Boolean.FALSE.equals(t.getPortalShowFeedback()),

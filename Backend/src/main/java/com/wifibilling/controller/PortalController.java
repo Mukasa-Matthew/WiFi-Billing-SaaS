@@ -80,6 +80,7 @@ public class PortalController {
                 Boolean.TRUE.equals(tenant.getPortalShowDeviceLimits()),
                 Boolean.TRUE.equals(tenant.getPortalShowDeviceMac()),
                 !Boolean.FALSE.equals(tenant.getPortalShowPackageTime()),
+                !Boolean.FALSE.equals(tenant.getPortalShowPackageSpeed()),
                 !Boolean.FALSE.equals(tenant.getPortalAllowPurchases()),
                 // School vouchers are tied to the verified student's own device.
                 !tenant.isSchool() && !Boolean.FALSE.equals(tenant.getPortalBuyForOther()),

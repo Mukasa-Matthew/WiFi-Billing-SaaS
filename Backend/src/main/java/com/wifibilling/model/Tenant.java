@@ -162,6 +162,10 @@ public class Tenant {
     @Builder.Default
     private Boolean portalShowPackageTime = true;
 
+    @Column(name = "portal_show_package_speed")
+    @Builder.Default
+    private Boolean portalShowPackageSpeed = true;
+
     @Column(name = "portal_allow_purchases")
     @Builder.Default
     private Boolean portalAllowPurchases = true;

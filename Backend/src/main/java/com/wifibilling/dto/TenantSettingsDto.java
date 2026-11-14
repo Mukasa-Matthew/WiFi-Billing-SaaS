@@ -29,6 +29,7 @@ public record TenantSettingsDto(
         Boolean portalShowDeviceLimits,
         Boolean portalShowDeviceMac,
         Boolean portalShowPackageTime,
+        Boolean portalShowPackageSpeed,
         Boolean portalAllowPurchases,
         Boolean portalBuyForOther,
         Boolean portalShowFeedback,

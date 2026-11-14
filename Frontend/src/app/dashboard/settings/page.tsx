@@ -37,6 +37,7 @@ interface TenantSettings {
   portalShowDeviceLimits: boolean;
   portalShowDeviceMac: boolean;
   portalShowPackageTime: boolean;
+  portalShowPackageSpeed: boolean;
   portalAllowPurchases: boolean;
   portalBuyForOther: boolean;
   portalShowFeedback: boolean;
@@ -576,6 +577,7 @@ export default function TenantSettingsPage() {
                 <Toggle on={form.portalAllowPurchases} onChange={(v) => set("portalAllowPurchases", v)} title="Allow online purchases" desc="Show the buy options on packages." />
                 <Toggle on={form.portalShowDeviceLimits} onChange={(v) => set("portalShowDeviceLimits", v)} title="Show package device limits" />
                 <Toggle on={form.portalShowPackageTime} onChange={(v) => set("portalShowPackageTime", v)} title="Show package time" desc='Prints how long each package lasts under its name, e.g. "1 Hour".' />
+                <Toggle on={form.portalShowPackageSpeed} onChange={(v) => set("portalShowPackageSpeed", v)} title="Show package speed" desc='Prints the speed each package gets under its name, e.g. "Speed 5M/5M".' />
                 <Toggle on={form.portalShowDeviceMac} onChange={(v) => set("portalShowDeviceMac", v)} title="Show device MAC" />
                 <Toggle on={form.portalBuyForOther} onChange={(v) => set("portalBuyForOther", v)} title="Buy for TV or another device" />
                 <Toggle on={form.portalShowFeedback} onChange={(v) => set("portalShowFeedback", v)} title="Show feedback button" />

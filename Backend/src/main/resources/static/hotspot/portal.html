@@ -900,7 +900,7 @@ function renderPackages(plans) {
         var meta = document.createElement('span'); meta.className = 'pkg-meta';
         var cfg = window.PORTAL_CFG || {};
         meta.textContent = [cfg.showPackageTime !== false && p.sessionTimeout ? fmtDuration(p.sessionTimeout) : '',
-            p.rateLimit ? 'Speed ' + p.rateLimit : '',
+            cfg.showPackageSpeed !== false && p.rateLimit ? 'Speed ' + p.rateLimit : '',
             cfg.showDeviceLimits !== false ? '1 Device' : ''].filter(Boolean).join(' · ');
         left.appendChild(meta);
         var right = document.createElement('span'); right.className = 'pkg-right';
