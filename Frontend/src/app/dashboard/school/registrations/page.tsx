@@ -115,6 +115,29 @@ export default function SchoolRegistrationsPage() {
   const [rejectReason, setRejectReason] = useState("");
   const startReject = (reg: Registration) => { setRejecting(reg); setRejectReason(""); };
 
+  const [resending, setResending] = useState<Registration | null>(null);
+  const [resendEmail, setResendEmail] = useState("");
+  const resend = async (reg: Registration) => {
+    setBusy(reg.id);
+    try {
+      const corrected = resendEmail.trim() !== reg.email ? resendEmail.trim() : "";
+      const { data } = await api.post<{ email: string; delivered: boolean; slip: { id: string; name: string; identifier: string; pin: string } | null }>(
+        `/api/school/registrations/${reg.id}/resend`, corrected ? { email: corrected } : {});
+      if (data.delivered) {
+        toast("success", `A fresh PIN was emailed to ${data.email}.`);
+      } else {
+        if (data.slip) setUnsent((prev) => [...prev, data.slip!]);
+        toast("error", `Couldn't deliver to ${data.email} — the new PIN is listed at the top to hand out.`);
+      }
+      setResending(null);
+      registrations.load();
+    } catch (err) {
+      toast("error", message(err));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const data = registrations.data;
   const switchStatus = (v: Status) => { setStatus(v); setPage(0); };
 
@@ -269,6 +292,23 @@ export default function SchoolRegistrationsPage() {
                   <button type="button" disabled={busy === r.id} onClick={() => startReject(r)} className={buttonGhost}>
                     <XCircle className="h-4 w-4" />
                     Reject
+                  </button>
+                </div>
+              ),
+            }] : []),
+            ...(status === "APPROVED" ? [{
+              label: "",
+              render: (r: Registration) => resending?.id === r.id ? (
+                <div className="flex items-center justify-end gap-2">
+                  <input className={`${field} w-56`} type="email" value={resendEmail} onChange={(e) => setResendEmail(e.target.value)} maxLength={254} placeholder="their-email@example.com" autoFocus />
+                  <button type="button" disabled={busy === r.id || !resendEmail.trim()} onClick={() => resend(r)} className={button}>{busy === r.id ? "Sending…" : "Send"}</button>
+                  <button type="button" className={buttonGhost} onClick={() => setResending(null)}>Cancel</button>
+                </div>
+              ) : (
+                <div className="flex items-center justify-end gap-2">
+                  <button type="button" disabled={busy === r.id} onClick={() => { setResending(r); setResendEmail(r.email); }} className={buttonGhost}>
+                    <NotePencil className="h-4 w-4" />
+                    Fix email / resend
                   </button>
                 </div>
               ),

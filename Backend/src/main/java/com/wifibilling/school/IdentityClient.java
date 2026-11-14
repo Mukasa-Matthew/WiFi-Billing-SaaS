@@ -84,6 +84,12 @@ public class IdentityClient {
         if (accessUntil != null) body.put("accessUntil", accessUntil.toString());
         call("PATCH", school(tenantId, "/registrations/" + id), body);
     }
+    public JsonNode resendRegistration(long tenantId, UUID id, String email, String decidedBy) {
+        var body = new java.util.HashMap<String, Object>();
+        body.put("decidedBy", decidedBy);
+        if (email != null && !email.isBlank()) body.put("email", email.trim());
+        return call("POST", school(tenantId, "/registrations/" + id + "/resend"), body);
+    }
     public JsonNode verify(long tenantId, String identifier, String pin, String mac) {
         return call("POST", school(tenantId, "/portal/verify"), mac == null ? Map.of("identifier", identifier, "pin", pin) : Map.of("identifier", identifier, "pin", pin, "deviceMac", mac));
     }

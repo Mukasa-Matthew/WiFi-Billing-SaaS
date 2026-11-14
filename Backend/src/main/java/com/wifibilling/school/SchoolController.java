@@ -110,4 +110,14 @@ public class SchoolController {
         }
         identity.correctRegistration(tenant.getId(), id, body.fullName(), body.registrationNumber(), body.accessUntil(), principal.getName() + " (" + principal.getUsername() + ")");
     }
+
+    /** Sends an approved student's PIN email again — to their address, or a corrected one when they mistyped it. */
+    public record RegistrationResend(@Email @Size(max = 254) String email) {}
+
+    @PostMapping("/registrations/{id}/resend")
+    public JsonNode resendRegistration(@AuthenticationPrincipal TenantPrincipal principal, @PathVariable UUID id,
+            @Valid @RequestBody(required = false) RegistrationResend body) {
+        var tenant = schools.school(principal.getTenantId());
+        return identity.resendRegistration(tenant.getId(), id, body == null ? null : body.email(), principal.getName() + " (" + principal.getUsername() + ")");
+    }
 }
