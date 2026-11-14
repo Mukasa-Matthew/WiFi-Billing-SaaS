@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { CheckCircle, Copy, GraduationCap, Lock, ShieldCheck, Ticket, UserPlus, Users, WarningCircle, XCircle } from "@/components/icons";
 import {
@@ -55,6 +55,11 @@ interface ActiveSession {
   nasIpAddress: string | null; acctSessionTime: number | null; acctInputOctets?: number | null;
   acctOutputOctets?: number | null; totalOctets: number | null; category?: string | null;
   categoryLabel?: string | null; packageName?: string | null; customerName?: string | null; personName?: string | null; rateLimit?: string | null;
+}
+interface Person {
+  id: string; fullName: string; groupCode: string; groupName: string; category: string;
+  email?: string | null; effectiveStatus: string; accessUntil?: string | null;
+  identifiers: { type: string; raw: string }[];
 }
 interface CategoryDataItem {
   category: string; label: string; free: boolean; downBytes: number; upBytes: number; totalBytes: number; users: number;
@@ -309,6 +314,9 @@ export default function SchoolPage() {
         <NetworkSizeCard />
         </div>
       </div>
+
+      {/* People directory — owner can fix group placement mistakes themselves */}
+      <PeopleDirectoryCard />
 
       {/* Live Connected Devices with Speed, Data Usage, Cap Progress & Disconnect Action */}
       <Card
@@ -1435,5 +1443,156 @@ function ExceptionRow({ request, now, onDecided }: { request: StaffException; no
         </button>
       </div>
     </li>
+  );
+}
+
+function PeopleDirectoryCard() {
+  const toast = useToast();
+  const [search, setSearch] = useState("");
+  const [q, setQ] = useState("");
+  const [page, setPage] = useState(0);
+  const [moving, setMoving] = useState<Person | null>(null);
+  const [staffId, setStaffId] = useState("");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => { setQ(search.trim()); setPage(0); }, 300);
+    return () => clearTimeout(t);
+  }, [search]);
+  const people = useApi<Page<Person>>(`/api/school/people?q=${encodeURIComponent(q)}&page=${page}`);
+
+  const move = async (person: Person, groupCode: string) => {
+    setBusy(true);
+    try {
+      await api.post(`/api/school/people/${person.id}/group`, {
+        groupCode,
+        ...(staffId.trim() ? { staffId: staffId.trim() } : {}),
+      });
+      toast("success", `${person.fullName} moved to ${groupCode === "staff" ? "Staff" : "Students"}. Staff get free internet — they are never asked to pay.`);
+      setMoving(null);
+      setStaffId("");
+      people.load();
+    } catch (err) {
+      toast("error", message(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const rows = people.data?.content ?? [];
+  return (
+    <Card
+      title="People"
+      description="Every student and staff member registered at this school. If IT placed someone in the wrong group, fix it here — moving a person to Staff gives them free internet automatically."
+      bodyClassName=""
+    >
+      <div className="border-b border-[var(--border)] p-4">
+        <input
+          className={field}
+          placeholder="Search by name, registration number, staff ID or email…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+      <Table
+        rows={rows}
+        loading={people.loading && !people.data}
+        rowKey={(p) => p.id}
+        emptyIcon={<Users />}
+        emptyTitle={q ? "Nobody matches that search" : "No people registered yet"}
+        emptyDescription="Students and staff appear here once IT registers or approves them."
+        columns={[
+          {
+            label: "Person",
+            render: (p) => (
+              <div>
+                <div className="font-medium text-[var(--fg)]">{p.fullName}</div>
+                {p.email && <div className="text-xs text-[var(--fg-muted)]">{p.email}</div>}
+              </div>
+            ),
+          },
+          {
+            label: "ID number",
+            render: (p) => (
+              <div className="text-xs">
+                {p.identifiers.map((i) => (
+                  <div key={i.type + i.raw}>
+                    <span className="text-[var(--fg-muted)]">{i.type === "STAFF" ? "Staff" : "Reg"}:</span> {i.raw}
+                  </div>
+                ))}
+              </div>
+            ),
+          },
+          {
+            label: "Group",
+            render: (p) => (
+              <Badge tone={p.category === "STAFF" ? "green" : "blue"}>
+                {p.category === "STAFF" ? "Staff · free WiFi" : p.groupName || p.groupCode}
+              </Badge>
+            ),
+          },
+          {
+            label: "Status",
+            render: (p) => (
+              <Badge tone={p.effectiveStatus === "ACTIVE" ? "green" : "amber"}>{humanize(p.effectiveStatus)}</Badge>
+            ),
+          },
+          {
+            label: "",
+            className: "text-right",
+            render: (p) => {
+              const isStaff = p.category === "STAFF" || p.groupCode === "staff";
+              const hasStaffId = p.identifiers.some((i) => i.type === "STAFF");
+              if (moving?.id === p.id) {
+                return (
+                  <div className="flex flex-col items-end gap-2">
+                    {!hasStaffId && (
+                      <input
+                        className={field}
+                        placeholder="Staff ID e.g. SNAHP/SF/02"
+                        value={staffId}
+                        onChange={(e) => setStaffId(e.target.value)}
+                      />
+                    )}
+                    {!isStaff && !hasStaffId && (
+                      <p className="text-xs text-[var(--fg-muted)]">Type their staff ID number first.</p>
+                    )}
+                    <div className="flex gap-2">
+                      <button type="button" disabled={busy || (!hasStaffId && !staffId.trim())} onClick={() => move(p, "staff")} className={button}>
+                        Make staff
+                      </button>
+                      <button type="button" disabled={busy} onClick={() => { setMoving(null); setStaffId(""); }} className={buttonGhost}>
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+              return isStaff ? (
+                <button type="button" disabled={busy} onClick={() => move(p, "student")} className={buttonGhost}>
+                  Move to students
+                </button>
+              ) : (
+                <button type="button" disabled={busy} onClick={() => { setMoving(p); setStaffId(""); }} className={buttonGhost}>
+                  Move to staff
+                </button>
+              );
+            },
+          },
+        ]}
+      />
+      {(people.data?.totalElements ?? 0) > 20 && (
+        <div className="flex items-center justify-between border-t border-[var(--border)] p-4 text-sm text-[var(--fg-muted)]">
+          <span>{people.data?.totalElements.toLocaleString()} people</span>
+          <div className="flex gap-2">
+            <button type="button" disabled={page === 0} onClick={() => setPage(page - 1)} className={buttonGhost}>
+              Previous
+            </button>
+            <button type="button" disabled={(page + 1) * 20 >= (people.data?.totalElements ?? 0)} onClick={() => setPage(page + 1)} className={buttonGhost}>
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+    </Card>
   );
 }

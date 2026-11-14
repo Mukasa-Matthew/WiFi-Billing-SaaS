@@ -120,4 +120,22 @@ public class SchoolController {
         var tenant = schools.school(principal.getTenantId());
         return identity.resendRegistration(tenant.getId(), id, body == null ? null : body.email(), principal.getName() + " (" + principal.getUsername() + ")");
     }
+
+    /** The school's people (students and staff), searchable, so the owner can fix mistakes themselves. */
+    @GetMapping("/people")
+    public JsonNode people(@AuthenticationPrincipal TenantPrincipal principal,
+            @RequestParam(defaultValue = "") @Size(max = 128) String q,
+            @RequestParam(defaultValue = "0") @Min(0) int page) {
+        return identity.people(schools.school(principal.getTenantId()).getId(), q, page);
+    }
+
+    /** Moves a person between groups — e.g. a staff member IT accidentally placed in the student group. */
+    public record PersonGroup(@NotBlank @Size(max = 64) String groupCode, @Size(max = 128) String staffId) {}
+
+    @PostMapping("/people/{id}/group")
+    public JsonNode setPersonGroup(@AuthenticationPrincipal TenantPrincipal principal, @PathVariable String id,
+            @Valid @RequestBody PersonGroup body) {
+        var tenant = schools.school(principal.getTenantId());
+        return identity.setPersonGroup(tenant.getId(), id, body.groupCode(), body.staffId(), principal.getName() + " (" + principal.getUsername() + ")");
+    }
 }

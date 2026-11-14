@@ -57,6 +57,13 @@ public class IdentityClient {
         return call("GET", school(tenantId, "/people?query=" + URLEncoder.encode(query == null ? "" : query, StandardCharsets.UTF_8) + "&page=" + page + "&size=20"), null);
     }
     public void unlock(long tenantId, String personId) { call("POST", school(tenantId, "/people/" + URLEncoder.encode(personId, StandardCharsets.UTF_8) + "/unlock"), null); }
+    public JsonNode setPersonGroup(long tenantId, String personId, String groupCode, String staffId, String decidedBy) {
+        var body = new java.util.HashMap<String, Object>();
+        body.put("groupCode", groupCode);
+        body.put("decidedBy", decidedBy);
+        if (staffId != null && !staffId.isBlank()) body.put("staffId", staffId.trim());
+        return call("POST", school(tenantId, "/people/" + URLEncoder.encode(personId, StandardCharsets.UTF_8) + "/group"), body);
+    }
     public JsonNode visitorPasses(long tenantId, int page) { return call("GET", school(tenantId, "/visitor-passes?page=" + page + "&size=50"), null); }
     public JsonNode staffExceptions(long tenantId, String status) {
         return call("GET", school(tenantId, "/staff-exceptions" + (status == null ? "" : "?status=" + URLEncoder.encode(status, StandardCharsets.UTF_8))), null);
