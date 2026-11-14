@@ -64,8 +64,9 @@ public class IdentityClient {
     public JsonNode decideStaffException(long tenantId, UUID request, boolean approve, String decidedBy) {
         return call("POST", school(tenantId, "/staff-exceptions/" + request + "/decision"), Map.of("approve", approve, "decidedBy", decidedBy));
     }
-    public JsonNode registrations(long tenantId, String status, int page) {
-        return call("GET", school(tenantId, "/registrations?status=" + URLEncoder.encode(status, StandardCharsets.UTF_8) + "&page=" + Math.max(0, page) + "&size=50"), null);
+    public JsonNode registrations(long tenantId, String status, String query, int page) {
+        return call("GET", school(tenantId, "/registrations?status=" + URLEncoder.encode(status, StandardCharsets.UTF_8)
+                + "&q=" + URLEncoder.encode(query == null ? "" : query, StandardCharsets.UTF_8) + "&page=" + Math.max(0, page) + "&size=50"), null);
     }
     public JsonNode decideRegistrations(long tenantId, java.util.List<UUID> ids, boolean approve, String reason, String decidedBy) {
         var body = new java.util.HashMap<String, Object>();

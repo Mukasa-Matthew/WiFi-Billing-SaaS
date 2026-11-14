@@ -85,8 +85,9 @@ public class SchoolController {
     @GetMapping("/registrations")
     public JsonNode registrations(@AuthenticationPrincipal TenantPrincipal principal,
             @RequestParam(defaultValue = "PENDING") @Pattern(regexp = "PENDING|APPROVED|REJECTED") String status,
+            @RequestParam(defaultValue = "") @Size(max = 128) String q,
             @RequestParam(defaultValue = "0") @Min(0) int page) {
-        return identity.registrations(schools.school(principal.getTenantId()).getId(), status, page);
+        return identity.registrations(schools.school(principal.getTenantId()).getId(), status, q, page);
     }
 
     public record RegistrationDecision(@NotEmpty @Size(max = 500) List<@NotNull UUID> ids, @NotNull Boolean approve, @Size(max = 500) String reason) {}

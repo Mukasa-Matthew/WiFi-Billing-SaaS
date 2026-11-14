@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { CheckCircle, Copy, NotePencil, XCircle } from "@/components/icons";
 import {
@@ -32,7 +32,13 @@ export default function SchoolRegistrationsPage() {
   const toast = useToast();
   const [status, setStatus] = useState<Status>("PENDING");
   const [page, setPage] = useState(0);
-  const registrations = useApi<Page<Registration>>(`/api/school/registrations?status=${status}&page=${page}`);
+  const [search, setSearch] = useState("");
+  const [q, setQ] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => { setQ(search.trim()); setPage(0); }, 300);
+    return () => clearTimeout(t);
+  }, [search]);
+  const registrations = useApi<Page<Registration>>(`/api/school/registrations?status=${status}&page=${page}&q=${encodeURIComponent(q)}`);
   const overview = useApi<{ school?: { registrationPrefixes?: string[] } }>("/api/school");
   const storedPrefixes = overview.data?.school?.registrationPrefixes ?? [];
   const [prefixInput, setPrefixInput] = useState<string | null>(null);
@@ -181,12 +187,21 @@ export default function SchoolRegistrationsPage() {
         }
         bodyClassName=""
       >
+        <div className="border-b border-[var(--border-soft)] px-5 py-3">
+          <input
+            aria-label="Search registrations"
+            placeholder="Search name, registration number or email…"
+            className={`${field} max-w-sm`}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
         <Table
           rows={data?.content ?? []}
           loading={registrations.loading && !data}
           rowKey={(r) => r.id}
           paginated={false}
-          searchPlaceholder="Search name, registration number or email…"
+          searchable={false}
           emptyIcon={<CheckCircle />}
           emptyTitle={status === "PENDING" ? "Nothing waiting for a decision" : `No ${status.toLowerCase()} registrations`}
           emptyDescription={status === "PENDING" ? "New student sign-ups appear here as they come in." : undefined}
