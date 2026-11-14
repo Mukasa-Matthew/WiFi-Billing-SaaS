@@ -236,6 +236,11 @@ export default function SchoolRegistrationsPage() {
                   <input className={field} value={editName} onChange={(e) => setEditName(e.target.value)} maxLength={200} placeholder="Full name" />
                   <div className="mt-1 truncate text-xs text-[var(--fg-muted)]">{r.email}</div>
                 </div>
+              ) : resending?.id === r.id ? (
+                <div className="min-w-0">
+                  <div className="truncate font-medium text-[var(--fg)]">{r.fullName}</div>
+                  <input className={`${field} mt-1`} type="email" value={resendEmail} onChange={(e) => setResendEmail(e.target.value)} maxLength={254} placeholder="Correct email address" autoFocus />
+                </div>
               ) : (
                 <div className="min-w-0">
                   <div className="truncate font-medium text-[var(--fg)]">{r.fullName}</div>
@@ -300,7 +305,6 @@ export default function SchoolRegistrationsPage() {
               label: "",
               render: (r: Registration) => resending?.id === r.id ? (
                 <div className="flex items-center justify-end gap-2">
-                  <input className={`${field} w-56`} type="email" value={resendEmail} onChange={(e) => setResendEmail(e.target.value)} maxLength={254} placeholder="their-email@example.com" autoFocus />
                   <button type="button" disabled={busy === r.id || !resendEmail.trim()} onClick={() => resend(r)} className={button}>{busy === r.id ? "Sending…" : "Send"}</button>
                   <button type="button" className={buttonGhost} onClick={() => setResending(null)}>Cancel</button>
                 </div>
