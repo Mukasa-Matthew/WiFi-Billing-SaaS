@@ -305,8 +305,9 @@
             <button type="submit" class="btn btn-dark" onclick="document.getElementById('password-input').value = document.getElementById('username-input').value.trim();">Connect</button>
         </form>
 
-        <button type="button" class="btn btn-outline" onclick="showFind()">🔍 &nbsp;Already bought? Find your voucher</button>
         </div>
+
+        <button type="button" class="btn btn-outline" id="find-voucher-btn" onclick="showFind()">🔍 &nbsp;Already bought? Find your voucher</button>
 
         <div class="voucher-result" id="voucher-result">
             <div style="font-size:11.5px;color:var(--muted)">Your voucher code</div>
