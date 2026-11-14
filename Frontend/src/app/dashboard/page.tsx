@@ -187,9 +187,10 @@ export default function TenantDashboardOverview() {
       <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <StatCard label="Online now" href="/dashboard/users" icon={<Radio />} tone="green" value={s ? s.activeUsers.toLocaleString() : "—"} hintText={(() => {
           const cat = s?.activeByCategory;
-          if (!cat || (!cat.STUDENT && !cat.STAFF && !cat.VISITOR)) return "Customers connected right now";
+          if (!cat || (!cat.STUDENT && !cat.STUDENT_FREE && !cat.STAFF && !cat.VISITOR)) return "Customers connected right now";
           const parts = [
             cat.STUDENT ? `${cat.STUDENT} student${cat.STUDENT === 1 ? "" : "s"}` : "",
+            cat.STUDENT_FREE ? `${cat.STUDENT_FREE} free student${cat.STUDENT_FREE === 1 ? "" : "s"}` : "",
             cat.STAFF ? `${cat.STAFF} staff` : "",
             cat.VISITOR ? `${cat.VISITOR} visitor${cat.VISITOR === 1 ? "" : "s"}` : "",
             cat.PAID_CUSTOMER ? `${cat.PAID_CUSTOMER} customer${cat.PAID_CUSTOMER === 1 ? "" : "s"}` : "",
@@ -380,7 +381,7 @@ export default function TenantDashboardOverview() {
                         <span className="min-w-0">
                           <span className="flex flex-wrap items-center gap-1.5">
                             <span className="truncate text-[13.5px] font-medium text-[var(--fg)]">{u.customer || u.username}</span>
-                            {u.categoryLabel && <Badge tone={u.category === "STUDENT" ? "green" : u.category === "STAFF" ? "blue" : u.category === "VISITOR" ? "amber" : "slate"}>{u.categoryLabel}</Badge>}
+                            {u.categoryLabel && <Badge tone={u.category === "STUDENT" || u.category === "STUDENT_FREE" ? "green" : u.category === "STAFF" ? "blue" : u.category === "VISITOR" ? "amber" : "slate"}>{u.categoryLabel}</Badge>}
                           </span>
                           <span className="block truncate text-xs text-[var(--fg-muted)]">{[u.package, u.phone].filter(Boolean).join(" · ") || u.username}</span>
                         </span>
@@ -558,6 +559,7 @@ const GROUP_COLOR: Record<string, string> = {
 };
 const CATEGORY_COLOR: Record<string, string> = {
   STUDENT: "var(--status-good)",
+  STUDENT_FREE: "#34D399",
   STAFF: "var(--chart-1)",
   VISITOR: "var(--status-warn)",
   PAID_CUSTOMER: "#8B5CF6",

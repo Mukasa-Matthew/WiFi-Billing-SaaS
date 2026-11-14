@@ -11,6 +11,7 @@ interface User {id:number;customerId:number|null;customerName:string|null;phone:
 
 const CATEGORY_TONE: Record<string, "green" | "blue" | "amber" | "slate"> = {
   STUDENT: "green",
+  STUDENT_FREE: "green",
   STAFF: "blue",
   VISITOR: "amber",
   PAID_CUSTOMER: "slate",
@@ -18,7 +19,7 @@ const CATEGORY_TONE: Record<string, "green" | "blue" | "amber" | "slate"> = {
 
 function CategoryBadge({u}:{u:User}) {
  const cat = u.category || "PAID_CUSTOMER";
- const lbl = u.categoryLabel || (cat === "STUDENT" ? "Paid Student" : cat === "STAFF" ? "School Staff" : cat === "VISITOR" ? "Visitor Pass" : "Paid Customer");
+ const lbl = u.categoryLabel || (cat === "STUDENT" ? "Paid Student" : cat === "STUDENT_FREE" ? "Free Student" : cat === "STAFF" ? "School Staff" : cat === "VISITOR" ? "Visitor Pass" : "Paid Customer");
  return <Badge tone={CATEGORY_TONE[cat] ?? "slate"}>{lbl}</Badge>;
 }
 
@@ -49,7 +50,7 @@ export default function UserDirectory({expired=false}:{expired?:boolean}) {
  const toast=useToast();
  const {confirm,dialog}=useConfirmDialog();
  const active=data.filter(u=>u.status==="active"), online=active.filter(u=>u.online), offline=active.filter(u=>!u.online);
- const onlineStudents=online.filter(u=>u.category==="STUDENT").length;
+ const onlineStudents=online.filter(u=>u.category==="STUDENT"||u.category==="STUDENT_FREE").length;
  const onlineStaff=online.filter(u=>u.category==="STAFF").length;
  const onlineVisitors=online.filter(u=>u.category==="VISITOR").length;
  const onlineCustomers=online.filter(u=>!u.category||u.category==="PAID_CUSTOMER").length;
@@ -87,7 +88,7 @@ export default function UserDirectory({expired=false}:{expired?:boolean}) {
   </div>:<>
    <div className="grid gap-4 sm:grid-cols-3"><StatCard label="All active" value={loading?"—":active.length} icon={<Users size={20}/>} hintText="Vouchers within their validity period"/><StatCard label="Online now" value={loading?"—":online.length} icon={<WifiHigh size={20}/>} tone="green" hintText={hasSchoolCategories?`${onlineStudents} student · ${onlineStaff} staff · ${onlineVisitors} visitor${onlineCustomers?` · ${onlineCustomers} customer`:""}`:"Seen connected in the last few minutes"}/><StatCard label="Offline" value={loading?"—":offline.length} icon={<WifiSlash size={20}/>} hintText="Valid access with no recent connection"/></div>
    <div className="flex flex-wrap items-center justify-between gap-3">
-    {hasSchoolCategories ? <FilterTabs loading={loading} value={catFilter} onChange={setCatFilter} options={[{key:"ALL",label:"All types",count:baseRows.length},{key:"STUDENT",label:"Paid Students",count:baseRows.filter(u=>u.category==="STUDENT").length},{key:"STAFF",label:"School Staff",count:baseRows.filter(u=>u.category==="STAFF").length},{key:"VISITOR",label:"Visitor Passes",count:baseRows.filter(u=>u.category==="VISITOR").length},{key:"PAID_CUSTOMER",label:"Walk-in / Paid",count:baseRows.filter(u=>!u.category||u.category==="PAID_CUSTOMER").length}]}/> : <span />}
+    {hasSchoolCategories ? <FilterTabs loading={loading} value={catFilter} onChange={setCatFilter} options={[{key:"ALL",label:"All types",count:baseRows.length},{key:"STUDENT",label:"Paid Students",count:baseRows.filter(u=>u.category==="STUDENT").length},{key:"STUDENT_FREE",label:"Free Students",count:baseRows.filter(u=>u.category==="STUDENT_FREE").length},{key:"STAFF",label:"School Staff",count:baseRows.filter(u=>u.category==="STAFF").length},{key:"VISITOR",label:"Visitor Passes",count:baseRows.filter(u=>u.category==="VISITOR").length},{key:"PAID_CUSTOMER",label:"Walk-in / Paid",count:baseRows.filter(u=>!u.category||u.category==="PAID_CUSTOMER").length}]}/> : <span />}
     <FilterTabs loading={loading} value={tab} onChange={setTab} options={[{key:"ONLINE",label:"Online now",count:online.length},{key:"OFFLINE",label:"Offline",count:offline.length},{key:"ALL",label:"All active",count:active.length}]}/>
    </div>
   </>}

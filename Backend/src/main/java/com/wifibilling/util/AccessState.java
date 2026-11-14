@@ -32,9 +32,10 @@ public final class AccessState {
                 : null;
     }
 
-    /** STUDENT, STAFF, VISITOR, or PAID_CUSTOMER for a voucher. */
+    /** STUDENT, STUDENT_FREE (daily free study data), STAFF, VISITOR, or PAID_CUSTOMER for a voucher. */
     public static String category(Voucher v) {
         if (v == null) return "PAID_CUSTOMER";
+        if ("STUDENT".equals(v.getSchoolCategory()) && "SCHOOL_STUDENT_FREE".equals(v.getSaleType())) return "STUDENT_FREE";
         if (v.getSchoolCategory() != null && !v.getSchoolCategory().isBlank()) return v.getSchoolCategory();
         if ("SCHOOL_STAFF".equals(v.getSaleType())) return "STAFF";
         if ("SCHOOL_VISITOR".equals(v.getSaleType())) return "VISITOR";
@@ -46,6 +47,7 @@ public final class AccessState {
         if (v != null && "GIVEAWAY".equals(v.getSaleType())) return "Giveaway";
         return switch (category(v)) {
             case "STUDENT" -> "Paid Student";
+            case "STUDENT_FREE" -> "Free Student";
             case "STAFF" -> "School Staff";
             case "VISITOR" -> "Visitor Pass";
             default -> "Paid Customer";
@@ -62,6 +64,7 @@ public final class AccessState {
         if ("GIVEAWAY".equals(v.getSaleType())) return "Giveaway";
         return switch (category(v)) {
             case "STUDENT" -> "Paid Student";
+            case "STUDENT_FREE" -> "Free Student";
             case "STAFF" -> "School Staff";
             case "VISITOR" -> "School Visitor";
             default -> "Paid Customer";

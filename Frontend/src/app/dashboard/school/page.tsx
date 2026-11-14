@@ -68,10 +68,11 @@ const PASS_TONE: Record<string, "green" | "blue" | "amber" | "slate"> = {
   IN_USE: "green", UNUSED: "blue", EXPIRED: "slate", REVOKED: "amber",
 };
 const CAT_TONE: Record<string, "green" | "blue" | "amber" | "slate"> = {
-  STUDENT: "green", STAFF: "blue", VISITOR: "amber", PAID_CUSTOMER: "slate",
+  STUDENT: "green", STUDENT_FREE: "green", STAFF: "blue", VISITOR: "amber", PAID_CUSTOMER: "slate",
 };
 const CAT_COLOR: Record<string, string> = {
   STUDENT: "var(--status-good)",
+  STUDENT_FREE: "#34D399",
   STAFF: "var(--chart-1)",
   VISITOR: "var(--status-warn)",
   PAID_CUSTOMER: "#8B5CF6",
@@ -169,7 +170,7 @@ export default function SchoolPage() {
   const school = overview.data?.school;
   const settings = overview.data?.settings;
   const connected = liveSessions.data ?? [];
-  const connectedStudents = connected.filter((s) => s.category === "STUDENT").length;
+  const connectedStudents = connected.filter((s) => s.category === "STUDENT" || s.category === "STUDENT_FREE").length;
   const connectedStaff = connected.filter((s) => s.category === "STAFF").length;
   const connectedVisitors = connected.filter((s) => s.category === "VISITOR").length;
   const connectedCustomers = connected.filter((s) => !s.category || s.category === "PAID_CUSTOMER").length;
@@ -507,6 +508,7 @@ function SchoolBandwidthMonitor({
 }) {
   const categories = usage?.categories ?? [
     { category: "STUDENT", label: "Paid Students", free: false, downBytes: 0, upBytes: 0, totalBytes: 0, users: 0 },
+    { category: "STUDENT_FREE", label: "Free Students", free: true, downBytes: 0, upBytes: 0, totalBytes: 0, users: 0 },
     { category: "STAFF", label: "School Staff", free: true, downBytes: 0, upBytes: 0, totalBytes: 0, users: 0 },
     { category: "VISITOR", label: "Visitors", free: true, downBytes: 0, upBytes: 0, totalBytes: 0, users: 0 },
     { category: "PAID_CUSTOMER", label: "Paid Customers", free: false, downBytes: 0, upBytes: 0, totalBytes: 0, users: 0 },
@@ -536,7 +538,7 @@ function SchoolBandwidthMonitor({
   return (
     <Card
       title="Bandwidth & data usage by school group"
-      description={`Compare how much internet Paid Students, Free Staff, Free Visitors, and Walk-in Customers consume (${periodLabel.toLowerCase()}).`}
+      description={`Compare how much internet Paid Students, Free Students, Free Staff, Free Visitors, and Walk-in Customers consume (${periodLabel.toLowerCase()}).`}
       action={<Segmented label="School bandwidth period" value={period} onChange={onPeriod} options={[...PERIOD_OPTIONS]} />}
     >
       <div className={`space-y-5 transition-opacity ${loading && usage ? "opacity-60" : ""}`}>

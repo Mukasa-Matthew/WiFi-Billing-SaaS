@@ -129,6 +129,7 @@ public interface RadAcctRepository extends JpaRepository<RadAcct, Long> {
     /** Per-category download, upload, and distinct users in a window, tenant-scoped. */
     @Query(value = """
             SELECT CASE
+                     WHEN v.school_category = 'STUDENT' AND v.sale_type = 'SCHOOL_STUDENT_FREE' THEN 'STUDENT_FREE'
                      WHEN v.school_category IS NOT NULL AND v.school_category <> '' THEN v.school_category
                      WHEN v.sale_type = 'SCHOOL_STAFF' THEN 'STAFF'
                      WHEN v.sale_type = 'SCHOOL_VISITOR' THEN 'VISITOR'

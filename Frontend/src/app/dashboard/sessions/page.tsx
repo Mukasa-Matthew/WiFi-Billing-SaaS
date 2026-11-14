@@ -119,7 +119,7 @@ export default function TenantActiveSessionsPage() {
   }, [sessions, search, catFilter]);
 
   const countByCat = useMemo(() => {
-    const counts: Record<string, number> = { ALL: sessions.length, STUDENT: 0, STAFF: 0, VISITOR: 0, PAID_CUSTOMER: 0 };
+    const counts: Record<string, number> = { ALL: sessions.length, STUDENT: 0, STUDENT_FREE: 0, STAFF: 0, VISITOR: 0, PAID_CUSTOMER: 0 };
     sessions.forEach((s) => {
       const c = s.category || "PAID_CUSTOMER";
       counts[c] = (counts[c] || 0) + 1;
@@ -223,6 +223,7 @@ export default function TenantActiveSessionsPage() {
           {(school ? [
             { key: "ALL", label: "All Connected" },
             { key: "STUDENT", label: "Paid Students" },
+            { key: "STUDENT_FREE", label: "Free Students" },
             { key: "STAFF", label: "School Staff" },
             { key: "VISITOR", label: "Visitor Passes" },
             { key: "PAID_CUSTOMER", label: "Paid Customers" },
@@ -283,7 +284,7 @@ export default function TenantActiveSessionsPage() {
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold ${
                         session.category === "STAFF" ? "bg-blue-500/10 text-blue-600 border border-blue-500/20" :
                         session.category === "VISITOR" ? "bg-amber-500/10 text-amber-600 border border-amber-500/20" :
-                        session.category === "STUDENT" ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20" :
+                        session.category === "STUDENT" || session.category === "STUDENT_FREE" ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20" :
                         "bg-[var(--fill)] text-[var(--fg-body)]"
                       }`}>
                         {session.categoryLabel || "Paid Customer"}

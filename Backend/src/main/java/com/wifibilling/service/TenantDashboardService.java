@@ -451,7 +451,7 @@ public class TenantDashboardService {
                 .build();
     }
 
-    private static final List<String> CATEGORY_ORDER = List.of("STUDENT", "STAFF", "VISITOR", "PAID_CUSTOMER");
+    private static final List<String> CATEGORY_ORDER = List.of("STUDENT", "STUDENT_FREE", "STAFF", "VISITOR", "PAID_CUSTOMER");
 
     private static String normalizeCategory(String raw) {
         return raw != null && CATEGORY_ORDER.contains(raw) ? raw : "PAID_CUSTOMER";
@@ -460,6 +460,7 @@ public class TenantDashboardService {
     private static String categoryTitle(String cat) {
         return switch (cat) {
             case "STUDENT" -> "Paid Students";
+            case "STUDENT_FREE" -> "Free Students";
             case "STAFF" -> "School Staff";
             case "VISITOR" -> "Visitors";
             default -> "Paid Customers";
@@ -467,7 +468,7 @@ public class TenantDashboardService {
     }
 
     private static boolean isFreeCategory(String cat) {
-        return "STAFF".equals(cat) || "VISITOR".equals(cat);
+        return "STUDENT_FREE".equals(cat) || "STAFF".equals(cat) || "VISITOR".equals(cat);
     }
 
     /**
