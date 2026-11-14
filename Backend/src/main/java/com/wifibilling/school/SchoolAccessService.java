@@ -132,7 +132,18 @@ public class SchoolAccessService {
                     })
                     .orElse(null);
             if (voucher == null) {
-                return PortalResult.signIn(null);
+                // Vouchers bought with cash or Mobile Money on a school network carry no school
+                // category — they still auto-reconnect like any ordinary hotspot voucher.
+                Voucher hotspot = vouchers.findLiveHotspotByTenantIdAndClaimedMac(tenant.getId(), mac).stream()
+                        .filter(v -> (v.getExpiresAt() == null || v.getExpiresAt().isAfter(now))
+                                && (v.getHardExpiresAt() == null || v.getHardExpiresAt().isAfter(now))
+                                && !Boolean.TRUE.equals(v.getSchoolHold()))
+                        .findFirst().orElse(null);
+                if (hotspot == null) return PortalResult.signIn(null);
+                OffsetDateTime limit = hotspot.getHardExpiresAt() != null ? hotspot.getHardExpiresAt() : now.plusDays(1);
+                reprovision(hotspot, router, mac, limit, null);
+                return PortalResult.connect(hotspot.getCode(), null, "PAID_CUSTOMER",
+                        hotspot.getExpiresAt() != null ? hotspot.getExpiresAt() : limit);
             }
             if (Boolean.TRUE.equals(voucher.getSchoolHold()) && !HOLD_CAP.equals(voucher.getDelivery())) {
                 return PortalResult.signIn(null);

@@ -441,6 +441,28 @@ class SchoolFlowIntegrationTest {
     }
 
     @Test
+    void cashBoughtVouchersAutoReconnectOnSchoolNetworks() throws Exception {
+        Site school = site("cash-resume-school", true);
+        var plan = plans.findById(school.planId().longValue()).orElseThrow();
+        // An ordinary cash sale: no school category, claimed by the phone that typed the code in.
+        vouchers.save(Voucher.builder().code("CASHCODE1").tenant(school.tenant()).packagePlan(plan)
+                .status("active").claimedMac(PHONE_MAC).firstLogin(OffsetDateTime.now().minusHours(1))
+                .expiresAt(OffsetDateTime.now().plusHours(5)).build());
+
+        String resumed = portal("resume", "{\"token\":\"" + school.routerToken() + "\",\"mac\":\"" + PHONE_MAC + "\"}");
+        assertEquals("CONNECT", JsonPath.read(resumed, "$.action"));
+        assertEquals("CASHCODE1", JsonPath.read(resumed, "$.code"));
+        assertEquals("PAID_CUSTOMER", JsonPath.read(resumed, "$.category"));
+        verifyNoInteractions(identity);
+
+        // An expired one still asks for sign-in instead.
+        vouchers.save(Voucher.builder().code("CASHOLD01").tenant(school.tenant()).packagePlan(plan)
+                .status("active").claimedMac(TABLET_MAC).firstLogin(OffsetDateTime.now().minusDays(2))
+                .expiresAt(OffsetDateTime.now().minusHours(1)).build());
+        assertEquals("SIGN_IN", JsonPath.read(portal("resume", "{\"token\":\"" + school.routerToken() + "\",\"mac\":\"" + TABLET_MAC + "\"}"), "$.action"));
+    }
+
+    @Test
     void studentDailyFreeDataAllowsStudySitesAndUpgradesToPaidPackageCleanly() throws Exception {
         Site school = site("student-free-school", true);
         when(identity.updateSchool(eq(school.tenant().getId()), anyMap()))
