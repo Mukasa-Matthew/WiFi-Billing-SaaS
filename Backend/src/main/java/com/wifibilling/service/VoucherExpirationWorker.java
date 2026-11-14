@@ -76,7 +76,11 @@ public class VoucherExpirationWorker {
      * identity-bound, and moves go through the school move flow instead.
      */
     private void reconcileDeviceLocks() {
-        List<Voucher> regular = voucherRepository.findAllByStatus(STATUS_ACTIVE).stream()
+        // Unused paid vouchers are swept too: they were pinned to the buyer's MAC
+        // at purchase, and since no session can ever be open on an unused code the
+        // pin would otherwise survive a MAC rotation and permanently lock the
+        // customer out of a voucher they paid for.
+        List<Voucher> regular = voucherRepository.findAllByStatusIn(List.of(STATUS_ACTIVE, STATUS_UNUSED)).stream()
                 .filter(v -> v.getSchoolCategory() == null)
                 .toList();
         if (regular.isEmpty()) return;

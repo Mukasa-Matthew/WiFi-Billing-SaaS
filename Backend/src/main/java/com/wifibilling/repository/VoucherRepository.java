@@ -78,6 +78,8 @@ public interface VoucherRepository extends JpaRepository<Voucher, Long> {
 
     List<Voucher> findAllByStatus(String status);
 
+    List<Voucher> findAllByStatusIn(List<String> statuses);
+
     long countByTenantId(Long tenantId);
 
     long countByTenantIdAndStatus(Long tenantId, String status);
