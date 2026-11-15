@@ -10,7 +10,7 @@ import {
 import { useToast } from "@/components/ui/Toast";
 
 interface Registration {
-  id: string; fullName: string; registrationNumber: string; email: string; courseEnds: string | null;
+  id: string; fullName: string; registrationNumber: string; email: string; phone: string | null; courseEnds: string | null;
   accessUntil: string | null; source: string | null; status: string; submittedAt: string;
   decidedAt: string | null; decidedBy: string | null; personId: string | null;
 }
@@ -245,6 +245,7 @@ export default function SchoolRegistrationsPage() {
                 <div className="min-w-0">
                   <div className="truncate font-medium text-[var(--fg)]">{r.fullName}</div>
                   <div className="truncate text-xs text-[var(--fg-muted)]">{r.email}</div>
+                  {r.phone && <a href={`tel:${r.phone}`} className="text-xs text-[var(--accent)] hover:underline">{r.phone}</a>}
                 </div>
               ),
             },
