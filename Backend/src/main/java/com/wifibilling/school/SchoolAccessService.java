@@ -250,10 +250,10 @@ public class SchoolAccessService {
     public void forgetRegistrationForm(long tenantId) { registrationForms.remove(tenantId); }
 
     /** Sends a student's self-registration to the identity system, where it waits for the school's IT person to approve it. */
-    public void register(String routerToken, String fullName, String registrationNumber, String email, int completionYear, String rawMac) {
+    public void register(String routerToken, String fullName, String registrationNumber, String email, int completionYear, String phone, String rawMac) {
         Router router = schoolRouter(routerToken);
         String mac = requireMac(rawMac);
-        identity.register(router.getTenant().getId(), fullName, registrationNumber, email, completionYear, mac);
+        identity.register(router.getTenant().getId(), fullName, registrationNumber, email, completionYear, phone, mac);
     }
 
     public PortalResult visitor(String routerToken, String code, String rawMac) {

@@ -108,9 +108,15 @@ public class IdentityClient {
     }
 
     public JsonNode registrationForm(long tenantId) { return call("GET", school(tenantId, "/portal/registration"), null); }
-    public JsonNode register(long tenantId, String fullName, String registrationNumber, String email, int completionYear, String mac) {
-        return call("POST", school(tenantId, "/portal/register"), Map.of("fullName", fullName, "registrationNumber", registrationNumber, "email", email,
-                "completionYear", completionYear, "deviceMac", mac));
+    public JsonNode register(long tenantId, String fullName, String registrationNumber, String email, int completionYear, String phone, String mac) {
+        var body = new java.util.HashMap<String, Object>();
+        body.put("fullName", fullName);
+        body.put("registrationNumber", registrationNumber);
+        body.put("email", email);
+        body.put("completionYear", completionYear);
+        if (phone != null && !phone.isBlank()) body.put("phone", phone.trim());
+        body.put("deviceMac", mac);
+        return call("POST", school(tenantId, "/portal/register"), body);
     }
 
     private static String school(long tenantId, String suffix) { return BASE_PATH + "/" + tenantId + suffix; }

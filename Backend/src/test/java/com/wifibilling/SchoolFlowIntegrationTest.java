@@ -242,10 +242,10 @@ class SchoolFlowIntegrationTest {
         verify(identity, times(1)).registrationForm(school.tenant().getId());
         mvc.perform(get("/api/portal/school/registration").param("token", shop.routerToken())).andExpect(status().isNotFound());
 
-        String body = "{\"token\":\"" + school.routerToken() + "\",\"fullName\":\"Amina Nakato\",\"registrationNumber\":\"S23/0412\",\"email\":\"amina@student.test\",\"completionYear\":2027,\"mac\":\"" + PHONE_MAC + "\"}";
+        String body = "{\"token\":\"" + school.routerToken() + "\",\"fullName\":\"Amina Nakato\",\"registrationNumber\":\"S23/0412\",\"email\":\"amina@student.test\",\"completionYear\":2027,\"phone\":\"0700123456\",\"mac\":\"" + PHONE_MAC + "\"}";
         mvc.perform(post("/api/portal/school/register").contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isAccepted()).andExpect(jsonPath("$.status").value("PENDING"));
-        verify(identity).register(school.tenant().getId(), "Amina Nakato", "S23/0412", "amina@student.test", 2027, PHONE_MAC.toUpperCase().replace('-', ':'));
-        when(identity.register(anyLong(), anyString(), anyString(), anyString(), anyInt(), anyString()))
+        verify(identity).register(school.tenant().getId(), "Amina Nakato", "S23/0412", "amina@student.test", 2027, "0700123456", PHONE_MAC.toUpperCase().replace('-', ':'));
+        when(identity.register(anyLong(), anyString(), anyString(), anyString(), anyInt(), anyString(), anyString()))
                 .thenThrow(new IdentityException(409, "ALREADY_REGISTERED", "This registration number is already registered.", null));
         mvc.perform(post("/api/portal/school/register").contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("ALREADY_REGISTERED")).andExpect(jsonPath("$.message").value("This registration number is already registered."));

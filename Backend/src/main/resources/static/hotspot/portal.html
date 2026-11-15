@@ -253,6 +253,7 @@
                 <div class="input-wrap">
                     <span class="icon">✉️</span>
                     <input class="form-input" id="school-reg-email2" type="email" placeholder="Repeat email address" required autocomplete="email" maxlength="254">
+                    <input class="form-input" id="school-reg-phone" type="tel" placeholder="Phone number (optional — so the IT office can reach you)" autocomplete="tel" maxlength="32">
                 </div>
                 <div class="input-wrap">
                     <span class="icon">📅</span>
@@ -569,7 +570,8 @@ function schoolRegister(ev) {
     fetch(BASE + '/api/portal/school/register', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({
         token: TOKEN, mac: schoolMac(), fullName: document.getElementById('school-reg-name').value.trim(),
         registrationNumber: document.getElementById('school-reg-number').value.trim(), email: email,
-        completionYear: parseInt(document.getElementById('school-reg-year').value, 10) }) })
+        completionYear: parseInt(document.getElementById('school-reg-year').value, 10),
+        phone: document.getElementById('school-reg-phone').value.trim() }) })
         .then(function(r){ return r.json().then(function(res){ return { ok: r.ok, res: res }; }); })
         .then(function(out){
             SCHOOL.busy = false; button.disabled = false;
