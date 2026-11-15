@@ -114,7 +114,7 @@ public class IdentityClient {
         body.put("registrationNumber", registrationNumber);
         body.put("email", email);
         body.put("completionYear", completionYear);
-        if (phone != null && !phone.isBlank()) body.put("phone", phone.trim());
+        body.put("phone", phone == null ? "" : phone.trim());
         body.put("deviceMac", mac);
         return call("POST", school(tenantId, "/portal/register"), body);
     }

@@ -30,7 +30,7 @@ public class SchoolPortalController {
     public record StudentFree(@NotBlank @Size(max = 128) String token, @NotBlank @Size(max = 600) String ticket, @NotBlank @Size(max = 24) String mac) {}
     public record Register(@NotBlank @Size(max = 128) String token, @NotBlank @Size(max = 200) String fullName,
                            @NotBlank @Size(max = 128) String registrationNumber, @NotBlank @jakarta.validation.constraints.Email @Size(max = 254) String email,
-                           @jakarta.validation.constraints.NotNull Integer completionYear, @Size(max = 32) String phone, @NotBlank @Size(max = 24) String mac) {
+                           @jakarta.validation.constraints.NotNull Integer completionYear, @NotBlank @Size(max = 32) String phone, @NotBlank @Size(max = 24) String mac) {
         @Override public String toString() { return "Register[redacted]"; }
     }
     public record MovePackage(@NotBlank @Size(max = 128) String token, @NotBlank @Size(max = 600) String ticket,
