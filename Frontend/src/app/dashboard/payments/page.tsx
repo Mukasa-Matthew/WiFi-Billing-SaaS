@@ -150,9 +150,9 @@ function PaymentLookup({ money }: { money: (value: number) => string }) {
               { label: "Amount", align: "right", render: (payment) => <span className="num font-semibold text-[var(--fg)]">{money(Number(payment.amount))}</span> },
               { label: "Status", render: (payment) => <Badge dot tone={statusTone(payment.status)}>{humanize(payment.status)}</Badge> },
               { label: "Channel", render: (payment) => <Badge tone="slate">{humanize(payment.method)}</Badge> },
-              { label: "MoMo transaction ID", render: (payment) => payment.mobileMoneyId ? <span className="num text-xs">{payment.mobileMoneyId}</span> : <span className="text-[var(--fg-faint)]">—</span> },
-              { label: "Voucher & package", hideBelow: "md", render: (payment) => <span>{payment.voucher ? <span className="num block text-xs font-semibold">{payment.voucher}</span> : <span className="text-[var(--fg-faint)]">No voucher</span>}<span className="block text-[11px] text-[var(--fg-muted)]">{payment.packageName || "—"}</span></span> },
-              { label: "Reference", hideBelow: "lg", render: (payment) => <span className="num text-[11px] text-[var(--fg-muted)]">{payment.reference}</span> },
+              { label: "MoMo transaction ID", hideBelow: "lg", render: (payment) => payment.mobileMoneyId ? <span className="num text-xs">{payment.mobileMoneyId}</span> : <span className="text-[var(--fg-faint)]">—</span> },
+              { label: "Voucher & package", render: (payment) => <span>{payment.voucher ? <span className="num block text-xs font-semibold">{payment.voucher}</span> : <span className="text-[var(--fg-faint)]">No voucher</span>}<span className="block text-[11px] text-[var(--fg-muted)]">{payment.packageName || "—"}</span></span> },
+              { label: "Reference", hideBelow: "md", render: (payment) => <span className="num text-[11px] text-[var(--fg-muted)]">{payment.reference}</span> },
             ]}
           />
           <Pager page={found.page} totalPages={found.totalPages} totalElements={found.totalElements} onPage={setPage} busy={result.refreshing} />
