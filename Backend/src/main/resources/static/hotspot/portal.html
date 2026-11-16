@@ -412,6 +412,7 @@ var pollTimer = null;
 var configTimer = null;
 var configReady = false;
 var everConfigured = false;
+var configFails = 0;
 var purchasedCode = '';
 var selectedPkg = null;
 
@@ -627,7 +628,7 @@ function schoolPost(path, body, onDone) {
             if (!out.ok) {
                 var res = out.res || {};
                 var text = res.message || 'Sign-in failed. Please try again.';
-                if (res.code === 'WRONG_PIN' && res.attemptsLeft) text += ' ' + res.attemptsLeft + ' attempt' + (res.attemptsLeft === '1' ? '' : 's') + ' left.';
+                if (res.code === 'WRONG_PIN' && res.attemptsLeft && Number(res.attemptsLeft) <= 10) text += ' ' + res.attemptsLeft + ' attempt' + (res.attemptsLeft === '1' ? '' : 's') + ' left.';
                 if (res.code === 'LOCKED' && res.secondsRemaining > 0) text += ' Try again in ' + Math.ceil(res.secondsRemaining / 60) + ' min.';
                 showMsg(escapeText(text), true);
                 if (onDone) onDone(false);
@@ -998,6 +999,7 @@ function refreshConfig() {
         if (!config) return;
         var recovered = everConfigured && !configReady;
         configReady = true;
+        configFails = 0;
         everConfigured = true;
         renderSettings(config.settings);
         renderPackages(config.packages || []);
@@ -1012,11 +1014,16 @@ function refreshConfig() {
     }).catch(function(){
         clearTimeout(timeout);
         configReady = false;
+        configFails++;
         selectedPkg = null;
         hidePay();
         Array.prototype.forEach.call(document.querySelectorAll('.pkg-buy'), function(button){ button.disabled = true; });
-        if (!everConfigured) document.getElementById('packages-list').innerHTML = '<div class="empty-state">Plans are temporarily unavailable. Reconnecting automatically…</div>';
-        else showMsg('Package updates are temporarily offline. Purchases are paused while reconnecting…', true);
+        // Only surface an error after several failed polls: a single dropped request on a
+        // captive network is routine and should just look like the page is still loading.
+        if (configFails >= 3) {
+            if (!everConfigured) document.getElementById('packages-list').innerHTML = '<div class="empty-state">Plans are temporarily unavailable. Reconnecting automatically…</div>';
+            else showMsg('Package updates are temporarily offline. Purchases are paused while reconnecting…', true);
+        }
     });
 }
 refreshConfig();
