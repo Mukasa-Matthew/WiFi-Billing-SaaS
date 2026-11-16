@@ -240,6 +240,10 @@ public class Tenant {
     @Column(name = "school_student_allowed_sites", columnDefinition = "TEXT")
     private String schoolStudentAllowedSites;
 
+    /** Multiplier applied to reported free-student data usage; 1.0 means report real octets. */
+    @Column(name = "school_free_data_display_factor")
+    private Double schoolFreeDataDisplayFactor;
+
     /** Staff website/app filter mode: "ALL" (unrestricted), "ALLOW_LIST" (only selected), or "BLOCK_LIST" (block selected). */
     @Column(name = "school_staff_site_mode", length = 16)
     private String schoolStaffSiteMode;

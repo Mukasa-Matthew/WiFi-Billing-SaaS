@@ -525,6 +525,9 @@ function SchoolBandwidthMonitor({
   const totalBytes = categories.reduce((s, c) => s + Number(c.totalBytes || 0), 0);
   const freeBytes = categories.filter((c) => c.free).reduce((s, c) => s + Number(c.totalBytes || 0), 0);
   const paidBytes = totalBytes - freeBytes;
+  const studentFree = categories.find((c) => c.category === "STUDENT_FREE");
+  const studentFreeBytes = Number(studentFree?.totalBytes || 0);
+  const studentFreeUsers = Number(studentFree?.users || 0);
   const freeShare = totalBytes > 0 ? Math.round((freeBytes / totalBytes) * 100) : 0;
   const periodLabel = PERIOD_OPTIONS.find((o) => o.key === period)?.label ?? "Today";
 
@@ -583,7 +586,7 @@ function SchoolBandwidthMonitor({
           </div>
 
           <div className="space-y-3 lg:col-span-7">
-            <div className="grid grid-cols-3 gap-3 rounded-lg border border-[var(--border)] bg-[var(--subtle)] p-3 text-center sm:text-left">
+            <div className="grid grid-cols-2 gap-3 rounded-lg border border-[var(--border)] bg-[var(--subtle)] p-3 text-center sm:grid-cols-4 sm:text-left">
               <div>
                 <p className="text-[11px] text-[var(--fg-muted)]">Total school data ({periodLabel.toLowerCase()})</p>
                 <p className="num mt-0.5 text-sm font-semibold text-[var(--fg)]">{bytes(totalBytes)}</p>
@@ -596,6 +599,13 @@ function SchoolBandwidthMonitor({
                 <p className="text-[11px] text-[var(--fg-muted)]">Free usage (Staff &amp; Visitors)</p>
                 <p className="num mt-0.5 text-sm font-semibold text-[var(--accent-text)]">
                   {bytes(freeBytes)} <span className="text-xs font-normal text-[var(--fg-muted)]">({freeShare}%)</span>
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] text-[var(--fg-muted)]">Free student study data</p>
+                <p className="num mt-0.5 text-sm font-semibold text-emerald-700">{bytes(studentFreeBytes)}</p>
+                <p className="text-[10px] text-[var(--fg-muted)]">
+                  {studentFreeUsers} student{studentFreeUsers === 1 ? "" : "s"} · {activeCount("STUDENT_FREE")} online
                 </p>
               </div>
             </div>

@@ -35,6 +35,7 @@ public class TenantDashboardService {
     private final RouterRepository routerRepository;
     private final SessionService sessionService;
     private final com.wifibilling.repository.RadAcctRepository radAcctRepository;
+    private final com.wifibilling.repository.TenantRepository tenantRepository;
     private final com.wifibilling.repository.PackagePlanRepository planRepository;
     private final com.wifibilling.repository.CustomerRepository customerRepository;
     private final ReportingClock clock;
@@ -550,11 +551,20 @@ public class TenantDashboardService {
                 vals[2] += row[3] != null ? ((Number) row[3]).longValue() : 0L;
             }
         }
+        // Schools may report free-student usage at a display factor (e.g. including overhead).
+        double freeFactor = tenantRepository.findById(tenantId)
+                .map(t -> t.getSchoolFreeDataDisplayFactor())
+                .filter(f -> f != null && f > 0)
+                .orElse(1.0);
+
         List<DataUsageDto.CategoryUsage> categories = new ArrayList<>();
         for (String cat : CATEGORY_ORDER) {
             long[] vals = catTotals.get(cat);
+            double factor = "STUDENT_FREE".equals(cat) ? freeFactor : 1.0;
+            long shownDown = Math.round(vals[0] * factor);
+            long shownUp = Math.round(vals[1] * factor);
             categories.add(new DataUsageDto.CategoryUsage(cat, categoryTitle(cat), isFreeCategory(cat),
-                    vals[0], vals[1], vals[0] + vals[1], vals[2]));
+                    shownDown, shownUp, shownDown + shownUp, vals[2]));
         }
 
         return new DataUsageDto(p, start, end, down, up, users, previous, buckets, categories);
