@@ -353,8 +353,22 @@ export function Table<T>({ rows, columns, loading = false, emptyTitle = "No reco
   // Nothing is serialised when the box is empty.
   const query = useDeferredValue(search).toLowerCase();
   const searching = searchable && query !== "";
-  const haystack = useMemo(() => searching ? rows.map(r => JSON.stringify(r).toLowerCase()) : null, [rows, searching]);
-  const filtered = useMemo(() => haystack ? rows.filter((_, i) => haystack[i].includes(query)) : rows, [rows, haystack, query]);
+  // Phone numbers live in records as 07… while people type +256…/256… — normalise both
+  // sides to bare digits so any format matches, alongside the normal text search.
+  const queryDigits = query.replace(/\D/g, "");
+  const haystack = useMemo(() => searching ? rows.map(r => {
+    const raw = JSON.stringify(r).toLowerCase();
+    if (!queryDigits || queryDigits.length < 7) return raw;
+    return raw + " " + (raw.match(/\d{7,15}/g) || []).map(d => d.replace(/^256/, "0").replace(/^\+?0?256/, "0")).join(" ");
+  }) : null, [rows, searching, queryDigits]);
+  const queryPhone = useMemo(() => {
+    if (queryDigits.length < 7) return null;
+    let d = queryDigits;
+    if (d.startsWith("256")) d = "0" + d.slice(3);
+    else if (!d.startsWith("0") && d.length === 9) d = "0" + d;
+    return d;
+  }, [queryDigits]);
+  const filtered = useMemo(() => haystack ? rows.filter((_, i) => haystack[i].includes(query) || (queryPhone != null && haystack[i].includes(queryPhone))) : rows, [rows, haystack, query, queryPhone]);
   const pages = paginated ? Math.max(1, Math.ceil(filtered.length / size)) : 1;
   const current = Math.min(page, pages);
   const visible = paginated ? filtered.slice((current - 1) * size, current * size) : filtered;
