@@ -285,6 +285,8 @@
                 <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:10px" id="school-student-free-desc"></div>
                 <button type="button" class="btn btn-dark" id="school-student-free-btn" onclick="useStudentFree()">Use Free Study Data</button>
             </div>
+            <button type="button" class="btn btn-dark" id="school-store-btn" style="display:none;margin-top:10px" onclick="showSchoolStore(true)">🛒 &nbsp;Need full internet? Buy a package</button>
+            <div id="school-store-note" style="display:none;font-size:11.5px;color:var(--muted);margin:6px 0 0;text-align:center">Packages are sold by <b>FastConnect Solutions</b>, not the school.</div>
             <button type="button" class="btn btn-outline" id="school-visitor-btn" style="display:none" onclick="showSchoolVisitor()">🧳 &nbsp;I'm a visitor</button>
             <form id="school-visitor-form" style="display:none" onsubmit="schoolVisitor(event)">
                 <span class="section-label">Visitor pass</span>
@@ -320,6 +322,8 @@
         </div>
 
         <div class="divider" id="plans-label">or purchase a package</div>
+
+        <button type="button" class="btn btn-outline" id="school-store-back" style="display:none;margin-bottom:10px" onclick="showSchoolStore(false)">← &nbsp;Back to school options</button>
 
         <div id="packages-section">
             <div class="pkg-head"><span>Package</span><span>Price</span></div>
@@ -517,7 +521,7 @@ function renderSettings(settings) {
    their school ID and PIN first: staff and returning students are connected
    straight away, other students then see packages and pay with a ticket that
    proves the check. Ordinary tenants never reach this code. */
-var SCHOOL = { ticket: null, pinChangeToken: null, busy: false, resumed: false };
+var SCHOOL = { ticket: null, pinChangeToken: null, busy: false, resumed: false, store: false, paidDevices: 0, brand: null };
 function applySchoolMode(settings) {
     if (!settings.school) return;
     document.getElementById('school-section').style.display = '';
@@ -525,9 +529,13 @@ function applySchoolMode(settings) {
     document.getElementById('school-visitor-btn').style.display =
         settings.schoolVisitors && !SCHOOL.ticket && document.getElementById('school-visitor-form').style.display === 'none' ? '' : 'none';
     if (!settings.schoolVisitors) document.getElementById('school-visitor-form').style.display = 'none';
-    var showPackages = !!SCHOOL.ticket && settings.allowPurchases !== false;
+    var showPackages = !!SCHOOL.ticket && SCHOOL.store === true && settings.allowPurchases !== false && !SCHOOL.paidDevices;
     document.getElementById('packages-section').style.display = showPackages ? '' : 'none';
     document.getElementById('plans-label').style.display = showPackages ? '' : 'none';
+    document.getElementById('school-store-back').style.display = showPackages ? '' : 'none';
+    var showStoreBtn = !!SCHOOL.ticket && SCHOOL.store !== true && settings.allowPurchases !== false && !SCHOOL.paidDevices;
+    document.getElementById('school-store-btn').style.display = showStoreBtn ? '' : 'none';
+    document.getElementById('school-store-note').style.display = showStoreBtn ? '' : 'none';
     if (!SCHOOL.resumed) {
         SCHOOL.resumed = true;
         trySchoolResume();
@@ -656,6 +664,58 @@ function useStudentFree() {
     if (!SCHOOL.ticket) return;
     schoolPost('student-free', { ticket: SCHOOL.ticket });
 }
+/* The school's page shows only the free study data; the packages live on a second
+   view branded as the hotspot operator's shop (FastConnect Solutions), so the
+   school is never presented as the one selling data to students. */
+var STORE_NAME = 'FastConnect Solutions';
+var STORE_SUBTITLE = 'Data bundles & packages';
+var STORE_COLOR = '#0F766E';
+function showSchoolStore(on) {
+    if (on && !SCHOOL.ticket) return;
+    var h1 = document.querySelector('.brand h1');
+    var sub = document.querySelector('.brand p');
+    if (on) {
+        if (!SCHOOL.brand) {
+            SCHOOL.brand = {
+                h1: h1.textContent, sub: sub.textContent,
+                primary: document.body.style.getPropertyValue('--primary'),
+                headerBg: document.body.style.getPropertyValue('--header-bg'),
+                headerText: document.body.style.getPropertyValue('--header-text'),
+                buyBg: document.body.style.getPropertyValue('--buy-bg'),
+                buyText: document.body.style.getPropertyValue('--buy-text'),
+                title: document.title
+            };
+        }
+        SCHOOL.store = true;
+        h1.textContent = STORE_NAME.toUpperCase();
+        sub.textContent = STORE_SUBTITLE;
+        document.title = STORE_NAME;
+        document.body.style.setProperty('--primary', STORE_COLOR);
+        document.body.style.setProperty('--header-bg', STORE_COLOR);
+        document.body.style.setProperty('--buy-bg', STORE_COLOR);
+        var onColor = contrastOn(STORE_COLOR);
+        document.body.style.setProperty('--header-text', onColor);
+        document.body.style.setProperty('--buy-text', onColor);
+        document.getElementById('school-student-free-box').style.display = 'none';
+    } else {
+        SCHOOL.store = false;
+        if (SCHOOL.brand) {
+            h1.textContent = SCHOOL.brand.h1;
+            sub.textContent = SCHOOL.brand.sub;
+            document.title = SCHOOL.brand.title;
+            document.body.style.setProperty('--primary', SCHOOL.brand.primary);
+            document.body.style.setProperty('--header-bg', SCHOOL.brand.headerBg);
+            document.body.style.setProperty('--header-text', SCHOOL.brand.headerText);
+            document.body.style.setProperty('--buy-bg', SCHOOL.brand.buyBg);
+            document.body.style.setProperty('--buy-text', SCHOOL.brand.buyText);
+        }
+        var freeBox = document.getElementById('school-student-free-box');
+        if (freeBox.getAttribute('data-available') === '1') freeBox.style.display = '';
+    }
+    applySchoolMode(window.PORTAL_CFG || {});
+    if (on) document.getElementById('packages-section').scrollIntoView({ behavior: 'smooth' });
+    else window.scrollTo({ top: 0, behavior: 'smooth' });
+}
 function schoolResult(res) {
     if (res.action === 'CHANGE_PIN') {
         SCHOOL.pinChangeToken = res.pinChangeToken;
@@ -667,32 +727,37 @@ function schoolResult(res) {
     document.getElementById('school-pin-form').style.display = 'none';
     if (res.action === 'BUY') {
         SCHOOL.ticket = res.ticket;
+        SCHOOL.store = false;
+        SCHOOL.paidDevices = (res.paidDevices || []).length;
         document.getElementById('school-signin').style.display = 'none';
         var welcome = document.getElementById('school-welcome');
         var atDeviceLimit = !!(res.paidDevices && res.paidDevices.length);
         welcome.textContent = (res.fullName ? 'Signed in as ' + res.fullName + '. ' : 'Welcome back. ') +
             (atDeviceLimit ? 'Your packages work on 2 devices at a time.'
-                : res.studentFreeAvailable ? 'Use free data or buy a full-internet package below.' : 'Choose a package below.');
+                : res.studentFreeAvailable ? 'Use your free data below, or tap "Buy a package" for full internet.'
+                : 'Tap "Buy a package" to choose a full-internet package.');
         welcome.style.display = '';
         var freeBox = document.getElementById('school-student-free-box');
         var freeBtn = document.getElementById('school-student-free-btn');
         var freeTitle = document.getElementById('school-student-free-title');
         var freeDesc = document.getElementById('school-student-free-desc');
         if (res.studentFreeAvailable && res.studentFreeDailyCapMb > 0) {
+            freeBox.setAttribute('data-available', '1');
             freeBox.style.display = '';
             var rem = Number(res.studentFreeRemainingMb || 0);
             if (rem > 0) {
                 freeTitle.textContent = '🎓 Free Data';
                 freeDesc.textContent = atDeviceLimit ? 'Works on the school\'s study websites only, on one device at a time.'
-                    : 'Works on the school\'s study websites only. Need full internet later? Open login.wifi in your browser and tap "Buy full internet", or buy a package below now.';
+                    : 'Works on the school\'s study websites only. Need full internet? Tap "Buy a package" below.';
                 freeBtn.style.display = '';
                 freeBtn.textContent = '🎓 Connect with Free Data';
             } else {
                 freeTitle.textContent = '⌛ Free Data Used Up';
-                freeDesc.textContent = 'You have used your free data for today. It resets tomorrow, or you can purchase a package below for full internet access.';
+                freeDesc.textContent = 'You have used your free data for today. It resets tomorrow, or tap "Buy a package" for full internet access.';
                 freeBtn.style.display = 'none';
             }
         } else {
+            freeBox.setAttribute('data-available', '0');
             freeBox.style.display = 'none';
         }
         document.getElementById('msg-area').innerHTML = '';
@@ -727,6 +792,9 @@ function schoolResult(res) {
         document.getElementById('school-signin').style.display = 'none';
         document.getElementById('school-student-free-box').style.display = 'none';
         document.getElementById('school-move-box').style.display = 'none';
+        document.getElementById('school-store-btn').style.display = 'none';
+        document.getElementById('school-store-note').style.display = 'none';
+        document.getElementById('school-store-back').style.display = 'none';
         var who = res.category === 'STAFF' ? 'staff access' : res.category === 'VISITOR' ? 'visitor access' : res.category === 'STUDENT_FREE' ? 'free daily study data' : 'your package';
         if (!LINK_LOGIN || LINK_LOGIN.charAt(0) === '$') { showMsg('Signed in. Reopen this page from the WiFi network to connect.', true); return; }
         var greeting = res.fullName ? ('Welcome, ' + escapeText(res.fullName) + '. ') : 'Welcome back! ';
