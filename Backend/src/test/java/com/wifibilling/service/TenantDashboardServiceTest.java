@@ -50,6 +50,7 @@ class TenantDashboardServiceTest {
     RouterRepository routers = mock(RouterRepository.class);
     SessionService sessions = mock(SessionService.class);
     RadAcctRepository accounting = mock(RadAcctRepository.class);
+    com.wifibilling.repository.TenantRepository tenants = mock(com.wifibilling.repository.TenantRepository.class);
     PackagePlanRepository plans = mock(PackagePlanRepository.class);
     CustomerRepository customers = mock(CustomerRepository.class);
     ReportingClock clock = new ReportingClock(KAMPALA, Clock.fixed(NOW, ZoneOffset.UTC));
@@ -68,7 +69,7 @@ class TenantDashboardServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new TenantDashboardService(transactions, vouchers, routers, sessions, accounting, plans, customers, clock);
+        service = new TenantDashboardService(transactions, vouchers, routers, sessions, accounting, tenants, plans, customers, clock);
         when(transactions.findAllByTenantIdOrderByCreatedAtDesc(TENANT)).thenReturn(List.of(
                 tx(plan1, "SUCCESSFUL", 1000, thisMonth),
                 tx(plan1, "SUCCESSFUL", 2000, thisMonth.plusDays(1)),

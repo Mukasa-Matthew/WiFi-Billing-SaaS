@@ -33,6 +33,7 @@ class ReportingTimezoneTest {
     @Mock private RouterRepository routerRepository;
     @Mock private SessionService sessionService;
     @Mock private RadAcctRepository radAcctRepository;
+    @Mock private com.wifibilling.repository.TenantRepository tenantRepository;
     @Mock private PackagePlanRepository planRepository;
     @Mock private CustomerRepository customerRepository;
 
@@ -66,7 +67,7 @@ class ReportingTimezoneTest {
     private TenantDashboardStatsDto stats(List<Transaction> txs, String range) {
         when(transactionRepository.findAllByTenantIdOrderByCreatedAtDesc(1L)).thenReturn(txs);
         TenantDashboardService service = new TenantDashboardService(transactionRepository, voucherRepository, routerRepository,
-                sessionService, radAcctRepository, planRepository, customerRepository, clock);
+                sessionService, radAcctRepository, tenantRepository, planRepository, customerRepository, clock);
         return service.getStats(1L, "ROLE_ADMIN", range);
     }
 
