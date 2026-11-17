@@ -10,6 +10,7 @@ import { Dialog } from "@/components/ui/Dialog";
 import { useToast } from "@/components/ui/Toast";
 import { useResource, Table, Badge, ErrorNotice, button, buttonGhost, field, date, message, FilterTabs, PageHeader, label, StatCard, ugx, humanize } from "@/components/BillingUI";
 import { Plus, DownloadSimple, Ticket, CheckCircle, Clock, Money, Copy, Archive } from "@/components/icons";
+import { PAYMENT_METHODS } from "@/lib/paymentMethods";
 
 interface Voucher { id: number; code: string; status: string; packageId?: number; packageName: string; price: number; customerId: number | null; customerName: string | null; customerPhone: string | null; batchReference: string | null; saleType: string; delivery: string; archived: boolean; createdAt: string; firstLogin: string | null; expiresAt: string | null }
 interface Customer { id: number; name: string }
@@ -182,7 +183,7 @@ export default function VouchersPage() {
       <form onSubmit={sell} className="space-y-4">
         <div><label className={label}>Router</label><select required value={router} onChange={(event) => setRouter(event.target.value)} className={field}><option value="">Select router</option>{routers.data.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
         <div><label className={label}>Amount received (UGX)</label><input type="number" required min="0.01" step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} className={field} /></div>
-        <div><label className={label}>Payment method</label><select value={method} onChange={(event) => setMethod(event.target.value)} className={field}>{["CASH", "MTN", "AIRTEL", "BANK", "OTHER"].map((item) => <option key={item}>{item}</option>)}</select></div>
+        <div><label className={label}>Payment method</label><select value={method} onChange={(event) => setMethod(event.target.value)} className={field}>{PAYMENT_METHODS.map(([item, text]) => <option key={item} value={item}>{text}</option>)}</select></div>
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"><button type="button" disabled={!!busy} onClick={() => setSale(false)} className={buttonGhost}>Cancel</button><button disabled={!!busy} className={button}><BusyLabel busy={busy === "sale"} label="Recording…">Record payment</BusyLabel></button></div>
       </form>
     </Dialog>}

@@ -227,13 +227,16 @@ class TenantDashboardServiceTest {
                 .reference("SALE-1").network("CASH").phone("MANUAL").amount(BigDecimal.valueOf(5000)).createdAt(recent).build();
         Transaction counterMomo = Transaction.builder().packagePlan(plan2).router(router).status("SUCCESSFUL")
                 .reference("SALE-2").network("MTN").phone("MANUAL").amount(BigDecimal.valueOf(1000)).createdAt(recent).build();
-        when(transactions.findAllByTenantIdOrderByCreatedAtDesc(TENANT)).thenReturn(List.of(mtn079, airtel073, unknownPrefix, cash, counterMomo));
+        Transaction counterOtherNetwork = Transaction.builder().packagePlan(plan2).router(router).status("SUCCESSFUL")
+                .reference("SALE-3").network("MOMO").phone("MANUAL").amount(BigDecimal.valueOf(300)).createdAt(recent).build();
+        when(transactions.findAllByTenantIdOrderByCreatedAtDesc(TENANT)).thenReturn(List.of(mtn079, airtel073, unknownPrefix, cash, counterMomo, counterOtherNetwork));
 
         TenantDashboardStatsDto s = service.getStats(TENANT, "ROLE_ADMIN", "7d");
 
         assertThat((BigDecimal) channel(s, "MTN").get("revenue")).as("online 079 + MoMo recorded at the counter").isEqualByComparingTo("1500");
         assertThat((BigDecimal) channel(s, "AIRTEL").get("revenue")).isEqualByComparingTo("1500");
-        assertThat((BigDecimal) channel(s, "OTHER").get("revenue")).isEqualByComparingTo("700");
+        assertThat((BigDecimal) channel(s, "OTHER").get("revenue")).as("online unknown network + other-network MoMo at the counter")
+                .isEqualByComparingTo("1000");
         assertThat((BigDecimal) channel(s, "WALK_IN").get("revenue")).as("only the hand-recorded sale").isEqualByComparingTo("5000");
         var walkInGroup = s.revenueByGroup().stream().filter(m -> "WALK_IN".equals(m.get("key"))).findFirst().orElseThrow();
         assertThat((BigDecimal) walkInGroup.get("revenue")).as("mobile money is never walk-in, even recorded by hand").isEqualByComparingTo("5000");

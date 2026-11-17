@@ -7,6 +7,7 @@ import api from "@/lib/api";
 import {invalidateDashboardData} from "@/lib/cacheInvalidation";
 import {useResource,Notice,field,message,label,hint,FormHeader,FormSection,FormActions,FormLayout,SummaryCard,date} from "@/components/BillingUI";
 import { Money, CellTower } from "@/components/icons";
+import { PAYMENT_METHODS } from "@/lib/paymentMethods";
 
 interface RouterRec{id:number;name:string}
 interface Plan{id:number;name:string;price:number;sessionTimeout:number}
@@ -104,7 +105,7 @@ export default function Page(){
      </div>
      <div>
       <label className={label}>Payment method{req}</label>
-      <select value={method} onChange={e=>setMethod(e.target.value)} className={field}>{["CASH","MTN","AIRTEL","BANK","OTHER"].map(m=><option key={m}>{m}</option>)}</select>
+      <select value={method} onChange={e=>setMethod(e.target.value)} className={field}>{PAYMENT_METHODS.map(([m,l])=><option key={m} value={m}>{l}</option>)}</select>
      </div>
      <div className="sm:col-span-2">
       <label className={label}>Payment reference</label>

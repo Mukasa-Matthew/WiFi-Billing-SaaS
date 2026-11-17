@@ -22,7 +22,7 @@ public class VoucherController {
 
     public record SaleRequest(@jakarta.validation.constraints.NotNull Long routerId,
         @jakarta.validation.constraints.NotNull @jakarta.validation.constraints.DecimalMin("0.01") java.math.BigDecimal amount,
-        @jakarta.validation.constraints.NotNull @jakarta.validation.constraints.Pattern(regexp="CASH|MTN|AIRTEL|BANK|OTHER") String method,
+        @jakarta.validation.constraints.NotNull @jakarta.validation.constraints.Pattern(regexp="CASH|MTN|AIRTEL|MOMO|BANK|OTHER") String method,
         @jakarta.validation.constraints.Size(max=128) String reference,
         @jakarta.validation.constraints.Size(max=1000) String notes) {}
     @PostMapping("/{code}/sale")

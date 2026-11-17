@@ -12,7 +12,7 @@ public class IpBindingController {
  public record Request(@NotNull Long routerId,@NotBlank @Size(max=120) String name,Long packageId,
   @NotBlank @Pattern(regexp="(?i)[0-9a-f]{2}(:[0-9a-f]{2}){5}") String mac,@Size(max=15) String address,
   @Future OffsetDateTime expiresAt,boolean recordPayment,@DecimalMin("0.01") BigDecimal amount,
-  @Pattern(regexp="CASH|MTN|AIRTEL|BANK|OTHER") String method,@Size(max=128) String reference,@Size(max=1000) String notes) {}
+  @Pattern(regexp="CASH|MTN|AIRTEL|MOMO|BANK|OTHER") String method,@Size(max=128) String reference,@Size(max=1000) String notes) {}
  public record Response(Long id,Long routerId,String router,String name,String mac,String address,String packageName,OffsetDateTime expiresAt,String status,boolean synced) {}
  @GetMapping @Transactional(readOnly=true) public List<Response> list(@AuthenticationPrincipal TenantPrincipal p){return bindings.findAllByTenantIdOrderByCreatedAtDesc(p.getTenantId()).stream().map(v->{boolean active=!Boolean.TRUE.equals(v.getRemoved())&&(v.getExpiresAt()==null||v.getExpiresAt().isAfter(OffsetDateTime.now()));return new Response(v.getId(),v.getRouter().getId(),v.getRouter().getName(),v.getName(),v.getMac(),v.getAddress(),v.getPackagePlan()==null?null:v.getPackagePlan().getName(),v.getExpiresAt(),Boolean.TRUE.equals(v.getRemoved())?"REMOVED":active?"ACTIVE":"EXPIRED",management.bindingsSynced(v.getRouter()));}).toList();}
  @PostMapping @ResponseStatus(HttpStatus.CREATED) @Transactional public Map<String,Long> create(@AuthenticationPrincipal TenantPrincipal p,@Valid @RequestBody Request req){

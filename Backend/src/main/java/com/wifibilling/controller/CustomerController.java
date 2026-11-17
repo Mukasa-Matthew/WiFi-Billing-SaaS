@@ -28,7 +28,7 @@ public class CustomerController {
   return customerService.list(p.getTenantId());
  }
  public record OnboardRequest(@Size(max=120) String name,@NotBlank @Size(max=32) String phone,@Size(max=500) String notes,
-  Long packageId,Long routerId,@DecimalMin("0.01") java.math.BigDecimal amount,@Pattern(regexp="CASH|MTN|AIRTEL|BANK|OTHER") String method) {}
+  Long packageId,Long routerId,@DecimalMin("0.01") java.math.BigDecimal amount,@Pattern(regexp="CASH|MTN|AIRTEL|MOMO|BANK|OTHER") String method) {}
  /** New customer form: the customer plus, optionally, one voucher of a package and its walk-in payment, atomically. */
  @PostMapping("/onboard") @ResponseStatus(HttpStatus.CREATED)
  public com.wifibilling.service.CustomerService.Onboarded onboard(@AuthenticationPrincipal TenantPrincipal p,@Valid @RequestBody OnboardRequest r){

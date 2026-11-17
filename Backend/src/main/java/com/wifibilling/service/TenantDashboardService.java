@@ -255,12 +255,13 @@ public class TenantDashboardService {
                 periodPlatFees = periodPlatFees.add(platFee);
                 periodNet = periodNet.add(txNet);
 
-                // Walk-in means recorded by hand (counter sale, IP binding), never merely "a network
-                // we didn't recognise": every online payment carries its gateway mode, and online
-                // MoMo from new prefixes used to land here as walk-in revenue owners never made.
-                boolean walkInSale = t.getGatewayMode() == null || t.getGatewayMode().isBlank();
-                String net = com.wifibilling.util.MobileNetwork.of(t.getNetwork(), t.getPhone());
-                String chKey = "MTN".equals(net) ? "MTN" : "AIRTEL".equals(net) ? "AIRTEL" : walkInSale ? "WALK_IN" : "OTHER";
+                // Money received by mobile money on ANY network is never walk-in, whether it came
+                // through the portal or was recorded by hand. Walk-in is only a voucher handed out
+                // without mobile money (cash, bank, free). Online MoMo from new prefixes used to
+                // land here as walk-in revenue owners never made.
+                String net = com.wifibilling.util.MobileNetwork.ofPayment(t.getNetwork(), t.getPhone(), t.getGatewayMode());
+                String chKey = "MTN".equals(net) ? "MTN" : "AIRTEL".equals(net) ? "AIRTEL"
+                        : com.wifibilling.util.MobileNetwork.isMobileMoney(net) ? "OTHER" : "WALK_IN";
                 channelRev.put(chKey, channelRev.get(chKey).add(amt));
                 channelTx.put(chKey, channelTx.get(chKey) + 1);
 

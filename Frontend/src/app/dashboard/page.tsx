@@ -13,6 +13,7 @@ import {
 import { BarChart, DonutChart, Meter, MiniBars, StatusBar } from "@/components/charts";
 import { routerState, servicesState } from "@/lib/routerState";
 import { FirstRouterCard } from "@/components/router/FirstRouterCard";
+import { MOBILE_MONEY } from "@/lib/paymentMethods";
 
 interface SeriesPoint { date: string; label: string; revenue?: number; transactions?: number; users?: number; registrations?: number }
 interface WeeklySale { date: string; day: string; revenue: number; transactions: number }
@@ -44,7 +45,6 @@ const RANGES = [
   { key: "today", label: "Today" }, { key: "7d", label: "7 days" }, { key: "week", label: "This week" }, { key: "lastweek", label: "Last week" },
   { key: "month", label: "This month" }, { key: "lastmonth", label: "Last month" }, { key: "year", label: "This year" }, { key: "lastyear", label: "Last year" },
 ];
-const MOBILE_MONEY = ["MTN", "AIRTEL"];
 const USAGE_PERIODS = [{ key: "today", label: "Today" }, { key: "week", label: "Week" }, { key: "month", label: "Month" }] as const;
 type UsagePeriod = (typeof USAGE_PERIODS)[number]["key"];
 // Upload is a lighter tint of the same hue, so the pair reads as one measure.
@@ -249,7 +249,7 @@ export default function TenantDashboardOverview() {
                   const mm = MOBILE_MONEY.includes(p.method);
                   return (
                     <li key={p.id} className="flex items-center gap-3 px-5 py-3">
-                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${mm ? "bg-[var(--primary-soft)] text-[var(--accent-text)]" : "bg-[var(--fill)] text-[var(--fg-muted)]"}`}>{mm ? p.method.slice(0, 3) : "Cash"}</span>
+                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${mm ? "bg-[var(--primary-soft)] text-[var(--accent-text)]" : "bg-[var(--fill)] text-[var(--fg-muted)]"}`}>{mm ? (p.method === "MOMO" ? "MoMo" : p.method.slice(0, 3)) : "Cash"}</span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-[13.5px] font-medium text-[var(--fg)]">{p.packageName || "Walk-in sale"}</span>
                         <span className="block truncate text-xs text-[var(--fg-muted)]">{[p.phone, p.voucher, p.router].filter(Boolean).join(" · ")}</span>

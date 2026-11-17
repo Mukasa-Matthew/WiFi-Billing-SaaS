@@ -14,6 +14,8 @@ public final class MobileNetwork {
     public static final String MTN = "MTN";
     public static final String AIRTEL = "AIRTEL";
     public static final String UNKNOWN = "UNKNOWN";
+    /** Mobile money on a network other than MTN or Airtel; still mobile money, never walk-in. */
+    public static final String OTHER_MOMO = "MOMO";
 
     private MobileNetwork() {}
 
@@ -44,5 +46,21 @@ public final class MobileNetwork {
     public static String of(String recorded, String phone) {
         String n = recorded == null ? "" : recorded.trim().toUpperCase(Locale.ROOT);
         return n.isEmpty() || UNKNOWN.equals(n) ? fromPhone(phone) : n;
+    }
+
+    /**
+     * How a stored payment was received: MTN, AIRTEL, MOMO (any other mobile money network),
+     * or the hand-recorded method (CASH, BANK, OTHER). Everything that came through the online
+     * gateway was mobile money, so it is never reported as anything else.
+     */
+    public static String ofPayment(String recorded, String phone, String gatewayMode) {
+        String n = of(recorded, phone);
+        boolean online = gatewayMode != null && !gatewayMode.isBlank();
+        return online && !MTN.equals(n) && !AIRTEL.equals(n) ? OTHER_MOMO : n;
+    }
+
+    /** True for money received by mobile money on any network. */
+    public static boolean isMobileMoney(String received) {
+        return MTN.equals(received) || AIRTEL.equals(received) || OTHER_MOMO.equals(received);
     }
 }

@@ -440,6 +440,17 @@ class PaymentServiceTest {
     }
 
     @Test
+    void anythingThroughTheGatewayIsMobileMoneyAndHandRecordedCashIsNot() {
+        assertEquals("MOMO", com.wifibilling.util.MobileNetwork.ofPayment("UNKNOWN", "+256391000000", "PLATFORM"));
+        assertEquals("AIRTEL", com.wifibilling.util.MobileNetwork.ofPayment("UNKNOWN", "+256731636014", "PLATFORM"));
+        assertEquals("MOMO", com.wifibilling.util.MobileNetwork.ofPayment("MOMO", "MANUAL", null));
+        assertEquals("CASH", com.wifibilling.util.MobileNetwork.ofPayment("CASH", "MANUAL", null));
+        assertTrue(com.wifibilling.util.MobileNetwork.isMobileMoney("MOMO"));
+        assertFalse(com.wifibilling.util.MobileNetwork.isMobileMoney("CASH"));
+        assertFalse(com.wifibilling.util.MobileNetwork.isMobileMoney("BANK"));
+    }
+
+    @Test
     void ownGatewayPaymentsNeverPayThePlatformFee() throws Exception {
         Transaction tx = platformCollection("PAY-PF3", 300, "OWN");
 

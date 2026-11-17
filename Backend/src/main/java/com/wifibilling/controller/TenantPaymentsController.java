@@ -78,7 +78,9 @@ public class TenantPaymentsController {
     }
 
     private static Payment toPayment(Transaction t) {
-        return new Payment(t.getId(), t.getReference(), t.getNetwork(), t.getAmount(), t.getStatus(), t.getPhone(),
+        return new Payment(t.getId(), t.getReference(),
+                com.wifibilling.util.MobileNetwork.ofPayment(t.getNetwork(), t.getPhone(), t.getGatewayMode()),
+                t.getAmount(), t.getStatus(), t.getPhone(),
                 t.getVoucherCode(),
                 t.getPackagePlan() != null ? t.getPackagePlan().getName() : null,
                 t.getRouter() != null ? t.getRouter().getName() : null,

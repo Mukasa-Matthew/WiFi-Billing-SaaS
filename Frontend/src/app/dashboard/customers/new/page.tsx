@@ -8,12 +8,13 @@ import { useRouter } from "next/navigation";
 import api from "@/lib/api";
 import { useResource, Notice, field, label, hint, message, button, buttonGhost, ugx, FormHeader, FormSection, FormLayout, SummaryCard } from "@/components/BillingUI";
 import { User, Stack, Money } from "@/components/icons";
+import { PAYMENT_METHODS } from "@/lib/paymentMethods";
 
 interface Plan { id: number; name: string; price: number; sessionTimeout: number; availability: string }
 interface Router { id: number; name: string }
 
 const req = <span className="text-red-500">*</span>;
-const METHODS = [["CASH", "Cash"], ["MTN", "MTN Mobile Money"], ["AIRTEL", "Airtel Money"], ["BANK", "Bank"], ["OTHER", "Other"]] as const;
+const METHODS = PAYMENT_METHODS;
 
 /** "1 day", "7 days", "3 hours" from a package's session length in seconds. */
 function duration(seconds: number) {
