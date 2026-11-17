@@ -625,6 +625,40 @@ class SchoolFlowIntegrationTest {
     }
 
     @Test
+    void findVoucherNeverHandsOutASchoolCodeThatThisDeviceCannotUse() throws Exception {
+        Site school = site("lookup-school", true);
+        verified(school.tenant().getId(), "OK", "STUDENT", "student-lookup");
+        String ticket = JsonPath.read(portal("verify", verifyBody(school, PHONE_MAC)), "$.ticket");
+        String reference = JsonPath.read(pay(school, PHONE_MAC, ticket), "$.reference");
+        mvc.perform(post("/api/payments/webhook").header("X-Webhook-Secret", "school-test-webhook-secret").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"reference\":\"" + reference + "\",\"status\":\"SUCCESSFUL\"}")).andExpect(status().isOk());
+        var tx = transactions.findByReference(reference).orElseThrow();
+        tx.setProviderTransactionId("MP-55501236789");
+        transactions.save(tx);
+        String code = tx.getVoucherCode();
+
+        // The device the voucher is locked to gets the code, as before
+        assertEquals(code, JsonPath.read(findVoucher(school, "0770000001", PHONE_MAC), "$.vouchers[0].code"));
+
+        // Any other MAC (another phone, or this phone after MAC randomisation) would be refused by RADIUS:
+        // no code, no unlock box, and directions to the ID and PIN sign-in that moves the lock
+        String other = findVoucher(school, "0770000001", TABLET_MAC);
+        assertFalse(other.contains(code));
+        assertEquals(true, JsonPath.read(other, "$.vouchers[0].schoolSignIn"));
+        assertEquals(false, JsonPath.read(other, "$.vouchers[0].canUnlock"));
+        Number id = JsonPath.read(other, "$.vouchers[0].id");
+        unlock(school, "0770000001", id, "6789").andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("school ID and PIN")));
+
+        // Once ID and PIN have moved the voucher to the tablet, the phone that paid no longer gets the code
+        Voucher voucher = vouchers.findByCode(code).orElseThrow();
+        voucher.setClaimedMac(TABLET_MAC);
+        vouchers.save(voucher);
+        assertEquals(true, JsonPath.read(findVoucher(school, "0770000001", PHONE_MAC), "$.vouchers[0].schoolSignIn"));
+        assertEquals(code, JsonPath.read(findVoucher(school, "0770000001", TABLET_MAC), "$.vouchers[0].code"));
+    }
+
+    @Test
     void ownerFindsEveryPaymentForANumberWhateverFormatOrStatus() throws Exception {
         Site shop = site("payment-search-shop", false);
         Site other = site("payment-search-other", false);

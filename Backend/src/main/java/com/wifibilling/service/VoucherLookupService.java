@@ -63,8 +63,13 @@ public class VoucherLookupService {
             Voucher v = byCode.get(code);
             String status = status(v, now);
             boolean usable = "active".equals(status) || "unused".equals(status);
-            boolean ownDevice = device != null && (device.equals(normalizeMac(tx.getClientMac()))
-                    || (v != null && device.equals(normalizeMac(v.getClaimedMac()))));
+            // School vouchers are locked at RADIUS to the one device in claimed_mac; the code is
+            // rejected anywhere else, so only that device may be handed it. Another phone (or the
+            // same phone with a new MAC) must sign in with ID and PIN, which moves the lock.
+            boolean school = isSchool(v);
+            boolean ownDevice = device != null && (school
+                    ? device.equals(normalizeMac(v.getClaimedMac()))
+                    : device.equals(normalizeMac(tx.getClientMac())) || (v != null && device.equals(normalizeMac(v.getClaimedMac()))));
             boolean reveal = usable && ownDevice;
             if (reveal && firstOwnActive.isEmpty()) firstOwnActive = code;
             PackagePlan plan = tx.getPackagePlan() != null ? tx.getPackagePlan() : v != null ? v.getPackagePlan() : null;
@@ -79,7 +84,8 @@ public class VoucherLookupService {
             item.put("status", usable ? status : "expired");
             item.put("isActive", usable);
             item.put("locked", usable && !reveal);
-            item.put("canUnlock", usable && !reveal && proofDigits(tx) != null);
+            item.put("canUnlock", usable && !reveal && !school && proofDigits(tx) != null);
+            item.put("schoolSignIn", usable && !reveal && school);
             item.put("firstLogin", v != null && v.getFirstLogin() != null ? v.getFirstLogin().toString() : null);
             OffsetDateTime expiry = v == null ? null : AccessState.expiry(v, v.getFirstLogin());
             item.put("expiresAt", expiry != null ? expiry.toString() : null);
@@ -123,12 +129,26 @@ public class VoucherLookupService {
                     "That doesn't match the Transaction ID in your payment SMS.");
         }
         String code = code(tx.get());
-        String status = status(vouchers.findByCode(code).orElse(null), OffsetDateTime.now());
+        Voucher voucher = vouchers.findByCode(code).orElse(null);
+        String status = status(voucher, OffsetDateTime.now());
         if (!"active".equals(status) && !"unused".equals(status)) {
             throw new ResponseStatusException(HttpStatus.GONE, "This voucher has expired.");
         }
+        if (isSchool(voucher)) {
+            // The bare code would be rejected on this device; portals cached on routers still
+            // offer Unlock, so refuse here with directions that work.
+            throw new ResponseStatusException(HttpStatus.CONFLICT, SCHOOL_SIGN_IN_HINT);
+        }
         failures.remove(key);
         return code;
+    }
+
+    static final String SCHOOL_SIGN_IN_HINT =
+            "This is your school voucher. Sign in with your school ID and PIN on this phone to use it — your time is kept.";
+
+    /** Identity-bound school vouchers, whose device lock moves only through ID and PIN sign-in. */
+    private static boolean isSchool(Voucher v) {
+        return v != null && v.getSchoolCategory() != null && v.getPersonId() != null;
     }
 
     /** The last digits of the provider's Transaction ID, or null when we never received one. */

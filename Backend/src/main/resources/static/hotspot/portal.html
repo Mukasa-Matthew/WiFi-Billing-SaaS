@@ -834,6 +834,13 @@ function toggleFaq(){
     document.getElementById('faq-caret').textContent = open ? '▴' : '▾';
 }
 function showFind(){ document.getElementById('find-modal').classList.add('show'); }
+/** School vouchers move to a new phone only through ID and PIN, so send the student there. */
+function useSchoolSignIn(){
+    hideFind();
+    var id = document.getElementById('school-id');
+    showMsg('Sign in with your school ID and PIN — your voucher will move to this phone.', false);
+    if (id) { id.scrollIntoView({ block: 'center' }); id.focus(); }
+}
 function hideFind(){ document.getElementById('find-modal').classList.remove('show'); }
 function hidePay(){ document.getElementById('pay-modal').classList.remove('show'); }
 
@@ -906,11 +913,15 @@ function findVoucher(){
                 html += '  </div>';
                 if (v.code) {
                     html += '  <button type="button" onclick="selectFoundVoucher(\'' + escapeText(v.code) + '\')" style="white-space:nowrap;padding:7px 12px;font-size:12px;font-weight:700;background:var(--primary);color:#fff;border:none;border-radius:8px;cursor:pointer;">Connect</button>';
+                } else if (v.schoolSignIn) {
+                    html += '  <button type="button" onclick="useSchoolSignIn()" style="white-space:nowrap;padding:7px 12px;font-size:12px;font-weight:700;background:var(--primary);color:#fff;border:none;border-radius:8px;cursor:pointer;">Sign in with ID</button>';
                 } else if (v.canUnlock) {
                     html += '  <button type="button" onclick="showUnlock(' + Number(v.id) + ')" style="white-space:nowrap;padding:7px 12px;font-size:12px;font-weight:700;background:#fff;border:1px solid var(--primary);color:var(--primary);border-radius:8px;cursor:pointer;">🔒 Unlock</button>';
                 }
                 html += '</div>';
-                if (v.locked && v.canUnlock) {
+                if (v.schoolSignIn) {
+                    html += '<div style="font-size:12px;color:var(--muted);margin-top:6px;">🎓 This is your school voucher. Sign in with your school ID and PIN on this phone to use it — your time is kept.</div>';
+                } else if (v.locked && v.canUnlock) {
                     html += '<div id="unlock-' + Number(v.id) + '" style="display:none;margin-top:8px;border-top:1px dashed #cbd5e1;padding-top:8px;">';
                     html += '  <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">This was bought on another phone. Enter the <b>last 4 digits of the Transaction ID</b> in your MTN/Airtel payment SMS.</div>';
                     html += '  <div style="display:flex;gap:6px;"><input class="form-input" id="unlock-digits-' + Number(v.id) + '" type="tel" inputmode="numeric" maxlength="4" placeholder="1234" style="flex:1;padding-left:12px;">';
