@@ -141,8 +141,12 @@ public class IdentityClient {
         try { json = response.body() == null || response.body().isBlank() ? mapper.createObjectNode() : mapper.readTree(response.body()); }
         catch (RuntimeException e) { json = mapper.createObjectNode(); }
         if (response.statusCode() >= 200 && response.statusCode() < 300) return json;
-        if (response.statusCode() >= 500 || response.statusCode() == 401) {
-            log.warn("Identity system rejected {} {} with {}", method, pathAndQuery.replaceAll("\\?.*", ""), response.statusCode());
+        // A 401 is only an outage when identity refused our signature. Wrong PINs and expired PIN-change
+        // tokens are also 401s and must reach the student with their own message and attempts left.
+        String code = json.path("code").asString("");
+        boolean integrationFault = response.statusCode() == 401 && (code.isBlank() || "INVALID_SIGNATURE".equals(code));
+        if (response.statusCode() >= 500 || integrationFault) {
+            log.warn("Identity system rejected {} {} with {} {}", method, pathAndQuery.replaceAll("\\?.*", ""), response.statusCode(), code);
             throw IdentityException.unavailable();
         }
         throw new IdentityException(response.statusCode(), json.path("code").asString("IDENTITY_ERROR"),
