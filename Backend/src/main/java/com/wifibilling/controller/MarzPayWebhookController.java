@@ -48,6 +48,7 @@ public class MarzPayWebhookController {
     private final WebhookEventRepository webhookEvents;
     private final MarzPayClient marzPay;
     private final com.wifibilling.service.SubscriptionService subscriptionService;
+    private final com.wifibilling.service.PlatformEarningsService platformEarnings;
 
     @PostMapping("/callback")
     public ResponseEntity<Void> callback(
@@ -115,7 +116,11 @@ public class MarzPayWebhookController {
 
     private void dispatch(JsonNode payload, String eventType) {
         if (eventType.startsWith("disbursement")) {
-            withdrawalService.processDisbursementCallback(payload);
+            // Platform-level payouts live in a different table — try them first;
+            // processPayoutCallback returns false when the ref isn't one of theirs.
+            if (!platformEarnings.processPayoutCallback(payload)) {
+                withdrawalService.processDisbursementCallback(payload);
+            }
         } else {
             paymentService.processMarzPayCollection(payload);
         }
