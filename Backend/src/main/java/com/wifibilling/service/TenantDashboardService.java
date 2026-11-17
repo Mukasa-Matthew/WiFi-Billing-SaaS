@@ -266,7 +266,9 @@ public class TenantDashboardService {
 
                 Voucher tv = t.getVoucherCode() != null ? byCode.get(t.getVoucherCode()) : null;
                 boolean isStudent = t.getPersonId() != null || (tv != null && "STUDENT".equals(com.wifibilling.util.AccessState.category(tv)));
-                String grpKey = isStudent ? "STUDENT" : walkInSale ? "WALK_IN" : "PAID_CUSTOMER";
+                // Anything paid with mobile money is a paying customer, even when recorded by hand;
+                // walk-in is only a voucher handed out without mobile money (cash or free).
+                String grpKey = isStudent ? "STUDENT" : "WALK_IN".equals(chKey) ? "WALK_IN" : "PAID_CUSTOMER";
                 groupRev.put(grpKey, groupRev.get(grpKey).add(amt));
                 groupTx.put(grpKey, groupTx.get(grpKey) + 1);
 
