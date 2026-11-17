@@ -129,7 +129,10 @@ sudo /usr/local/bin/deploy-service-control restart "frontend-${TARGET_SLOT}"
 # 6. Comprehensive Pre-Cutover Readiness Probes
 echo "=== Polling Target Backend for Deep Readiness (DB + Internal Version Verification) ==="
 BACKEND_READY=false
-for i in $(seq 1 45); do
+# Spring Boot takes 80-110s to start on the shared production host under normal
+# load; 45 tries killed healthy releases seconds before they came up (Nov 17).
+READINESS_TRIES="${READINESS_TRIES:-180}"
+for i in $(seq 1 "${READINESS_TRIES}"); do
     HEALTH_RESP=$(curl -s -f "http://127.0.0.1:${TARGET_BACKEND_PORT}/api/health" 2>/dev/null || true)
     VERSION_RESP=$(curl -s -f "http://127.0.0.1:${TARGET_BACKEND_PORT}/api/health/version" 2>/dev/null || true)
     if echo "${HEALTH_RESP}" | grep -q '"database":"CONNECTED"' && echo "${VERSION_RESP}" | grep -q "${COMMIT_SHA}"; then
