@@ -623,6 +623,10 @@ public class PaymentService {
             return;
         }
         if (uuid != null && !uuid.isBlank()) tx.setProviderUuid(uuid);
+        // The provider knows which network actually took the money; our prefix guess may not.
+        String paidOn = com.wifibilling.util.MobileNetwork.fromProvider(payload.path("collection").path("provider")
+                .asText(txn.path("provider").asText(null)));
+        if (paidOn != null) tx.setNetwork(paidOn);
 
         if ("completed".equals(status)) {
             var money = txn.path("net_amount");
@@ -708,15 +712,6 @@ public class PaymentService {
         if (hint != null && !hint.isBlank()) {
             return hint.trim().toUpperCase();
         }
-        String clean = phone.replaceAll("[^0-9]", "");
-        if (clean.startsWith("256")) clean = clean.substring(3);
-        else if (clean.startsWith("0")) clean = clean.substring(1);
-
-        if (clean.startsWith("77") || clean.startsWith("78") || clean.startsWith("76")) {
-            return "MTN";
-        } else if (clean.startsWith("70") || clean.startsWith("75") || clean.startsWith("74")) {
-            return "AIRTEL";
-        }
-        return "UNKNOWN";
+        return com.wifibilling.util.MobileNetwork.fromPhone(phone);
     }
 }

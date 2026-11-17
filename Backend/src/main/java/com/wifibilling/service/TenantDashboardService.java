@@ -223,7 +223,7 @@ public class TenantDashboardService {
 
         Map<String, BigDecimal> channelRev = new LinkedHashMap<>();
         Map<String, Long> channelTx = new LinkedHashMap<>();
-        for (String ch : List.of("MTN", "AIRTEL", "WALK_IN")) {
+        for (String ch : List.of("MTN", "AIRTEL", "WALK_IN", "OTHER")) {
             channelRev.put(ch, BigDecimal.ZERO);
             channelTx.put(ch, 0L);
         }
@@ -255,14 +255,18 @@ public class TenantDashboardService {
                 periodPlatFees = periodPlatFees.add(platFee);
                 periodNet = periodNet.add(txNet);
 
-                String net = t.getNetwork() != null ? t.getNetwork().trim().toUpperCase(Locale.ROOT) : "";
-                String chKey = "MTN".equals(net) ? "MTN" : "AIRTEL".equals(net) ? "AIRTEL" : "WALK_IN";
+                // Walk-in means recorded by hand (counter sale, IP binding), never merely "a network
+                // we didn't recognise": every online payment carries its gateway mode, and online
+                // MoMo from new prefixes used to land here as walk-in revenue owners never made.
+                boolean walkInSale = t.getGatewayMode() == null || t.getGatewayMode().isBlank();
+                String net = com.wifibilling.util.MobileNetwork.of(t.getNetwork(), t.getPhone());
+                String chKey = "MTN".equals(net) ? "MTN" : "AIRTEL".equals(net) ? "AIRTEL" : walkInSale ? "WALK_IN" : "OTHER";
                 channelRev.put(chKey, channelRev.get(chKey).add(amt));
                 channelTx.put(chKey, channelTx.get(chKey) + 1);
 
                 Voucher tv = t.getVoucherCode() != null ? byCode.get(t.getVoucherCode()) : null;
                 boolean isStudent = t.getPersonId() != null || (tv != null && "STUDENT".equals(com.wifibilling.util.AccessState.category(tv)));
-                String grpKey = isStudent ? "STUDENT" : "WALK_IN".equals(chKey) ? "WALK_IN" : "PAID_CUSTOMER";
+                String grpKey = isStudent ? "STUDENT" : walkInSale ? "WALK_IN" : "PAID_CUSTOMER";
                 groupRev.put(grpKey, groupRev.get(grpKey).add(amt));
                 groupTx.put(grpKey, groupTx.get(grpKey) + 1);
 
@@ -367,11 +371,15 @@ public class TenantDashboardService {
             revenueByPackage.add(pm);
         }
 
-        List<Map<String, Object>> revenueByChannel = List.of(
+        List<Map<String, Object>> revenueByChannel = new ArrayList<>(List.of(
                 Map.of("key", "MTN", "label", "MTN Mobile Money", "revenue", channelRev.get("MTN"), "transactions", channelTx.get("MTN")),
                 Map.of("key", "AIRTEL", "label", "Airtel Money", "revenue", channelRev.get("AIRTEL"), "transactions", channelTx.get("AIRTEL")),
                 Map.of("key", "WALK_IN", "label", "Walk-in / Cash", "revenue", channelRev.get("WALK_IN"), "transactions", channelTx.get("WALK_IN"))
-        );
+        ));
+        // Online payments from a number no prefix rule knows yet; shown only when there are some.
+        if (channelTx.get("OTHER") > 0) {
+            revenueByChannel.add(Map.of("key", "OTHER", "label", "Other Mobile Money", "revenue", channelRev.get("OTHER"), "transactions", channelTx.get("OTHER")));
+        }
 
         List<Map<String, Object>> revenueByGroup = List.of(
                 Map.of("key", "STUDENT", "label", "Paid Students", "revenue", groupRev.get("STUDENT"), "transactions", groupTx.get("STUDENT")),

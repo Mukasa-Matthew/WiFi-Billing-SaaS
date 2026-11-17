@@ -208,4 +208,32 @@ class TenantDashboardServiceTest {
         assertThat(s.dataByCategory().get(0)).containsEntry("totalBytes", 1000L).containsEntry("free", false);
         assertThat(s.dataByCategory().get(2)).containsEntry("totalBytes", 500L).containsEntry("free", true);
     }
+
+    private static Map<String, Object> channel(TenantDashboardStatsDto s, String key) {
+        return s.revenueByChannel().stream().filter(m -> key.equals(m.get("key"))).findFirst().orElse(null);
+    }
+
+    /** Synergy's case: online MoMo from 079/073 numbers was stored as UNKNOWN and shown as walk-in revenue. */
+    @Test
+    void onlinePaymentsAreNeverCountedAsWalkInWhateverTheirNetwork() {
+        OffsetDateTime recent = OffsetDateTime.parse("2026-10-27T10:00:00Z");
+        Transaction mtn079 = Transaction.builder().packagePlan(plan1).router(router).status("SUCCESSFUL").gatewayMode("PLATFORM")
+                .network("UNKNOWN").phone("+256790870264").amount(BigDecimal.valueOf(500)).createdAt(recent).build();
+        Transaction airtel073 = Transaction.builder().packagePlan(plan1).router(router).status("SUCCESSFUL").gatewayMode("PLATFORM")
+                .network("UNKNOWN").phone("+256731636014").amount(BigDecimal.valueOf(1500)).createdAt(recent).build();
+        Transaction unknownPrefix = Transaction.builder().packagePlan(plan1).router(router).status("SUCCESSFUL").gatewayMode("PLATFORM")
+                .network("UNKNOWN").phone("+256391000000").amount(BigDecimal.valueOf(700)).createdAt(recent).build();
+        Transaction cash = Transaction.builder().packagePlan(plan2).router(router).status("SUCCESSFUL")
+                .reference("SALE-1").network("CASH").phone("MANUAL").amount(BigDecimal.valueOf(5000)).createdAt(recent).build();
+        when(transactions.findAllByTenantIdOrderByCreatedAtDesc(TENANT)).thenReturn(List.of(mtn079, airtel073, unknownPrefix, cash));
+
+        TenantDashboardStatsDto s = service.getStats(TENANT, "ROLE_ADMIN", "7d");
+
+        assertThat((BigDecimal) channel(s, "MTN").get("revenue")).isEqualByComparingTo("500");
+        assertThat((BigDecimal) channel(s, "AIRTEL").get("revenue")).isEqualByComparingTo("1500");
+        assertThat((BigDecimal) channel(s, "OTHER").get("revenue")).isEqualByComparingTo("700");
+        assertThat((BigDecimal) channel(s, "WALK_IN").get("revenue")).as("only the hand-recorded sale").isEqualByComparingTo("5000");
+        var walkInGroup = s.revenueByGroup().stream().filter(m -> "WALK_IN".equals(m.get("key"))).findFirst().orElseThrow();
+        assertThat((BigDecimal) walkInGroup.get("revenue")).isEqualByComparingTo("5000");
+    }
 }

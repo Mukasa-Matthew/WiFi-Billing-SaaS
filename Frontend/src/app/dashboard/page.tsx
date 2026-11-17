@@ -551,6 +551,7 @@ const CHANNEL_COLOR: Record<string, string> = {
   MTN: "var(--status-warn)",
   AIRTEL: "var(--status-bad)",
   WALK_IN: "var(--status-good)",
+  OTHER: "var(--chart-1)",
 };
 const GROUP_COLOR: Record<string, string> = {
   STUDENT: "var(--status-good)",

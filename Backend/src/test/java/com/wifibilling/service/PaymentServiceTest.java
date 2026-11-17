@@ -414,6 +414,31 @@ class PaymentServiceTest {
         verifyNoInteractions(platformEarnings);
     }
 
+    /** The provider's answer is authoritative: a payment guessed UNKNOWN from its prefix is stored as the network that took it. */
+    @Test
+    void completedCollectionRecordsTheNetworkTheProviderReports() throws Exception {
+        Transaction tx = platformCollection("PAY-NW1", 0, "PLATFORM");
+        tx.setNetwork("UNKNOWN");
+        when(transactionRepository.findByExternalReferenceForUpdate("ext-PAY-NW1")).thenReturn(Optional.of(tx));
+
+        paymentService.processMarzPayCollection(new tools.jackson.databind.ObjectMapper().readTree(
+                "{\"transaction\":{\"reference\":\"ext-PAY-NW1\",\"status\":\"completed\",\"provider\":\"airtel\","
+                        + "\"net_amount\":{\"raw\":1940},\"charge\":{\"raw\":60}},\"collection\":{\"provider\":\"airtel\"}}"));
+
+        assertEquals("AIRTEL", tx.getNetwork());
+    }
+
+    @Test
+    void newPrefixesAreRecognised() {
+        assertEquals("MTN", com.wifibilling.util.MobileNetwork.fromPhone("+256790870264"));
+        assertEquals("MTN", com.wifibilling.util.MobileNetwork.fromPhone("0771234567"));
+        assertEquals("AIRTEL", com.wifibilling.util.MobileNetwork.fromPhone("0731636014"));
+        assertEquals("AIRTEL", com.wifibilling.util.MobileNetwork.fromPhone("256701234567"));
+        assertEquals("UNKNOWN", com.wifibilling.util.MobileNetwork.fromPhone("0391000000"));
+        assertEquals("CASH", com.wifibilling.util.MobileNetwork.of("CASH", "MANUAL"));
+        assertEquals("MTN", com.wifibilling.util.MobileNetwork.of("UNKNOWN", "+256790870264"));
+    }
+
     @Test
     void ownGatewayPaymentsNeverPayThePlatformFee() throws Exception {
         Transaction tx = platformCollection("PAY-PF3", 300, "OWN");
