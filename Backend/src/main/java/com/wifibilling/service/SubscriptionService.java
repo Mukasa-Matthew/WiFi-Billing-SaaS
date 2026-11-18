@@ -259,13 +259,30 @@ public class SubscriptionService {
                     prep.callbackUrl()
             );
             if (resp != null) {
-                providerUuid = resp.path("transaction").path("provider_reference").asText(
-                        resp.path("data").path("transaction_id").asText(null));
+                JsonNode txn = resp.path("data").path("transaction");
+                providerUuid = txn.path("uuid").asText(null);
             }
-        } catch (Exception e) {
-            log.error("Failed to initiate Mobile Money collection for sub checkout {}: {}", prep.reference(), e.getMessage());
-            self.failSubscriptionCheckout(prep.checkoutId(), "Failed to initiate mobile money prompt: " + e.getMessage());
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Could not reach Mobile Money provider. Please try again.");
+        } catch (MarzPayClient.MarzPayException e) {
+            log.error("Subscription checkout {} — MarzPay collect failed (HTTP {}): {}",
+                    prep.reference(), e.getStatus(), e.getMessage());
+            if (e.getStatus() >= 400 && e.getStatus() < 500) {
+                // The provider looked at the request and refused it: nothing was sent to the phone.
+                self.failSubscriptionCheckout(prep.checkoutId(), truncate("Provider rejected request: " + e.getMessage(), 255));
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                        "Mobile Money could not start this payment. Check that " + prep.phoneE164()
+                                + " is a registered Mobile Money number and try again.");
+            }
+            // Timeout or provider error: the prompt may still have gone out. Keep the
+            // checkout PENDING; the status poll, the callback or the sweep resolves it
+            // by asking the provider. Never mark it failed — money may have moved.
+            return new SubscriptionDto.CheckoutResponse(
+                    prep.reference(),
+                    SubscriptionCheckout.STATUS_PENDING,
+                    prep.amount(),
+                    prep.phoneE164(),
+                    "We're confirming the request with Mobile Money. If a prompt appears on " + prep.phoneE164()
+                            + ", enter your PIN to approve UGX " + String.format("%,d", prep.amount()) + "."
+            );
         }
 
         if (providerUuid != null) self.setCheckoutProviderUuid(prep.checkoutId(), providerUuid);
@@ -296,7 +313,8 @@ public class SubscriptionService {
 
         long amount = plan.getPrice();
         String phoneE164 = toE164(req.phone());
-        String reference = "SUB-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16).toUpperCase();
+        // MarzPay only accepts a UUID as the merchant reference.
+        String reference = UUID.randomUUID().toString();
 
         SubscriptionCheckout checkout = checkouts.save(SubscriptionCheckout.builder()
                 .tenant(tenant)
@@ -333,47 +351,155 @@ public class SubscriptionService {
     record CheckoutPrep(Long checkoutId, String reference, long amount, String phoneE164, String planName,
                         com.wifibilling.service.payment.MarzPayClient.Credentials creds, String country, String callbackUrl) {}
 
-    @Transactional
-    public boolean confirmSubscriptionCheckout(String reference, JsonNode payload) {
+    /**
+     * A MarzPay callback mentioned this reference. The callback body is unsigned, so it is only
+     * a hint: the outcome is always read back from the provider before anything is applied.
+     * Not transactional — the provider call must hold no database transaction.
+     * Returns false when the reference is not a subscription checkout.
+     */
+    public boolean confirmSubscriptionCheckout(String reference, JsonNode hint) {
         if (reference == null) return false;
         Optional<SubscriptionCheckout> opt = checkouts.findByReference(reference);
         if (opt.isEmpty()) return false;
-
-        String status = payload.path("status").asText(payload.path("transaction").path("status").asText(""));
-        String extRef = payload.path("external_reference").asText(
-                payload.path("transaction").path("provider_reference").asText(reference));
-        String reason = payload.path("failure_reason").asText(
-                payload.path("transaction").path("failure_reason").asText(null));
-
-        processSubscriptionWebhook(reference, status, extRef, reason);
+        verifyWithProvider(opt.get());
         return true;
     }
 
+    /** The tenant's own view of one checkout; asks the provider while it is still pending. */
+    public SubscriptionDto.CheckoutResponse checkoutStatus(Long tenantId, String reference) {
+        SubscriptionCheckout checkout = checkouts.findByReference(reference)
+                .filter(c -> c.getTenant() != null && tenantId.equals(c.getTenant().getId()))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Checkout not found"));
+        if (SubscriptionCheckout.STATUS_PENDING.equals(checkout.getStatus())) {
+            Long last = lastProviderCheck.get(checkout.getId());
+            if (last == null || System.currentTimeMillis() - last >= PROVIDER_CHECK_INTERVAL_MS) {
+                verifyWithProvider(checkout);
+                checkout = checkouts.findByReference(reference).orElse(checkout);
+            }
+        }
+        String status = checkout.getStatus();
+        String message = switch (status) {
+            case SubscriptionCheckout.STATUS_SUCCESSFUL -> "Payment received! Your subscription has been extended.";
+            case SubscriptionCheckout.STATUS_FAILED -> "The payment was not completed. No money was taken — you can try again.";
+            default -> "Waiting for you to approve the prompt on " + checkout.getPhone() + ".";
+        };
+        return new SubscriptionDto.CheckoutResponse(checkout.getReference(), status, checkout.getAmount(),
+                checkout.getPhone(), message);
+    }
+
+    /**
+     * Callbacks can be lost. Every two minutes, ask the provider about checkouts still
+     * pending from the last day so a paid renewal is never left unapplied.
+     */
+    @Scheduled(fixedDelay = 120_000, initialDelay = 90_000)
+    public void reconcilePendingCheckouts() {
+        leaderLockService.executeIfLeader(LeaderLockService.JOB_SUBSCRIPTION_CHECKOUT, 300, 110,
+                this::doReconcilePendingCheckouts);
+    }
+
+    void doReconcilePendingCheckouts() {
+        OffsetDateTime now = OffsetDateTime.now();
+        for (SubscriptionCheckout c : checkouts.findAllByStatus(SubscriptionCheckout.STATUS_PENDING)) {
+            if (c.getCreatedAt() == null) continue;
+            if (c.getCreatedAt().isAfter(now.minusMinutes(1))) continue;   // give the callback a chance first
+            if (c.getCreatedAt().isBefore(now.minusDays(1))) {             // prompts expire long before this
+                self.failSubscriptionCheckout(c.getId(), "No confirmation from the provider within 24 hours");
+                continue;
+            }
+            verifyWithProvider(c);
+        }
+    }
+
+    private static final long PROVIDER_CHECK_INTERVAL_MS = 5_000;
+    private final java.util.concurrent.ConcurrentHashMap<Long, Long> lastProviderCheck = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** Reads the authoritative outcome from MarzPay and applies it. Best-effort: on any error it stays pending. */
+    private void verifyWithProvider(SubscriptionCheckout checkout) {
+        if (SubscriptionCheckout.STATUS_SUCCESSFUL.equals(checkout.getStatus())) return;
+        String reference = checkout.getReference();
+        if (!isUuid(reference)) return; // legacy SUB- references were never accepted by the provider
+        lastProviderCheck.put(checkout.getId(), System.currentTimeMillis());
+        try {
+            var creds = gatewayConfig.credentialsFor(checkout.getTenant(), TenantGatewayConfig.MODE_PLATFORM);
+            JsonNode res = marzPay.getTransaction(creds, reference);
+            JsonNode payload = res != null && res.has("data") && res.get("data").isObject() ? res.get("data") : res;
+            JsonNode txn = payload == null ? null : payload.path("transaction");
+            if (txn == null || txn.isMissingNode()) return;
+            String status = txn.path("status").asText("").toLowerCase(Locale.ROOT);
+            Long paid = amountOf(txn.path("amount"));
+            String providerUuid = txn.path("uuid").asText(null);
+            String providerTx = payload.path("collection").path("provider_transaction_id").asText(providerUuid);
+            String description = txn.path("description").asText(null);
+            self.applyProviderOutcome(checkout.getId(), status, paid, providerTx, description);
+        } catch (MarzPayClient.MarzPayException e) {
+            if (e.isNotFound()) {
+                log.info("Subscription checkout {}: provider has no record yet", reference);
+            } else {
+                log.warn("Subscription checkout {}: provider lookup failed: {}", reference, e.getMessage());
+            }
+        } catch (Exception e) {
+            log.warn("Subscription checkout {}: provider lookup failed: {}", reference, e.getMessage());
+        }
+    }
+
+    /**
+     * Applies a provider-confirmed outcome under a row lock, so a callback, the status poll and
+     * the sweep racing each other can never extend a subscription twice.
+     */
     @Transactional
-    public void processSubscriptionWebhook(String reference, String status, String extRef, String failureReason) {
-        Optional<SubscriptionCheckout> opt = checkouts.findByReference(reference);
-        if (opt.isEmpty()) return;
+    public void applyProviderOutcome(Long checkoutId, String providerStatus, Long paidAmount,
+                                     String providerTx, String description) {
+        SubscriptionCheckout checkout = checkouts.findById(checkoutId)
+                .flatMap(c -> checkouts.findByReferenceForUpdate(c.getReference()))
+                .orElse(null);
+        if (checkout == null || SubscriptionCheckout.STATUS_SUCCESSFUL.equals(checkout.getStatus())) return;
+        String status = providerStatus == null ? "" : providerStatus.toLowerCase(Locale.ROOT);
 
-        SubscriptionCheckout checkout = opt.get();
-        if (SubscriptionCheckout.STATUS_SUCCESSFUL.equals(checkout.getStatus())) {
-            log.info("Subscription checkout {} already processed as SUCCESSFUL (idempotent ignore)", reference);
-            return;
-        }
-
-        if ("SUCCESS".equalsIgnoreCase(status) || "SUCCESSFUL".equalsIgnoreCase(status)) {
+        if (status.equals("completed") || status.equals("successful") || status.equals("success")) {
+            if (paidAmount != null && paidAmount < checkout.getAmount()) {
+                checkout.setStatus(SubscriptionCheckout.STATUS_FAILED);
+                checkout.setFailureReason(truncate("Provider confirmed only UGX " + paidAmount + " of "
+                        + checkout.getAmount() + " — needs manual review", 255));
+                checkouts.save(checkout);
+                log.error("Subscription checkout {} underpaid: {} of {}", checkout.getReference(), paidAmount, checkout.getAmount());
+                return;
+            }
+            // A provider-confirmed payment wins even over an earlier local FAILED: the money moved.
             checkout.setStatus(SubscriptionCheckout.STATUS_SUCCESSFUL);
-            checkout.setExternalReference(extRef);
+            checkout.setExternalReference(providerTx);
+            checkout.setFailureReason(null);
             checkout.setCompletedAt(OffsetDateTime.now());
             checkouts.save(checkout);
-
             applySuccessfulPayment(checkout);
-        } else {
+        } else if (status.equals("failed") || status.equals("cancelled") || status.equals("expired")) {
+            if (SubscriptionCheckout.STATUS_FAILED.equals(checkout.getStatus())) return;
             checkout.setStatus(SubscriptionCheckout.STATUS_FAILED);
-            checkout.setFailureReason(failureReason != null ? failureReason : "Gateway reported failed status");
+            checkout.setFailureReason(truncate("Provider status: " + status
+                    + (description == null || description.isBlank() ? "" : " — " + description), 255));
             checkout.setCompletedAt(OffsetDateTime.now());
             checkouts.save(checkout);
-            log.warn("Subscription checkout {} failed: {}", reference, checkout.getFailureReason());
+            log.warn("Subscription checkout {} failed at provider: {}", checkout.getReference(), status);
         }
+        // pending / processing: nothing to do yet
+    }
+
+    private static Long amountOf(JsonNode amount) {
+        if (amount == null || amount.isMissingNode() || amount.isNull()) return null;
+        if (amount.isNumber()) return amount.longValue();
+        if (amount.path("raw").isNumber()) return amount.path("raw").longValue();
+        if (amount.isString()) {
+            try { return (long) Double.parseDouble(amount.asString().replace(",", "")); } catch (NumberFormatException e) { return null; }
+        }
+        return null;
+    }
+
+    private static boolean isUuid(String s) {
+        if (s == null) return false;
+        try { UUID.fromString(s); return s.length() == 36; } catch (IllegalArgumentException e) { return false; }
+    }
+
+    private static String truncate(String s, int max) {
+        return s == null ? null : s.substring(0, Math.min(s.length(), max));
     }
 
     private void applySuccessfulPayment(SubscriptionCheckout checkout) {

@@ -51,6 +51,7 @@ public class LeaderLockService {
     public static final String JOB_NOC_INCIDENT         = "NOC_INCIDENT";
     public static final String JOB_WIREGUARD_SYNC       = "WIREGUARD_SYNC";
     public static final String JOB_CUSTOMER_BACKFILL    = "CUSTOMER_BACKFILL";
+    public static final String JOB_SUBSCRIPTION_CHECKOUT = "SUBSCRIPTION_CHECKOUT";
 
     public LeaderLockService() {
         this.jdbcTemplate = null;

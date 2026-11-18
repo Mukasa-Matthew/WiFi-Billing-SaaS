@@ -188,20 +188,30 @@ export default function SubscriptionHubPage() {
     load();
   }, []);
 
-  // Poll for payment confirmation if reference is active
+  // Poll this checkout's own outcome. The server asks Mobile Money directly while it is pending,
+  // so an already-active subscription never shows a false "payment received".
   useEffect(() => {
     if (!activeReference || !checkoutOpen) return;
+    const startedAt = Date.now();
     const interval = setInterval(async () => {
       try {
-        const res = await api.get<TenantSubView>("/api/subscription");
-        setSub(res.data);
-        if (!res.data.isExpired && res.data.status === "ACTIVE") {
-          setCheckoutMsg({
-            text: "Payment received! Your subscription has been activated successfully.",
-            tone: "success",
-          });
+        const res = await api.get<{ reference: string; status: string; message: string }>(
+          `/api/subscription/checkout/${encodeURIComponent(activeReference)}`
+        );
+        if (res.data.status === "SUCCESSFUL") {
           setActiveReference(null);
+          setCheckoutMsg({ text: res.data.message, tone: "success" });
           setOk("Subscription renewed! All customer payments and router tools are fully unlocked.");
+          load();
+        } else if (res.data.status === "FAILED") {
+          setActiveReference(null);
+          setCheckoutMsg({ text: res.data.message, tone: "danger" });
+        } else if (Date.now() - startedAt > 5 * 60 * 1000) {
+          setActiveReference(null);
+          setCheckoutMsg({
+            text: "Still waiting for Mobile Money. If you approved the payment, your subscription will update automatically within a few minutes.",
+            tone: "info",
+          });
         }
       } catch (e) {
         // ignore poll errors

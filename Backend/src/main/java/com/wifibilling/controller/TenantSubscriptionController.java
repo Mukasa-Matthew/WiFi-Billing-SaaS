@@ -36,6 +36,13 @@ public class TenantSubscriptionController {
         return service.initiateSubscriptionCheckout(p.getTenantId(), req);
     }
 
+    /** Outcome of one checkout — confirmed with the provider while it is still pending. */
+    @GetMapping("/checkout/{reference}")
+    public SubscriptionDto.CheckoutResponse checkoutStatus(
+            @AuthenticationPrincipal TenantPrincipal p, @PathVariable String reference) {
+        return service.checkoutStatus(p.getTenantId(), reference);
+    }
+
     @PostMapping("/notifications/{id}/dismiss")
     public void dismissNotification(@AuthenticationPrincipal TenantPrincipal p, @PathVariable Long id) {
         service.dismissNotification(p.getTenantId(), id);

@@ -17,6 +17,8 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -151,6 +153,33 @@ public class SubscriptionServiceTest {
         assertThrows(ResponseStatusException.class, () -> service.assertTenantManagementAllowed(2L));
     }
 
+    private static final String REF = "123e4567-e89b-12d3-a456-426614174000";
+
+    /** What MarzPay's GET /transactions/{reference} returns. */
+    private tools.jackson.databind.JsonNode providerSays(String status, long amount) {
+        tools.jackson.databind.ObjectMapper mapper = new tools.jackson.databind.ObjectMapper();
+        tools.jackson.databind.node.ObjectNode root = mapper.createObjectNode();
+        tools.jackson.databind.node.ObjectNode txn = root.putObject("data").putObject("transaction");
+        txn.put("reference", REF);
+        txn.put("status", status);
+        txn.putObject("amount").put("raw", amount);
+        txn.put("uuid", "prov-uuid-1");
+        return root;
+    }
+
+    private void checkoutIsStored(SubscriptionCheckout checkout) {
+        lenient().when(checkouts.findByReference(checkout.getReference())).thenReturn(Optional.of(checkout));
+        lenient().when(checkouts.findById(checkout.getId())).thenReturn(Optional.of(checkout));
+        lenient().when(checkouts.findByReferenceForUpdate(checkout.getReference())).thenReturn(Optional.of(checkout));
+        lenient().when(gatewayConfig.credentialsFor(any(), any())).thenReturn(new MarzPayClient.Credentials("k", "s"));
+    }
+
+    private tools.jackson.databind.JsonNode callback(String status) {
+        tools.jackson.databind.node.ObjectNode payload = new tools.jackson.databind.ObjectMapper().createObjectNode();
+        payload.putObject("transaction").put("status", status).put("reference", REF);
+        return payload;
+    }
+
     @Test
     @DisplayName("Early renewal extends remaining days without penalty")
     void testEarlyRenewalPreservesRemainingTime() {
@@ -168,33 +197,125 @@ public class SubscriptionServiceTest {
                 .build();
 
         SubscriptionCheckout checkout = SubscriptionCheckout.builder()
-                .id(101L)
-                .tenant(tenant)
-                .plan(defaultPlan)
-                .reference("SUB-12345")
-                .amount(50000L)
-                .phone("+256700000002")
+                .id(101L).tenant(tenant).plan(defaultPlan).reference(REF)
+                .amount(50000L).phone("+256700000002")
                 .status(SubscriptionCheckout.STATUS_PENDING)
                 .build();
 
         lenient().when(subs.findByTenantId(2L)).thenReturn(Optional.of(sub));
         when(invoices.save(any())).thenAnswer(i -> i.getArgument(0));
         when(payments.save(any())).thenAnswer(i -> i.getArgument(0));
-        when(checkouts.findByReference("SUB-12345")).thenReturn(Optional.of(checkout));
+        checkoutIsStored(checkout);
+        when(marzPay.getTransaction(any(), eq(REF))).thenReturn(providerSays("completed", 50000L));
 
-        tools.jackson.databind.ObjectMapper mapper = new tools.jackson.databind.ObjectMapper();
-        tools.jackson.databind.node.ObjectNode payload = mapper.createObjectNode();
-        tools.jackson.databind.node.ObjectNode txNode = payload.putObject("transaction");
-        txNode.put("status", "SUCCESSFUL");
-        txNode.put("amount", 50000L);
-
-        boolean confirmed = service.confirmSubscriptionCheckout("SUB-12345", payload);
+        boolean confirmed = service.confirmSubscriptionCheckout(REF, callback("completed"));
 
         assertTrue(confirmed);
         assertEquals(SubscriptionCheckout.STATUS_SUCCESSFUL, checkout.getStatus());
         assertEquals(Subscription.STATUS_ACTIVE, sub.getStatus());
         // New expiry must be 4 days + 1 month (approx 34-35 days from now, NOT 30 days from now)
         assertTrue(sub.getExpiresAt().isAfter(now.plusDays(33)));
+    }
+
+    @Test
+    @DisplayName("A forged 'successful' callback is ignored unless MarzPay itself confirms the payment")
+    void forgedCallbackNeverExtendsTheSubscription() {
+        SubscriptionCheckout checkout = SubscriptionCheckout.builder()
+                .id(104L).tenant(tenant).plan(defaultPlan).reference(REF)
+                .amount(50000L).phone("+256700000002")
+                .status(SubscriptionCheckout.STATUS_PENDING)
+                .build();
+        checkoutIsStored(checkout);
+        when(marzPay.getTransaction(any(), eq(REF))).thenReturn(providerSays("pending", 50000L));
+
+        assertTrue(service.confirmSubscriptionCheckout(REF, callback("SUCCESSFUL")));
+
+        assertEquals(SubscriptionCheckout.STATUS_PENDING, checkout.getStatus());
+        verify(subs, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("A payment the provider confirms for less than the plan price is not applied")
+    void underpaymentIsNotApplied() {
+        SubscriptionCheckout checkout = SubscriptionCheckout.builder()
+                .id(105L).tenant(tenant).plan(defaultPlan).reference(REF)
+                .amount(50000L).phone("+256700000002")
+                .status(SubscriptionCheckout.STATUS_PENDING)
+                .build();
+        checkoutIsStored(checkout);
+        when(marzPay.getTransaction(any(), eq(REF))).thenReturn(providerSays("completed", 500L));
+
+        service.confirmSubscriptionCheckout(REF, callback("completed"));
+
+        assertEquals(SubscriptionCheckout.STATUS_FAILED, checkout.getStatus());
+        verify(subs, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Checkout sends MarzPay a UUID reference — it rejects anything else")
+    void checkoutReferenceIsAUuid() {
+        when(checkouts.save(any())).thenAnswer(i -> { SubscriptionCheckout c = i.getArgument(0); c.setId(200L); return c; });
+        lenient().when(subs.findByTenantId(2L)).thenReturn(Optional.of(Subscription.builder().id(1L).tenant(tenant)
+                .status(Subscription.STATUS_ACTIVE).plan(defaultPlan).expiresAt(OffsetDateTime.now().plusDays(3)).build()));
+        when(gatewayConfig.credentialsFor(any(), any())).thenReturn(new MarzPayClient.Credentials("k", "s"));
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "publicBaseUrl", "https://example.test");
+
+        var res = service.initiateSubscriptionCheckout(2L, new com.wifibilling.dto.SubscriptionDto.CheckoutRequest(1L, "0789781923"));
+
+        var ref = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(marzPay).collectMoney(any(), eq(50000L), eq("+256789781923"), ref.capture(), any(), any(), any());
+        assertEquals(java.util.UUID.fromString(ref.getValue()).toString(), ref.getValue());
+        assertEquals(ref.getValue(), res.reference());
+        assertEquals(SubscriptionCheckout.STATUS_PENDING, res.status());
+    }
+
+    @Test
+    @DisplayName("A provider timeout keeps the checkout pending instead of failing a payment that may have gone through")
+    void providerTimeoutKeepsCheckoutPending() {
+        when(checkouts.save(any())).thenAnswer(i -> { SubscriptionCheckout c = i.getArgument(0); c.setId(201L); return c; });
+        lenient().when(subs.findByTenantId(2L)).thenReturn(Optional.of(Subscription.builder().id(1L).tenant(tenant)
+                .status(Subscription.STATUS_ACTIVE).plan(defaultPlan).expiresAt(OffsetDateTime.now().plusDays(3)).build()));
+        when(gatewayConfig.credentialsFor(any(), any())).thenReturn(new MarzPayClient.Credentials("k", "s"));
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "publicBaseUrl", "https://example.test");
+        when(marzPay.collectMoney(any(), anyLong(), any(), any(), any(), any(), any()))
+                .thenThrow(new MarzPayClient.MarzPayException(-1, "MarzPay request failed: Read timed out"));
+
+        var res = service.initiateSubscriptionCheckout(2L, new com.wifibilling.dto.SubscriptionDto.CheckoutRequest(1L, "0789781923"));
+
+        assertEquals(SubscriptionCheckout.STATUS_PENDING, res.status());
+        verify(checkouts, never()).findById(201L); // never marked failed
+    }
+
+    @Test
+    @DisplayName("A provider rejection fails the checkout with a message the owner can act on")
+    void providerRejectionExplainsWhatToCheck() {
+        when(checkouts.save(any())).thenAnswer(i -> { SubscriptionCheckout c = i.getArgument(0); c.setId(202L); return c; });
+        lenient().when(subs.findByTenantId(2L)).thenReturn(Optional.of(Subscription.builder().id(1L).tenant(tenant)
+                .status(Subscription.STATUS_ACTIVE).plan(defaultPlan).expiresAt(OffsetDateTime.now().plusDays(3)).build()));
+        when(gatewayConfig.credentialsFor(any(), any())).thenReturn(new MarzPayClient.Credentials("k", "s"));
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "publicBaseUrl", "https://example.test");
+        when(marzPay.collectMoney(any(), anyLong(), any(), any(), any(), any(), any()))
+                .thenThrow(new MarzPayClient.MarzPayException(422, "{\"error_code\":\"VALIDATION_ERROR\"}"));
+
+        var ex = assertThrows(ResponseStatusException.class, () ->
+                service.initiateSubscriptionCheckout(2L, new com.wifibilling.dto.SubscriptionDto.CheckoutRequest(1L, "0789781923")));
+
+        assertTrue(ex.getReason().contains("+256789781923"));
+        verify(checkouts).findById(202L);
+    }
+
+    @Test
+    @DisplayName("An owner cannot read another hotspot's checkout")
+    void checkoutStatusIsTenantScoped() {
+        SubscriptionCheckout checkout = SubscriptionCheckout.builder()
+                .id(106L).tenant(tenant).plan(defaultPlan).reference(REF)
+                .amount(50000L).phone("+256700000002")
+                .status(SubscriptionCheckout.STATUS_SUCCESSFUL)
+                .build();
+        when(checkouts.findByReference(REF)).thenReturn(Optional.of(checkout));
+
+        assertThrows(ResponseStatusException.class, () -> service.checkoutStatus(99L, REF));
+        assertEquals(SubscriptionCheckout.STATUS_SUCCESSFUL, service.checkoutStatus(2L, REF).status());
     }
 
     @Test
@@ -232,19 +353,16 @@ public class SubscriptionServiceTest {
                 .id(102L)
                 .tenant(tenant)
                 .plan(defaultPlan)
-                .reference("SUB-FAIL-1")
+                .reference(REF)
+                .amount(50000L)
                 .status(SubscriptionCheckout.STATUS_PENDING)
                 .build();
 
-        when(checkouts.findByReference("SUB-FAIL-1")).thenReturn(Optional.of(checkout));
+        checkoutIsStored(checkout);
         lenient().when(subs.findByTenantId(2L)).thenReturn(Optional.of(sub));
+        when(marzPay.getTransaction(any(), eq(REF))).thenReturn(providerSays("failed", 50000L));
 
-        tools.jackson.databind.ObjectMapper mapper = new tools.jackson.databind.ObjectMapper();
-        tools.jackson.databind.node.ObjectNode payload = mapper.createObjectNode();
-        tools.jackson.databind.node.ObjectNode txNode = payload.putObject("transaction");
-        txNode.put("status", "FAILED");
-
-        boolean handled = service.confirmSubscriptionCheckout("SUB-FAIL-1", payload);
+        boolean handled = service.confirmSubscriptionCheckout(REF, callback("failed"));
 
         assertTrue(handled);
         assertEquals(SubscriptionCheckout.STATUS_FAILED, checkout.getStatus());
@@ -265,18 +383,13 @@ public class SubscriptionServiceTest {
                 .id(103L)
                 .tenant(tenant)
                 .plan(defaultPlan)
-                .reference("SUB-DUP-1")
+                .reference(REF)
                 .status(SubscriptionCheckout.STATUS_SUCCESSFUL) // already marked successful
                 .build();
 
-        when(checkouts.findByReference("SUB-DUP-1")).thenReturn(Optional.of(checkout));
+        checkoutIsStored(checkout);
 
-        tools.jackson.databind.ObjectMapper mapper = new tools.jackson.databind.ObjectMapper();
-        tools.jackson.databind.node.ObjectNode payload = mapper.createObjectNode();
-        tools.jackson.databind.node.ObjectNode txNode = payload.putObject("transaction");
-        txNode.put("status", "SUCCESSFUL");
-
-        boolean confirmed = service.confirmSubscriptionCheckout("SUB-DUP-1", payload);
+        boolean confirmed = service.confirmSubscriptionCheckout(REF, callback("completed"));
 
         assertTrue(confirmed, "Duplicate webhook should acknowledge 200 without reprocessing");
         verify(subs, never()).save(any());
