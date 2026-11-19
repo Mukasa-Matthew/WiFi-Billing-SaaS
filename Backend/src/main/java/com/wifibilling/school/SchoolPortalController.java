@@ -18,11 +18,11 @@ public class SchoolPortalController {
     }
 
     public record Verify(@NotBlank @Size(max = 128) String token, @NotBlank @Size(max = 128) String identifier,
-                         @NotBlank @Size(max = 8) String pin, @Size(max = 24) String mac) {
+                         @NotBlank @Size(max = 8) String pin, @Size(max = 24) String mac, Long voucherId) {
         @Override public String toString() { return "Verify[pin=redacted]"; }
     }
     public record ChangePin(@NotBlank @Size(max = 128) String token, @NotBlank @Size(max = 2048) String pinChangeToken,
-                            @NotBlank @Size(max = 8) String newPin, @Size(max = 24) String mac) {
+                            @NotBlank @Size(max = 8) String newPin, @Size(max = 24) String mac, Long voucherId) {
         @Override public String toString() { return "ChangePin[redacted]"; }
     }
     public record Visitor(@NotBlank @Size(max = 128) String token, @NotBlank @Size(max = 16) String code, @Size(max = 24) String mac) {}
@@ -57,13 +57,13 @@ public class SchoolPortalController {
     @PostMapping("/verify")
     public SchoolAccessService.PortalResult verify(@Valid @RequestBody Verify body) {
         rateLimiter.check("verify", body.mac());
-        return access.verify(body.token(), body.identifier(), body.pin(), body.mac());
+        return access.verify(body.token(), body.identifier(), body.pin(), body.mac(), body.voucherId());
     }
 
     @PostMapping("/change-pin")
     public SchoolAccessService.PortalResult changePin(@Valid @RequestBody ChangePin body) {
         rateLimiter.check("change-pin", body.mac());
-        return access.changePin(body.token(), body.pinChangeToken(), body.newPin(), body.mac());
+        return access.changePin(body.token(), body.pinChangeToken(), body.newPin(), body.mac(), body.voucherId());
     }
 
     /** Whether this school's portal offers "Register as a student", with the completion years to choose from. */

@@ -659,6 +659,44 @@ class SchoolFlowIntegrationTest {
     }
 
     @Test
+    void aStudentOnANewWifiAddressGetsTheirPackageBackWithIdAndPin() throws Exception {
+        Site school = site("bring-package-school", true);
+        String newMac = "AA:BB:CC:00:00:09";
+        verified(school.tenant().getId(), "OK", "STUDENT", "student-bring");
+        String ticket = JsonPath.read(portal("verify", verifyBody(school, PHONE_MAC)), "$.ticket");
+        String reference = JsonPath.read(pay(school, PHONE_MAC, ticket), "$.reference");
+        mvc.perform(post("/api/payments/webhook").header("X-Webhook-Secret", "school-test-webhook-secret").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"reference\":\"" + reference + "\",\"status\":\"SUCCESSFUL\"}")).andExpect(status().isOk());
+        String code = transactions.findByReference(reference).orElseThrow().getVoucherCode();
+        Voucher voucher = vouchers.findByCode(code).orElseThrow();
+        voucher.setClaimedMac(PHONE_MAC);
+        vouchers.save(voucher);
+
+        // Plain sign-in from the new address offers the package instead of only "buy another"
+        String signedIn = portal("verify", verifyBody(school, newMac));
+        assertEquals("BUY", JsonPath.read(signedIn, "$.action"));
+        assertEquals(voucher.getId().intValue(), ((Number) JsonPath.read(signedIn, "$.movableDevices[0].id")).intValue());
+
+        // From "Find your voucher": the card carries the package, and ID + PIN there connect at once
+        String found = findVoucher(school, "0770000001", newMac);
+        Number voucherId = JsonPath.read(found, "$.vouchers[0].voucherId");
+        String body = "{\"token\":\"" + school.routerToken() + "\",\"identifier\":\"S23/0412\",\"pin\":\"4826\",\"mac\":\"" + newMac
+                + "\",\"voucherId\":" + voucherId + "}";
+        String connected = portal("verify", body);
+        assertEquals("CONNECT", JsonPath.read(connected, "$.action"));
+        assertEquals(code, JsonPath.read(connected, "$.code"));
+        assertEquals(newMac, vouchers.findByCode(code).orElseThrow().getClaimedMac());
+
+        // Someone else's ID and PIN can never pull the package to their phone
+        verified(school.tenant().getId(), "OK", "STUDENT", "student-someone-else");
+        mvc.perform(post("/api/portal/school/verify").contentType(MediaType.APPLICATION_JSON)
+                        .content(body.replace(newMac, TABLET_MAC)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("different student")));
+        assertEquals(newMac, vouchers.findByCode(code).orElseThrow().getClaimedMac());
+    }
+
+    @Test
     void ownerFindsEveryPaymentForANumberWhateverFormatOrStatus() throws Exception {
         Site shop = site("payment-search-shop", false);
         Site other = site("payment-search-other", false);

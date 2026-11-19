@@ -86,6 +86,9 @@ public class VoucherLookupService {
             item.put("locked", usable && !reveal);
             item.put("canUnlock", usable && !reveal && !school && proofDigits(tx) != null);
             item.put("schoolSignIn", usable && !reveal && school);
+            // Lets the portal sign the student in right here and bring this package to the device.
+            // Useless on its own: the move only happens for the student whose ID and PIN own it.
+            if (usable && !reveal && school) item.put("voucherId", v.getId());
             item.put("firstLogin", v != null && v.getFirstLogin() != null ? v.getFirstLogin().toString() : null);
             OffsetDateTime expiry = v == null ? null : AccessState.expiry(v, v.getFirstLogin());
             item.put("expiresAt", expiry != null ? expiry.toString() : null);
