@@ -181,6 +181,29 @@ public class WalletService {
         return true;
     }
 
+    /**
+     * The owner pays their AirPairy subscription from their balance: available → AirPairy.
+     * The money never leaves the platform account, it only stops being the tenant's.
+     * Idempotent per externalRef; refuses rather than going below zero.
+     *
+     * @return false when this externalRef was already paid
+     */
+    @Transactional(propagation = Propagation.REQUIRED)
+    public boolean debitForSubscription(Long tenantId, long amount, String externalRef, String note) {
+        if (amount <= 0) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A positive amount is required");
+        WalletAccount w = walletForUpdate(tenantId);
+        if (ledgerRepository.existsByWalletIdAndTypeAndExternalRef(w.getId(),
+                WalletLedgerEntry.SUBSCRIPTION_DEBIT, externalRef)) return false;
+        if (w.getAvailableBalance() < amount) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Your wallet has UGX "
+                    + String.format("%,d", w.getAvailableBalance()) + ", which is not enough for UGX "
+                    + String.format("%,d", amount) + ". Pay with Mobile Money instead.");
+        }
+        w.setAvailableBalance(w.getAvailableBalance() - amount);
+        record(w, WalletLedgerEntry.SUBSCRIPTION_DEBIT, amount, externalRef, null, null, note);
+        return true;
+    }
+
     /** Authorized admin adjustment. Positive amount credits; negative debits. */
     @Transactional(propagation = Propagation.REQUIRED)
     public void adjust(Long tenantId, long amount, String externalRef, String note) {

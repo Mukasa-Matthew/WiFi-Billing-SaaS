@@ -58,6 +58,22 @@ class WalletServiceTest {
     }
 
     @Test
+    void subscriptionDebitTakesTheAmountOnceAndNeverGoesBelowZero() {
+        assertTrue(service.debitForSubscription(1L, 6_000, "SUB:k1", "plan"));
+        assertEquals(4_000L, wallet.getAvailableBalance());
+        verify(ledger).save(argThat(e -> WalletLedgerEntry.SUBSCRIPTION_DEBIT.equals(e.getType())
+                && e.getAmount() == 6_000L && e.getAvailableAfter() == 4_000L));
+
+        when(ledger.existsByWalletIdAndTypeAndExternalRef(5L, WalletLedgerEntry.SUBSCRIPTION_DEBIT, "SUB:k1")).thenReturn(true);
+        assertFalse(service.debitForSubscription(1L, 6_000, "SUB:k1", "plan"));
+        assertEquals(4_000L, wallet.getAvailableBalance());
+
+        var ex = assertThrows(ResponseStatusException.class, () -> service.debitForSubscription(1L, 5_000, "SUB:k2", "plan"));
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+        assertEquals(4_000L, wallet.getAvailableBalance());
+    }
+
+    @Test
     void reserveMovesAvailableToReserved() {
         service.reserveForWithdrawal(1L, 8_000, "RES:W1", 7L);
         assertEquals(2_000L, wallet.getAvailableBalance());

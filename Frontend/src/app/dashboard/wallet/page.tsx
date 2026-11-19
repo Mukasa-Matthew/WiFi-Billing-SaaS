@@ -37,6 +37,7 @@ const LEDGER_LABEL: Record<string, { name: string; tone: string }> = {
   ADJUSTMENT_CREDIT: { name: "Adjustment +", tone: "green" },
   ADJUSTMENT_DEBIT: { name: "Adjustment −", tone: "red" },
   EXTERNAL_WITHDRAWAL: { name: "Paid out (recorded by admin)", tone: "blue" },
+  SUBSCRIPTION_DEBIT: { name: "AirPairy subscription", tone: "blue" },
   RESERVE_CORRECTION: { name: "Reserve correction", tone: "slate" },
 };
 const STATUS_TONE: Record<string, string> = {

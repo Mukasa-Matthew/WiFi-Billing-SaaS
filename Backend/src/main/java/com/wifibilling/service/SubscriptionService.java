@@ -48,6 +48,21 @@ public class SubscriptionService {
     private final SubscriptionPeriodHistoryRepository periodHistoryRepository;
     private final TenantRepository tenants;
     private LeaderLockService leaderLockService = new LeaderLockService();
+    private WalletService walletService;
+    private PlatformEarningsService platformEarnings;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setWalletService(@org.springframework.context.annotation.Lazy WalletService walletService) {
+        this.walletService = walletService;
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setPlatformEarnings(@org.springframework.context.annotation.Lazy PlatformEarningsService platformEarnings) {
+        this.platformEarnings = platformEarnings;
+    }
+
+    /** Stored as the checkout's phone when the owner paid from their wallet balance. */
+    public static final String PAID_FROM_WALLET = "WALLET";
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     public void setLeaderLockService(LeaderLockService leaderLockService) {
@@ -305,11 +320,7 @@ public class SubscriptionService {
         Subscription sub = subscriptions.findByTenantId(tenantId)
                 .orElseGet(() -> grantTrialIfEligible(tenant));
 
-        SubscriptionPlan plan = req.planId() != null
-                ? plans.findById(req.planId()).filter(SubscriptionPlan::getActive)
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Subscription plan not found or inactive"))
-                : (sub.getPlan() != null ? sub.getPlan() : plans.findAllByActiveTrueOrderByDisplayOrderAscPriceAsc().stream().findFirst()
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No active plans configured")));
+        SubscriptionPlan plan = resolvePlan(sub, req.planId());
 
         long amount = plan.getPrice();
         String phoneE164 = toE164(req.phone());
@@ -329,6 +340,69 @@ public class SubscriptionService {
         String country = gatewayConfig.countryFor(tenant, TenantGatewayConfig.MODE_PLATFORM);
         String callbackUrl = publicBaseUrl.replaceAll("/+$", "") + "/api/payments/marzpay/callback";
         return new CheckoutPrep(checkout.getId(), reference, amount, phoneE164, plan.getName(), creds, country, callbackUrl);
+    }
+
+    private SubscriptionPlan resolvePlan(Subscription sub, Long planId) {
+        return planId != null
+                ? plans.findById(planId).filter(SubscriptionPlan::getActive)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Subscription plan not found or inactive"))
+                : (sub.getPlan() != null ? sub.getPlan() : plans.findAllByActiveTrueOrderByDisplayOrderAscPriceAsc().stream().findFirst()
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No active plans configured")));
+    }
+
+    /**
+     * The owner pays the plan from their wallet balance instead of Mobile Money. One database
+     * transaction takes the money and extends the subscription, so it is all or nothing.
+     * {@code requestKey} (a UUID the page makes once per tap of Pay) makes a double tap or a
+     * retry return the first payment instead of charging twice.
+     */
+    @Transactional
+    public SubscriptionDto.CheckoutResponse payFromWallet(Long tenantId, Long planId, String requestKey) {
+        if (walletService == null) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Wallet payments are not available right now.");
+        }
+        if (!isUuid(requestKey)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing payment request key. Refresh the page and try again.");
+        }
+        Optional<SubscriptionCheckout> earlier = checkouts.findByReference(requestKey);
+        if (earlier.isPresent()) return walletReceipt(tenantId, earlier.get());
+
+        Tenant tenant = tenants.findById(tenantId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tenant not found"));
+        Subscription sub = subscriptions.findByTenantId(tenantId).orElseGet(() -> grantTrialIfEligible(tenant));
+        SubscriptionPlan plan = resolvePlan(sub, planId);
+        long amount = plan.getPrice();
+
+        if (!walletService.debitForSubscription(tenantId, amount, "SUB:" + requestKey,
+                "AirPairy subscription — " + plan.getName())) {
+            // A concurrent request with the same key won the wallet lock and has committed by now.
+            return checkouts.findByReference(requestKey).map(c -> walletReceipt(tenantId, c))
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "This payment is already being processed."));
+        }
+        SubscriptionCheckout checkout = checkouts.save(SubscriptionCheckout.builder()
+                .tenant(tenant)
+                .plan(plan)
+                .reference(requestKey)
+                .phone(PAID_FROM_WALLET)
+                .amount(amount)
+                .status(SubscriptionCheckout.STATUS_SUCCESSFUL)
+                .completedAt(OffsetDateTime.now())
+                .build());
+        applySuccessfulPayment(checkout);
+        log.info("Tenant {} paid subscription {} (UGX {}) from wallet", tenantId, requestKey, amount);
+        return walletReceipt(tenantId, checkout);
+    }
+
+    private SubscriptionDto.CheckoutResponse walletReceipt(Long tenantId, SubscriptionCheckout checkout) {
+        if (checkout.getTenant() == null || !tenantId.equals(checkout.getTenant().getId())
+                || !PAID_FROM_WALLET.equals(checkout.getPhone())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Payment request key already used. Refresh the page and try again.");
+        }
+        String until = subscriptions.findByTenantId(tenantId).map(Subscription::getExpiresAt)
+                .map(e -> e.atZoneSameInstant(TIMEZONE_KAMPALA).toLocalDate().toString()).orElse(null);
+        return new SubscriptionDto.CheckoutResponse(checkout.getReference(), checkout.getStatus(), checkout.getAmount(), null,
+                "Paid UGX " + String.format("%,d", checkout.getAmount()) + " from your wallet."
+                        + (until != null ? " Your subscription is active until " + until + "." : ""));
     }
 
     @Transactional
@@ -398,6 +472,7 @@ public class SubscriptionService {
     }
 
     void doReconcilePendingCheckouts() {
+        backfillSubscriptionEarnings();
         OffsetDateTime now = OffsetDateTime.now();
         for (SubscriptionCheckout c : checkouts.findAllByStatus(SubscriptionCheckout.STATUS_PENDING)) {
             if (c.getCreatedAt() == null) continue;
@@ -427,10 +502,11 @@ public class SubscriptionService {
             if (txn == null || txn.isMissingNode()) return;
             String status = txn.path("status").asText("").toLowerCase(Locale.ROOT);
             Long paid = amountOf(txn.path("amount"));
+            Long net = amountOf(txn.path("net_amount"));
             String providerUuid = txn.path("uuid").asText(null);
             String providerTx = payload.path("collection").path("provider_transaction_id").asText(providerUuid);
             String description = txn.path("description").asText(null);
-            self.applyProviderOutcome(checkout.getId(), status, paid, providerTx, description);
+            self.applyProviderOutcome(checkout.getId(), status, paid, net, providerTx, description);
         } catch (MarzPayClient.MarzPayException e) {
             if (e.isNotFound()) {
                 log.info("Subscription checkout {}: provider has no record yet", reference);
@@ -447,7 +523,7 @@ public class SubscriptionService {
      * the sweep racing each other can never extend a subscription twice.
      */
     @Transactional
-    public void applyProviderOutcome(Long checkoutId, String providerStatus, Long paidAmount,
+    public void applyProviderOutcome(Long checkoutId, String providerStatus, Long paidAmount, Long netAmount,
                                      String providerTx, String description) {
         SubscriptionCheckout checkout = checkouts.findById(checkoutId)
                 .flatMap(c -> checkouts.findByReferenceForUpdate(c.getReference()))
@@ -467,6 +543,7 @@ public class SubscriptionService {
             // A provider-confirmed payment wins even over an earlier local FAILED: the money moved.
             checkout.setStatus(SubscriptionCheckout.STATUS_SUCCESSFUL);
             checkout.setExternalReference(providerTx);
+            checkout.setNetAmount(netAmount);
             checkout.setFailureReason(null);
             checkout.setCompletedAt(OffsetDateTime.now());
             checkouts.save(checkout);
@@ -481,6 +558,59 @@ public class SubscriptionService {
             log.warn("Subscription checkout {} failed at provider: {}", checkout.getReference(), status);
         }
         // pending / processing: nothing to do yet
+    }
+
+    /**
+     * Subscription money sits in the platform MarzPay account either way: a Mobile Money renewal
+     * lands there net of the provider fee, a wallet payment was already there as the tenant's balance.
+     * Without this credit the reconciliation shows it as unexplained surplus.
+     */
+    private void creditPlatformEarnings(SubscriptionPayment payment, SubscriptionCheckout checkout) {
+        if (platformEarnings == null || payment == null || payment.getId() == null) return;
+        Long settled = PAID_FROM_WALLET.equals(checkout.getPhone()) ? checkout.getAmount() : checkout.getNetAmount();
+        if (settled == null) {
+            log.warn("Subscription payment {}: provider net unknown — earnings credit left to the backfill", payment.getId());
+            return;
+        }
+        platformEarnings.creditSubscriptionPayment(payment, "MARZPAY", settled);
+    }
+
+    private final java.util.concurrent.atomic.AtomicBoolean earningsBackfilled = new java.util.concurrent.atomic.AtomicBoolean();
+
+    /**
+     * Once per process: earlier renewals were never added to platform earnings. Each one is
+     * credited at the net the provider reports for it, so the books match what MarzPay holds.
+     */
+    void backfillSubscriptionEarnings() {
+        if (platformEarnings == null || !earningsBackfilled.compareAndSet(false, true)) return;
+        boolean complete = true;
+        for (SubscriptionPayment p : payments.findAll()) {
+            if (!"MOBILE_MONEY".equals(p.getMethod()) && !"WALLET".equals(p.getMethod())) continue;
+            if (platformEarnings.hasSubscriptionEarning(p.getId())) continue;
+            SubscriptionCheckout c = p.getExternalRef() == null ? null : checkouts.findByReference(p.getExternalRef()).orElse(null);
+            if (c == null) continue;
+            Long settled = "WALLET".equals(p.getMethod()) ? p.getAmount() : c.getNetAmount();
+            if (settled == null) settled = providerNet(c);
+            if (settled == null) { complete = false; continue; }
+            platformEarnings.creditSubscriptionPayment(p, "MARZPAY", settled);
+            log.info("Backfilled platform earnings for subscription payment {}: UGX {}", p.getId(), settled);
+        }
+        if (!complete) earningsBackfilled.set(false); // try the rest on the next sweep
+    }
+
+    private Long providerNet(SubscriptionCheckout c) {
+        if (!isUuid(c.getReference())) return null;
+        try {
+            var creds = gatewayConfig.credentialsFor(c.getTenant(), TenantGatewayConfig.MODE_PLATFORM);
+            JsonNode res = marzPay.getTransaction(creds, c.getReference());
+            JsonNode payload = res != null && res.has("data") && res.get("data").isObject() ? res.get("data") : res;
+            JsonNode txn = payload == null ? null : payload.path("transaction");
+            if (txn == null || !"completed".equalsIgnoreCase(txn.path("status").asText(""))) return null;
+            return amountOf(txn.path("net_amount"));
+        } catch (Exception e) {
+            log.warn("Could not read provider net for subscription checkout {}: {}", c.getReference(), e.getMessage());
+            return null;
+        }
     }
 
     private static Long amountOf(JsonNode amount) {
@@ -543,18 +673,21 @@ public class SubscriptionService {
             invoice = invoices.save(invoice);
         } catch (DataIntegrityViolationException ignored) {}
 
+        boolean fromWallet = PAID_FROM_WALLET.equals(checkout.getPhone());
         SubscriptionPayment payment = SubscriptionPayment.builder()
                 .subscription(sub)
                 .invoice(invoice)
                 .tenant(tenant)
                 .amount(checkout.getAmount())
-                .method("MOBILE_MONEY")
+                .method(fromWallet ? "WALLET" : "MOBILE_MONEY")
                 .externalRef(checkout.getReference())
                 .recordRef(UUID.randomUUID().toString())
                 .paidAt(now)
-                .note("Self-service Mobile Money renewal via MarzPay (" + checkout.getPhone() + ")")
+                .note(fromWallet ? "Self-service renewal paid from wallet balance"
+                        : "Self-service Mobile Money renewal via MarzPay (" + checkout.getPhone() + ")")
                 .build();
-        payments.save(payment);
+        payment = payments.save(payment);
+        creditPlatformEarnings(payment, checkout);
 
         // Record Subscription Period History
         SubscriptionPeriodHistory hist = SubscriptionPeriodHistory.builder()
@@ -569,7 +702,7 @@ public class SubscriptionService {
                 .status("ACTIVE")
                 .paymentDate(now)
                 .paymentReference(checkout.getReference())
-                .note("Self-service renewal (" + checkout.getPhone() + ")")
+                .note(fromWallet ? "Self-service renewal (wallet)" : "Self-service renewal (" + checkout.getPhone() + ")")
                 .build();
         periodHistoryRepository.save(hist);
 
@@ -879,8 +1012,8 @@ public class SubscriptionService {
                         c.getExternalReference(),
                         c.getPlan() != null ? c.getPlan().getName() : "SaaS Subscription",
                         c.getAmount(),
-                        maskPhone(c.getPhone()),
-                        "MOBILE_MONEY",
+                        PAID_FROM_WALLET.equals(c.getPhone()) ? "Wallet balance" : maskPhone(c.getPhone()),
+                        PAID_FROM_WALLET.equals(c.getPhone()) ? "WALLET" : "MOBILE_MONEY",
                         c.getStatus(),
                         c.getFailureReason()))
                 .toList();

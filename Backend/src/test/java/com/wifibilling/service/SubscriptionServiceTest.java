@@ -19,6 +19,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -37,6 +38,8 @@ public class SubscriptionServiceTest {
     @Mock private GatewayConfigService gatewayConfig;
     @Mock private EmailService emailService;
     @Mock private EmailTemplates emailTemplates;
+    @Mock private WalletService walletService;
+    @Mock private PlatformEarningsService platformEarnings;
 
     private SubscriptionService service;
     private Tenant tenant;
@@ -50,6 +53,8 @@ public class SubscriptionServiceTest {
                 gatewayConfig, emailService, emailTemplates
         );
         org.springframework.test.util.ReflectionTestUtils.setField(service, "subscriptionEnforcementEnabled", true);
+        service.setWalletService(walletService);
+        service.setPlatformEarnings(platformEarnings);
 
         tenant = Tenant.builder()
                 .id(2L)
@@ -163,6 +168,7 @@ public class SubscriptionServiceTest {
         txn.put("reference", REF);
         txn.put("status", status);
         txn.putObject("amount").put("raw", amount);
+        txn.putObject("net_amount").put("raw", amount * 93 / 100);
         txn.put("uuid", "prov-uuid-1");
         return root;
     }
@@ -215,6 +221,95 @@ public class SubscriptionServiceTest {
         assertEquals(Subscription.STATUS_ACTIVE, sub.getStatus());
         // New expiry must be 4 days + 1 month (approx 34-35 days from now, NOT 30 days from now)
         assertTrue(sub.getExpiresAt().isAfter(now.plusDays(33)));
+    }
+
+    @Test
+    @DisplayName("A Mobile Money renewal adds the provider's net to platform earnings, not the gross")
+    void momoRenewalCreditsTheNetTheProviderHolds() {
+        Subscription sub = Subscription.builder().id(1L).tenant(tenant).status(Subscription.STATUS_ACTIVE)
+                .plan(defaultPlan).expiresAt(OffsetDateTime.now().plusDays(2)).build();
+        SubscriptionCheckout checkout = SubscriptionCheckout.builder()
+                .id(107L).tenant(tenant).plan(defaultPlan).reference(REF)
+                .amount(50000L).phone("+256700000002").status(SubscriptionCheckout.STATUS_PENDING).build();
+        lenient().when(subs.findByTenantId(2L)).thenReturn(Optional.of(sub));
+        when(invoices.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(payments.save(any())).thenAnswer(i -> { SubscriptionPayment p = i.getArgument(0); p.setId(77L); return p; });
+        checkoutIsStored(checkout);
+        when(marzPay.getTransaction(any(), eq(REF))).thenReturn(providerSays("completed", 50000L));
+
+        service.confirmSubscriptionCheckout(REF, callback("completed"));
+
+        verify(platformEarnings).creditSubscriptionPayment(argThat(p -> p.getId() == 77L), eq("MARZPAY"), eq(46500L));
+    }
+
+    @Test
+    @DisplayName("Paying from the wallet takes the price, extends the subscription and credits platform earnings in full")
+    void walletPaymentExtendsTheSubscription() {
+        OffsetDateTime now = OffsetDateTime.now();
+        Subscription sub = Subscription.builder().id(1L).tenant(tenant).status(Subscription.STATUS_GRACE_PERIOD)
+                .plan(defaultPlan).expiresAt(now.minusDays(1)).build();
+        lenient().when(subs.findByTenantId(2L)).thenReturn(Optional.of(sub));
+        when(checkouts.findByReference(REF)).thenReturn(Optional.empty());
+        when(checkouts.save(any())).thenAnswer(i -> { SubscriptionCheckout c = i.getArgument(0); c.setId(300L); return c; });
+        when(walletService.debitForSubscription(eq(2L), eq(50000L), eq("SUB:" + REF), any())).thenReturn(true);
+        when(invoices.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(payments.save(any())).thenAnswer(i -> { SubscriptionPayment p = i.getArgument(0); p.setId(78L); return p; });
+
+        var res = service.payFromWallet(2L, 1L, REF);
+
+        assertEquals(SubscriptionCheckout.STATUS_SUCCESSFUL, res.status());
+        assertEquals(Subscription.STATUS_ACTIVE, sub.getStatus());
+        assertTrue(sub.getExpiresAt().isAfter(now.plusDays(27)));
+        verify(payments).save(argThat(p -> "WALLET".equals(p.getMethod())));
+        verify(platformEarnings).creditSubscriptionPayment(argThat(p -> p.getId() == 78L), eq("MARZPAY"), eq(50000L));
+        verifyNoInteractions(marzPay);
+    }
+
+    @Test
+    @DisplayName("Not enough in the wallet: nothing is paid and the subscription is untouched")
+    void walletTooLowChangesNothing() {
+        Subscription sub = Subscription.builder().id(1L).tenant(tenant).status(Subscription.STATUS_ACTIVE)
+                .plan(defaultPlan).expiresAt(OffsetDateTime.now().plusDays(2)).build();
+        lenient().when(subs.findByTenantId(2L)).thenReturn(Optional.of(sub));
+        when(checkouts.findByReference(REF)).thenReturn(Optional.empty());
+        when(walletService.debitForSubscription(anyLong(), anyLong(), any(), any()))
+                .thenThrow(new ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT, "Your wallet has UGX 1,000"));
+
+        assertThrows(ResponseStatusException.class, () -> service.payFromWallet(2L, 1L, REF));
+        verify(subs, never()).save(any());
+        verify(checkouts, never()).save(any());
+        verify(payments, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("A double tap with the same key returns the first payment and never charges again")
+    void walletPaymentReplayDoesNotChargeTwice() {
+        SubscriptionCheckout done = SubscriptionCheckout.builder().id(301L).tenant(tenant).plan(defaultPlan).reference(REF)
+                .amount(50000L).phone(SubscriptionService.PAID_FROM_WALLET).status(SubscriptionCheckout.STATUS_SUCCESSFUL).build();
+        when(checkouts.findByReference(REF)).thenReturn(Optional.of(done));
+
+        var res = service.payFromWallet(2L, 1L, REF);
+
+        assertEquals(SubscriptionCheckout.STATUS_SUCCESSFUL, res.status());
+        verifyNoInteractions(walletService);
+        verify(subs, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Earlier renewals are added to platform earnings once, at the provider's net")
+    void backfillCreditsEarlierRenewalsAtNet() {
+        SubscriptionCheckout c = SubscriptionCheckout.builder().id(400L).tenant(tenant).plan(defaultPlan).reference(REF)
+                .amount(25000L).phone("+256789781923").status(SubscriptionCheckout.STATUS_SUCCESSFUL).build();
+        SubscriptionPayment old = SubscriptionPayment.builder().id(1L).amount(25000L).method("MOBILE_MONEY").externalRef(REF).build();
+        when(payments.findAll()).thenReturn(List.of(old));
+        when(platformEarnings.hasSubscriptionEarning(1L)).thenReturn(false);
+        checkoutIsStored(c);
+        when(marzPay.getTransaction(any(), eq(REF))).thenReturn(providerSays("completed", 25000L));
+
+        service.backfillSubscriptionEarnings();
+        service.backfillSubscriptionEarnings(); // second run in the same process does nothing
+
+        verify(platformEarnings, times(1)).creditSubscriptionPayment(old, "MARZPAY", 23250L);
     }
 
     @Test

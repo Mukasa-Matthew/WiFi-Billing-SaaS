@@ -31,7 +31,8 @@ public class WalletLedgerEntry {
     public static final String FEE_DEBIT = "FEE_DEBIT";                       // informational: fee recorded (not deducted twice — credit is net)
     public static final String WITHDRAWAL_RESERVE = "WITHDRAWAL_RESERVE";     // available → reserved hold
     public static final String WITHDRAWAL_DEBIT = "WITHDRAWAL_DEBIT";         // payout completed: reserved → gone
-    public static final String ADJUSTMENT_DEBIT = "ADJUSTMENT_DEBIT";         // authorized admin debit
+    public static final String ADJUSTMENT_DEBIT = "ADJUSTMENT_DEBIT";
+    public static final String SUBSCRIPTION_DEBIT = "SUBSCRIPTION_DEBIT";     // owner paid their AirPairy subscription from the wallet         // authorized admin debit
     public static final String EXTERNAL_WITHDRAWAL = "EXTERNAL_WITHDRAWAL";   // paid out directly from the provider, recorded by an admin
     public static final String RESERVE_CORRECTION = "RESERVE_CORRECTION";     // one-off: stranded reserve cleared, available unchanged
 

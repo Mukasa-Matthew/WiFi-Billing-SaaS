@@ -63,6 +63,10 @@ public class SubscriptionCheckout {
     @Column(name = "provider_uuid", length = 128)
     private String providerUuid;
 
+    /** What the provider settled after its fee; null for wallet payments and until confirmed. */
+    @Column(name = "net_amount")
+    private Long netAmount;
+
     @Column(name = "created_at")
     @Builder.Default
     private OffsetDateTime createdAt = OffsetDateTime.now();

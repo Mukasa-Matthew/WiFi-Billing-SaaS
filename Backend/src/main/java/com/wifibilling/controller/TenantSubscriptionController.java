@@ -36,6 +36,20 @@ public class TenantSubscriptionController {
         return service.initiateSubscriptionCheckout(p.getTenantId(), req);
     }
 
+    public record WalletPayRequest(Long planId) {}
+
+    /**
+     * Pays the plan from the tenant's wallet balance. The page sends a fresh UUID per tap in
+     * {@code Idempotency-Key}; a retry with the same key returns the first payment.
+     */
+    @PostMapping("/pay-from-wallet")
+    public SubscriptionDto.CheckoutResponse payFromWallet(
+            @AuthenticationPrincipal TenantPrincipal p,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+            @RequestBody(required = false) WalletPayRequest req) {
+        return service.payFromWallet(p.getTenantId(), req != null ? req.planId() : null, idempotencyKey);
+    }
+
     /** Outcome of one checkout — confirmed with the provider while it is still pending. */
     @GetMapping("/checkout/{reference}")
     public SubscriptionDto.CheckoutResponse checkoutStatus(

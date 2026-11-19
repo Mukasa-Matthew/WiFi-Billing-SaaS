@@ -157,6 +157,11 @@ export default function SubscriptionHubPage() {
   const [checkoutBusy, setCheckoutBusy] = useState(false);
   const [checkoutMsg, setCheckoutMsg] = useState<{ text: string; tone: "info" | "success" | "danger" } | null>(null);
   const [activeReference, setActiveReference] = useState<string | null>(null);
+  // How the owner pays: a Mobile Money prompt, or straight from the wallet balance their hotspot earned.
+  const [payMethod, setPayMethod] = useState<"MOMO" | "WALLET">("MOMO");
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  // One key per payment attempt: a double tap or a retry can never charge the wallet twice.
+  const [walletKey, setWalletKey] = useState("");
 
   // Receipt modal
   const [selectedReceipt, setSelectedReceipt] = useState<PaymentHistoryItem | null>(null);
@@ -236,16 +241,70 @@ export default function SubscriptionHubPage() {
     return { days, hours, minutes, seconds, isPast: false };
   }, [sub, nowTimestamp]);
 
+  const newKey = () =>
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : "10000000-1000-4000-8000-100000000000".replace(/[018]/g, (c) =>
+          (Number(c) ^ (Math.random() * 16) >> (Number(c) / 4)).toString(16)
+        );
+
+  const loadWallet = async (price?: number) => {
+    try {
+      const res = await api.get<{ available: number }>("/api/wallet");
+      const available = Number(res.data.available || 0);
+      setWalletBalance(available);
+      if (price !== undefined) setPayMethod(available >= price ? "WALLET" : "MOMO");
+    } catch {
+      setWalletBalance(null);
+      setPayMethod("MOMO");
+    }
+  };
+
   const handleStartCheckout = (plan?: PlanOption) => {
+    const chosen = plan || selectedPlan;
     if (plan) setSelectedPlan(plan);
     setCheckoutMsg(null);
     setActiveReference(null);
+    setWalletKey(newKey());
     setCheckoutOpen(true);
+    loadWallet(chosen?.price);
+  };
+
+  const walletCovers = walletBalance !== null && !!selectedPlan && walletBalance >= selectedPlan.price;
+
+  const handlePayFromWallet = async () => {
+    if (!selectedPlan) return;
+    setCheckoutBusy(true);
+    setCheckoutMsg({ text: "Paying from your wallet…", tone: "info" });
+    try {
+      const res = await api.post<{ reference: string; status: string; message: string }>(
+        "/api/subscription/pay-from-wallet",
+        { planId: selectedPlan.id },
+        { headers: { "Idempotency-Key": walletKey } }
+      );
+      setCheckoutMsg({ text: res.data.message, tone: "success" });
+      setOk("Subscription renewed from your wallet balance.");
+      setWalletKey(newKey());
+      load();
+      loadWallet();
+    } catch (e) {
+      // With no answer the payment may have gone through: keep the key so a retry can't pay twice.
+      const answered = !!(e as { response?: unknown })?.response;
+      if (answered) setWalletKey(newKey());
+      setCheckoutMsg({ text: message(e), tone: "danger" });
+      if (answered) loadWallet();
+    } finally {
+      setCheckoutBusy(false);
+    }
   };
 
   const handleInitiatePayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPlan) return;
+    if (payMethod === "WALLET") {
+      await handlePayFromWallet();
+      return;
+    }
     if (!phone || phone.trim().length < 9) {
       setCheckoutMsg({ text: "Please enter a valid Mobile Money phone number.", tone: "danger" });
       return;
@@ -745,17 +804,66 @@ export default function SubscriptionHubPage() {
             </div>
 
             <div>
-              <label className={label}>Mobile Money Phone Number</label>
-              <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="e.g. 0770000000 or 0750000000"
-                className={field}
-                required
-              />
-              <p className={hint}>MTN MoMo or Airtel Money. A PIN approval prompt will be sent directly to your phone.</p>
+              <label className={label}>How do you want to pay?</label>
+              <div className="mt-1 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => walletCovers && setPayMethod("WALLET")}
+                  disabled={!walletCovers || checkoutBusy}
+                  aria-pressed={payMethod === "WALLET"}
+                  className={`rounded-lg border p-3 text-left transition ${
+                    payMethod === "WALLET"
+                      ? "border-blue-500 bg-blue-50 ring-2 ring-blue-500/30"
+                      : "border-[var(--border-strong)] bg-[var(--subtle)]"
+                  } ${!walletCovers ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
+                >
+                  <div className="text-sm font-bold text-[var(--fg)]">Wallet balance</div>
+                  <div className="text-xs text-[var(--fg-muted)]">
+                    {walletBalance === null
+                      ? "Checking balance…"
+                      : `Available: ${money(walletBalance)}`}
+                  </div>
+                  {walletBalance !== null && !walletCovers && (
+                    <div className="mt-1 text-[11px] font-semibold text-amber-700">Not enough for this plan</div>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPayMethod("MOMO")}
+                  disabled={checkoutBusy}
+                  aria-pressed={payMethod === "MOMO"}
+                  className={`cursor-pointer rounded-lg border p-3 text-left transition ${
+                    payMethod === "MOMO"
+                      ? "border-blue-500 bg-blue-50 ring-2 ring-blue-500/30"
+                      : "border-[var(--border-strong)] bg-[var(--subtle)]"
+                  }`}
+                >
+                  <div className="text-sm font-bold text-[var(--fg)]">Mobile Money</div>
+                  <div className="text-xs text-[var(--fg-muted)]">MTN MoMo or Airtel Money prompt</div>
+                </button>
+              </div>
             </div>
+
+            {payMethod === "WALLET" ? (
+              <p className={hint}>
+                {money(selectedPlan?.price)} will be taken from your wallet balance straight away
+                {walletBalance !== null && selectedPlan ? `, leaving ${money(walletBalance - selectedPlan.price)}` : ""}.
+                No phone prompt is needed.
+              </p>
+            ) : (
+              <div>
+                <label className={label}>Mobile Money Phone Number</label>
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="e.g. 0770000000 or 0750000000"
+                  className={field}
+                  required
+                />
+                <p className={hint}>MTN MoMo or Airtel Money. A PIN approval prompt will be sent directly to your phone.</p>
+              </div>
+            )}
 
             {checkoutMsg && (
               <div
@@ -785,7 +893,9 @@ export default function SubscriptionHubPage() {
                 className={`${button} bg-blue-600 hover:bg-blue-500 text-white font-bold`}
                 disabled={checkoutBusy}
               >
-                <BusyLabel busy={checkoutBusy} label="Sending prompt…">{`Pay ${money(selectedPlan?.price)} via MoMo`}</BusyLabel>
+                <BusyLabel busy={checkoutBusy} label={payMethod === "WALLET" ? "Paying…" : "Sending prompt…"}>
+                  {payMethod === "WALLET" ? `Pay ${money(selectedPlan?.price)} from wallet` : `Pay ${money(selectedPlan?.price)} via MoMo`}
+                </BusyLabel>
               </button>
             </div>
           </form>

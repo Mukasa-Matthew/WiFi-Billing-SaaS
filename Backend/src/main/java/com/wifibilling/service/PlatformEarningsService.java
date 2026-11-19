@@ -87,14 +87,25 @@ public class PlatformEarningsService {
      */
     @Transactional
     public boolean creditSubscriptionPayment(SubscriptionPayment payment, String channel) {
+        return creditSubscriptionPayment(payment, channel, payment.getAmount());
+    }
+
+    /**
+     * {@code settledAmount} is what really landed in the platform MarzPay account: the provider's
+     * net for a Mobile Money renewal (its fee is kept back), the full price for one paid from a
+     * tenant wallet. Crediting more than that would put the books above the provider and block payouts.
+     */
+    @Transactional
+    public boolean creditSubscriptionPayment(SubscriptionPayment payment, String channel, long settledAmount) {
         PlatformEarningsAccount a = accountForUpdate();
         String ref = "SUBPAY:" + payment.getId();
         if ("MARZPAY".equalsIgnoreCase(channel)) {
             if (ledger.existsByTypeAndExternalRef(PlatformLedgerEntry.EARNING_MARZPAY, ref)) return false;
-            a.setSettledEarnings(a.getSettledEarnings() + payment.getAmount());
-            a.setTotalEarned(a.getTotalEarned() + payment.getAmount());
-            record(a, PlatformLedgerEntry.EARNING_MARZPAY, payment.getAmount(), ref,
-                    payment.getId(), null, "Subscription payment " + payment.getId());
+            a.setSettledEarnings(a.getSettledEarnings() + settledAmount);
+            a.setTotalEarned(a.getTotalEarned() + settledAmount);
+            record(a, PlatformLedgerEntry.EARNING_MARZPAY, settledAmount, ref,
+                    payment.getId(), null, "Subscription payment " + payment.getId()
+                            + (settledAmount != payment.getAmount() ? " (net of UGX " + (payment.getAmount() - settledAmount) + " provider fee)" : ""));
             return true;
         }
         if (ledger.existsByTypeAndExternalRef(PlatformLedgerEntry.EARNING_EXTERNAL, ref)) return false;
@@ -103,6 +114,11 @@ public class PlatformEarningsService {
         record(a, PlatformLedgerEntry.EARNING_EXTERNAL, payment.getAmount(), ref,
                 payment.getId(), null, "External subscription payment " + payment.getId());
         return true;
+    }
+
+    @Transactional(readOnly = true)
+    public boolean hasSubscriptionEarning(Long paymentId) {
+        return ledger.existsByTypeAndExternalRef(PlatformLedgerEntry.EARNING_MARZPAY, "SUBPAY:" + paymentId);
     }
 
     // ---------- reconciliation ----------
