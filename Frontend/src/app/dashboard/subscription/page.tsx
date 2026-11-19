@@ -515,13 +515,18 @@ export default function SubscriptionHubPage() {
       {/* SECTION 2: AVAILABLE SUBSCRIPTION PLANS */}
       <div className={panel}>
         <div className="border-b border-[var(--border-soft)] px-5 py-4">
-          <h2 className="text-sm font-bold text-[var(--fg)]">Available Subscription Plans</h2>
+          <h2 className="text-sm font-bold text-[var(--fg)]">Your Subscription Plan</h2>
           <p className="text-xs text-[var(--fg-muted)]">
-            Choose a plan configured by Super Admin. Self-service renewal with MTN or Airtel Mobile Money.
+            The plan allocated to your workspace. Self-service renewal with wallet balance or MTN/Airtel Mobile Money.
           </p>
         </div>
         <div className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2 lg:grid-cols-3">
-          {sub.availablePlans.map((p) => {
+          {sub.availablePlans.every((p) => p.id !== sub.planId) && (
+            <p className="col-span-full text-xs text-[var(--fg-muted)]">
+              No paid plan is allocated to your workspace yet. Contact your administrator to be assigned one.
+            </p>
+          )}
+          {sub.availablePlans.filter((p) => p.id === sub.planId).map((p) => {
             const isCurrent = p.id === sub.planId;
             return (
               <div
