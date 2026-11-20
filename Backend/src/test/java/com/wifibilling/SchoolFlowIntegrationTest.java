@@ -22,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -438,6 +439,45 @@ class SchoolFlowIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tetheringProtection").value("BLOCK"));
         assertEquals("BLOCK", tenants.findById(school.tenant().getId()).orElseThrow().getTetheringProtection());
+    }
+
+    @Test
+    void freeDataFactorShowsOnlyOnTheItDashboardNeverToTheOwner() throws Exception {
+        Site school = site("factor-school", true);
+        var tenant = tenants.findById(school.tenant().getId()).orElseThrow();
+        tenant.setSchoolFreeDataDisplayFactor(2.0);
+        tenants.save(tenant);
+        var plan = plans.findById(school.planId().longValue()).orElseThrow();
+        vouchers.save(Voucher.builder().code("FREEUSE01").tenant(school.tenant()).packagePlan(plan).status("active")
+                .schoolCategory("STUDENT").saleType("SCHOOL_STUDENT_FREE").personId("p-free").build());
+        vouchers.save(Voucher.builder().code("PAIDUSE01").tenant(school.tenant()).packagePlan(plan).status("active")
+                .schoolCategory("STUDENT").saleType("ONLINE").personId("p-paid").build());
+        var noon = LocalDate.now(java.time.ZoneId.of("Africa/Kampala")).atTime(12, 0).atZone(java.time.ZoneId.of("Africa/Kampala")).toOffsetDateTime();
+        long mb = 1024L * 1024L;
+        radAcct.saveAndFlush(com.wifibilling.radius.RadAcct.builder().acctSessionId("f1").acctUniqueId("uf1").username("FREEUSE01")
+                .nasIpAddress("10.9.0.2").acctStartTime(noon).acctInputOctets(20 * mb).acctOutputOctets(80 * mb).build());
+        radAcct.saveAndFlush(com.wifibilling.radius.RadAcct.builder().acctSessionId("p1").acctUniqueId("up1").username("PAIDUSE01")
+                .nasIpAddress("10.9.0.2").acctStartTime(noon).acctInputOctets(50 * mb).acctOutputOctets(250 * mb).build());
+
+        // The hotspot owner sees exactly what the router measured
+        mvc.perform(get("/api/dashboard/data-usage").param("period", "today").header("Authorization", "Bearer " + school.jwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.categories[?(@.category=='STUDENT_FREE')].totalBytes").value(org.hamcrest.Matchers.hasItem((int) (100 * mb))))
+                .andExpect(jsonPath("$.categories[?(@.category=='STUDENT')].totalBytes").value(org.hamcrest.Matchers.hasItem((int) (300 * mb))));
+
+        // The IT dashboard gets free access only, with free students at the school's factor
+        byte[] body = ("{\"tenantId\":" + school.tenant().getId() + ",\"period\":\"today\"}").getBytes(StandardCharsets.UTF_8);
+        long now = java.time.Instant.now().getEpochSecond();
+        String nonce = UUID.randomUUID().toString();
+        String it = mvc.perform(post("/api/integrations/identity/data-usage").contentType(MediaType.APPLICATION_JSON).content(body)
+                        .header("X-Timestamp", now).header("X-Nonce", nonce)
+                        .header("X-Signature", IdentitySignature.sign(SECRET, IdentitySignature.FROM_IDENTITY, now, nonce, "POST", "/api/integrations/identity/data-usage", body)))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertEquals(List.of(200 * mb), ((List<?>) JsonPath.read(it, "$.groups[?(@.category=='STUDENT_FREE')].totalBytes")).stream().map(n -> ((Number) n).longValue()).toList());
+        assertTrue(((List<?>) JsonPath.read(it, "$.groups[?(@.category=='STUDENT')]")).isEmpty(), "IT never sees paid packages");
+
+        // Unsigned calls are refused
+        mvc.perform(post("/api/integrations/identity/data-usage").contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isUnauthorized());
     }
 
     @Test

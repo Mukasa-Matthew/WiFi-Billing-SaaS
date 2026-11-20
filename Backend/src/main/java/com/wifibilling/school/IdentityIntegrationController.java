@@ -30,12 +30,34 @@ public class IdentityIntegrationController {
     private final SchoolAccessService access;
     private final IntegrationNonceRepository nonces;
     private final EmailService emailService;
+    private final com.wifibilling.service.TenantDashboardService dashboard;
+    private final com.wifibilling.repository.TenantRepository tenants;
     private final String secret;
     private final ObjectMapper mapper = new ObjectMapper();
 
     public IdentityIntegrationController(SchoolAccessService access, IntegrationNonceRepository nonces,
-                                         EmailService emailService, @Value("${identity.shared-secret:}") String secret) {
-        this.access = access; this.nonces = nonces; this.emailService = emailService; this.secret = secret;
+                                         EmailService emailService, com.wifibilling.service.TenantDashboardService dashboard,
+                                         com.wifibilling.repository.TenantRepository tenants,
+                                         @Value("${identity.shared-secret:}") String secret) {
+        this.access = access; this.nonces = nonces; this.emailService = emailService;
+        this.dashboard = dashboard; this.tenants = tenants; this.secret = secret;
+    }
+
+    /** Free-access data use (free students, staff, visitors) for the school's IT dashboard. */
+    @PostMapping("/data-usage")
+    public ResponseEntity<Map<String, Object>> dataUsage(@RequestBody(required = false) byte[] body, HttpServletRequest request,
+            @RequestHeader(value = "X-Timestamp", required = false) String timestamp,
+            @RequestHeader(value = "X-Nonce", required = false) String nonce,
+            @RequestHeader(value = "X-Signature", required = false) String signature) {
+        byte[] bytes = body == null ? new byte[0] : body;
+        if (!authentic(bytes, request, timestamp, nonce, signature)) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        JsonNode json = mapper.readTree(bytes);
+        long tenantId = json.path("tenantId").asLong();
+        String period = json.path("period").isString() ? json.path("period").asString() : "today";
+        if (tenantId <= 0 || tenants.findById(tenantId).filter(com.wifibilling.model.Tenant::isSchool).isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok(dashboard.schoolFreeUsageForIt(tenantId, period));
     }
 
     /** Sends an IT administrator's account email (sign-in, password reset and email-change codes) for the identity system. */

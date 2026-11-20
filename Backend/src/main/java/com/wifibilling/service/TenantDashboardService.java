@@ -562,23 +562,52 @@ public class TenantDashboardService {
                 vals[2] += row[3] != null ? ((Number) row[3]).longValue() : 0L;
             }
         }
-        // Schools may report free-student usage at a display factor (e.g. including overhead).
-        double freeFactor = tenantRepository.findById(tenantId)
-                .map(t -> t.getSchoolFreeDataDisplayFactor())
-                .filter(f -> f != null && f > 0)
-                .orElse(1.0);
-
+        // The owner always sees what the routers really measured.
         List<DataUsageDto.CategoryUsage> categories = new ArrayList<>();
         for (String cat : CATEGORY_ORDER) {
             long[] vals = catTotals.get(cat);
-            double factor = "STUDENT_FREE".equals(cat) ? freeFactor : 1.0;
-            long shownDown = Math.round(vals[0] * factor);
-            long shownUp = Math.round(vals[1] * factor);
             categories.add(new DataUsageDto.CategoryUsage(cat, categoryTitle(cat), isFreeCategory(cat),
-                    shownDown, shownUp, shownDown + shownUp, vals[2]));
+                    vals[0], vals[1], vals[0] + vals[1], vals[2]));
         }
 
         return new DataUsageDto(p, start, end, down, up, users, previous, buckets, categories);
+    }
+
+    /**
+     * Free-access usage for the school's IT dashboard: free students, staff and visitors only (IT
+     * never sees paid packages or money). Free-student figures are shown at the school's display
+     * factor; the hotspot owner's dashboard is never affected by it.
+     */
+    @Transactional(readOnly = true)
+    public java.util.Map<String, Object> schoolFreeUsageForIt(Long tenantId, String period) {
+        DataUsageDto usage = getDataUsage(tenantId, period);
+        double factor = tenantRepository.findById(tenantId)
+                .map(t -> t.getSchoolFreeDataDisplayFactor())
+                .filter(f -> f != null && f > 0)
+                .orElse(1.0);
+        List<java.util.Map<String, Object>> groups = new ArrayList<>();
+        long total = 0;
+        for (DataUsageDto.CategoryUsage c : usage.categories()) {
+            if (!c.free()) continue;
+            double f = "STUDENT_FREE".equals(c.category()) ? factor : 1.0;
+            long down = Math.round(c.downBytes() * f), up = Math.round(c.upBytes() * f);
+            total += down + up;
+            java.util.Map<String, Object> g = new java.util.LinkedHashMap<>();
+            g.put("category", c.category());
+            g.put("label", c.label());
+            g.put("downBytes", down);
+            g.put("upBytes", up);
+            g.put("totalBytes", down + up);
+            g.put("users", c.users());
+            groups.add(g);
+        }
+        java.util.Map<String, Object> out = new java.util.LinkedHashMap<>();
+        out.put("period", usage.period());
+        out.put("from", usage.from().toString());
+        out.put("to", usage.to().toString());
+        out.put("totalBytes", total);
+        out.put("groups", groups);
+        return out;
     }
 
     private static LocalDate toLocalDate(Object v) {
