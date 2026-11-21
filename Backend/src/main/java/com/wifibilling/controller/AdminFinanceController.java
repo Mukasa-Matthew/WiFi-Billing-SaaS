@@ -90,7 +90,7 @@ public class AdminFinanceController {
     }
 
     public record AdminWithdrawalRow(Long id, Long tenantId, String businessName, Long amount, Long fee,
-                                     Long totalDeduction, String phone, String status,
+                                     Long totalDeduction, String phone, String reason, String status,
                                      String failureReason, String createdAt) {}
 
     public record ExternalWithdrawalRequest(Long amount, String note, String password) {}
@@ -137,7 +137,7 @@ public class AdminFinanceController {
         return stream.map(w -> {
             var t = w.getTenant();
             return new AdminWithdrawalRow(w.getId(), t.getId(), t.getName(), w.getAmount(), w.getFee(),
-                    w.getTotalDeduction(), w.getPhone(), w.getStatus(), w.getFailureReason(),
+                    w.getTotalDeduction(), w.getPhone(), w.getReason(), w.getStatus(), w.getFailureReason(),
                     w.getCreatedAt() != null ? w.getCreatedAt().toString() : null);
         }).toList();
     }

@@ -33,6 +33,7 @@ public class WalletController {
     private boolean otpRequired;
 
     public record WalletView(
+            String businessName,
             Long available, Long pending, Long reserved,
             Long totalCollected, Long totalFees, Long totalWithdrawn,
             String currency,
@@ -50,12 +51,13 @@ public class WalletController {
         List<WithdrawalRequest> all = withdrawalService.list(p.getTenantId());
         long open = all.stream().filter(r -> List.of(WithdrawalRequest.REQUESTED,
                 WithdrawalRequest.PENDING_APPROVAL, WithdrawalRequest.PROCESSING).contains(r.getStatus())).count();
-        return new WalletView(w.getAvailableBalance(), w.getPendingBalance(), w.getReservedBalance(),
+        var tenant = tenantRepository.findById(p.getTenantId());
+        return new WalletView(tenant.map(com.wifibilling.model.Tenant::getName).orElse(""),
+                w.getAvailableBalance(), w.getPendingBalance(), w.getReservedBalance(),
                 w.getTotalCollected(), w.getTotalFees(), w.getTotalWithdrawn(),
                 w.getCurrency(), open, withdrawalService.limits(),
                 withdrawalService.maxWithdrawable(w.getAvailableBalance()),
-                tenantRepository.findById(p.getTenantId())
-                        .map(t -> java.math.BigDecimal.valueOf(t.activePlatformFeeBps(), 2).stripTrailingZeros())
+                tenant.map(t -> java.math.BigDecimal.valueOf(t.activePlatformFeeBps(), 2).stripTrailingZeros())
                         .orElse(java.math.BigDecimal.ZERO));
     }
 
@@ -75,7 +77,7 @@ public class WalletController {
     }
 
     public record WithdrawalView(Long id, Long amount, Long fee, Long totalDeduction,
-                                 String phone, String status, String failureReason, String payoutRef,
+                                 String phone, String reason, String status, String failureReason, String payoutRef,
                                  OffsetDateTime createdAt, OffsetDateTime completedAt) {}
 
     @GetMapping("/withdrawals")
@@ -83,7 +85,7 @@ public class WalletController {
         return withdrawalService.list(p.getTenantId()).stream().map(WalletController::toView).toList();
     }
 
-    public record WithdrawalCreate(Long amount, String phone, String otp) {}
+    public record WithdrawalCreate(Long amount, String phone, String reason, String otp) {}
 
     public record OtpResponse(boolean sent, String devCode) {}
 
@@ -112,12 +114,16 @@ public class WalletController {
             throw new org.springframework.web.server.ResponseStatusException(
                     org.springframework.http.HttpStatus.BAD_REQUEST, "A positive amount is required");
         }
+        if (req.reason() == null || req.reason().trim().length() < 3) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST, "Give a reason for this withdrawal.");
+        }
         var earlier = withdrawalService.findByIdempotencyKey(p.getTenantId(), idempotencyKey);
         if (earlier.isEmpty() && otpRequired) {
             otpService.verify(p.getEmail(), com.wifibilling.model.EmailOtp.PURPOSE_WITHDRAWAL, req.otp());
         }
         // A replay still goes through request(), which rejects a changed amount or number.
-        return toView(withdrawalService.request(p.getTenantId(), req.amount(), req.phone(), idempotencyKey));
+        return toView(withdrawalService.request(p.getTenantId(), req.amount(), req.phone(), req.reason(), idempotencyKey));
     }
 
     @PostMapping("/withdrawals/{id}/cancel")
@@ -127,7 +133,7 @@ public class WalletController {
 
     private static WithdrawalView toView(WithdrawalRequest w) {
         return new WithdrawalView(w.getId(), w.getAmount(), w.getFee(), w.getTotalDeduction(),
-                w.getPhone(), w.getStatus(), w.getFailureReason(), w.getPayoutRef(),
+                w.getPhone(), w.getReason(), w.getStatus(), w.getFailureReason(), w.getPayoutRef(),
                 w.getCreatedAt(), w.getCompletedAt());
     }
 }

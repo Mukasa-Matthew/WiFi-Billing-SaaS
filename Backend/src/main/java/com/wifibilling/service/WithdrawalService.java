@@ -115,6 +115,10 @@ public class WithdrawalService {
      * never create or pay a second one.
      */
     public WithdrawalRequest request(Long tenantId, long amount, String phone, String idempotencyKey) {
+        return request(tenantId, amount, phone, null, idempotencyKey);
+    }
+
+    public WithdrawalRequest request(Long tenantId, long amount, String phone, String reason, String idempotencyKey) {
         String key = normalizeKey(idempotencyKey);
         if (amount < minAmount) throw badRequest("The minimum withdrawal is " + ugx(minAmount) + ".");
         if (amount > maxAmount) throw badRequest("The maximum withdrawal is " + ugx(maxAmount) + ".");
@@ -151,6 +155,8 @@ public class WithdrawalService {
                         .totalDeduction(amount + fee)
                         .phone(phoneE164)
                         .payoutRef(UUID.randomUUID().toString())
+                        .reason(reason == null || reason.isBlank() ? null
+                                : reason.trim().substring(0, Math.min(reason.trim().length(), 255)))
                         .idempotencyKey(key)
                         .status(requireApproval ? WithdrawalRequest.PENDING_APPROVAL : WithdrawalRequest.REQUESTED)
                         .build());

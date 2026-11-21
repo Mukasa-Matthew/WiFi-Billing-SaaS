@@ -48,6 +48,10 @@ public class WithdrawalRequest {
     @Column(nullable = false, length = 20)
     private String phone;
 
+    /** Tenant's reason for taking money out of the business. */
+    @Column(length = 255)
+    private String reason;
+
     @Column(nullable = false, length = 20)
     @Builder.Default
     private String network = "UNKNOWN";
