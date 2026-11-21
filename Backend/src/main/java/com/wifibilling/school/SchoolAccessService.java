@@ -162,7 +162,7 @@ public class SchoolAccessService {
                     long used = staffUsedTodayBytes(tenant.getId(), voucher.getPersonId(), voucher.getCode());
                     if (used >= capBytes) {
                         holdAndDisconnect(voucher);
-                        return PortalResult.signIn("You have reached your daily free data limit (" + capMb + " MB). Your free access resets tomorrow.");
+                        return PortalResult.signIn("You have reached your daily data limit (" + capMb + " MB). Your access resets tomorrow.");
                     }
                     remainingBytes = capBytes - used;
                 }
@@ -296,7 +296,7 @@ public class SchoolAccessService {
         Tenant tenant = router.getTenant();
         SchoolTickets.Ticket t = tickets.require(ticketToken, tenant.getId(), mac);
         if (!tenant.isSchoolStudentFreeEnabled()) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Free daily student study data is not enabled for this school.");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Daily student study data is not enabled for this school.");
         }
         OffsetDateTime hardLimit = endOf(t.accessUntil());
         return transaction.execute(status -> {
@@ -567,14 +567,14 @@ public class SchoolAccessService {
     private Long checkStudentFreeDailyCap(Tenant tenant, String personId, Voucher live) {
         Integer capMb = tenant.getSchoolStudentDailyFreeMb();
         if (capMb == null || capMb <= 0) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Free daily student study data is not configured.");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Daily student study data is not configured.");
         }
         long capBytes = capMb.longValue() * 1024L * 1024L;
         long used = studentFreeUsedTodayBytes(tenant.getId(), personId, live != null ? live.getCode() : null);
         if (used >= capBytes) {
             if (live != null) holdAndDisconnect(live);
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
-                    "You have used all of your free data for today. Purchase a package below for full internet, or wait until tomorrow.");
+                    "You have used all of your study data for today. Purchase a package below for full internet, or wait until tomorrow.");
         }
         return capBytes - used;
     }
