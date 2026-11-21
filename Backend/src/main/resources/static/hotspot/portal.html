@@ -693,6 +693,8 @@ function showSchoolStore(on) {
         h1.textContent = STORE_NAME.toUpperCase();
         sub.textContent = STORE_SUBTITLE;
         document.title = STORE_NAME;
+        var icon = document.querySelector('.brand-icon');
+        if (icon) icon.style.display = 'none';
         document.getElementById('school-student-free-box').style.display = 'none';
     } else {
         SCHOOL.store = false;
@@ -701,6 +703,8 @@ function showSchoolStore(on) {
             sub.textContent = SCHOOL.brand.sub;
             document.title = SCHOOL.brand.title;
         }
+        var iconBack = document.querySelector('.brand-icon');
+        if (iconBack) iconBack.style.display = '';
         var freeBox = document.getElementById('school-student-free-box');
         if (freeBox.getAttribute('data-available') === '1') freeBox.style.display = '';
     }
