@@ -325,6 +325,15 @@
 
         <button type="button" class="btn btn-outline" id="school-store-back" style="display:none;margin-bottom:10px" onclick="showSchoolStore(false)">← &nbsp;Back to school options</button>
 
+        <form id="school-voucher-box" style="display:none;margin-bottom:12px" onsubmit="useSchoolVoucher(event)">
+            <span class="section-label">Have a voucher code?</span>
+            <div class="input-wrap">
+                <span class="icon">🎟️</span>
+                <input class="form-input" id="school-voucher-input" type="text" placeholder="Enter voucher code" autocomplete="off" autocorrect="off" autocapitalize="characters">
+            </div>
+            <button type="submit" class="btn btn-dark">Connect with voucher</button>
+        </form>
+
         <div id="packages-section">
             <div class="pkg-head"><span>Package</span><span>Price</span></div>
             <div id="packages-list"><div class="spinner"></div></div>
@@ -513,6 +522,8 @@ function renderSettings(settings) {
     if (settings.showFeedback === false) {
         document.getElementById('share-btn').style.display = 'none';
     }
+    // Whether any support contact is configured — school tenants see it only on the buy page.
+    window.SUPPORT_VISIBLE = document.getElementById('support-block').style.display !== 'none';
     window.PORTAL_CFG = settings;
     applySchoolMode(settings);
 }
@@ -535,6 +546,8 @@ function applySchoolMode(settings) {
     document.getElementById('plans-label').style.display = showPackages ? '' : 'none';
     document.getElementById('school-store-back').style.display = showPackages ? '' : 'none';
     document.getElementById('find-voucher-btn').style.display = showPackages ? '' : 'none';
+    document.getElementById('school-voucher-box').style.display = showPackages ? '' : 'none';
+    document.getElementById('support-block').style.display = showPackages && window.SUPPORT_VISIBLE ? '' : 'none';
     var showStoreBtn = !!SCHOOL.ticket && SCHOOL.store !== true && settings.allowPurchases !== false && !SCHOOL.paidDevices;
     document.getElementById('school-store-btn').style.display = showStoreBtn ? '' : 'none';
     document.getElementById('school-store-note').style.display = showStoreBtn ? '' : 'none';
@@ -711,6 +724,16 @@ function showSchoolStore(on) {
     applySchoolMode(window.PORTAL_CFG || {});
     if (on) document.getElementById('packages-section').scrollIntoView({ behavior: 'smooth' });
     else window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+/* A manually-issued voucher entered on the store page connects like a normal
+   voucher sign-in (code goes in as both hotspot username and password). */
+function useSchoolVoucher(e) {
+    e.preventDefault();
+    var code = document.getElementById('school-voucher-input').value.trim();
+    if (!code) return;
+    document.getElementById('username-input').value = code;
+    document.getElementById('password-input').value = code;
+    document.getElementById('login-form').submit();
 }
 function schoolResult(res) {
     if (res.action === 'CHANGE_PIN') {
