@@ -20,7 +20,7 @@ interface WalletRow {
 }
 interface WithdrawalRow {
   id: number; tenantId: number; businessName: string; amount: number; fee: number;
-  totalDeduction: number; phone: string; status: string;
+  totalDeduction: number; phone: string; reason: string | null; status: string;
   failureReason: string | null; createdAt: string;
 }
 
@@ -130,7 +130,7 @@ export default function AdminFinancePage() {
 
   const exportCsv = () => {
     if (!withdrawals.length) return;
-    const header = ["ID", "Date", "Tenant", "Phone", "Amount (UGX)", "Fee (UGX)", "Total Deduction (UGX)", "Status", "Failure Reason"];
+    const header = ["ID", "Date", "Tenant", "Phone", "Amount (UGX)", "Fee (UGX)", "Total Deduction (UGX)", "Reason", "Status", "Failure Reason"];
     const rows = withdrawals.map((w) => [
       String(w.id),
       w.createdAt ? new Date(w.createdAt).toLocaleString() : "",
@@ -139,6 +139,7 @@ export default function AdminFinancePage() {
       String(w.amount),
       String(w.fee),
       String(w.totalDeduction),
+      w.reason || "",
       w.status,
       w.failureReason || ""
     ]);
@@ -328,6 +329,7 @@ export default function AdminFinancePage() {
             { label: "Date", render: (w: WithdrawalRow) => <span className="text-[var(--fg-muted)]">{date(w.createdAt)}</span> },
             { label: "Tenant", render: (w: WithdrawalRow) => <span className="font-medium">{w.businessName}</span> },
             { label: "Phone", render: (w: WithdrawalRow) => <span className="font-mono text-xs">{w.phone}</span> },
+            { label: "Reason", render: (w: WithdrawalRow) => <span className="text-[var(--fg-muted)]">{w.reason || "—"}</span> },
             { label: "Amount", render: (w: WithdrawalRow) => <span className="font-semibold">{money(w.amount)}</span> },
             { label: "Fee", render: (w: WithdrawalRow) => <span className="text-[var(--fg-muted)]">{money(w.fee)}</span> },
             { label: "Status", render: (w: WithdrawalRow) => (

@@ -6,9 +6,10 @@ import { useResource, Table, Badge, ErrorNotice, date, field, button, buttonGhos
 import { Dialog } from "@/components/ui/Dialog";
 import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
-import { Wallet, Bank, ArrowDown, ShieldCheck } from "@/components/icons";
+import { Bank, ArrowDown, ShieldCheck } from "@/components/icons";
 
 interface WalletSummary {
+  businessName: string;
   available: number; pending: number; reserved: number;
   totalCollected: number; totalFees: number; totalWithdrawn: number;
   currency: string; openWithdrawals: number;
@@ -23,7 +24,7 @@ interface LedgerEntry {
 }
 interface Withdrawal {
   id: number; amount: number; fee: number; totalDeduction: number;
-  phone: string; status: string; failureReason: string | null; payoutRef: string;
+  phone: string; reason: string | null; status: string; failureReason: string | null; payoutRef: string;
   createdAt: string; completedAt: string | null;
 }
 
@@ -66,6 +67,7 @@ export default function WalletPage() {
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState("");
   const [phone, setPhone] = useState("");
+  const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState("");
   const [otp, setOtp] = useState("");
@@ -107,10 +109,10 @@ export default function WalletPage() {
     e.preventDefault();
     setBusy(true); setFormError("");
     try {
-      await api.post("/api/wallet/withdrawals", { amount: requested, phone, otp },
+      await api.post("/api/wallet/withdrawals", { amount: requested, phone, reason: reason.trim(), otp },
         { headers: { "Idempotency-Key": idempotencyKey } });
       setIdempotencyKey("");
-      setOpen(false); setAmount(""); setPhone(""); setOtp(""); setOtpSent(false);
+      setOpen(false); setAmount(""); setPhone(""); setReason(""); setOtp(""); setOtpSent(false);
       toast("success", "Withdrawal request submitted for processing.");
       refreshAll();
     } catch (err) { setFormError(message(err)); }
@@ -139,13 +141,34 @@ export default function WalletPage() {
 
       <ErrorNotice text={formError || actErr} />
 
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <div className={`${panel} p-5`}>
-          <div className="flex items-center gap-2 text-xs font-semibold text-[var(--fg-muted)]"><Wallet size={15} /> Available balance</div>
-          <div className="mt-2 text-2xl font-bold text-[var(--fg)]">{money(summary?.available)}</div>
-          <p className="mt-1 text-xs text-[var(--fg-faint)]">Ready to withdraw</p>
+      {/* Virtual wallet card */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 via-blue-700 to-blue-950 p-6 text-white shadow-lg sm:p-7">
+        <div className="pointer-events-none absolute -right-14 -top-20 h-64 w-64 rounded-full bg-white/10" />
+        <div className="pointer-events-none absolute -bottom-24 -left-12 h-64 w-64 rounded-full bg-white/5" />
+        <div className="relative flex items-start justify-between gap-4">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-blue-200">AirPairy Wallet</p>
+            <p className="mt-1 text-sm font-bold">{summary?.businessName || "Your business"}</p>
+          </div>
+          {/* chip */}
+          <div className="h-8 w-11 shrink-0 rounded-md bg-gradient-to-br from-amber-200 via-amber-300 to-amber-500 p-1 shadow-inner">
+            <div className="h-full w-full rounded-sm border border-amber-600/40 bg-gradient-to-br from-amber-100 to-amber-300" />
+          </div>
         </div>
+        <p className="relative mt-7 font-mono text-sm tracking-[0.35em] text-blue-100/90">••••&nbsp;&nbsp;••••&nbsp;&nbsp;••••&nbsp;&nbsp;••••</p>
+        <div className="relative mt-7 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-blue-200">Available balance</p>
+            <p className="mt-1 text-3xl font-bold tracking-tight">{money(summary?.available)}</p>
+          </div>
+          <div className="space-y-1 text-right text-xs text-blue-100">
+            <p>Reserved: <span className="font-semibold text-white">{money(summary?.reserved)}</span></p>
+            <p>Withdrawable now: <span className="font-semibold text-white">{money(maxAmount)}</span></p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className={`${panel} p-5`}>
           <div className="flex items-center gap-2 text-xs font-semibold text-[var(--fg-muted)]"><ShieldCheck size={15} /> Reserved</div>
           <div className="mt-2 text-2xl font-bold text-[var(--fg)]">{money(summary?.reserved)}</div>
@@ -187,6 +210,7 @@ export default function WalletPage() {
             { label: "Requested", render: (w: Withdrawal) => <span className="text-[var(--fg-muted)]">{date(w.createdAt)}</span> },
             { label: "Method", render: () => <span className="text-[var(--fg-muted)]">Mobile money</span> },
             { label: "Phone", render: (w: Withdrawal) => <span className="font-mono text-xs">{w.phone}</span> },
+            { label: "Reason", render: (w: Withdrawal) => <span className="text-[var(--fg-muted)]">{w.reason || "—"}</span> },
             { label: "Amount", render: (w: Withdrawal) => <span className="font-semibold">{money(w.amount)}</span> },
             { label: "Fee", render: (w: Withdrawal) => <span className="text-[var(--fg-muted)]">{money(w.fee)}</span> },
             { label: "Paid", render: (w: Withdrawal) => <span className="text-[var(--fg-muted)]">{w.completedAt ? date(w.completedAt) : "—"}</span> },
@@ -268,6 +292,13 @@ export default function WalletPage() {
                 placeholder="07XX XXX XXX" />
               <p className={hint}>MTN or Airtel number that will receive the payout.</p>
             </div>
+            <div className="mt-4">
+              <label className={label}>Reason for this withdrawal</label>
+              <input className={field} type="text" required minLength={3} maxLength={255} value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="e.g. Buying new equipment, paying rent, owner draw" />
+              <p className={hint}>Recorded against the withdrawal for your business records and the platform review.</p>
+            </div>
             {requested >= (summary?.limits.min ?? Infinity) && !overBalance && (
               <dl className="mt-4 space-y-1.5 rounded-xl border border-[var(--border-soft)] bg-[var(--subtle)] px-4 py-3 text-xs">
                 <div className="flex justify-between"><dt className="font-semibold text-[var(--fg)]">Sent to your mobile money</dt><dd className="font-bold text-emerald-700">{money(requested)}</dd></div>
@@ -302,7 +333,7 @@ export default function WalletPage() {
             )}
             <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <button type="button" className={buttonGhost} disabled={busy} onClick={() => setOpen(false)}>Cancel</button>
-              <button type="submit" className={button} disabled={busy || otpBusy || otp.length !== 6 || overBalance || underMinimum || requested <= 0}>
+              <button type="submit" className={button} disabled={busy || otpBusy || otp.length !== 6 || overBalance || underMinimum || requested <= 0 || reason.trim().length < 3}>
                 <BusyLabel busy={busy} label="Submitting…">Request withdrawal</BusyLabel>
               </button>
             </div>
