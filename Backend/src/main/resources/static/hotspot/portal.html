@@ -534,6 +534,7 @@ function applySchoolMode(settings) {
     document.getElementById('packages-section').style.display = showPackages ? '' : 'none';
     document.getElementById('plans-label').style.display = showPackages ? '' : 'none';
     document.getElementById('school-store-back').style.display = showPackages ? '' : 'none';
+    document.getElementById('find-voucher-btn').style.display = showPackages ? '' : 'none';
     var showStoreBtn = !!SCHOOL.ticket && SCHOOL.store !== true && settings.allowPurchases !== false && !SCHOOL.paidDevices;
     document.getElementById('school-store-btn').style.display = showStoreBtn ? '' : 'none';
     document.getElementById('school-store-note').style.display = showStoreBtn ? '' : 'none';
