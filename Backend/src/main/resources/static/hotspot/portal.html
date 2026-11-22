@@ -92,6 +92,22 @@
         .brand h1 { font-size: 20px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
         .brand p { font-size: 14.5px; opacity: .75; margin-top: 4px; }
 
+        /* School package store: always the operator's own blue-and-white look,
+           whatever theme, colors, logo or background the school tenant chose.
+           !important so it also beats the inline overrides renderSettings sets. */
+        body.school-store {
+            --bg-1: #BFD9F2 !important; --bg-2: #8FB8E8 !important;
+            --card: #FFFFFF !important; --card-2: #F7FAFC !important;
+            --header-bg: #2563EB !important; --header-text: #FFFFFF !important;
+            --text: #0F172A !important; --muted: #64748B !important; --border: #E2E8F0 !important;
+            --input-bg: #F8FAFC !important; --buy-bg: #2563EB !important; --buy-text: #FFFFFF !important;
+            --info-bg: #EFF6FF !important; --info-border: #BFDBFE !important; --info-text: #1D4ED8 !important;
+            --primary: #2563EB !important;
+            background: linear-gradient(160deg, var(--bg-1) 0%, var(--bg-2) 100%) !important;
+        }
+        body.school-store .brand-icon { display: none !important; }
+        body.school-store .pkg-featured { background: #DBEAFE !important; color: #1D4ED8 !important; }
+
         .card-body { padding: 22px 24px 20px; }
 
         .section-label {
@@ -536,6 +552,7 @@ function renderSettings(settings) {
 var SCHOOL = { ticket: null, pinChangeToken: null, busy: false, resumed: false, store: false, paidDevices: 0, brand: null, bringVoucherId: null };
 function applySchoolMode(settings) {
     if (!settings.school) return;
+    syncStoreBrand();
     document.getElementById('school-section').style.display = '';
     document.getElementById('voucher-entry').style.display = 'none';
     document.getElementById('school-visitor-btn').style.display =
@@ -691,6 +708,15 @@ function useStudentFree() {
    school is never presented as the one selling data to students. */
 var STORE_NAME = 'FastConnect Solutions';
 var STORE_SUBTITLE = 'Data bundles & packages';
+/* Runs on every settings refresh (every few seconds): renderSettings puts the
+   school's name, logo and theme back, so the store branding is re-applied here. */
+function syncStoreBrand() {
+    document.body.classList.toggle('school-store', SCHOOL.store === true);
+    if (SCHOOL.store !== true) return;
+    document.querySelector('.brand h1').textContent = STORE_NAME.toUpperCase();
+    document.querySelector('.brand p').textContent = STORE_SUBTITLE;
+    document.title = STORE_NAME;
+}
 function showSchoolStore(on) {
     if (on && !SCHOOL.ticket) return;
     var h1 = document.querySelector('.brand h1');
@@ -703,11 +729,6 @@ function showSchoolStore(on) {
             };
         }
         SCHOOL.store = true;
-        h1.textContent = STORE_NAME.toUpperCase();
-        sub.textContent = STORE_SUBTITLE;
-        document.title = STORE_NAME;
-        var icon = document.querySelector('.brand-icon');
-        if (icon) icon.style.display = 'none';
         document.getElementById('school-student-free-box').style.display = 'none';
     } else {
         SCHOOL.store = false;
@@ -716,8 +737,6 @@ function showSchoolStore(on) {
             sub.textContent = SCHOOL.brand.sub;
             document.title = SCHOOL.brand.title;
         }
-        var iconBack = document.querySelector('.brand-icon');
-        if (iconBack) iconBack.style.display = '';
         var freeBox = document.getElementById('school-student-free-box');
         if (freeBox.getAttribute('data-available') === '1') freeBox.style.display = '';
     }
