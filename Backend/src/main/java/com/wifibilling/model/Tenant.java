@@ -198,6 +198,10 @@ public class Tenant {
     @Column(name = "tenant_type", length = 16)
     private String tenantType;
 
+    /** Owner's monthly sales goal in UGX (gross sales), shown on Financial analysis; null = not set. */
+    @Column(name = "monthly_sales_target")
+    private Long monthlySalesTarget;
+
     /** School tenants only. Mirrors the owner's visitor switch, which is also sent to the identity system. */
     @Column(name = "school_visitors_enabled")
     private Boolean schoolVisitorsEnabled;

@@ -14,6 +14,8 @@ import { BarChart, DonutChart, Meter, MiniBars, StatusBar } from "@/components/c
 import { routerState, servicesState } from "@/lib/routerState";
 import { FirstRouterCard } from "@/components/router/FirstRouterCard";
 import { MOBILE_MONEY } from "@/lib/paymentMethods";
+import { hideStore } from "@/lib/hideRevenue";
+import { CHANNEL_COLOR, GROUP_COLOR } from "@/lib/revenueColors";
 
 interface SeriesPoint { date: string; label: string; revenue?: number; transactions?: number; users?: number; registrations?: number }
 interface WeeklySale { date: string; day: string; revenue: number; transactions: number }
@@ -49,14 +51,6 @@ const USAGE_PERIODS = [{ key: "today", label: "Today" }, { key: "week", label: "
 type UsagePeriod = (typeof USAGE_PERIODS)[number]["key"];
 // Upload is a lighter tint of the same hue, so the pair reads as one measure.
 const UPLOAD_FILL = "color-mix(in srgb, var(--chart-1) 38%, transparent)";
-
-/* Revenue visibility is a per-device preference, so it lives in localStorage. */
-const HIDE_KEY = "wb_hide_revenue";
-const hideStore = {
-  subscribe(cb: () => void) { window.addEventListener("storage", cb); window.addEventListener(HIDE_KEY, cb); return () => { window.removeEventListener("storage", cb); window.removeEventListener(HIDE_KEY, cb); }; },
-  get() { try { return localStorage.getItem(HIDE_KEY) === "1"; } catch { return false; } },
-  set(v: boolean) { try { localStorage.setItem(HIDE_KEY, v ? "1" : "0"); } catch { /* unavailable */ } window.dispatchEvent(new Event(HIDE_KEY)); },
-};
 
 function greeting(now: number) {
   if (!now) return "Welcome back";
@@ -547,17 +541,6 @@ const REVENUE_VIEWS = [
 ] as const;
 type RevenueView = (typeof REVENUE_VIEWS)[number]["key"];
 
-const CHANNEL_COLOR: Record<string, string> = {
-  MTN: "var(--status-warn)",
-  AIRTEL: "var(--status-bad)",
-  WALK_IN: "var(--status-good)",
-  OTHER: "var(--chart-1)",
-};
-const GROUP_COLOR: Record<string, string> = {
-  STUDENT: "var(--status-good)",
-  PAID_CUSTOMER: "var(--chart-1)",
-  WALK_IN: "var(--status-warn)",
-};
 const CATEGORY_COLOR: Record<string, string> = {
   STUDENT: "var(--status-good)",
   STUDENT_FREE: "#34D399",

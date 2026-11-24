@@ -123,17 +123,17 @@ export default function AppShell(props: AppShellProps) {
   });
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-[var(--canvas)] text-[var(--fg)]">
+    <div className="flex h-dvh overflow-hidden bg-[var(--canvas)] text-[var(--fg)] print:block print:h-auto print:overflow-visible">
       <button
         aria-hidden={!drawerOpen}
         tabIndex={-1}
         onClick={() => setDrawerOpen(false)}
-        className={`fixed inset-0 z-30 bg-slate-950/50 transition-opacity duration-200 lg:hidden ${drawerOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+        className={`fixed inset-0 z-30 bg-slate-950/50 transition-opacity duration-200 lg:hidden print:hidden ${drawerOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
       />
 
       <aside
         aria-label="Main navigation"
-        className={`fixed inset-y-0 left-0 z-40 flex w-[17rem] shrink-0 flex-col border-r border-[var(--sidebar-line)] bg-[var(--sidebar)] transition-[transform,visibility,width] duration-200 ease-[var(--ease-out)] lg:static lg:visible lg:translate-x-0 ${rail ? "lg:w-[4.5rem]" : "lg:w-64"} ${drawerOpen ? "visible translate-x-0" : "invisible -translate-x-full"}`}
+        className={`print:hidden fixed inset-y-0 left-0 z-40 flex w-[17rem] shrink-0 flex-col border-r border-[var(--sidebar-line)] bg-[var(--sidebar)] transition-[transform,visibility,width] duration-200 ease-[var(--ease-out)] lg:static lg:visible lg:translate-x-0 ${rail ? "lg:w-[4.5rem]" : "lg:w-64"} ${drawerOpen ? "visible translate-x-0" : "invisible -translate-x-full"}`}
       >
         {/* Brand */}
         <div className={`flex h-16 shrink-0 items-center gap-3 border-b border-[var(--sidebar-line)] ${rail ? "lg:justify-center lg:px-0" : ""} px-5`}>
@@ -227,8 +227,8 @@ export default function AppShell(props: AppShellProps) {
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-[var(--border)] bg-[var(--header)] px-4 sm:px-6 lg:px-8">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden print:block print:overflow-visible">
+        <header className="print:hidden flex h-16 shrink-0 items-center justify-between gap-3 border-b border-[var(--border)] bg-[var(--header)] px-4 sm:px-6 lg:px-8">
           <div className="flex min-w-0 items-center gap-2.5">
             <button aria-label="Open navigation" aria-expanded={drawerOpen} onClick={() => setDrawerOpen(true)}
               className="-ml-1.5 rounded-lg p-2 text-[var(--fg-muted)] hover:bg-[var(--fill)] hover:text-[var(--fg)] lg:hidden">
@@ -252,7 +252,7 @@ export default function AppShell(props: AppShellProps) {
           </div>
         </header>
 
-        <main className="main-scroll flex-1 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-7">
+        <main className="main-scroll flex-1 overflow-y-auto print:overflow-visible print:p-0 px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-7">
           <div className="page-enter mx-auto w-full max-w-[1440px]">{children}</div>
         </main>
       </div>

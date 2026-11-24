@@ -399,3 +399,271 @@ export function DonutChart({
     </div>
   );
 }
+
+/* ------------------------------------------------------------------ comparison trend */
+
+export interface TrendPoint { key: string; label: string; detail?: string; value: number; previous?: number | null }
+
+/**
+ * One measure over time as a 2px line on a soft area, with an optional comparison
+ * period as a 2px de-emphasis line on the same axis (never a second axis). A full-height
+ * hit band per point drives a crosshair tooltip showing both values.
+ */
+export function TrendChart({ data, label, height = 260, format = (v) => v.toLocaleString(), tickFormat = compactTick,
+  currentName = "This period", previousName = "Previous period", showPrevious = true, dim = false }: {
+  data: TrendPoint[]; label: string; height?: number; format?: (v: number) => string; tickFormat?: (v: number) => string;
+  currentName?: string; previousName?: string; showPrevious?: boolean; dim?: boolean;
+}) {
+  const [ref, width] = useWidth<HTMLDivElement>();
+  const [hover, setHover] = useState<number | null>(null);
+  const hasPrev = showPrevious && data.some((d) => d.previous != null);
+  const max = Math.max(0, ...data.map((d) => Math.max(d.value, hasPrev ? Number(d.previous || 0) : 0)));
+  const ticks = niceTicks(max, 4);
+  const top = ticks[ticks.length - 1] || 1;
+  const left = Math.max(28, Math.max(...ticks.map((t) => tickFormat(t).length)) * 7 + 12);
+  const pad = { top: 14, right: 10, bottom: 26 };
+  const innerW = Math.max(0, width - left - pad.right);
+  const innerH = height - pad.top - pad.bottom;
+  const n = data.length;
+  const x = (i: number) => left + (n <= 1 ? innerW / 2 : (i / (n - 1)) * innerW);
+  const y = (v: number) => pad.top + innerH - (v / top) * innerH;
+  const line = (vals: (number | null | undefined)[]) => {
+    let d = ""; let pen = false;
+    vals.forEach((v, i) => {
+      if (v == null) { pen = false; return; }
+      d += `${pen ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`; pen = true;
+    });
+    return d;
+  };
+  const cur = line(data.map((d) => d.value));
+  const area = n ? `${cur}L${x(n - 1).toFixed(1)},${y(0)}L${x(0).toFixed(1)},${y(0)}Z` : "";
+  // Space labels by their own width so neighbours never collide.
+  const labelW = Math.max(36, Math.max(0, ...data.map((d) => d.label.length)) * 6.5 + 18);
+  const every = Math.max(1, Math.ceil(n / Math.max(1, Math.floor(innerW / labelW))));
+  const band = n ? innerW / Math.max(1, n - 1) : 0;
+  const h = hover != null ? data[hover] : null;
+
+  return (
+    <div className={`transition-opacity ${dim ? "opacity-60" : ""}`}>
+      <ul className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--fg-muted)]" aria-hidden>
+        <li className="flex items-center gap-1.5"><span className="h-0.5 w-4 rounded-full bg-[var(--chart-1)]" />{currentName}</li>
+        {hasPrev && <li className="flex items-center gap-1.5"><span className="h-0.5 w-4 rounded-full bg-[var(--fg-faint)]" />{previousName}</li>}
+      </ul>
+      <div ref={ref} className="relative w-full" style={{ height }}>
+        {width > 0 && (
+          <svg width={width} height={height} role="img" aria-label={label} className="block overflow-visible">
+            {ticks.map((t) => (
+              <g key={t}>
+                <line x1={left} x2={width - pad.right} y1={y(t)} y2={y(t)} stroke="var(--chart-grid)" strokeWidth={1} shapeRendering="crispEdges" />
+                <text x={left - 8} y={y(t)} dy="0.32em" textAnchor="end" className="num fill-[var(--fg-faint)] text-[11px]">{tickFormat(t)}</text>
+              </g>
+            ))}
+            <line x1={left} x2={width - pad.right} y1={y(0)} y2={y(0)} stroke="var(--border-strong)" strokeWidth={1} shapeRendering="crispEdges" />
+            {data.map((d, i) => i % every === 0 && (
+              <text key={d.key} x={x(i)} y={height - 8} textAnchor={i === 0 && n > 1 ? "start" : i === n - 1 && n > 1 ? "end" : "middle"} className="fill-[var(--fg-muted)] text-[11px]">{d.label}</text>
+            ))}
+            <path d={area} fill="var(--chart-1-wash)" />
+            {hasPrev && <path d={line(data.map((d) => d.previous))} fill="none" stroke="var(--fg-faint)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />}
+            <path d={cur} fill="none" stroke="var(--chart-1)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+            {h && hover != null && (
+              <g pointerEvents="none">
+                <line x1={x(hover)} x2={x(hover)} y1={pad.top} y2={y(0)} stroke="var(--border-strong)" strokeWidth={1} />
+                {hasPrev && h.previous != null && <circle cx={x(hover)} cy={y(h.previous)} r={4} fill="var(--fg-faint)" stroke="var(--surface)" strokeWidth={2} />}
+                <circle cx={x(hover)} cy={y(h.value)} r={4.5} fill="var(--chart-1)" stroke="var(--surface)" strokeWidth={2} />
+              </g>
+            )}
+            {data.map((d, i) => (
+              <rect key={d.key} x={x(i) - band / 2} y={pad.top} width={Math.max(band, 8)} height={innerH} fill="transparent"
+                tabIndex={0} aria-label={`${d.detail || d.label}: ${format(d.value)}${hasPrev && d.previous != null ? `, ${previousName.toLowerCase()} ${format(d.previous)}` : ""}`}
+                onPointerEnter={() => setHover(i)} onPointerLeave={() => setHover(null)} onFocus={() => setHover(i)} onBlur={() => setHover(null)}
+                className="cursor-default outline-none" />
+            ))}
+          </svg>
+        )}
+        {h && hover != null && (
+          <div role="presentation" className="pointer-events-none absolute top-0 z-10 -translate-x-1/2 whitespace-nowrap rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 shadow-[var(--shadow-overlay)]"
+            style={{ left: Math.min(Math.max(x(hover), 90), width - 90) }}>
+            <p className="text-[11px] text-[var(--fg-muted)]">{h.detail || h.label}</p>
+            <p className="num text-sm font-semibold text-[var(--fg)]">{format(h.value)}</p>
+            {hasPrev && h.previous != null && <p className="num text-[11px] text-[var(--fg-muted)]">{previousName}: {format(h.previous)}</p>}
+          </div>
+        )}
+      </div>
+      <div className="sr-only"><table>
+        <caption>{label}</caption>
+        <thead><tr><th scope="col">When</th><th scope="col">{currentName}</th>{hasPrev && <th scope="col">{previousName}</th>}</tr></thead>
+        <tbody>{data.map((d) => <tr key={d.key}><th scope="row">{d.detail || d.label}</th><td>{format(d.value)}</td>{hasPrev && <td>{d.previous == null ? "—" : format(d.previous)}</td>}</tr>)}</tbody>
+      </table></div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ gauge */
+
+/**
+ * Half-circle gauge for one ratio against a limit: same-hue arc on a neutral track,
+ * an optional marker (e.g. where you should be by now), the figure in the middle.
+ */
+export function Gauge({ value, max = 1, label, display, caption, marker, markerLabel, tone = "info" }: {
+  value: number; max?: number; label: string; display: string; caption?: React.ReactNode;
+  marker?: number | null; markerLabel?: string; tone?: StatusTone;
+}) {
+  const w = 220, h = 124, cx = w / 2, cy = 112, r = 92, stroke = 16;
+  const frac = max > 0 ? Math.max(0, Math.min(1, value / max)) : 0;
+  const pt = (f: number, rr = r) => {
+    const a = Math.PI * (1 - f);
+    return [cx + rr * Math.cos(a), cy - rr * Math.sin(a)] as const;
+  };
+  const arc = (f: number) => {
+    const [ex, ey] = pt(f);
+    return `M${cx - r},${cy}A${r},${r} 0 0 1 ${ex.toFixed(2)},${ey.toFixed(2)}`;
+  };
+  const m = marker != null && max > 0 ? Math.max(0, Math.min(1, marker / max)) : null;
+  return (
+    <div className="flex flex-col items-center">
+      <svg viewBox={`0 0 ${w} ${h}`} className="block w-full max-w-[240px]" role="meter" aria-label={label}
+        aria-valuemin={0} aria-valuemax={max} aria-valuenow={Math.min(value, max)} aria-valuetext={display}>
+        <path d={arc(1)} fill="none" stroke="var(--fill)" strokeWidth={stroke} strokeLinecap="round" />
+        {frac > 0 && <path d={arc(frac)} fill="none" stroke={toneVar[tone]} strokeWidth={stroke} strokeLinecap="round" />}
+        {m != null && (() => {
+          const [ax, ay] = pt(m, r - stroke / 2 - 3); const [bx, by] = pt(m, r + stroke / 2 + 3);
+          return <line x1={ax} y1={ay} x2={bx} y2={by} stroke="var(--fg)" strokeWidth={2} strokeLinecap="round"><title>{markerLabel}</title></line>;
+        })()}
+        <text x={cx} y={cy - 18} textAnchor="middle" className="fill-[var(--fg)] text-[26px] font-semibold">{display}</text>
+      </svg>
+      {caption && <div className="mt-1 text-center text-xs leading-relaxed text-[var(--fg-muted)]">{caption}</div>}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ heatmap */
+
+/**
+ * Day × hour grid, one hue light→dark for magnitude, 2px gaps, a scale legend and a
+ * per-cell tooltip. rows[d][h] with Monday first.
+ */
+export function Heatmap({ rows, rowLabels, label, format = (v) => v.toLocaleString(), detail }: {
+  rows: number[][]; rowLabels: string[]; label: string; format?: (v: number) => string;
+  detail?: (row: number, col: number) => string;
+}) {
+  const [hover, setHover] = useState<[number, number] | null>(null);
+  const max = Math.max(0, ...rows.flat());
+  const shade = (v: number) => v <= 0 ? "var(--fill)" : `color-mix(in srgb, var(--chart-1) ${Math.round(18 + 82 * (v / (max || 1)))}%, var(--surface))`;
+  const hv = hover ? rows[hover[0]][hover[1]] : 0;
+  return (
+    <div className="relative">
+      <div className="grid gap-[2px]" style={{ gridTemplateColumns: "2.4rem repeat(24, minmax(0, 1fr))" }} role="img" aria-label={label}>
+        {rows.map((row, d) => (
+          <React.Fragment key={d}>
+            <span className="flex items-center text-[11px] text-[var(--fg-muted)]">{rowLabels[d]}</span>
+            {row.map((v, hr) => (
+              <span key={hr} tabIndex={-1}
+                onPointerEnter={() => setHover([d, hr])} onPointerLeave={() => setHover(null)}
+                className="aspect-square min-h-2 rounded-[3px] transition-opacity"
+                style={{ background: shade(v), opacity: hover == null || (hover[0] === d && hover[1] === hr) ? 1 : 0.7 }} />
+            ))}
+          </React.Fragment>
+        ))}
+        <span />
+        {Array.from({ length: 24 }, (_, hr) => (
+          <span key={hr} className="text-center text-[10px] text-[var(--fg-faint)]">{hr % 3 === 0 ? String(hr).padStart(2, "0") : ""}</span>
+        ))}
+      </div>
+      <div className="mt-3 flex items-center justify-between gap-3 text-[11px] text-[var(--fg-muted)]">
+        <span>{hover ? `${detail ? detail(hover[0], hover[1]) : `${rowLabels[hover[0]]} ${hover[1]}:00`}: ${format(hv)}` : "Point at a square to see the amount."}</span>
+        <span className="flex shrink-0 items-center gap-1.5" aria-hidden>
+          Less
+          {[0, 0.25, 0.5, 0.75, 1].map((f) => <span key={f} className="h-2.5 w-2.5 rounded-[3px]" style={{ background: f === 0 ? "var(--fill)" : `color-mix(in srgb, var(--chart-1) ${Math.round(18 + 82 * f)}%, var(--surface))` }} />)}
+          More
+        </span>
+      </div>
+      <div className="sr-only"><table>
+        <caption>{label}</caption>
+        <thead><tr><th scope="col">Day</th>{Array.from({ length: 24 }, (_, hr) => <th key={hr} scope="col">{hr}:00</th>)}</tr></thead>
+        <tbody>{rows.map((row, d) => <tr key={d}><th scope="row">{rowLabels[d]}</th>{row.map((v, hr) => <td key={hr}>{format(v)}</td>)}</tr>)}</tbody>
+      </table></div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ ranked bars */
+
+export interface RankedRow { key: string; label: string; value: number; sublabel?: string; aside?: React.ReactNode; muted?: boolean }
+
+/** Ranked horizontal bars (largest first), one hue, figure at the right of each row. */
+export function RankedBars({ rows, label, format = (v) => v.toLocaleString(), empty = "Nothing to show." }: {
+  rows: RankedRow[]; label: string; format?: (v: number) => string; empty?: string;
+}) {
+  const max = Math.max(1, ...rows.map((r) => r.value));
+  if (!rows.length) return <p className="py-8 text-center text-sm text-[var(--fg-muted)]">{empty}</p>;
+  return (
+    <ul className="space-y-3.5" aria-label={label}>
+      {rows.map((r) => (
+        <li key={r.key}>
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="min-w-0 truncate text-[13px] font-medium text-[var(--fg)]" title={r.label}>{r.label}</span>
+            <span className="flex shrink-0 items-baseline gap-2">
+              {r.aside}
+              <span className="num text-[13px] font-semibold text-[var(--fg)]">{format(r.value)}</span>
+            </span>
+          </div>
+          <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-[var(--fill)]">
+            <div className="h-full rounded-full" style={{ width: `${r.value > 0 ? Math.max(1.5, (r.value / max) * 100) : 0}%`, background: r.muted ? "var(--chart-muted)" : "var(--chart-1)" }} />
+          </div>
+          {r.sublabel && <p className="mt-1 text-[11.5px] text-[var(--fg-muted)]">{r.sublabel}</p>}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/* ------------------------------------------------------------------ waterfall */
+
+export interface WaterfallStep { key: string; label: string; value: number; kind: "total" | "minus" }
+
+/**
+ * Money flow: totals stand on the baseline in the accent; deductions float from the
+ * running total in the de-emphasis tone. Every step is labelled with its amount.
+ */
+export function Waterfall({ steps, label, format = (v) => v.toLocaleString(), height = 230 }: {
+  steps: WaterfallStep[]; label: string; format?: (v: number) => string; height?: number;
+}) {
+  const [ref, width] = useWidth<HTMLDivElement>();
+  // Each deduction hangs from the running total left by the steps before it.
+  const bars = steps.map((s, i) => {
+    if (s.kind === "total") return { ...s, from: 0, to: s.value };
+    const before = steps.slice(0, i).reduce((run, p) => (p.kind === "total" ? p.value : Math.max(0, run - p.value)), 0);
+    return { ...s, from: Math.max(0, before - s.value), to: before };
+  });
+  const max = Math.max(1, ...bars.map((b) => b.to));
+  const pad = { top: 22, bottom: 40 };
+  const innerH = height - pad.top - pad.bottom;
+  const band = width / Math.max(1, bars.length);
+  const barW = Math.max(8, Math.min(44, band * 0.56));
+  const y = (v: number) => pad.top + innerH - (v / max) * innerH;
+  return (
+    <div ref={ref} className="w-full" style={{ height }}>
+      {width > 0 && (
+        <svg width={width} height={height} role="img" aria-label={label} className="block overflow-visible">
+          <line x1={0} x2={width} y1={y(0)} y2={y(0)} stroke="var(--border-strong)" strokeWidth={1} shapeRendering="crispEdges" />
+          {bars.map((b, i) => {
+            const x = i * band + (band - barW) / 2;
+            const hgt = Math.max(b.to > b.from ? 2 : 0, y(b.from) - y(b.to));
+            return (
+              <g key={b.key}>
+                {hgt > 0 && <rect x={x} y={y(b.to)} width={barW} height={hgt} rx={4} fill={b.kind === "total" ? "var(--chart-1)" : "var(--chart-muted)"} />}
+                <text x={x + barW / 2} y={y(b.to) - 6} textAnchor="middle" className="num fill-[var(--fg-body)] text-[11px] font-medium">
+                  {b.kind === "minus" && b.value > 0 ? `−${format(b.value)}` : format(b.value)}
+                </text>
+                <foreignObject x={i * band + 2} y={height - pad.bottom + 6} width={band - 4} height={pad.bottom - 6}>
+                  <p className="text-center text-[11px] leading-tight text-[var(--fg-muted)] [overflow-wrap:anywhere]">{b.label}</p>
+                </foreignObject>
+              </g>
+            );
+          })}
+        </svg>
+      )}
+      <div className="sr-only"><table><caption>{label}</caption><tbody>{steps.map((s) => <tr key={s.key}><th scope="row">{s.label}</th><td>{s.kind === "minus" ? "minus " : ""}{format(s.value)}</td></tr>)}</tbody></table></div>
+    </div>
+  );
+}
