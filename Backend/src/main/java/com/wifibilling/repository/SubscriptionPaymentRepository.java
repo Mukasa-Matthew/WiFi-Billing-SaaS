@@ -9,6 +9,8 @@ import java.util.Optional;
 
 public interface SubscriptionPaymentRepository extends JpaRepository<SubscriptionPayment, Long> {
     List<SubscriptionPayment> findAllBySubscriptionIdOrderByPaidAtDesc(Long subscriptionId);
+    List<SubscriptionPayment> findAllByTenantIdAndPaidAtGreaterThanEqualAndPaidAtLessThan(
+            Long tenantId, java.time.OffsetDateTime from, java.time.OffsetDateTime to);
     Optional<SubscriptionPayment> findByRecordRef(String recordRef);
 
     @Query("SELECT COALESCE(SUM(p.amount), 0) FROM SubscriptionPayment p WHERE p.invoice.id = :invoiceId")

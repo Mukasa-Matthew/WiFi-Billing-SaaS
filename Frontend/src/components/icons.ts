@@ -103,4 +103,9 @@ export {
   Info,
   Funnel,
   Columns3 as Columns,
+  Target,
+  TrendingUp,
+  TrendingDown,
+  Printer,
+  Lightbulb,
 } from "lucide-react";
