@@ -111,6 +111,16 @@ public class SchoolController {
         identity.correctRegistration(tenant.getId(), id, body.fullName(), body.registrationNumber(), body.accessUntil(), principal.getName() + " (" + principal.getUsername() + ")");
     }
 
+    /** Fixes an approved student's registration number when it was approved with a typo. The old number stops signing in; the PIN stays the same. */
+    public record ApprovedNumberCorrection(@NotBlank @Size(max = 128) String registrationNumber) {}
+
+    @PatchMapping("/registrations/{id}/number")
+    @ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
+    public void correctApprovedNumber(@AuthenticationPrincipal TenantPrincipal principal, @PathVariable UUID id, @Valid @RequestBody ApprovedNumberCorrection body) {
+        var tenant = schools.school(principal.getTenantId());
+        identity.correctApprovedNumber(tenant.getId(), id, body.registrationNumber(), principal.getName() + " (" + principal.getUsername() + ")");
+    }
+
     /** Sends an approved student's PIN email again — to their address, or a corrected one when they mistyped it. */
     public record RegistrationResend(@Email @Size(max = 254) String email) {}
 

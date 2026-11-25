@@ -138,6 +138,24 @@ export default function SchoolRegistrationsPage() {
     }
   };
 
+  const [fixingNumber, setFixingNumber] = useState<Registration | null>(null);
+  const [fixedNumber, setFixedNumber] = useState("");
+  const saveNumber = async (reg: Registration) => {
+    const next = fixedNumber.trim();
+    if (!next || next === reg.registrationNumber) { setFixingNumber(null); return; }
+    setBusy(reg.id);
+    try {
+      await api.patch(`/api/school/registrations/${reg.id}/number`, { registrationNumber: next });
+      toast("success", `${reg.fullName} now signs in with ${next} — same PIN. The old number no longer works.`);
+      setFixingNumber(null);
+      registrations.load();
+    } catch (err) {
+      toast("error", message(err));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const data = registrations.data;
   const switchStatus = (v: Status) => { setStatus(v); setPage(0); };
 
@@ -253,6 +271,8 @@ export default function SchoolRegistrationsPage() {
               label: "Registration no.",
               render: (r) => editing?.id === r.id
                 ? <input className={`${field} font-mono`} value={editRegNumber} onChange={(e) => setEditRegNumber(e.target.value)} maxLength={128} />
+                : fixingNumber?.id === r.id
+                  ? <input className={`${field} font-mono`} value={fixedNumber} onChange={(e) => setFixedNumber(e.target.value)} maxLength={128} placeholder="Correct registration number" autoFocus />
                 : rejecting?.id === r.id
                   ? <input className={field} value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} maxLength={500} placeholder="Reason, e.g. not a student here" autoFocus />
                   : <span className="font-mono text-xs">{r.registrationNumber}</span>,
@@ -309,9 +329,18 @@ export default function SchoolRegistrationsPage() {
                   <button type="button" disabled={busy === r.id || !resendEmail.trim()} onClick={() => resend(r)} className={button}>{busy === r.id ? "Sending…" : "Send"}</button>
                   <button type="button" className={buttonGhost} onClick={() => setResending(null)}>Cancel</button>
                 </div>
+              ) : fixingNumber?.id === r.id ? (
+                <div className="flex items-center justify-end gap-2">
+                  <button type="button" disabled={busy === r.id || !fixedNumber.trim()} onClick={() => saveNumber(r)} className={button}>{busy === r.id ? "Saving…" : "Save"}</button>
+                  <button type="button" className={buttonGhost} onClick={() => setFixingNumber(null)}>Cancel</button>
+                </div>
               ) : (
                 <div className="flex items-center justify-end gap-2">
-                  <button type="button" disabled={busy === r.id} onClick={() => { setResending(r); setResendEmail(r.email); }} className={buttonGhost}>
+                  <button type="button" disabled={busy === r.id} onClick={() => { setResending(null); setFixingNumber(r); setFixedNumber(r.registrationNumber); }} className={buttonGhost}>
+                    <NotePencil className="h-4 w-4" />
+                    Fix reg. no.
+                  </button>
+                  <button type="button" disabled={busy === r.id} onClick={() => { setFixingNumber(null); setResending(r); setResendEmail(r.email); }} className={buttonGhost}>
                     <NotePencil className="h-4 w-4" />
                     Fix email / resend
                   </button>
