@@ -197,6 +197,10 @@ class RouterScriptGeneratorTest {
 
         // Staff block list drops only the selected services, by name and by learned address
         String blockRules = generator.schoolFilterRules(false, "", "BLOCK_LIST", "youtube.com, @tiktok", "https://app.qticket.dev");
+        String socialBlocks = generator.schoolFilterRules(false, "", "BLOCK_LIST", "@tiktok, @snapchat", "https://app.qticket.dev");
+        assertTrue(socialBlocks.contains("wb-site-snapchat.com"));
+        assertTrue(socialBlocks.contains("wb-site-tiktok.com"));
+        assertFalse(socialBlocks.contains("staff drop other"));
         assertTrue(blockRules.contains("src-address-list=\"wb-staff-free\" protocol=tcp dst-port=443 tls-host=\"*tiktok.com\" action=drop"));
         assertTrue(blockRules.contains("src-address-list=\"wb-staff-free\" dst-address-list=\"wb-site-googlevideo.com\" action=drop"), "typing youtube.com also blocks its videos");
         assertTrue(blockRules.contains("dst-address-list=\"wb-site-youtubei.googleapis.com\" action=drop"), "and the YouTube app");

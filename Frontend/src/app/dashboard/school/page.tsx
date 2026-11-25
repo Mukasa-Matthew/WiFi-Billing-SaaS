@@ -136,6 +136,7 @@ const STAFF_APP_PRESETS = [
   { token: "@youtube", label: "YouTube" },
   { token: "@chatgpt", label: "ChatGPT" },
   { token: "@tiktok", label: "TikTok" },
+  { token: "@snapchat", label: "Snapchat" },
   { token: "@facebook", label: "Facebook" },
   { token: "@instagram", label: "Instagram" },
   { token: "@twitter", label: "X / Twitter" },
