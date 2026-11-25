@@ -502,6 +502,41 @@ class SchoolFlowIntegrationTest {
         assertEquals("SIGN_IN", JsonPath.read(portal("resume", "{\"token\":\"" + school.routerToken() + "\",\"mac\":\"" + TABLET_MAC + "\"}"), "$.action"));
     }
 
+    /**
+     * Regression: a free 1-week voucher given out by hand on a school network was cut to 24 hours
+     * when the phone reconnected through the school portal (RADIUS Expiration = now + 1 day), so
+     * students lost the rest of the week and re-entering the code failed.
+     */
+    @Test
+    void reconnectKeepsAnOrdinaryVouchersOwnEndTime() throws Exception {
+        Site school = site("giveaway-week-school", true);
+        var plan = plans.findById(school.planId().longValue()).orElseThrow();
+        OffsetDateTime weekEnd = OffsetDateTime.now().plusDays(6).withNano(0);
+        vouchers.save(Voucher.builder().code("WEEKFREE1").tenant(school.tenant()).packagePlan(plan)
+                .saleType("GIVEAWAY").status("active").claimedMac(PHONE_MAC)
+                .firstLogin(OffsetDateTime.now().minusDays(1)).expiresAt(weekEnd).build());
+        var radiusFormat = java.time.format.DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm:ss", java.util.Locale.ENGLISH);
+        String expected = weekEnd.toInstant().atZone(java.time.ZoneId.systemDefault()).format(radiusFormat);
+
+        for (int reconnect = 0; reconnect < 2; reconnect++) {
+            String resumed = portal("resume", "{\"token\":\"" + school.routerToken() + "\",\"mac\":\"" + PHONE_MAC + "\"}");
+            assertEquals("CONNECT", JsonPath.read(resumed, "$.action"));
+            assertEquals("WEEKFREE1", JsonPath.read(resumed, "$.code"));
+            assertEquals(expected, radCheck.findFirstByUsernameAndAttribute("WEEKFREE1", "Expiration").orElseThrow().getValue(),
+                    "RADIUS lets the voucher in until its real end, not 24 hours from the reconnect");
+            Voucher saved = vouchers.findByCode("WEEKFREE1").orElseThrow();
+            assertNull(saved.getHardExpiresAt(), "an ordinary voucher gets no school limit");
+            assertEquals(weekEnd.toInstant(), saved.getExpiresAt().toInstant());
+        }
+
+        // Never used yet: no end time is invented; it starts at first login like any voucher.
+        vouchers.save(Voucher.builder().code("WEEKFREE2").tenant(school.tenant()).packagePlan(plan)
+                .saleType("GIVEAWAY").status("unused").claimedMac(TABLET_MAC).build());
+        assertEquals("CONNECT", JsonPath.read(portal("resume", "{\"token\":\"" + school.routerToken() + "\",\"mac\":\"" + TABLET_MAC + "\"}"), "$.action"));
+        assertFalse(radCheck.findFirstByUsernameAndAttribute("WEEKFREE2", "Expiration").isPresent());
+        assertNull(vouchers.findByCode("WEEKFREE2").orElseThrow().getHardExpiresAt());
+    }
+
     @Test
     void studentDailyFreeDataAllowsStudySitesAndUpgradesToPaidPackageCleanly() throws Exception {
         Site school = site("student-free-school", true);

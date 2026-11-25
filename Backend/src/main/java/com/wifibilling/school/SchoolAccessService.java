@@ -140,7 +140,10 @@ public class SchoolAccessService {
                                 && !Boolean.TRUE.equals(v.getSchoolHold()))
                         .findFirst().orElse(null);
                 if (hotspot == null) return PortalResult.signIn(null);
-                OffsetDateTime limit = hotspot.getHardExpiresAt() != null ? hotspot.getHardExpiresAt() : now.plusDays(1);
+                // An ordinary voucher keeps its own end time (first login + package length). It has no
+                // school limit, so none is invented here: a 24-hour cap once cut free 1-week vouchers
+                // down to a day after the phone reconnected.
+                OffsetDateTime limit = hotspot.getHardExpiresAt();
                 reprovision(hotspot, router, mac, limit, null);
                 return PortalResult.connect(hotspot.getCode(), null, "PAID_CUSTOMER",
                         hotspot.getExpiresAt() != null ? hotspot.getExpiresAt() : limit);
@@ -520,13 +523,17 @@ public class SchoolAccessService {
         return vouchers.save(voucher);
     }
 
-    /** Rebuilds the voucher's RADIUS entries for this device and router, ending any session elsewhere. */
+    /**
+     * Rebuilds the voucher's RADIUS entries for this device and router, ending any session elsewhere.
+     * {@code hardLimit} is the school limit (leaving date, pass end, …); null for an ordinary voucher,
+     * which then ends at its own expiry — or, if never used yet, gets one at first login.
+     */
     private void reprovision(Voucher voucher, Router router, String mac, OffsetDateTime hardLimit, Long remainingBytes) {
         if (Boolean.TRUE.equals(voucher.getSchoolHold()) || voucher.getClaimedMac() != null && !voucher.getClaimedMac().equalsIgnoreCase(mac)) {
             expiration.disconnectActiveSessions(voucher.getCode());
         }
         voucher.setHardExpiresAt(hardLimit);
-        if ("STAFF".equals(voucher.getSchoolCategory()) || SALE_STUDENT_FREE.equals(voucher.getSaleType())) {
+        if (hardLimit != null && ("STAFF".equals(voucher.getSchoolCategory()) || SALE_STUDENT_FREE.equals(voucher.getSaleType()))) {
             voucher.setExpiresAt(hardLimit);
         }
         voucher.setSchoolHold(false);
@@ -537,12 +544,14 @@ public class SchoolAccessService {
         String code = voucher.getCode();
         radCheck.deleteAllByUsername(code);
         radReply.deleteAllByUsername(code);
-        OffsetDateTime until = voucher.getExpiresAt() != null && voucher.getExpiresAt().isBefore(hardLimit) ? voucher.getExpiresAt() : hardLimit;
+        OffsetDateTime expires = voucher.getExpiresAt();
+        OffsetDateTime until = expires == null ? hardLimit
+                : hardLimit == null || expires.isBefore(hardLimit) ? expires : hardLimit;
         var checks = new java.util.ArrayList<>(List.of(
                 check(code, "Cleartext-Password", code),
                 RadCheck.builder().username(code).attribute("Calling-Station-Id").op("==").value(mac).build(),
-                check(code, "Simultaneous-Use", "1"),
-                check(code, "Expiration", radiusTime(until))));
+                check(code, "Simultaneous-Use", "1")));
+        if (until != null) checks.add(check(code, "Expiration", radiusTime(until)));
         if (router.getWgIp() != null) checks.add(RadCheck.builder().username(code).attribute("NAS-IP-Address").op("==").value(router.getWgIp()).build());
         radCheck.saveAll(checks);
         if (plan.getRateLimit() != null && !plan.getRateLimit().isBlank()) radReply.save(RadReply.builder().username(code).attribute("Mikrotik-Rate-Limit").op(":=").value(plan.getRateLimit()).build());
