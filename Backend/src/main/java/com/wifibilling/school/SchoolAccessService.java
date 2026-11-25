@@ -343,7 +343,7 @@ public class SchoolAccessService {
                         .toList();
                 Voucher live = staffVouchers.stream().filter(v -> mac.equalsIgnoreCase(v.getClaimedMac())).findFirst()
                         .or(() -> staffVouchers.stream().filter(v -> v.getClaimedMac() == null).findFirst())
-                        .orElse(staffVouchers.size() >= 2 ? staffVouchers.getLast() : null);
+                        .orElse(staffVouchers.size() >= 2 ? leastRecentlyUsed(staffVouchers, now) : null);
                 if (!tenant.isSchoolStaffEnabled()) {
                     if (live != null) holdAndDisconnect(live);
                     throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Free staff WiFi is currently paused by the network owner.");
@@ -548,6 +548,26 @@ public class SchoolAccessService {
                 .filter(v -> (v.getExpiresAt() == null || v.getExpiresAt().isAfter(now)) && (v.getHardExpiresAt() == null || v.getHardExpiresAt().isAfter(now)))
                 .min((a, b) -> Boolean.compare(!"active".equals(a.getStatus()), !"active".equals(b.getStatus())))
                 .orElse(null);
+    }
+
+    /**
+     * The voucher a new staff device takes over: one not online right now, idle the longest
+     * (never used counts as idlest), so the device a person is using keeps its connection.
+     * Ties fall back to the oldest voucher.
+     */
+    private Voucher leastRecentlyUsed(List<Voucher> staffVouchers, OffsetDateTime now) {
+        var online = new java.util.HashSet<String>();
+        var lastSeen = new java.util.HashMap<String, OffsetDateTime>();
+        for (Object[] row : radAcct.activityByUsername(staffVouchers.stream().map(Voucher::getCode).toList(), now.minusMinutes(10))) {
+            if (row[1] != null && ((Number) row[1]).longValue() > 0) online.add((String) row[0]);
+            if (row[2] != null) lastSeen.put((String) row[0], (OffsetDateTime) row[2]);
+        }
+        OffsetDateTime never = OffsetDateTime.MIN;
+        // staffVouchers is newest first; reversed, min() keeps the oldest voucher on a tie.
+        return staffVouchers.reversed().stream()
+                .min(java.util.Comparator.<Voucher>comparingInt(v -> online.contains(v.getCode()) ? 1 : 0)
+                        .thenComparing(v -> lastSeen.getOrDefault(v.getCode(), never)))
+                .orElseThrow();
     }
 
     /** The student's usable paid packages, active ones first. */

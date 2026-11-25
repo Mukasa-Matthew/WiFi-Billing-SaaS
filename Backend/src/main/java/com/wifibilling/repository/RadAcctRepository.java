@@ -167,6 +167,21 @@ public interface RadAcctRepository extends JpaRepository<RadAcct, Long> {
             """)
     long sumOctetsForUsernames(@Param("usernames") Collection<String> usernames);
 
+    /**
+     * Per-username activity: whether a session is open and fresh (interim update since {@code cut}),
+     * and when the code was last seen (stop, else last interim update, else start).
+     */
+    @Query("""
+            SELECT r.username,
+                   SUM(CASE WHEN r.acctStopTime IS NULL AND COALESCE(r.acctUpdateTime, r.acctStartTime) >= :cut THEN 1 ELSE 0 END),
+                   MAX(COALESCE(r.acctStopTime, r.acctUpdateTime, r.acctStartTime))
+            FROM RadAcct r
+            WHERE r.username IN :usernames
+            GROUP BY r.username
+            """)
+    List<Object[]> activityByUsername(@Param("usernames") Collection<String> usernames,
+                                      @Param("cut") OffsetDateTime cut);
+
     /** Per-username octet totals since a timestamp — batched school cap enforcement. */
     @Query("""
             SELECT r.username, COALESCE(SUM(COALESCE(r.acctInputOctets, 0) + COALESCE(r.acctOutputOctets, 0)), 0)
