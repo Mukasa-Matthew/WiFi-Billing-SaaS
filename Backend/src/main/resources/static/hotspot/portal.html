@@ -913,6 +913,31 @@ function useFoundSchoolVoucher(ev, k, voucherId){
         })
         .catch(function(){ SCHOOL.busy = false; button.disabled = false; say('Could not reach the server. Check your connection and try again.', true); });
 }
+// One tap from "Find your voucher": the phone number already typed brings the student's package to this phone.
+// If that can't be done (daily move limit, on hold…), the ID and PIN form is shown as the fallback.
+function connectFoundSchool(id, k){
+    var button = document.getElementById('fc-btn-' + id), msg = document.getElementById('fc-msg-' + id);
+    function say(text, bad){ if (msg) { msg.style.color = bad ? '#dc2626' : 'var(--muted)'; msg.textContent = text; } }
+    if (!schoolMac()) { say('Connect to the school WiFi and open this page again.', true); return; }
+    if (SCHOOL.busy) return;
+    SCHOOL.busy = true; if (button) button.disabled = true; say('Connecting…', false);
+    fetch(BASE + '/api/portal/school/connect-found', { method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ token: TOKEN, phone: document.getElementById('find-phone').value.trim(), id: id, mac: schoolMac() }) })
+        .then(function(r){ return r.json().then(function(res){ return { ok: r.ok, res: res }; }); })
+        .then(function(out){
+            SCHOOL.busy = false; if (button) button.disabled = false;
+            if (!out.ok || !out.res || !out.res.code) {
+                say((out.res && out.res.message) || 'Could not connect this package here.', true);
+                var form = document.getElementById('fs-form-' + k);
+                if (form) form.style.display = '';
+                if (button) button.style.display = 'none';
+                return;
+            }
+            hideFind();
+            schoolResult(out.res);
+        })
+        .catch(function(){ SCHOOL.busy = false; if (button) button.disabled = false; say('Could not reach the server. Check your connection and try again.', true); });
+}
 function rememberedSchoolId(){ try { return localStorage.getItem('school-id') || ''; } catch (e) { return ''; } }
 function rememberSchoolId(id){ try { localStorage.setItem('school-id', id); } catch (e) {} }
 function hideFind(){ document.getElementById('find-modal').classList.remove('show'); }
@@ -987,13 +1012,16 @@ function findVoucher(){
                 html += '  </div>';
                 if (v.code) {
                     html += '  <button type="button" onclick="selectFoundVoucher(\'' + escapeText(v.code) + '\')" style="white-space:nowrap;padding:7px 12px;font-size:12px;font-weight:700;background:var(--primary);color:#fff;border:none;border-radius:8px;cursor:pointer;">Connect</button>';
+                } else if (v.phoneConnect) {
+                    html += '  <button type="button" id="fc-btn-' + Number(v.id) + '" onclick="connectFoundSchool(' + Number(v.id) + ',\'' + Number(v.voucherId || 0) + '-' + Number(v.id) + '\')" style="white-space:nowrap;padding:7px 12px;font-size:12px;font-weight:700;background:var(--primary);color:#fff;border:none;border-radius:8px;cursor:pointer;">Connect</button>';
                 } else if (v.canUnlock) {
                     html += '  <button type="button" onclick="showUnlock(' + Number(v.id) + ')" style="white-space:nowrap;padding:7px 12px;font-size:12px;font-weight:700;background:#fff;border:1px solid var(--primary);color:var(--primary);border-radius:8px;cursor:pointer;">🔒 Unlock</button>';
                 }
                 html += '</div>';
                 if (v.schoolSignIn) {
                     var k = Number(v.voucherId || 0) + '-' + Number(v.id);
-                    html += '<form onsubmit="useFoundSchoolVoucher(event,\'' + k + '\',' + (v.voucherId ? Number(v.voucherId) : 'null') + ')" style="margin-top:8px;border-top:1px dashed #cbd5e1;padding-top:8px;">';
+                    if (v.phoneConnect) html += '<div id="fc-msg-' + Number(v.id) + '" style="font-size:12px;margin-top:6px;"></div>';
+                    html += '<form id="fs-form-' + k + '" onsubmit="useFoundSchoolVoucher(event,\'' + k + '\',' + (v.voucherId ? Number(v.voucherId) : 'null') + ')" style="margin-top:8px;border-top:1px dashed #cbd5e1;padding-top:8px;' + (v.phoneConnect ? 'display:none;' : '') + '">';
                     html += '  <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">🎓 Enter your school ID and PIN to use this package on this phone. Your remaining time is kept.</div>';
                     html += '  <input class="form-input" id="fs-id-' + k + '" type="text" placeholder="Registration number" required autocomplete="username" autocapitalize="characters" maxlength="128" value="' + escapeText(rememberedSchoolId()) + '" style="padding-left:12px;margin-bottom:6px;">';
                     html += '  <input class="form-input" id="fs-pin-' + k + '" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" placeholder="4-digit PIN" required autocomplete="current-password" style="padding-left:12px;margin-bottom:6px;">';

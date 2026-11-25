@@ -86,6 +86,9 @@ public class VoucherLookupService {
             item.put("locked", usable && !reveal);
             item.put("canUnlock", usable && !reveal && !school && proofDigits(tx) != null);
             item.put("schoolSignIn", usable && !reveal && school);
+            // A paid student package can be brought to this phone with one tap — no PIN (see SchoolAccessService.connectFoundPackage).
+            item.put("phoneConnect", usable && !reveal && school && "STUDENT".equals(v.getSchoolCategory())
+                    && !com.wifibilling.school.SchoolAccessService.SALE_STUDENT_FREE.equals(v.getSaleType()));
             // Lets the portal sign the student in right here and bring this package to the device.
             // Useless on its own: the move only happens for the student whose ID and PIN own it.
             if (usable && !reveal && school) item.put("voucherId", v.getId());

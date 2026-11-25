@@ -33,6 +33,8 @@ public class SchoolPortalController {
                            @jakarta.validation.constraints.NotNull Integer completionYear, @NotBlank @Size(max = 32) String phone, @NotBlank @Size(max = 24) String mac) {
         @Override public String toString() { return "Register[redacted]"; }
     }
+    public record ConnectFound(@NotBlank @Size(max = 128) String token, @NotBlank @Size(max = 32) String phone,
+                               @jakarta.validation.constraints.NotNull Long id, @NotBlank @Size(max = 24) String mac) {}
     public record MovePackage(@NotBlank @Size(max = 128) String token, @NotBlank @Size(max = 600) String ticket,
                               @jakarta.validation.constraints.NotNull Long voucherId, @NotBlank @Size(max = 24) String mac) {}
 
@@ -52,6 +54,13 @@ public class SchoolPortalController {
     public SchoolAccessService.PortalResult movePackage(@Valid @RequestBody MovePackage body) {
         rateLimiter.check("move-package", body.mac());
         return access.movePaidPackage(body.token(), body.ticket(), body.voucherId(), body.mac());
+    }
+
+    /** "Find your voucher" → Connect: the phone number alone brings a student's paid package to this phone. */
+    @PostMapping("/connect-found")
+    public SchoolAccessService.PortalResult connectFound(@Valid @RequestBody ConnectFound body) {
+        rateLimiter.check("connect-found", body.mac());
+        return access.connectFoundPackage(body.token(), body.phone(), body.id(), body.mac());
     }
 
     @PostMapping("/verify")
