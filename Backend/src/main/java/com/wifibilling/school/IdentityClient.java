@@ -91,6 +91,10 @@ public class IdentityClient {
         if (accessUntil != null) body.put("accessUntil", accessUntil.toString());
         call("PATCH", school(tenantId, "/registrations/" + id), body);
     }
+    /** Fixes an approved student's registration number (approved with a typo); their sign-in moves to the new number. */
+    public void correctApprovedNumber(long tenantId, UUID id, String registrationNumber, String decidedBy) {
+        call("PATCH", school(tenantId, "/registrations/" + id + "/number"), Map.of("registrationNumber", registrationNumber.trim(), "decidedBy", decidedBy));
+    }
     public JsonNode resendRegistration(long tenantId, UUID id, String email, String decidedBy) {
         var body = new java.util.HashMap<String, Object>();
         body.put("decidedBy", decidedBy);
