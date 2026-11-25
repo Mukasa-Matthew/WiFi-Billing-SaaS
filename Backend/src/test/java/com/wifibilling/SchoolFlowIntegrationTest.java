@@ -189,6 +189,16 @@ class SchoolFlowIntegrationTest {
         assertEquals(0, staffPlan.getPrice().signum());
         assertEquals("4M/4M", staffPlan.getRateLimit());
         assertEquals(code, JsonPath.read(portal("verify", verifyBody(school, PHONE_MAC)), "$.code"));
+        String secondCode = JsonPath.read(portal("verify", verifyBody(school, TABLET_MAC)), "$.code");
+        assertNotEquals(code, secondCode, "each of the two devices keeps its own voucher");
+        assertEquals(PHONE_MAC, vouchers.findByCode(code).orElseThrow().getClaimedMac());
+        assertEquals(TABLET_MAC, vouchers.findByCode(secondCode).orElseThrow().getClaimedMac());
+        assertEquals(code, JsonPath.read(portal("resume", "{\"token\":\"" + school.routerToken() + "\",\"mac\":\"" + PHONE_MAC + "\"}"), "$.code"));
+        String thirdMac = "AA:BB:CC:00:00:03";
+        portal("verify", verifyBody(school, thirdMac));
+        var devices = vouchers.findLiveForPerson(school.tenant().getId(), "demo-0000bbbb", "STAFF");
+        assertEquals(2, devices.size(), "a third device moves an existing voucher");
+        assertTrue(devices.stream().anyMatch(v -> thirdMac.equals(v.getClaimedMac())));
         String packages = mvc.perform(get("/api/packages").header("Authorization", "Bearer " + school.jwt())).andReturn().getResponse().getContentAsString();
         assertEquals(1, (int) JsonPath.read(packages, "$.length()"), "only the owner's own package is listed");
         mvc.perform(get("/api/packages/" + staffPlan.getId()).header("Authorization", "Bearer " + school.jwt())).andExpect(status().isNotFound());

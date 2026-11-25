@@ -332,9 +332,18 @@ public class SchoolAccessService {
         LocalDate accessUntil = LocalDate.parse(verified.path("accessUntil").asString());
         OffsetDateTime hardLimit = endOf(accessUntil);
         return transaction.execute(status -> {
+            // Serialize staff voucher allocation across both backend slots, including the first sign-in.
+            if ("STAFF".equals(category)) tenants.lockForStaffAccess(tenant.getId()).orElseThrow();
             rememberName(tenant.getId(), personId, fullName);
             if ("STAFF".equals(category)) {
-                Voucher live = live(tenant.getId(), personId, category);
+                OffsetDateTime now = clock.now();
+                List<Voucher> staffVouchers = vouchers.findLiveForPerson(tenant.getId(), personId, category).stream()
+                        .filter(v -> (v.getExpiresAt() == null || v.getExpiresAt().isAfter(now))
+                                && (v.getHardExpiresAt() == null || v.getHardExpiresAt().isAfter(now)))
+                        .toList();
+                Voucher live = staffVouchers.stream().filter(v -> mac.equalsIgnoreCase(v.getClaimedMac())).findFirst()
+                        .or(() -> staffVouchers.stream().filter(v -> v.getClaimedMac() == null).findFirst())
+                        .orElse(staffVouchers.size() >= 2 ? staffVouchers.getLast() : null);
                 if (!tenant.isSchoolStaffEnabled()) {
                     if (live != null) holdAndDisconnect(live);
                     throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Free staff WiFi is currently paused by the network owner.");

@@ -181,6 +181,7 @@ public class RouterScriptGenerator {
             java.util.Map.entry("@chatgpt", List.of("chatgpt.com", "openai.com", "oaistatic.com", "oaiusercontent.com")),
             java.util.Map.entry("@gmail", List.of("gmail.com", "googlemail.com", "mail.google.com", "accounts.google.com", "gstatic.com", "googleusercontent.com")),
             java.util.Map.entry("@tiktok", List.of("tiktok.com", "tiktokcdn.com", "tiktokv.com", "musical.ly", "byteoversea.com")),
+            java.util.Map.entry("@snapchat", List.of("snapchat.com", "snap.com", "sc-cdn.net", "snapchat-cdn.net")),
             java.util.Map.entry("@facebook", List.of("facebook.com", "fb.com", "fbcdn.net", "messenger.com")),
             java.util.Map.entry("@instagram", List.of("instagram.com", "cdninstagram.com")),
             java.util.Map.entry("@twitter", List.of("x.com", "twitter.com", "twimg.com", "t.co")),
