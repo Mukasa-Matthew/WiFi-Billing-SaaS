@@ -194,11 +194,18 @@ class SchoolFlowIntegrationTest {
         assertEquals(PHONE_MAC, vouchers.findByCode(code).orElseThrow().getClaimedMac());
         assertEquals(TABLET_MAC, vouchers.findByCode(secondCode).orElseThrow().getClaimedMac());
         assertEquals(code, JsonPath.read(portal("resume", "{\"token\":\"" + school.routerToken() + "\",\"mac\":\"" + PHONE_MAC + "\"}"), "$.code"));
+        // The phone is online now; the tablet was last used an hour ago.
+        java.time.OffsetDateTime now = java.time.OffsetDateTime.now();
+        radAcct.saveAndFlush(com.wifibilling.radius.RadAcct.builder().acctSessionId("staff-phone").acctUniqueId("u-staff-phone").username(code)
+                .nasIpAddress("10.9.0.2").acctStartTime(now.minusMinutes(30)).acctUpdateTime(now.minusMinutes(1)).build());
+        radAcct.saveAndFlush(com.wifibilling.radius.RadAcct.builder().acctSessionId("staff-tablet").acctUniqueId("u-staff-tablet").username(secondCode)
+                .nasIpAddress("10.9.0.2").acctStartTime(now.minusHours(2)).acctStopTime(now.minusHours(1)).build());
         String thirdMac = "AA:BB:CC:00:00:03";
-        portal("verify", verifyBody(school, thirdMac));
+        assertEquals(secondCode, JsonPath.read(portal("verify", verifyBody(school, thirdMac)), "$.code"), "a third device takes the idle device's voucher");
         var devices = vouchers.findLiveForPerson(school.tenant().getId(), "demo-0000bbbb", "STAFF");
         assertEquals(2, devices.size(), "a third device moves an existing voucher");
-        assertTrue(devices.stream().anyMatch(v -> thirdMac.equals(v.getClaimedMac())));
+        assertEquals(PHONE_MAC, vouchers.findByCode(code).orElseThrow().getClaimedMac(), "the phone in use keeps its connection");
+        assertEquals(thirdMac, vouchers.findByCode(secondCode).orElseThrow().getClaimedMac());
         String packages = mvc.perform(get("/api/packages").header("Authorization", "Bearer " + school.jwt())).andReturn().getResponse().getContentAsString();
         assertEquals(1, (int) JsonPath.read(packages, "$.length()"), "only the owner's own package is listed");
         mvc.perform(get("/api/packages/" + staffPlan.getId()).header("Authorization", "Bearer " + school.jwt())).andExpect(status().isNotFound());
@@ -368,19 +375,30 @@ class SchoolFlowIntegrationTest {
         assertEquals("3M/3M",
                 radReply.findFirstByUsernameAndAttribute(code, "Mikrotik-Rate-Limit").orElseThrow().getValue());
 
-        // Simulate 500 MB consumed today in radacct
+        // The same staff member on a second device: the cap is shared, not per device.
+        String tabletCode = JsonPath.read(portal("verify", verifyBody(school, TABLET_MAC)), "$.code");
+        assertNotEquals(code, tabletCode);
+
+        // Simulate 500 MB consumed today in radacct, split 300 MB phone + 200 MB tablet.
+        // Noon today in the reporting zone — the cap worker buckets usage by
+        // Africa/Kampala days, and "now minus N" lands on yesterday near midnight.
+        var noonToday = LocalDate.now(java.time.ZoneId.of("Africa/Kampala"))
+                .atTime(12, 0).atZone(java.time.ZoneId.of("Africa/Kampala")).toOffsetDateTime();
         radAcct.saveAndFlush(com.wifibilling.radius.RadAcct.builder()
                 .acctSessionId("sess-staff-cap-1").acctUniqueId("uniq-staff-cap-1").username(code)
-                // Noon today in the reporting zone — the cap worker buckets usage by
-                // Africa/Kampala days, and "now minus N" lands on yesterday near midnight.
-                .nasIpAddress("10.9.0.2").acctStartTime(LocalDate.now(java.time.ZoneId.of("Africa/Kampala"))
-                        .atTime(12, 0).atZone(java.time.ZoneId.of("Africa/Kampala")).toOffsetDateTime())
-                .acctInputOctets(100L * 1024L * 1024L).acctOutputOctets(400L * 1024L * 1024L).build());
+                .nasIpAddress("10.9.0.2").acctStartTime(noonToday)
+                .acctInputOctets(100L * 1024L * 1024L).acctOutputOctets(200L * 1024L * 1024L).build());
+        radAcct.saveAndFlush(com.wifibilling.radius.RadAcct.builder()
+                .acctSessionId("sess-staff-cap-2").acctUniqueId("uniq-staff-cap-2").username(tabletCode)
+                .nasIpAddress("10.9.0.2").acctStartTime(noonToday)
+                .acctInputOctets(50L * 1024L * 1024L).acctOutputOctets(150L * 1024L * 1024L).build());
 
-        // Worker holds voucher and clears radcheck/radreply when cap is reached
+        // Worker holds both devices and clears radcheck/radreply once the combined total reaches the cap
         lifecycle.processVoucherLifecycle();
         assertTrue(vouchers.findByCode(code).orElseThrow().getSchoolHold());
         assertFalse(radCheck.existsByUsername(code));
+        assertTrue(vouchers.findByCode(tabletCode).orElseThrow().getSchoolHold(), "neither device alone hit 500 MB, together they did");
+        assertFalse(radCheck.existsByUsername(tabletCode));
 
         // Portal blocks re-sign-in today with a clear daily cap message
         mvc.perform(post("/api/portal/school/verify").contentType(MediaType.APPLICATION_JSON).content(verifyBody(school, PHONE_MAC)))
