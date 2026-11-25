@@ -57,15 +57,24 @@ public class SchoolAccessService {
     private final VoucherExpirationWorker expiration;
     private final ReportingClock clock;
     private final TransactionTemplate transaction;
+    private final TransactionRepository transactions;
+    private final AuditLogRepository audit;
 
     public SchoolAccessService(IdentityClient identity, SchoolTickets tickets, RouterRepository routers, TenantRepository tenants,
                                VoucherRepository vouchers, PackagePlanRepository plans, RadCheckRepository radCheck, RadReplyRepository radReply,
                                RadAcctRepository radAcct, VoucherService voucherService, VoucherExpirationWorker expiration,
-                               ReportingClock clock, PlatformTransactionManager manager) {
+                               ReportingClock clock, PlatformTransactionManager manager, TransactionRepository transactions, AuditLogRepository audit) {
         this.identity = identity; this.tickets = tickets; this.routers = routers; this.tenants = tenants; this.vouchers = vouchers;
         this.plans = plans; this.radCheck = radCheck; this.radReply = radReply; this.radAcct = radAcct; this.voucherService = voucherService;
         this.expiration = expiration; this.clock = clock; this.transaction = new TransactionTemplate(manager);
+        this.transactions = transactions; this.audit = audit;
     }
+
+    /** How often one paid package may be moved to another phone from "Find your voucher" without the PIN. */
+    static final int MAX_PHONE_MOVES_PER_DAY = 3;
+    static final java.time.Duration PHONE_MOVE_WINDOW = java.time.Duration.ofHours(24);
+    public static final String AUDIT_PHONE_MOVE = "SCHOOL_PACKAGE_MOVED_BY_PHONE";
+    private final java.util.Map<Long, java.util.List<java.time.Instant>> phoneMoves = new java.util.concurrent.ConcurrentHashMap<>();
 
     public static final String HOLD_IT = "IT_HOLD";
     public static final String HOLD_CAP = "CAP_HOLD";
@@ -413,6 +422,60 @@ public class SchoolAccessService {
             return PortalResult.connect(voucher.getCode(), null, "STUDENT", voucher.getExpiresAt());
         });
     }
+
+    /**
+     * "Find your voucher" → Connect, for a student whose phone the network no longer recognises (a new or
+     * randomised WiFi address). The phone number they paid with is enough: the package moves to this device
+     * and connects, time left unchanged. Limited per package per day and written to the audit log, since
+     * anyone who knows the number could do it. Packages IT has put on hold are never released this way.
+     */
+    public PortalResult connectFoundPackage(String routerToken, String phone, long transactionId, String rawMac) {
+        Router router = schoolRouter(routerToken);
+        String mac = requireMac(rawMac);
+        Tenant tenant = router.getTenant();
+        com.wifibilling.util.PhoneMatch match = com.wifibilling.util.PhoneMatch.of(phone).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.BAD_REQUEST, "Enter the phone number you paid with."));
+        OffsetDateTime now = clock.now();
+        return transaction.execute(status -> {
+            Transaction tx = transactions.findById(transactionId)
+                    .filter(t -> t.getTenant() != null && tenant.getId().equals(t.getTenant().getId()))
+                    .filter(t -> "SUCCESSFUL".equals(t.getStatus()) && match.matches(t.getPhone()))
+                    .filter(t -> t.getVoucherCode() != null && !t.getVoucherCode().isBlank())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "That package is no longer available."));
+            Voucher voucher = vouchers.findByCode(tx.getVoucherCode().trim().toUpperCase(Locale.ROOT))
+                    .filter(v -> "STUDENT".equals(v.getSchoolCategory()) && v.getPersonId() != null && !SALE_STUDENT_FREE.equals(v.getSaleType()))
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "That package is no longer available."));
+            boolean live = ("unused".equals(voucher.getStatus()) || "active".equals(voucher.getStatus()))
+                    && (voucher.getExpiresAt() == null || voucher.getExpiresAt().isAfter(now))
+                    && (voucher.getHardExpiresAt() == null || voucher.getHardExpiresAt().isAfter(now));
+            if (!live) throw new ResponseStatusException(HttpStatus.GONE, "This package has ended.");
+            if (Boolean.TRUE.equals(voucher.getSchoolHold())) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "This package is on hold. Please see the school IT office.");
+            }
+            String from = voucher.getClaimedMac();
+            if (mac.equalsIgnoreCase(from)) return PortalResult.connect(voucher.getCode(), voucher.getPersonName(), "STUDENT", voucher.getExpiresAt());
+            java.time.Instant instant = now.toInstant();
+            var recent = phoneMoves.compute(voucher.getId(), (id, old) -> {
+                var kept = new java.util.ArrayList<java.time.Instant>();
+                if (old != null) old.stream().filter(t -> t.plus(PHONE_MOVE_WINDOW).isAfter(instant)).forEach(kept::add);
+                return kept;
+            });
+            if (recent.size() >= MAX_PHONE_MOVES_PER_DAY) {
+                throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                        "This package has moved phones too many times today. Sign in with your school ID and PIN instead.");
+            }
+            reprovision(voucher, router, mac, voucher.getHardExpiresAt(), null);
+            recent.add(instant);
+            String details = "Voucher " + voucher.getId() + " (" + (voucher.getPersonName() == null ? "student" : voucher.getPersonName())
+                    + ") moved from " + (from == null ? "no device" : from) + " to " + mac + " via Find your voucher";
+            audit.save(com.wifibilling.model.AuditLog.builder().tenantId(tenant.getId()).action(AUDIT_PHONE_MOVE)
+                    .details(truncate(details, 500)).createdAt(now).build());
+            log.info("School package {} moved by phone number from {} to {} (tenant {})", voucher.getId(), from, mac, tenant.getId());
+            return PortalResult.connect(voucher.getCode(), voucher.getPersonName(), "STUDENT", voucher.getExpiresAt());
+        });
+    }
+
+    private static String truncate(String text, int max) { return text.length() <= max ? text : text.substring(0, max); }
 
     /** After a successful school payment: ties the new voucher to the student and their leaving date, ending study data on that device. */
     public void bindPaidVoucher(Transaction tx, String code) {

@@ -5,6 +5,7 @@ import com.wifibilling.model.Tenant;
 import com.wifibilling.model.Voucher;
 import com.wifibilling.repository.*;
 import com.wifibilling.school.IdentityClient;
+import com.wifibilling.school.SchoolAccessService;
 import com.wifibilling.school.IdentityException;
 import com.wifibilling.school.IdentitySignature;
 import org.junit.jupiter.api.Test;
@@ -731,6 +732,56 @@ class SchoolFlowIntegrationTest {
         vouchers.save(voucher);
         assertEquals(true, JsonPath.read(findVoucher(school, "0770000001", PHONE_MAC), "$.vouchers[0].schoolSignIn"));
         assertEquals(code, JsonPath.read(findVoucher(school, "0770000001", TABLET_MAC), "$.vouchers[0].code"));
+    }
+
+    @Autowired com.wifibilling.repository.AuditLogRepository auditLogs;
+
+    private org.springframework.test.web.servlet.ResultActions connectFound(Site site, String phone, Number id, String mac) throws Exception {
+        return mvc.perform(post("/api/portal/school/connect-found").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"token\":\"" + site.routerToken() + "\",\"phone\":\"" + phone + "\",\"id\":" + id + ",\"mac\":\"" + mac + "\"}"));
+    }
+
+    @Test
+    void aStudentFindsTheirPackageByPhoneNumberAndConnectsWithOneTap() throws Exception {
+        Site school = site("phone-connect-school", true);
+        verified(school.tenant().getId(), "OK", "STUDENT", "student-phone-connect");
+        String ticket = JsonPath.read(portal("verify", verifyBody(school, PHONE_MAC)), "$.ticket");
+        String reference = JsonPath.read(pay(school, PHONE_MAC, ticket), "$.reference");
+        mvc.perform(post("/api/payments/webhook").header("X-Webhook-Secret", "school-test-webhook-secret").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"reference\":\"" + reference + "\",\"status\":\"SUCCESSFUL\"}")).andExpect(status().isOk());
+        String code = transactions.findByReference(reference).orElseThrow().getVoucherCode();
+        Voucher voucher = vouchers.findByCode(code).orElseThrow();
+        voucher.setClaimedMac(PHONE_MAC);
+        vouchers.save(voucher);
+
+        // The phone came back with a new WiFi address: the card offers one-tap Connect, no PIN
+        String found = findVoucher(school, "0770000001", TABLET_MAC);
+        assertEquals(true, JsonPath.read(found, "$.vouchers[0].phoneConnect"));
+        Number id = JsonPath.read(found, "$.vouchers[0].id");
+        connectFound(school, "+256 770 000001", id, TABLET_MAC).andExpect(status().isOk())
+                .andExpect(jsonPath("$.action").value("CONNECT")).andExpect(jsonPath("$.code").value(code));
+        assertEquals(TABLET_MAC, vouchers.findByCode(code).orElseThrow().getClaimedMac(), "the package now works on this phone");
+        assertTrue(auditLogs.findAll().stream().anyMatch(l -> SchoolAccessService.AUDIT_PHONE_MOVE.equals(l.getAction())
+                && school.tenant().getId().equals(l.getTenantId())), "every move is recorded");
+
+        // Tapping again on the same phone just connects; it doesn't count as another move
+        connectFound(school, "0770000001", id, TABLET_MAC).andExpect(status().isOk()).andExpect(jsonPath("$.code").value(code));
+
+        // A different number can't take it, and neither can another school's portal
+        connectFound(school, "0770000999", id, "AA:BB:CC:00:00:07").andExpect(status().isNotFound());
+        Site elsewhere = site("phone-connect-elsewhere", true);
+        connectFound(elsewhere, "0770000001", id, "AA:BB:CC:00:00:07").andExpect(status().isNotFound());
+
+        // Moves are limited per day (1 used above); after that the PIN sign-in is the way
+        connectFound(school, "0770000001", id, "AA:BB:CC:00:00:03").andExpect(status().isOk());
+        connectFound(school, "0770000001", id, "AA:BB:CC:00:00:04").andExpect(status().isOk());
+        connectFound(school, "0770000001", id, "AA:BB:CC:00:00:05").andExpect(status().isTooManyRequests());
+
+        // A package IT put on hold is never released by phone number
+        Voucher held = vouchers.findByCode(code).orElseThrow();
+        held.setSchoolHold(true);
+        vouchers.save(held);
+        connectFound(school, "0770000001", id, "AA:BB:CC:00:00:06").andExpect(status().isConflict());
     }
 
     @Test
