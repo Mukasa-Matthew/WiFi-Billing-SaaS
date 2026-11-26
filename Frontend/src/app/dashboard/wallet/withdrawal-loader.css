@@ -1,0 +1,24 @@
+/* From Uiverse.io by satyamchaudharydev - https://uiverse.io/satyamchaudharydev/splendid-husky-54
+   MIT License, Copyright (c) satyamchaudharydev (satyam) */
+.withdrawal-steps { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; color: var(--fg-faint); font-size: 12px; font-weight: 600; }
+.withdrawal-step { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+.withdrawal-step span { display: grid; width: 25px; height: 25px; place-items: center; border: 1px solid var(--border); border-radius: 50%; }
+.withdrawal-step-active { color: #2563eb; }
+.withdrawal-step-active span { color: white; background: #2563eb; border-color: #2563eb; }
+.withdrawal-step-line { height: 1px; flex: 1; background: var(--border); }
+.withdrawal-step-content { animation: withdrawal-reveal .25s ease both; }
+.withdrawal-code { font-size: 1.15rem; letter-spacing: .25em; font-weight: 600; }
+.withdrawal-loading { display: flex; align-items: center; justify-content: center; gap: 30px; padding: 4px 16px; border-radius: 12px; background: #172554; color: white; font-size: 12px; font-weight: 600; }
+.withdrawal-spinner { position: relative; width: 60px; height: 60px; display: flex; justify-content: center; align-items: center; border-radius: 50%; margin-left: -75px; }
+.withdrawal-spinner span { position: absolute; top: 50%; left: var(--left); width: 35px; height: 7px; background: #fff; animation: withdrawal-dominos 1s ease infinite; box-shadow: 2px 2px 3px 0 black; }
+.withdrawal-spinner span:nth-child(1) { --left: 80px; animation-delay: .125s; }
+.withdrawal-spinner span:nth-child(2) { --left: 70px; animation-delay: .3s; }
+.withdrawal-spinner span:nth-child(3) { --left: 60px; animation-delay: .425s; }
+.withdrawal-spinner span:nth-child(4) { --left: 50px; animation-delay: .54s; }
+.withdrawal-spinner span:nth-child(5) { --left: 40px; animation-delay: .665s; }
+.withdrawal-spinner span:nth-child(6) { --left: 30px; animation-delay: .79s; }
+.withdrawal-spinner span:nth-child(7) { --left: 20px; animation-delay: .915s; }
+.withdrawal-spinner span:nth-child(8) { --left: 10px; }
+@keyframes withdrawal-dominos { 50% { opacity: .7; } 75% { transform: rotate(90deg); } 80% { opacity: 1; } }
+@keyframes withdrawal-reveal { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .withdrawal-spinner span, .withdrawal-step-content { animation: none; } }
