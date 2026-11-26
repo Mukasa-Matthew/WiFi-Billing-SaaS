@@ -2,7 +2,7 @@
 import { BusyLabel, useSingleFlight } from "@/components/LoadingUI";
 import React, { useCallback, useEffect, useState } from "react";
 import api from "@/lib/api";
-import { Table, Badge, ErrorNotice, date, panel, button, buttonGhost, field, label, hint, message, PageHeader } from "@/components/BillingUI";
+import { Table, Badge, ErrorNotice, date, panel, button, buttonGhost, field, label, hint, message, PageHeader, ugx } from "@/components/BillingUI";
 import { Dialog } from "@/components/ui/Dialog";
 import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
@@ -43,7 +43,7 @@ const STATUS_TONE: Record<string, string> = {
   COMPLETED: "green", PROCESSING: "blue", PENDING_APPROVAL: "amber",
   REQUESTED: "amber", FAILED: "red", CANCELLED: "slate",
 };
-const money = (v?: number | null) => v == null || v < 0 ? "—" : `UGX ${v.toLocaleString()}`;
+const money = (v?: number | null) => (v != null && v < 0 ? "—" : ugx(v, { missing: "—" }));
 
 export default function AdminFinancePage() {
   const [overview, setOverview] = useState<Overview | null>(null);

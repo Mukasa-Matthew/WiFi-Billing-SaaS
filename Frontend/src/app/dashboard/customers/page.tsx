@@ -292,7 +292,7 @@ export default function Page() {
         ? <span className="whitespace-nowrap font-mono text-xs font-semibold text-[var(--fg)]">{c.voucher}</span>
         : <span className="text-[var(--fg-faint)]">—</span>,
     },
-    { key: "Package", label: "Package", hideBelow: "md", render: (c) => c.packageName ? <Badge tone="blue">{c.packageName}</Badge> : <span className="text-[var(--fg-faint)]">—</span> },
+    { key: "Package", label: "Plan", hideBelow: "md", render: (c) => c.packageName ? <Badge tone="blue">{c.packageName}</Badge> : <span className="text-[var(--fg-faint)]">—</span> },
     { key: "Status", label: "Status", render: (c) => <Badge tone={STATUS[c.status].tone}>{STATUS[c.status].label}</Badge> },
     {
       key: "Session start", label: "Session start", hideBelow: "lg", render: (c) => c.sessionStart
@@ -386,7 +386,7 @@ export default function Page() {
       {dialog}
       <PageHeader
         title="Customers"
-        description="Everyone who has bought access. Mobile money buyers are added automatically by phone number."
+        description="Everyone who has bought access. Mobile money buyers are added automatically."
         meta={!loading && data.length > 0 ? <>
           <span className="num">{data.length.toLocaleString()} customer{data.length === 1 ? "" : "s"}</span>
           <span aria-hidden className="text-[var(--fg-faint)]">·</span>

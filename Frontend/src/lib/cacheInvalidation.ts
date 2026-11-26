@@ -23,7 +23,10 @@ export function invalidateDashboardData(tenantId?: number, keys?: string[]) {
 
   keys.forEach((key) => {
     if (scope) {
-      qc.invalidateQueries({ queryKey: [scope, key] });
+      // Prefix match, so "/api/finance/payments" also refreshes ".../report?from=…" keys.
+      qc.invalidateQueries({
+        predicate: (query) => query.queryKey[0] === scope && typeof query.queryKey[1] === "string" && query.queryKey[1].startsWith(key),
+      });
     } else {
       qc.invalidateQueries({
         predicate: (query) => query.queryKey.some((k) => typeof k === "string" && k.includes(key)),

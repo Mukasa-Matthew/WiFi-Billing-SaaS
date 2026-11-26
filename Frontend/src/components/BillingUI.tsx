@@ -220,9 +220,9 @@ export function StatCard({ label, value, icon, hintText, hint, tone, href, child
     <>
       <div className="flex items-start justify-between gap-3">
         <p className="text-[13px] font-medium text-[var(--fg-muted)]">{label}</p>
-        {icon && <span className={`-mr-1 -mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg [&_svg]:h-4 [&_svg]:w-4 ${iconColor}`} aria-hidden>{icon}</span>}
+        {icon && <span className={`-mr-1 -mt-1 hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg sm:flex [&_svg]:h-4 [&_svg]:w-4 ${iconColor}`} aria-hidden>{icon}</span>}
       </div>
-      <p className="mt-1.5 truncate text-[1.7rem] font-semibold leading-tight tracking-tight text-[var(--fg)]">
+      <p className="mt-1.5 truncate text-[1.3rem] font-semibold leading-tight tracking-tight text-[var(--fg)] sm:text-[1.7rem]">
         {loading ? <span aria-hidden className="inline-block h-[0.8em] w-24 animate-pulse rounded bg-[var(--fill)] align-middle motion-reduce:animate-none" /> : value}
         {loading && <span className="sr-only">Loading</span>}
       </p>
@@ -231,9 +231,9 @@ export function StatCard({ label, value, icon, hintText, hint, tone, href, child
     </>
   );
   return href ? (
-    <Link href={href} className={`${panel} group block p-5 transition-colors hover:border-[var(--border-strong)]`}>{body}<NavigationPending /></Link>
+    <Link href={href} className={`${panel} group block p-4 transition-colors hover:border-[var(--border-strong)] sm:p-5`}>{body}<NavigationPending /></Link>
   ) : (
-    <section className={`${panel} p-5`}>{body}</section>
+    <section className={`${panel} p-4 sm:p-5`}>{body}</section>
   );
 }
 
@@ -501,7 +501,7 @@ export function Field({ label, children, mono = false }: { label: string; childr
 
 /* ---------- formatters ---------- */
 /** Compact 24h timestamp, e.g. "Oct 29, 21:42"; the year shows only when it isn't the current one. */
-export function date(value: string | null) {
+export function date(value: string | null | undefined) {
   if (!value) return "—";
   const d = new Date(value);
   if (isNaN(d.getTime())) return "—";
@@ -518,10 +518,18 @@ export function bytesTick(value: number) {
 }
 export function bytes(value: number) { if (!value) return "0 B"; return value < 1048576 ? `${(value / 1024).toFixed(1)} KB` : value < 1073741824 ? `${(value / 1048576).toFixed(2)} MB` : `${(value / 1073741824).toFixed(2)} GB`; }
 export function remaining(value: number | null) { if (value === null) return "Not started"; if (value === 0) return "Expired"; return `${Math.floor(value / 86400)}d ${Math.floor(value % 86400 / 3600)}h ${Math.floor(value % 3600 / 60)}m`; }
-export function ugx(v: number | string | null | undefined) { return `UGX ${Number(v || 0).toLocaleString()}`; }
+/**
+ * The one money format: "UGX 12,500". `hidden` masks it (privacy toggle); `missing`
+ * is shown instead of "UGX 0" when the value is null/undefined.
+ */
+export function ugx(v: number | string | null | undefined, opts?: { hidden?: boolean; missing?: string }) {
+  if (opts?.hidden) return "UGX ••••••";
+  if (v == null && opts?.missing !== undefined) return opts.missing;
+  return `UGX ${Number(v || 0).toLocaleString()}`;
+}
 /** 1,284 / 12.9K / 4.2M — for figures where precision isn't the point. */
 export function compactNumber(v: number) { return new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 }).format(v); }
-export function shortDate(value: string | null) { return value ? new Date(value).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "—"; }
+export function shortDate(value: string | null | undefined) { return value ? new Date(value).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "—"; }
 /** "just now", "5 min ago", "3 h ago", "2 d ago", then a date. */
 export function relativeTime(value: string | null, now = Date.now()) {
   if (!value) return "Never";

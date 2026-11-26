@@ -1,4 +1,5 @@
 "use client";
+import { PageHeader } from "@/components/BillingUI";
 import { notify } from "@/components/ui/Toast";
 import { BusyLabel, useSingleFlight } from "@/components/LoadingUI";
 import { mutateCache } from "@/lib/cacheInvalidation";
@@ -11,7 +12,6 @@ import {
   ArrowLeft,
   Check,
   CheckCircle,
-  CaretRight,
   Copy,
   CircleNotch,
   CellTower as RouterIcon,
@@ -158,15 +158,7 @@ export default function AddRouterPage() {
         <ArrowLeft className="h-4 w-4" /> Back to routers
       </button>
 
-      <div>
-        <div className="mb-2 flex items-center gap-2 text-xs text-[var(--fg-muted)]">
-          <span>MikroTik</span><CaretRight className="h-3.5 w-3.5" /><span>Create</span>
-        </div>
-        <h1 className="text-3xl font-bold tracking-tight text-[var(--fg)]">Add a router</h1>
-        <p className="mt-1 max-w-2xl text-sm text-[var(--fg-muted)]">
-          Connect your MikroTik box so AirPairy can set it up, take payments, and let you manage it from here.
-        </p>
-      </div>
+      <PageHeader title="Add a router" description="Connect your MikroTik so AirPairy can set it up and take payments." />
 
       <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm">
         <div className="grid border-b border-[var(--border)] md:grid-cols-3">

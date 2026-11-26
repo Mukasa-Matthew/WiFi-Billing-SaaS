@@ -47,9 +47,9 @@ interface Live { reachable: boolean; source: string; probedAt: string; hotspotUs
 interface Host { [k: string]: unknown }
 
 const TABS = ["Overview", "Live now", "Sessions", "Accounting", "Auth events", "Devices", "Provisioning", "Events", "Diagnostics"] as const;
-// Business owners get the essentials; RADIUS forensics, provisioning internals
-// and diagnostics stay in the platform NOC (scope "admin").
-const TENANT_TABS = ["Overview", "Live now", "Sessions", "Devices", "Events"] as const;
+// Business owners get the essentials; RADIUS forensics, provisioning internals,
+// diagnostics and the event timeline stay in the platform NOC (scope "admin").
+const TENANT_TABS = ["Overview", "Live now", "Sessions", "Devices"] as const;
 type Tab = typeof TABS[number];
 
 const checkTone = (s: string) => s === "HEALTHY" ? "green" : s === "WARNING" ? "amber" : s === "CRITICAL" ? "red" : "slate";

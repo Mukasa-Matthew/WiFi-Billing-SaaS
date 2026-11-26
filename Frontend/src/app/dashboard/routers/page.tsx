@@ -8,12 +8,16 @@ import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { notify, useToast } from "@/components/ui/Toast";
 import { useBusyAction } from "@/components/LoadingUI";
 import { ActionMenu, ActionMenuItem } from "@/components/ui/ActionMenu";
-import { useResource, Table, Badge, Notice, FilterTabs, button, date, message, panel } from "@/components/BillingUI";
+import { useResource, Table, Badge, Notice, FilterTabs, button, date, message, panel, PageHeader, humanize } from "@/components/BillingUI";
 import { FirstRouterCard } from "@/components/router/FirstRouterCard";
 import { Eye, ArrowClockwise, FileArrowDown, Clock, Terminal, Trash, Activity } from "@/components/icons";
 
 interface RouterRec { id: number; name: string; wgIp: string; registered: boolean; cpuLoad: number; memoryUsage: number; status: string; lastSeen: string | null; uptime: string | null; hotspotReady: boolean | null; radiusReady: boolean | null; portalReady: boolean | null }
 interface Task { id: number; action: string; status: string; createdAt: string }
+const TASK_LABEL: Record<string, string> = {
+  SYNC_PORTAL: "Update login page", SYNC_TIME: "Sync clock", PATCH_SCRIPTS: "Update router scripts", DISCONNECT: "Disconnect a user",
+  SYNC_TETHERING: "Update sharing rules", SYNC_SCHOOL_FILTER: "Update school filter", SYNC_SCHOOL_NETWORK: "Update school network",
+};
 
 export default function Page() {
   const nav = useRouter();
@@ -55,7 +59,7 @@ export default function Page() {
           const latest = res[0];
           if (latest && latest.action === actionName && latest.status === "APPLIED") {
             clearInterval(timer);
-            toast("success", `${actionName.replace("_", " ")} successfully applied to ${r.name}!`);
+            toast("success", `Done on ${r.name}.`);
           } else if (attempts >= 8) {
             clearInterval(timer);
           }
@@ -68,8 +72,8 @@ export default function Page() {
   const toast = useToast();
   const { confirm, dialog } = useConfirmDialog();
   const remove = (r: RouterRec) => confirm({
-    title: "Delete router",
-    body: `Are you sure you want to delete ${r.name}? Active customer sessions and payment history linked to this router will be affected.`,
+    title: `Delete ${r.name}?`,
+    body: "Customers connected through it will be affected, and so will the payment history linked to it.",
     confirmLabel: "Delete router",
     onConfirm: async () => {
       try { 
@@ -104,13 +108,8 @@ export default function Page() {
 
   return (
     <div className="space-y-6">{dialog}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-[var(--fg)]">Routers</h1>
-          <p className="mt-1 text-sm text-[var(--fg-muted)]">The MikroTik boxes that run your Wi-Fi. To get started, click 'Add a router'.</p>
-        </div>
-        <Link href="/dashboard/routers/new" className={button}>Add a router</Link>
-      </div>
+      <PageHeader title="Routers" description="The MikroTik routers that run your Wi-Fi."
+        action={<Link href="/dashboard/routers/new" className={button}>Add a router</Link>} />
       <Notice text={error || note} />
       {!loading && !error && data.length === 0 ? <FirstRouterCard /> : <>
       <FilterTabs loading={loading} options={tabs} value={tab} onChange={setTab} />
@@ -127,11 +126,11 @@ export default function Page() {
             if (r.status === "provisioned" || r.registered) return <Badge tone="amber">Setting up</Badge>;
             return <Badge tone="red">Offline</Badge>;
           }},
-          { label: "Uptime", render: r => r.lastSeen ? <span className="text-[var(--fg-muted)]">{r.uptime || "—"}</span> : "—" },
-          { label: "WinBox IP", render: r => r.wgIp
+          { label: "Uptime", hideBelow: "md", render: r => r.lastSeen ? <span className="text-[var(--fg-muted)]">{r.uptime || "—"}</span> : "—" },
+          { label: "WinBox IP", hideBelow: "lg", render: r => r.wgIp
             ? <button title="Copy WinBox address — open it in the WinBox app to manage the router" onClick={() => { void navigator.clipboard?.writeText(`${r.wgIp}`); toast("success", "WinBox address copied."); }} className="font-mono text-xs text-[var(--accent-text)] hover:underline">{r.wgIp}</button>
             : "—" },
-          { label: "Last check-in", render: r => <span className="text-[var(--fg-muted)]">{date(r.lastSeen)}</span> },
+          { label: "Last check-in", hideBelow: "sm", render: r => <span className="text-[var(--fg-muted)]">{date(r.lastSeen)}</span> },
           {
             label: "", render: r => (
               <ActionMenu ariaLabel={`Actions for ${r.name}`}>
@@ -159,15 +158,15 @@ export default function Page() {
           </p>
           {command && (
             <div>
-              <p className="mb-2 text-xs font-medium text-amber-700">Run this in the router terminal. Full reprovisioning moves customer interfaces; management-agent installation only enables sync and UTC/NTP time.</p>
+              <p className="mb-2 text-xs font-medium text-amber-700">Paste this into the router’s terminal. Full setup reconfigures the customer network; “Re-enable management” only restores syncing and the clock.</p>
               <textarea aria-label="Router setup command" readOnly value={command} onFocus={e => e.target.select()}
                 className="h-24 w-full rounded-lg border border-[var(--border-strong)] bg-[#0B1F36] p-3 font-mono text-xs text-slate-200" />
-              <p className="mt-1 text-xs text-[var(--fg-muted)]">Select the command and copy it. It works once{commandExpiry ? ` and expires at ${new Date(commandExpiry).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}. Generating another command cancels this one.</p>
+              <p className="mt-1 text-xs text-[var(--fg-muted)]">Works once{commandExpiry ? `, until ${new Date(commandExpiry).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}. A new command cancels this one.</p>
             </div>
           )}
           <Table rows={tasks} columns={[
-            { label: "Action", render: t => t.action },
-            { label: "Status", render: t => <Badge tone={t.status === "APPLIED" ? "green" : t.status === "FAILED" ? "red" : "amber"}>{t.status}</Badge> },
+            { label: "Action", render: t => TASK_LABEL[t.action] ?? humanize(t.action) },
+            { label: "Status", render: t => <Badge dot tone={t.status === "APPLIED" ? "green" : t.status === "FAILED" ? "red" : "amber"}>{t.status === "APPLIED" ? "Done" : humanize(t.status)}</Badge> },
             { label: "Requested", render: t => date(t.createdAt) },
           ]} />
         </section>

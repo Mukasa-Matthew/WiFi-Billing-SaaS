@@ -19,6 +19,10 @@ interface Router { id: number; name: string }
 const tabs = ["AVAILABLE", "ONLINE", "WALK_IN", "EXPIRED", "ARCHIVED", "GIVEAWAY", "ALL"];
 const matches = (voucher: Voucher, tab: string) => tab === "ALL" ? true : tab === "ARCHIVED" ? voucher.archived : voucher.archived ? false : tab === "AVAILABLE" ? voucher.status === "unused" && voucher.saleType !== "GIVEAWAY" : tab === "EXPIRED" ? ["expired", "revoked"].includes(voucher.status) : voucher.saleType === tab;
 const statusTone = (status: string) => status === "active" ? "blue" : status === "unused" ? "green" : status === "revoked" ? "red" : "amber";
+const STATUS_LABEL: Record<string, string> = { unused: "Ready", active: "In use", expired: "Expired", revoked: "Revoked", used: "Used up" };
+const statusLabel = (status: string) => STATUS_LABEL[status] ?? humanize(status);
+const CHANNEL_LABEL: Record<string, string> = { INVENTORY: "In stock", ONLINE: "Sold online", WALK_IN: "Walk-in", GIVEAWAY: "Giveaway" };
+const TAB_LABEL: Record<string, string> = { AVAILABLE: "Ready to sell", ONLINE: "Sold online", WALK_IN: "Walk-in", EXPIRED: "Expired", ARCHIVED: "Archived", GIVEAWAY: "Giveaway", ALL: "All" };
 
 export default function VouchersPage() {
   const { data, loading, error, load } = useResource<Voucher>("/api/vouchers");
@@ -51,14 +55,14 @@ export default function VouchersPage() {
 
   const revoke = (voucher: Voucher) => confirm({
     title: "Revoke voucher?",
-    body: `Revoke ${voucher.code}? The voucher will stop working and this cannot be undone.`,
+    body: `${voucher.code} stops working straight away. This can’t be undone.`,
     confirmLabel: "Revoke voucher",
     onConfirm: async () => { try { await api.post(`/api/vouchers/${voucher.code}/revoke`); toast("success", `Voucher ${voucher.code} revoked.`); mutateCache.voucherChanged(); await load(); } catch (err) { toast("error", message(err)); } },
   });
 
   const archiveVoucher = (voucher: Voucher) => confirm({
     title: "Archive voucher?",
-    body: `Move ${voucher.code} out of the active voucher lists? You can still find it under Archived.`,
+    body: `${voucher.code} moves out of your lists. You can still find it under Archived.`,
     confirmLabel: "Archive voucher",
     onConfirm: async () => { try { await api.post(`/api/vouchers/${voucher.code}/archive`); setSelected((codes) => codes.filter((code) => code !== voucher.code)); toast("success", `Voucher ${voucher.code} archived.`); mutateCache.voucherChanged(); await load(); } catch (err) { toast("error", message(err)); } },
   });
@@ -114,27 +118,27 @@ export default function VouchersPage() {
 
   return <div className="mx-auto max-w-7xl space-y-6">
     {dialog}
-    <PageHeader title="Vouchers" description="Generate access codes, organize batches, and track customer use." action={<Link href="/dashboard/vouchers/new" className={`${button} w-full sm:w-auto`}><Plus size={15} aria-hidden="true" /> Generate vouchers</Link>} />
+    <PageHeader title="Vouchers" description="Access codes you sell or hand out." action={<Link href="/dashboard/vouchers/new" className={`${button} w-full sm:w-auto`}><Plus size={15} aria-hidden="true" /> Generate vouchers</Link>} />
     <ErrorNotice text={error || note} />
 
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      <StatCard label="Available inventory" loading={loading} value={totals.available.toLocaleString()} icon={<Ticket />} hintText="Ready to sell or assign" tone="green" />
-      <StatCard label="Currently in use" loading={loading} value={totals.inUse.toLocaleString()} icon={<Clock />} hintText="Vouchers being used right now" />
-      <StatCard label="Sold vouchers" loading={loading} value={totals.sold.toLocaleString()} icon={<CheckCircle />} hintText="Online and walk-in sales" />
-      <StatCard label="Available value" loading={loading} value={ugx(totals.value)} icon={<Money />} hintText="Face value of unsold inventory" />
+    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <StatCard label="Ready to sell" loading={loading} value={totals.available.toLocaleString()} icon={<Ticket />} hintText="Unused codes" tone="green" />
+      <StatCard label="In use" loading={loading} value={totals.inUse.toLocaleString()} icon={<Clock />} hintText="Being used now" />
+      <StatCard label="Sold" loading={loading} value={totals.sold.toLocaleString()} icon={<CheckCircle />} hintText="Online and walk-in" />
+      <StatCard label="Unsold value" loading={loading} value={ugx(totals.value)} icon={<Money />} hintText="If every ready code sells" />
     </div>
 
-    <div className="overflow-x-auto pb-1"><FilterTabs loading={loading} value={tab} onChange={(next) => { setTab(next); setSelected([]); setSelectedPackage("ALL"); }} options={tabs.map((key) => ({ key, label: key === "WALK_IN" ? "Walk-in" : key === "ONLINE" ? "Sold online" : humanize(key), count: data.filter((voucher) => matches(voucher, key)).length }))} /></div>
+    <div className="overflow-x-auto pb-1"><FilterTabs loading={loading} value={tab} onChange={(next) => { setTab(next); setSelected([]); setSelectedPackage("ALL"); }} options={tabs.map((key) => ({ key, label: TAB_LABEL[key] ?? humanize(key), count: data.filter((voucher) => matches(voucher, key)).length }))} /></div>
 
     {packageOptions.length > 0 && (
       <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-2">
-        <span className="px-2 text-xs font-semibold uppercase tracking-wider text-[var(--fg-muted)]">Package:</span>
+        <span className="px-2 text-xs font-semibold text-[var(--fg-muted)]">Plan</span>
         <button
           type="button"
           onClick={() => setSelectedPackage("ALL")}
           className={"inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition " + (selectedPackage === "ALL" ? "bg-[var(--primary)] text-white shadow-sm" : "text-[var(--fg)] hover:bg-[var(--fill)]")}
         >
-          All Packages
+          All plans
           <span className={"rounded-full px-1.5 py-0.2 text-[10px] font-bold " + (selectedPackage === "ALL" ? "bg-white/20 text-white" : "bg-[var(--fill)] text-[var(--fg-muted)]")}>
             {data.filter((v) => matches(v, tab)).length}
           </span>
@@ -167,13 +171,13 @@ export default function VouchersPage() {
       {selected.length === 1 && selectedVoucher?.status === "unused" && selectedVoucher.saleType === "INVENTORY" && <button onClick={() => { setAmount(String(selectedVoucher.price || "")); setSale(true); }} className={`${buttonGhost} lg:ml-auto`}>Record walk-in sale</button>}
     </section>}
 
-    <Table emptyTitle="No vouchers in this state" emptyDescription="Generate vouchers or adjust the filter to see records." rows={visible} loading={loading} columns={[
+    <Table emptyTitle="No vouchers here" emptyDescription="Generate vouchers or pick another filter." searchPlaceholder="Search code, plan or customer" rows={visible} loading={loading} columns={[
       { label: "", className: "w-10", render: (voucher) => <input aria-label={`Select ${voucher.code}`} type="checkbox" checked={selected.includes(voucher.code)} onChange={(event) => setSelected(event.target.checked ? [...new Set([...selected, voucher.code])] : selected.filter((code) => code !== voucher.code))} /> },
-      { label: "Voucher", render: (voucher) => <div className="flex min-w-36 items-center gap-2"><button title="Copy voucher code" aria-label={`Copy ${voucher.code}`} onClick={() => { void navigator.clipboard.writeText(voucher.code); toast("success", `Copied ${voucher.code}.`); }} className="rounded-md p-1 text-[var(--fg-faint)] hover:bg-[var(--fill)] hover:text-[var(--fg)]"><Copy className="h-3.5 w-3.5" /></button><span className="num font-semibold tracking-wide text-[var(--fg)]">{voucher.code}</span></div> },
-      { label: "Package", render: (voucher) => <span><span className="block font-medium text-[var(--fg)]">{voucher.packageName}</span><span className="num text-[11px] text-[var(--fg-muted)]">{ugx(voucher.price)}</span></span> },
-      { label: "Status", render: (voucher) => <Badge dot tone={statusTone(voucher.status)}>{humanize(voucher.status)}</Badge> },
-      { label: "Channel", hideBelow: "md", render: (voucher) => <Badge tone="slate">{humanize(voucher.saleType)}</Badge> },
-      { label: "Customer", render: (voucher) => voucher.customerName ? <span><span className="block">{voucher.customerName}</span>{voucher.customerPhone && <span className="num text-[11px] text-[var(--fg-muted)]">{voucher.customerPhone}</span>}</span> : <span className="text-[var(--fg-faint)]">Unassigned</span> },
+      { label: "Voucher", render: (voucher) => <div className="flex min-w-36 items-center gap-2"><button title="Copy voucher code" aria-label={`Copy ${voucher.code}`} onClick={() => { void navigator.clipboard.writeText(voucher.code); toast("success", `Copied ${voucher.code}.`); }} className="rounded-md p-1 text-[var(--fg-faint)] hover:bg-[var(--fill)] hover:text-[var(--fg)]"><Copy className="h-3.5 w-3.5" /></button><span><span className="num block font-semibold tracking-wide text-[var(--fg)]">{voucher.code}</span>{/* Phones drop the Plan and Status columns. */}<span className="block text-[11px] text-[var(--fg-muted)] sm:hidden">{voucher.packageName} · {statusLabel(voucher.status)}</span></span></div> },
+      { label: "Plan", hideBelow: "sm", render: (voucher) => <span><span className="block font-medium text-[var(--fg)]">{voucher.packageName}</span><span className="num text-[11px] text-[var(--fg-muted)]">{ugx(voucher.price)}</span></span> },
+      { label: "Status", hideBelow: "sm", render: (voucher) => <Badge dot tone={statusTone(voucher.status)}>{statusLabel(voucher.status)}</Badge> },
+      { label: "Channel", hideBelow: "md", render: (voucher) => <Badge tone="slate">{CHANNEL_LABEL[voucher.saleType] ?? humanize(voucher.saleType)}</Badge> },
+      { label: "Customer", hideBelow: "md", render: (voucher) => voucher.customerName ? <span><span className="block">{voucher.customerName}</span>{voucher.customerPhone && <span className="num text-[11px] text-[var(--fg-muted)]">{voucher.customerPhone}</span>}</span> : <span className="text-[var(--fg-faint)]">Unassigned</span> },
       { label: "Batch", hideBelow: "lg", render: (voucher) => <span className="num text-xs text-[var(--fg-muted)]">{voucher.batchReference || "—"}</span> },
       { label: "Timeline", hideBelow: "lg", render: (voucher) => <span className="text-xs"><span className="block text-[var(--fg-muted)]">Created {date(voucher.createdAt)}</span><span className="block text-[var(--fg-faint)]">{voucher.expiresAt ? `Expires ${date(voucher.expiresAt)}` : voucher.firstLogin ? `First used ${date(voucher.firstLogin)}` : "Not activated"}</span></span> },
       { label: "", align: "right", className: "w-24", render: (voucher) => ["expired", "revoked"].includes(voucher.status) && !voucher.archived ? <button onClick={() => archiveVoucher(voucher)} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-[var(--fg-muted)] hover:bg-[var(--fill)]"><Archive className="h-3.5 w-3.5" />Archive</button> : <button disabled={["expired", "revoked"].includes(voucher.status)} onClick={() => revoke(voucher)} className="min-h-9 rounded-lg px-2.5 text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-30">Revoke</button> },

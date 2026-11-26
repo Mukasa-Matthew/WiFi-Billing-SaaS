@@ -1,10 +1,12 @@
 "use client";
 
-import React, { Suspense, useMemo, useState } from "react";
+import React, { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { useResource, useApi, Table, Badge, ErrorNotice, FilterTabs, Pager, date, PageHeader, StatCard, button, buttonGhost, field, panel, humanize, ugx, useNow } from "@/components/BillingUI";
-import { Wallet, Money, CalendarBlank, Eye, EyeSlash, DownloadSimple, ArrowsClockwise, CreditCard, Phone, MagnifyingGlass, X } from "@/components/icons";
+import api from "@/lib/api";
+import { useApi, Table, Badge, ErrorNotice, FilterTabs, Pager, date, PageHeader, StatCard, button, buttonGhost, field, panel, humanize, ugx, message } from "@/components/BillingUI";
+import { Wallet, Money, Eye, EyeSlash, DownloadSimple, ArrowsClockwise, CreditCard, Phone, MagnifyingGlass, X, Receipt } from "@/components/icons";
 import { useToast } from "@/components/ui/Toast";
+import { RANGE_LABEL, DEFAULT_RANGE, presetRange, reportUrl, exportUrl, describeRange, kampalaToday, type RangeKey, type StatusGroup, type DateRange } from "@/lib/paymentRange";
 
 interface Payment {
   id: number; reference: string; method: string; amount: number; status: string;
@@ -17,89 +19,127 @@ interface PhoneSearch {
   summary: { payments: number; successful: number; totalPaid: number; firstPaidAt: string | null; lastPaidAt: string | null };
 }
 
-type PaymentFilter = "ALL" | "SUCCESSFUL" | "PENDING" | "FAILED";
-const ONLINE = ["MTN", "AIRTEL"];
-const successful = (payment: Payment) => payment.status === "SUCCESSFUL";
-const sum = (rows: Payment[]) => rows.filter(successful).reduce((total, payment) => total + Number(payment.amount), 0);
+interface Report {
+  from: string; to: string;
+  summary: { collected: number; mobileMoney: number; walkIn: number; total: number; successful: number; pending: number; failed: number };
+  payments: Payment[]; page: number; totalPages: number; totalElements: number;
+}
+
 const statusTone = (status: string) => status === "SUCCESSFUL" ? "green" : status === "FAILED" ? "red" : "amber";
+const statusLabel = (status: string) => status === "SUCCESSFUL" ? "Paid" : humanize(status);
+const CHANNEL: Record<string, string> = { MTN: "MTN MoMo", AIRTEL: "Airtel Money", MOMO: "Mobile money", CASH: "Cash", BANK: "Bank", OTHER: "Other" };
+const channelLabel = (method: string) => CHANNEL[method] ?? humanize(method);
 
 export default function PaymentsPage() {
-  const { data, loading, refreshing, error, load } = useResource<Payment>("/api/finance/payments", true);
-  const [filter, setFilter] = useState<PaymentFilter>("ALL");
+  const [rangeKey, setRangeKey] = useState<RangeKey>(DEFAULT_RANGE);
+  const [custom, setCustom] = useState<DateRange>(() => presetRange("7d"));
+  const [status, setStatus] = useState<StatusGroup>("ALL");
+  const [page, setPage] = useState(0);
   const [hidden, setHidden] = useState(false);
-  const now = useNow(60000);
+  const [exporting, setExporting] = useState(false);
   const toast = useToast();
 
-  const metrics = useMemo(() => {
-    const current = new Date(now || 0);
-    const startToday = new Date(current.getFullYear(), current.getMonth(), current.getDate()).getTime();
-    const startMonth = new Date(current.getFullYear(), current.getMonth(), 1).getTime();
-    const startWeek = current.getTime() - (7 * 86400000);
-    const today = data.filter((payment) => new Date(payment.createdAt).getTime() >= startToday);
-    return {
-      todayOnline: sum(today.filter((payment) => ONLINE.includes(payment.method))),
-      todayWalkIn: sum(today.filter((payment) => !ONLINE.includes(payment.method))),
-      week: sum(data.filter((payment) => new Date(payment.createdAt).getTime() >= startWeek)),
-      month: sum(data.filter((payment) => new Date(payment.createdAt).getTime() >= startMonth)),
-    };
-  }, [data, now]);
+  const range = rangeKey === "custom" ? custom : presetRange(rangeKey);
+  const validRange = range.from <= range.to;
+  const report = useApi<Report>(validRange ? reportUrl(range, status, page) : null, 0, { keepPrevious: true });
+  const data = report.data;
+  const sum = data?.summary;
+  const money = (value: number) => ugx(value, { hidden });
+  const firstLoad = report.loading && !data;
 
-  const counts = useMemo(() => ({
-    ALL: data.length,
-    SUCCESSFUL: data.filter((payment) => payment.status === "SUCCESSFUL").length,
-    PENDING: data.filter((payment) => !["SUCCESSFUL", "FAILED"].includes(payment.status)).length,
-    FAILED: data.filter((payment) => payment.status === "FAILED").length,
-  }), [data]);
+  const pickRange = (key: RangeKey) => { setRangeKey(key); setPage(0); };
+  const pickStatus = (key: string) => { setStatus(key as StatusGroup); setPage(0); };
 
-  const visible = useMemo(() => filter === "ALL" ? data : filter === "PENDING"
-    ? data.filter((payment) => !["SUCCESSFUL", "FAILED"].includes(payment.status))
-    : data.filter((payment) => payment.status === filter), [data, filter]);
-
-  const money = (value: number) => hidden ? "UGX ••••••" : ugx(value);
-  const exportCsv = () => {
-    const rows = [["Reference", "Date", "Status", "Method", "Amount UGX", "Phone", "Voucher", "Package", "Router", "Notes"], ...visible.map((payment) => [payment.reference, payment.createdAt, payment.status, payment.method, String(payment.amount), payment.phone, payment.voucher || "", payment.packageName || "", payment.router || "", payment.notes || ""])];
-    const csv = rows.map((row) => row.map((value) => `"${value.replace(/"/g, '""').replace(/^[=+@-]/, "'")}"`).join(",")).join("\r\n");
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-    const anchor = document.createElement("a"); anchor.href = url; anchor.download = `payments-${filter.toLowerCase()}.csv`; anchor.click(); URL.revokeObjectURL(url);
-    toast("success", `${visible.length} transaction${visible.length === 1 ? "" : "s"} exported.`);
+  const exportCsv = async () => {
+    setExporting(true);
+    try {
+      const res = await api.get<Blob>(exportUrl(range, status), { responseType: "blob" });
+      const name = /filename="([^"]+)"/.exec(String(res.headers["content-disposition"] ?? ""))?.[1] ?? `payments-${range.from}-to-${range.to}.csv`;
+      const url = URL.createObjectURL(res.data);
+      const a = document.createElement("a"); a.href = url; a.download = name; a.click(); URL.revokeObjectURL(url);
+      toast("success", "Export downloaded.");
+    } catch (err) {
+      // Blob error bodies need reading before message() can show the server's reason.
+      const body = (err as { response?: { data?: unknown } })?.response?.data;
+      if (body instanceof Blob) {
+        try { toast("error", (JSON.parse(await body.text()) as { message?: string }).message || "Export failed."); return; } catch { /* fall through */ }
+      }
+      toast("error", message(err));
+    } finally { setExporting(false); }
   };
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
-      <PageHeader title="Payments & transactions" description="Track mobile-money collections and manually recorded sales across your hotspot business."
+      <PageHeader title="Payments" description="Every sale, from mobile money and walk-in."
         action={<div className="flex w-full gap-2 sm:w-auto">
-          <button onClick={() => setHidden((value) => !value)} aria-label={hidden ? "Show revenue" : "Hide revenue"} className={`${buttonGhost} px-3`}>{hidden ? <EyeSlash className="h-4 w-4" /> : <Eye className="h-4 w-4" />}<span className="hidden sm:inline">{hidden ? "Show totals" : "Hide totals"}</span></button>
-          <button onClick={() => void load()} disabled={refreshing} className={`${buttonGhost} px-3`}><ArrowsClockwise className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} /><span className="hidden sm:inline">Refresh</span></button>
+          <button onClick={() => setHidden((v) => !v)} aria-label={hidden ? "Show amounts" : "Hide amounts"} title={hidden ? "Show amounts" : "Hide amounts"} className={`${buttonGhost} px-3`}>{hidden ? <EyeSlash className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
+          <button onClick={() => void report.load()} disabled={report.refreshing} aria-label="Refresh" title="Refresh" className={`${buttonGhost} px-3`}><ArrowsClockwise className={`h-4 w-4 ${report.refreshing ? "animate-spin motion-reduce:animate-none" : ""}`} /></button>
+          <button onClick={() => void exportCsv()} disabled={exporting || !validRange || !data?.totalElements} className={`${buttonGhost} flex-1 sm:flex-none`}>
+            <DownloadSimple className="h-4 w-4" />{exporting ? "Exporting…" : "Export CSV"}
+          </button>
         </div>}
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Online revenue today" loading={loading} value={money(metrics.todayOnline)} icon={<CreditCard />} hintText="Successful MTN and Airtel payments" tone="green" />
-        <StatCard label="Walk-in revenue today" loading={loading} value={money(metrics.todayWalkIn)} icon={<Wallet />} hintText="Cash, bank, and manually recorded sales" />
-        <StatCard label="Last 7 days" loading={loading} value={money(metrics.week)} icon={<CalendarBlank />} hintText="Successful revenue in the rolling week" />
-        <StatCard label="This month" loading={loading} value={money(metrics.month)} icon={<Money />} hintText="Successful revenue since month start" />
+      {/* Date range */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <FilterTabs value={rangeKey} onChange={(k) => pickRange(k as RangeKey)}
+          options={(Object.keys(RANGE_LABEL) as RangeKey[]).map((key) => ({ key, label: RANGE_LABEL[key] }))} />
+        {rangeKey === "custom" ? (
+          <div className="flex items-center gap-2 text-xs text-[var(--fg-muted)]">
+            <label className="sr-only" htmlFor="pay-from">Start date</label>
+            <input id="pay-from" type="date" value={custom.from} max={kampalaToday()} onChange={(e) => { setCustom((c) => ({ ...c, from: e.target.value })); setPage(0); }} className={`${field} mt-0 min-h-10 w-auto py-1.5`} />
+            <span aria-hidden>to</span>
+            <label className="sr-only" htmlFor="pay-to">End date</label>
+            <input id="pay-to" type="date" value={custom.to} max={kampalaToday()} onChange={(e) => { setCustom((c) => ({ ...c, to: e.target.value })); setPage(0); }} className={`${field} mt-0 min-h-10 w-auto py-1.5`} />
+          </div>
+        ) : (
+          <p className="text-sm font-medium text-[var(--fg-muted)]">{describeRange(range)}</p>
+        )}
+      </div>
+      {!validRange && <ErrorNotice text="The start date must be on or before the end date." />}
+
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <StatCard label="Collected" loading={firstLoad} value={money(sum?.collected ?? 0)} icon={<Money />} tone="green" hintText={`${(sum?.successful ?? 0).toLocaleString()} paid sale${sum?.successful === 1 ? "" : "s"}`} />
+        <StatCard label="Mobile money" loading={firstLoad} value={money(sum?.mobileMoney ?? 0)} icon={<CreditCard />} hintText="MTN, Airtel and other networks" />
+        <StatCard label="Walk-in" loading={firstLoad} value={money(sum?.walkIn ?? 0)} icon={<Wallet />} hintText="Cash and other recorded sales" />
+        <StatCard label="Failed or pending" loading={firstLoad} value={((sum?.failed ?? 0) + (sum?.pending ?? 0)).toLocaleString()} icon={<Receipt />}
+          tone={(sum?.failed ?? 0) > 0 ? "amber" : "default"} hintText={`${(sum?.failed ?? 0).toLocaleString()} failed · ${(sum?.pending ?? 0).toLocaleString()} pending`} />
       </div>
 
+      <ErrorNotice text={report.error} />
+
+      <section className={`${panel} overflow-hidden`}>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] p-3">
+          <FilterTabs value={status} onChange={pickStatus} loading={firstLoad} options={[
+            { key: "ALL", label: "All", count: sum?.total },
+            { key: "SUCCESSFUL", label: "Paid", count: sum?.successful },
+            { key: "PENDING", label: "Pending", count: sum?.pending },
+            { key: "FAILED", label: "Failed", count: sum?.failed },
+          ]} />
+          {report.refreshing && <span className="text-xs text-[var(--fg-faint)]">Updating…</span>}
+        </div>
+        <Table bare searchable={false} paginated={false} rows={data?.payments ?? []} loading={firstLoad}
+          rowKey={(payment) => payment.id || payment.reference} emptyIcon={<CreditCard />}
+          emptyTitle="No payments in this period" emptyDescription="Try a different date range or status."
+          columns={[
+            { label: "Date", render: (payment) => (
+              <span className="block whitespace-nowrap">
+                <span className="text-[var(--fg)]">{date(payment.createdAt)}</span>
+                <span className="num block text-[11px] text-[var(--fg-faint)]">{payment.reference}</span>
+                <span className="mt-1 block sm:hidden"><Badge dot tone={statusTone(payment.status)}>{statusLabel(payment.status)}</Badge></span>
+              </span>
+            )},
+            { label: "Customer", hideBelow: "md", render: (payment) => <span>{payment.phone ? <span className="num inline-flex items-center gap-1.5"><Phone className="h-3.5 w-3.5 text-[var(--fg-faint)]" />{payment.phone}</span> : <span className="text-[var(--fg-faint)]">—</span>}{payment.voucher && <span className="num mt-1 block text-[11px] text-[var(--fg-muted)]">Voucher {payment.voucher}</span>}</span> },
+            { label: "Plan", hideBelow: "lg", render: (payment) => <span><span className="block text-[var(--fg)]">{payment.packageName || "—"}</span>{payment.router && <span className="block text-[11px] text-[var(--fg-muted)]">{payment.router}</span>}</span> },
+            { label: "Channel", hideBelow: "md", render: (payment) => <Badge tone="slate">{channelLabel(payment.method)}</Badge> },
+            { label: "Status", hideBelow: "sm", render: (payment) => <Badge dot tone={statusTone(payment.status)}>{statusLabel(payment.status)}</Badge> },
+            { label: "Amount", align: "right", render: (payment) => <span className="num font-semibold text-[var(--fg)]">{money(payment.amount)}</span> },
+          ]}
+        />
+        {data && <Pager page={data.page} totalPages={data.totalPages} totalElements={data.totalElements} onPage={setPage} busy={report.refreshing} />}
+      </section>
+
       <Suspense><PaymentLookup money={money} /></Suspense>
-
-      <ErrorNotice text={error} />
-
-      <Table rows={visible} loading={loading} rowKey={(payment) => payment.id || payment.reference}
-        searchPlaceholder="Search reference, phone, voucher or package…" emptyIcon={<CreditCard />}
-        emptyTitle="No transactions in this view" emptyDescription={data.length ? "Choose another status or adjust your search." : "Payments will appear here as customers buy access or staff record walk-in sales."}
-        toolbar={<FilterTabs loading={loading} options={(["ALL", "SUCCESSFUL", "PENDING", "FAILED"] as PaymentFilter[]).map((key) => ({ key, label: key === "ALL" ? "All" : humanize(key), count: counts[key] }))} value={filter} onChange={(key) => setFilter(key as PaymentFilter)} />}
-        columns={[
-          { label: "Transaction", render: (payment) => <span className="block min-w-44"><span className="num block font-medium text-[var(--fg)]">{payment.reference}</span><span className="block text-[11px] text-[var(--fg-muted)]">{date(payment.createdAt)}</span></span> },
-          { label: "Customer", render: (payment) => <span>{payment.phone ? <span className="num inline-flex items-center gap-1.5"><Phone className="h-3.5 w-3.5 text-[var(--fg-faint)]" />{payment.phone}</span> : <span className="text-[var(--fg-faint)]">Not captured</span>}{payment.voucher && <span className="num mt-1 block text-[11px] text-[var(--fg-muted)]">Voucher {payment.voucher}</span>}</span> },
-          { label: "Package", hideBelow: "md", render: (payment) => <span><span className="block font-medium text-[var(--fg)]">{payment.packageName || "—"}</span><span className="block text-[11px] text-[var(--fg-muted)]">{payment.router || "Router unavailable"}</span></span> },
-          { label: "Channel", render: (payment) => <Badge tone="slate">{humanize(payment.method)}</Badge> },
-          { label: "Amount", align: "right", render: (payment) => <span className="num font-semibold text-[var(--fg)]">{hidden ? "UGX ••••" : ugx(payment.amount)}</span> },
-          { label: "Status", render: (payment) => <Badge dot tone={statusTone(payment.status)}>{humanize(payment.status)}</Badge> },
-          { label: "Notes", hideBelow: "lg", render: (payment) => payment.notes ? <span className="block max-w-48 truncate text-xs text-[var(--fg-muted)]" title={payment.notes}>{payment.notes}</span> : <span className="text-[var(--fg-faint)]">—</span> },
-        ]}
-      />
-
-      <div className="flex justify-end"><button onClick={exportCsv} disabled={!visible.length} className={buttonGhost}><DownloadSimple className="h-4 w-4" />Export current view</button></div>
     </div>
   );
 }
@@ -125,17 +165,17 @@ function PaymentLookup({ money }: { money: (value: number) => string }) {
     <section className={panel}>
       <form onSubmit={submit} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-end">
         <label className="min-w-0 flex-1 text-xs font-semibold text-[var(--fg-muted)]">
-          Find payments by phone number
-          <input className={field} type="tel" inputMode="tel" value={text} onChange={(event) => setText(event.target.value)} placeholder="e.g. 0772 123456 or +256772123456" />
+          Look up a customer’s payments
+          <input className={field} type="tel" inputMode="tel" value={text} onChange={(event) => setText(event.target.value)} placeholder="Phone number, e.g. 0772 123456" />
         </label>
         <div className="flex gap-2">
-          <button type="submit" className={button} disabled={digits.length < 7 || (result.refreshing && !!phone)}><MagnifyingGlass className="h-4 w-4" />Search all records</button>
+          <button type="submit" className={button} disabled={digits.length < 7 || (result.refreshing && !!phone)}><MagnifyingGlass className="h-4 w-4" />Search</button>
           {phone && <button type="button" onClick={clear} className={`${buttonGhost} px-3`} aria-label="Clear search"><X className="h-4 w-4" /></button>}
         </div>
       </form>
       {phone && <div className="border-t border-[var(--border)]">
         <ErrorNotice text={result.error} />
-        {result.loading && <p className="px-4 py-6 text-center text-[13px] text-[var(--fg-muted)]">Searching every payment…</p>}
+        {result.loading && <p className="px-4 py-6 text-center text-[13px] text-[var(--fg-muted)]">Searching…</p>}
         {found && <>
           <dl className="grid grid-cols-2 gap-x-6 gap-y-3 bg-[var(--subtle)] px-4 py-3 sm:grid-cols-4">
             <div><dt className="text-xs text-[var(--fg-muted)]">Number</dt><dd className="num text-[13px] font-semibold text-[var(--fg)]">{found.phone}</dd></div>
@@ -144,12 +184,12 @@ function PaymentLookup({ money }: { money: (value: number) => string }) {
             <div><dt className="text-xs text-[var(--fg-muted)]">Last successful payment</dt><dd className="num text-[13px] font-semibold text-[var(--fg)]">{found.summary.lastPaidAt ? date(found.summary.lastPaidAt) : "Never"}</dd></div>
           </dl>
           <Table bare searchable={false} paginated={false} rows={found.payments} rowKey={(payment) => payment.id}
-            emptyIcon={<Phone />} emptyTitle="No payments from this number" emptyDescription="Nothing was ever paid or attempted with this number on your network. Check the number with the customer."
+            emptyIcon={<Phone />} emptyTitle="No payments from this number" emptyDescription="Nothing was paid from this number. Check it with the customer."
             columns={[
               { label: "Date", render: (payment) => <span className="num">{date(payment.createdAt)}</span> },
               { label: "Amount", align: "right", render: (payment) => <span className="num font-semibold text-[var(--fg)]">{money(Number(payment.amount))}</span> },
               { label: "Status", render: (payment) => <Badge dot tone={statusTone(payment.status)}>{humanize(payment.status)}</Badge> },
-              { label: "Channel", render: (payment) => <Badge tone="slate">{humanize(payment.method)}</Badge> },
+              { label: "Channel", render: (payment) => <Badge tone="slate">{channelLabel(payment.method)}</Badge> },
               { label: "MoMo transaction ID", hideBelow: "lg", render: (payment) => payment.mobileMoneyId ? <span className="num text-xs">{payment.mobileMoneyId}</span> : <span className="text-[var(--fg-faint)]">—</span> },
               { label: "Voucher & package", render: (payment) => <span>{payment.voucher ? <span className="num block text-xs font-semibold">{payment.voucher}</span> : <span className="text-[var(--fg-faint)]">No voucher</span>}<span className="block text-[11px] text-[var(--fg-muted)]">{payment.packageName || "—"}</span></span> },
               { label: "Reference", hideBelow: "md", render: (payment) => <span className="num text-[11px] text-[var(--fg-muted)]">{payment.reference}</span> },

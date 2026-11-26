@@ -19,6 +19,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -177,5 +178,37 @@ class WalletServiceTest {
         assertEquals(5_150L, wallet.getReservedBalance());
         service.finalizeWithdrawal(1L, 5_150, "PAY:W10", 10L);
         assertEquals(0L, wallet.getReservedBalance());
+    }
+
+    @Test
+    void statementBalancesFromRecordedBalancesAndIgnoresInformationalFees() {
+        var from = java.time.OffsetDateTime.parse("2026-11-01T00:00:00Z");
+        var to = from.plusDays(7);
+        when(wallets.findByTenantId(1L)).thenReturn(Optional.of(wallet));
+        when(ledger.findFirstByWalletIdAndCreatedAtLessThanOrderByCreatedAtDescIdDesc(5L, from))
+                .thenReturn(Optional.of(WalletLedgerEntry.builder().availableAfter(10_000L).build()));
+        // collection +1,940 → 11,940; gateway fee (informational) 11,940; reserve −5,500 → 6,440;
+        // payout debit of held money 6,440; release +500 → 6,940
+        when(ledger.availableAfterInRange(5L, from, to)).thenReturn(java.util.List.of(11_940L, 11_940L, 6_440L, 6_440L, 6_940L));
+        when(ledger.findByWalletIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(eq(5L), eq(from), eq(to), any()))
+                .thenReturn(org.springframework.data.domain.Page.empty());
+
+        var s = service.statement(1L, from, to, org.springframework.data.domain.PageRequest.of(0, 25));
+
+        assertEquals(10_000L, s.opening());
+        assertEquals(2_440L, s.moneyIn());
+        assertEquals(5_500L, s.moneyOut());
+        assertEquals(6_940L, s.closing());
+        assertEquals(s.closing(), s.opening() + s.moneyIn() - s.moneyOut());
+    }
+
+    @Test
+    void statementForANewWalletStartsAtZero() {
+        var from = java.time.OffsetDateTime.parse("2026-11-01T00:00:00Z");
+        when(wallets.findByTenantId(1L)).thenReturn(Optional.empty());
+        var s = service.statement(1L, from, from.plusDays(1), org.springframework.data.domain.PageRequest.of(0, 25));
+        assertEquals(0L, s.opening());
+        assertEquals(0L, s.closing());
+        assertEquals(0L, s.entries().getTotalElements());
     }
 }

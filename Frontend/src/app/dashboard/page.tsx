@@ -6,10 +6,7 @@ import { DashboardLoading, ListSkeleton } from "@/components/LoadingUI";
 import {
   ArrowClockwise, ArrowDown, ArrowRight, CellTower, Eye, EyeSlash, Plus, Radio, Stack, Ticket, Users, WarningCircle,
 } from "@/components/icons";
-import {
-  Badge, Card, CardLink, ErrorNotice, Segmented, StatCard, StatusDot, button, buttonGhost,
-  bytes, compactNumber, field, relativeTime, useApi, useNow, useResource,
-} from "@/components/BillingUI";
+import { Badge, Card, CardLink, ErrorNotice, Segmented, StatCard, StatusDot, button, buttonGhost, bytes, compactNumber, field, relativeTime, useApi, useNow, useResource, ugx } from "@/components/BillingUI";
 import { BarChart, DonutChart, Meter, MiniBars, StatusBar } from "@/components/charts";
 import { routerState, servicesState } from "@/lib/routerState";
 import { FirstRouterCard } from "@/components/router/FirstRouterCard";
@@ -74,7 +71,7 @@ export default function TenantDashboardOverview() {
   const hidden = useSyncExternalStore(hideStore.subscribe, hideStore.get, () => false);
 
   const s = stats.data;
-  const money = (v: number | null | undefined) => (hidden ? "UGX ••••••" : `UGX ${Number(v || 0).toLocaleString()}`);
+  const money = (v: number | null | undefined) => ugx(v, { hidden });
   const moneyShort = (v: number) => (hidden ? "•••" : compactNumber(v));
 
   // Today vs yesterday from the fixed 7-day series (today is the last point).

@@ -28,6 +28,7 @@ public class WalletController {
     private final WithdrawalService withdrawalService;
     private final OtpService otpService;
     private final com.wifibilling.repository.TenantRepository tenantRepository;
+    private final com.wifibilling.service.ReportingClock clock;
 
     @org.springframework.beans.factory.annotation.Value("${withdrawals.otp-required:true}")
     private boolean otpRequired;
@@ -76,6 +77,38 @@ public class WalletController {
                 .toList();
     }
 
+    public record ActivityReport(java.time.LocalDate from, java.time.LocalDate to,
+                                 long openingBalance, long moneyIn, long moneyOut, long closingBalance,
+                                 List<LedgerView> entries, int page, int totalPages, long totalElements) {}
+
+    /** Statement for reporting-zone dates [from, to] (inclusive), entries newest first, a page at a time. */
+    @GetMapping("/activity/report")
+    public ActivityReport activityReport(@AuthenticationPrincipal TenantPrincipal p,
+            @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate from,
+            @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate to,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size) {
+        if (to.isBefore(from)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST, "The end date is before the start date.");
+        }
+        if (java.time.temporal.ChronoUnit.DAYS.between(from, to) >= 366) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST, "Choose a range of one year or less.");
+        }
+        var s = walletService.statement(p.getTenantId(), clock.startOf(from), clock.startOf(to.plusDays(1)),
+                org.springframework.data.domain.PageRequest.of(Math.max(0, page), Math.max(1, Math.min(200, size)),
+                        org.springframework.data.domain.Sort.by(
+                                org.springframework.data.domain.Sort.Order.desc("createdAt"),
+                                org.springframework.data.domain.Sort.Order.desc("id"))));
+        return new ActivityReport(from, to, s.opening(), s.moneyIn(), s.moneyOut(), s.closing(),
+                s.entries().map(e -> new LedgerView(e.getId(), e.getType(), e.getAmount(),
+                        e.getAvailableAfter(), e.getPendingAfter(), e.getReservedAfter(),
+                        e.getExternalRef(), e.getTransactionId(), e.getWithdrawalId(),
+                        e.getNote(), e.getCreatedAt())).getContent(),
+                s.entries().getNumber(), s.entries().getTotalPages(), s.entries().getTotalElements());
+    }
+
     public record WithdrawalView(Long id, Long amount, Long fee, Long totalDeduction,
                                  String phone, String reason, String status, String failureReason, String payoutRef,
                                  OffsetDateTime createdAt, OffsetDateTime completedAt) {}
@@ -87,7 +120,15 @@ public class WalletController {
 
     public record WithdrawalCreate(Long amount, String phone, String reason, String otp) {}
 
-    public record OtpResponse(boolean sent, String devCode) {}
+    /** {@code sentTo} is the account email masked (m•••@gmail.com) so the owner knows where to look. */
+    public record OtpResponse(boolean sent, String devCode, String sentTo) {}
+
+    static String maskEmail(String email) {
+        if (email == null) return null;
+        int at = email.indexOf('@');
+        if (at <= 0) return null;
+        return email.charAt(0) + "\u2022\u2022\u2022" + email.substring(at);
+    }
 
     /** Step 1 of withdrawal: email a verification code to the tenant's registered email. */
     @PostMapping("/withdrawals/otp")
@@ -98,7 +139,7 @@ public class WalletController {
         String devCode = otpService.issue(tenant.getEmail(), com.wifibilling.model.EmailOtp.PURPOSE_WITHDRAWAL,
                 tenant.getId(), tenant.getName(),
                 "You requested a wallet withdrawal. Enter this code to confirm it.");
-        return new OtpResponse(true, devCode);
+        return new OtpResponse(true, devCode, maskEmail(tenant.getEmail()));
     }
 
     /**
