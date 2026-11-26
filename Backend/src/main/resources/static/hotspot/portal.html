@@ -457,7 +457,7 @@ function handleRouterError() {
         SCHOOL_VOUCHER_RETRY = _schoolVoucher.code;
         document.getElementById('school-voucher-input').value = _schoolVoucher.code;
         showMsg('We couldn\'t connect with voucher <b>' + escapeText(_schoolVoucher.code) + '</b>. A voucher works on one device at a time: '
-            + 'if it was just in use on this or another phone, wait a minute and tap "Connect with voucher" again. '
+            + 'if it was just in use on this or another phone, wait 2 minutes and tap "Connect with voucher" again. '
             + 'Also check 0 and O, 1 and I.', true);
         applySchoolMode(window.PORTAL_CFG || {});
     } else if (_prevPurchase) {
