@@ -147,6 +147,32 @@ class CoreFlowIntegrationTest {
         mockMvc.perform(get("/api/routers/"+routerId+"/tasks").header("Authorization","Bearer "+jwt)).andExpect(jsonPath("$[0].status").value("APPLIED"));
     }
 
+    @Test @org.springframework.transaction.annotation.Transactional
+    void aBusySchoolsLeaseReportIsAcceptedAndTrimmedToTheFieldsTheDashboardUses() throws Exception {
+        String jwt=actor("hosts-busy-school");
+        Number routerId=JsonPath.read(request(jwt,"/api/routers","{\"name\":\"Busy School\"}"),"$.id");
+        String token=JsonPath.read(mockMvc.perform(get("/api/routers/"+routerId+"/portal-id").header("Authorization","Bearer "+jwt))
+                .andReturn().getResponse().getContentAsString(),"$.portalId");
+        // 300 leases in RouterOS's full shape (~280 chars each): over the old 250-row / 12k-char cap.
+        StringBuilder leases=new StringBuilder("[");
+        for(int i=0;i<300;i++){
+            if(i>0)leases.append(',');
+            leases.append(String.format("{\".id\":\"*%X\",\"address\":\"10.10.%d.%d\",\"blocked\":false,\"disabled\":false,\"dynamic\":true,\"host-name\":\"phone-%d\","
+                    +"\"last-seen\":\"1m\",\"mac-address\":\"AA:BB:CC:00:%02X:%02X\",\"radius\":false,\"server\":\"wb-hotspot-dhcp\",\"status\":\"bound\"}",i,i/250,i%250,i,i/256,i%256));
+        }
+        leases.append(']');
+        assertTrue(leases.length()>12000);
+        mockMvc.perform(post("/api/router/provision/"+token+"/hosts").contentType(MediaType.APPLICATION_JSON).content(leases.toString())).andExpect(status().isOk());
+        String hosts=mockMvc.perform(get("/api/routers/"+routerId+"/hosts").header("Authorization","Bearer "+jwt))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.hosts.length()").value(300))
+                .andExpect(jsonPath("$.hosts[7]['mac-address']").value("AA:BB:CC:00:00:07"))
+                .andExpect(jsonPath("$.hosts[7].address").value("10.10.0.7"))
+                .andExpect(jsonPath("$.hosts[7]['host-name']").value("phone-7"))
+                .andReturn().getResponse().getContentAsString();
+        assertFalse(hosts.contains("wb-hotspot-dhcp"),"fields the dashboard never reads are dropped");
+        mockMvc.perform(post("/api/router/provision/"+token+"/hosts").contentType(MediaType.APPLICATION_JSON).content("{\"not\":\"a list\"}")).andExpect(status().isBadRequest());
+    }
+
     @Test
     void superadminCanCreateTenantWhoCanImmediatelyLogin() throws Exception {
         tenantRepository.save(Tenant.builder()
