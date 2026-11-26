@@ -726,11 +726,13 @@ public class RouterScriptGenerator {
                 + ":do { /system/script/set [find name=wb-portal-sync] source={\n" + portalSyncBootstrap(publicBaseUrl, token) + "} } on-error={}\n"
                 // Reaper: if fetches ever wedge again (hung TLS holds a job forever on some
                 // RouterOS builds), a pile-up beyond ~8 concurrent jobs is killed wholesale —
-                // every legitimate job respawns on its next interval.
+                // every legitimate job respawns on its next interval. Only type=script jobs count:
+                // WinBox/terminal sessions are login/command jobs that can't be removed, and
+                // counting them (SYNERGY, Nov 26) kept the reaper killing wb-management every minute.
                 + "/system/scheduler/remove [find name=wb-jobwatch]\n"
                 + "/system/script/remove [find name=wb-jobwatch]\n"
                 + "/system/script/add name=wb-jobwatch policy=read,write,test comment=" + q(TAG)
-                + " source={ :if ([:len [/system/script/job find]] > 8) do={ /system/script/job/remove [find] } }\n"
+                + " source={ :if ([:len [/system/script/job find where type=\"script\"]] > 8) do={ /system/script/job/remove [find where type=\"script\"] } }\n"
                 + "/system/scheduler/add name=wb-jobwatch interval=1m comment=" + q(TAG)
                 + " on-event=\"/system script run wb-jobwatch\"\n";
     }

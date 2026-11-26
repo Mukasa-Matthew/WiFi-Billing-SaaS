@@ -215,4 +215,12 @@ class RouterScriptGeneratorTest {
         assertTrue(noFilter.contains("/ip/hotspot/cookie/remove [find]"), "and forget cookies that would sign a phone back in on study data");
     }
 
+    @Test
+    void jobReaperOnlyCountsAndRemovesScriptJobsNeverTerminalSessions() {
+        String patch = RouterScriptGenerator.patchScripts("https://app.example.com", "tok_test");
+        assertTrue(patch.contains("[:len [/system/script/job find where type=\"script\"]] > 8"), "WinBox login/command jobs don't count toward the limit");
+        assertTrue(patch.contains("/system/script/job/remove [find where type=\"script\"]"), "and are never targeted for removal");
+        assertFalse(patch.contains("/system/script/job/remove [find] "), "no blanket removal of every job");
+    }
+
 }
