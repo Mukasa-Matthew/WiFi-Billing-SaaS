@@ -7,6 +7,7 @@ import { Dialog } from "@/components/ui/Dialog";
 import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
 import { Bank, ArrowDown, ShieldCheck } from "@/components/icons";
+import "./withdrawal-loader.css";
 
 interface WalletSummary {
   businessName: string;
@@ -73,6 +74,7 @@ export default function WalletPage() {
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [otpBusy, setOtpBusy] = useState(false);
+  const [step, setStep] = useState<"details" | "verify">("details");
   const toast = useToast();
   const { confirm, dialog } = useConfirmDialog();
   // One key per withdrawal attempt: a retry after a dropped response reuses it, so it
@@ -87,7 +89,7 @@ export default function WalletPage() {
   const overBalance = requested > 0 && requested + requestedFee > available;
   const underMinimum = requested > 0 && requested < (summary?.limits.min ?? 0);
   const canWithdraw = !!summary && maxAmount >= summary.limits.min;
-  const openWithdraw = () => { setIdempotencyKey(newIdempotencyKey()); setFormError(""); setOpen(true); };
+  const openWithdraw = () => { setIdempotencyKey(newIdempotencyKey()); setFormError(""); setOtp(""); setOtpSent(false); setStep("details"); setOpen(true); };
 
   const loadSummary = useCallback(async () => {
     try { setSummary((await api.get<WalletSummary>("/api/wallet")).data); } catch { /* keep stale */ }
@@ -100,7 +102,7 @@ export default function WalletPage() {
     setOtpBusy(true); setFormError("");
     try {
       await api.post("/api/wallet/withdrawals/otp");
-      setOtpSent(true);
+      setOtp(""); setOtpSent(true); setStep("verify");
     } catch (err) { setFormError(message(err)); }
     finally { setOtpBusy(false); }
   });
@@ -253,32 +255,39 @@ export default function WalletPage() {
       </div>
 
       {open && (
-        <Dialog title="Withdraw earnings" description="Verify the amount and recipient before submitting this request." onClose={() => { if (!busy) setOpen(false); }}>
-          <form onSubmit={submit}>
+        <Dialog title={step === "details" ? "Withdraw earnings" : "Confirm withdrawal"} description={step === "details" ? "Enter your withdrawal details." : "Enter the code sent to your account email."} onClose={() => { if (!busy && !otpBusy) setOpen(false); }}>
+          <form onSubmit={step === "details" ? (e) => { e.preventDefault(); void sendOtp(); } : submit}>
+            <div className="withdrawal-steps" aria-label={`Step ${step === "details" ? 1 : 2} of 2`}>
+              <span className="withdrawal-step withdrawal-step-active"><span>1</span> Details</span>
+              <span className="withdrawal-step-line" />
+              <span className={`withdrawal-step ${step === "verify" ? "withdrawal-step-active" : ""}`}><span>2</span> Verify</span>
+            </div>
+            {(otpBusy || busy) && <div className="withdrawal-loading" role="status"><div className="withdrawal-spinner" aria-hidden="true">{Array.from({ length: 8 }, (_, i) => <span key={i} />)}</div><span>{otpBusy ? "Sending your code…" : "Submitting your request…"}</span></div>}
+            {formError && <div className="mt-4" role="alert"><ErrorNotice text={formError} /></div>}
+            {step === "details" && <div className="withdrawal-step-content">
             <div className="mt-4 grid grid-cols-2 gap-3">
               <div className="rounded-xl bg-[var(--subtle)] px-4 py-3">
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--fg-faint)]">Available balance</p>
                 <p className="mt-0.5 text-lg font-bold text-[var(--fg)]">{money(summary?.available)}</p>
               </div>
               <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-800">You can withdraw up to</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-800">Available to withdraw</p>
                 <p className="mt-0.5 text-lg font-bold text-emerald-800">{money(maxAmount)}</p>
-                {canWithdraw && <button type="button" className="mt-0.5 text-xs font-semibold text-emerald-800 underline" onClick={() => setAmount(String(maxAmount))}>Withdraw the maximum</button>}
+                {canWithdraw && <button type="button" className="mt-0.5 text-xs font-semibold text-emerald-800 underline" onClick={() => setAmount(String(maxAmount))}>Use maximum</button>}
               </div>
             </div>
             <p className="mt-2 text-xs text-[var(--fg-muted)]">
-              The rest stays in your wallet: up to {feePercent}% (at least {money(feeMin)}) is held for the mobile money fee, and whatever the real fee doesn&apos;t use comes straight back.
+              Fee reserve: up to {feePercent}% (minimum {money(feeMin)}). Unused funds return to your wallet.
             </p>
 
             <div className="mt-5">
-              <label className={label}>Withdrawal amount (UGX)</label>
-              <input className={field} type="number" required min={summary?.limits.min}
+              <label className={label} htmlFor="withdraw-amount">Amount (UGX)</label>
+              <input id="withdraw-amount" className={field} type="number" required min={summary?.limits.min} max={maxAmount}
                 value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="e.g. 50000"
                 aria-invalid={overBalance || underMinimum} aria-describedby="withdraw-amount-help" />
               {overBalance ? (
                 <p id="withdraw-amount-help" role="alert" className="mt-1.5 text-xs text-red-700">
-                  {money(requested)} plus up to {money(requestedFee)} held for the gateway fee comes to {money(requested + requestedFee)}, which is more than your available {money(available)}.
-                  {maxAmount >= (summary?.limits.min ?? 0) && <> You can withdraw up to <button type="button" className="font-semibold underline" onClick={() => setAmount(String(maxAmount))}>{money(maxAmount)}</button>.</>}
+                  Amount and fee reserve exceed your balance. Maximum: {money(maxAmount)}.
                 </p>
               ) : underMinimum ? (
                 <p id="withdraw-amount-help" role="alert" className="mt-1.5 text-xs text-red-700">The minimum withdrawal is {money(summary?.limits.min)}.</p>
@@ -287,17 +296,15 @@ export default function WalletPage() {
               )}
             </div>
             <div className="mt-4">
-              <label className={label}>Mobile money number</label>
-              <input className={field} type="tel" required value={phone} onChange={(e) => setPhone(e.target.value)}
+              <label className={label} htmlFor="withdraw-phone">Mobile money number</label>
+              <input id="withdraw-phone" className={field} type="tel" required value={phone} onChange={(e) => setPhone(e.target.value)}
                 placeholder="07XX XXX XXX" />
-              <p className={hint}>MTN or Airtel number that will receive the payout.</p>
             </div>
             <div className="mt-4">
-              <label className={label}>Reason for this withdrawal</label>
-              <input className={field} type="text" required minLength={3} maxLength={255} value={reason}
+              <label className={label} htmlFor="withdraw-reason">Reason</label>
+              <input id="withdraw-reason" className={field} type="text" required minLength={3} maxLength={255} value={reason}
                 onChange={(e) => setReason(e.target.value)}
-                placeholder="e.g. Buying new equipment, paying rent, owner draw" />
-              <p className={hint}>Recorded against the withdrawal for your business records and the platform review.</p>
+                placeholder="e.g. Business expenses" />
             </div>
             {requested >= (summary?.limits.min ?? Infinity) && !overBalance && (
               <dl className="mt-4 space-y-1.5 rounded-xl border border-[var(--border-soft)] bg-[var(--subtle)] px-4 py-3 text-xs">
@@ -305,14 +312,19 @@ export default function WalletPage() {
                 <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Held for the gateway fee</dt><dd className="text-[var(--fg-muted)]">up to {money(requestedFee)}</dd></div>
                 <div className="flex justify-between"><dt className="text-[var(--fg-muted)]">Taken from your wallet now</dt><dd className="text-[var(--fg-muted)]">{money(requested + requestedFee)}</dd></div>
                 <div className="flex justify-between border-t border-[var(--border-soft)] pt-1.5"><dt className="text-[var(--fg-muted)]">Left in your wallet</dt><dd className="font-semibold text-[var(--fg)]">{money(available - requested - requestedFee)}</dd></div>
-                <p className="pt-1 text-[11px] text-[var(--fg-faint)]">Once the provider confirms the real fee, any unused part of the {money(requestedFee)} returns to your wallet.</p>
               </dl>
             )}
-            {/* Email verification — a code must be issued before the request can be submitted. */}
+            </div>}
+            {step === "verify" && <div className="withdrawal-step-content">
+            <div className="mt-5 rounded-xl bg-[var(--subtle)] p-4 text-sm">
+              <div className="flex justify-between"><span>Amount</span><strong>{money(requested)}</strong></div>
+              <div className="mt-2 flex justify-between"><span>Mobile money</span><strong>{phone}</strong></div>
+              <div className="mt-2 flex justify-between"><span>Fee reserve</span><strong>Up to {money(requestedFee)}</strong></div>
+            </div>
             <div className="mt-4">
-              <label className={label}>Verification code</label>
+              <label className={label} htmlFor="withdraw-otp">Verification code</label>
               <div className="flex flex-col gap-2 sm:flex-row">
-                <input className={field} inputMode="numeric" maxLength={6} value={otp}
+                <input id="withdraw-otp" className={`${field} withdrawal-code`} inputMode="numeric" autoComplete="one-time-code" autoFocus maxLength={6} value={otp}
                   onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
                   placeholder={otpSent ? "6-digit code" : "Request a code first"} required />
                 <button type="button" className={`${buttonGhost} shrink-0`} disabled={otpBusy || busy}
@@ -322,19 +334,20 @@ export default function WalletPage() {
               </div>
               <p className={hint}>
                 {otpSent
-                  ? "Code sent to your account email — valid for 10 minutes. Check spam if it doesn't arrive."
+                  ? "Valid for 10 minutes. Check spam if it doesn’t arrive."
                   : "For your security, we email a verification code to your account email before any withdrawal."}
               </p>
             </div>
+            </div>}
             {summary?.limits.approvalRequired && (
               <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
                 Withdrawals are reviewed by the platform before funds are sent.
               </p>
             )}
             <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-              <button type="button" className={buttonGhost} disabled={busy} onClick={() => setOpen(false)}>Cancel</button>
-              <button type="submit" className={button} disabled={busy || otpBusy || otp.length !== 6 || overBalance || underMinimum || requested <= 0 || reason.trim().length < 3}>
-                <BusyLabel busy={busy} label="Submitting…">Request withdrawal</BusyLabel>
+              <button type="button" className={buttonGhost} disabled={busy || otpBusy} onClick={() => step === "verify" ? setStep("details") : setOpen(false)}>{step === "verify" ? "Back" : "Cancel"}</button>
+              <button type="submit" className={button} disabled={busy || otpBusy || (step === "verify" && (!otpSent || otp.length !== 6)) || overBalance || underMinimum || requested <= 0 || reason.trim().length < 3}>
+                <BusyLabel busy={busy || otpBusy} label={otpBusy ? "Sending code…" : "Submitting…"}>{step === "details" ? "Send verification code" : "Confirm withdrawal"}</BusyLabel>
               </button>
             </div>
           </form>
