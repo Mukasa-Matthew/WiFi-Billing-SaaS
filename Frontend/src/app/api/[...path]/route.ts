@@ -43,19 +43,21 @@ async function handler(
       resHeaders.delete("content-length");
     }
 
-    // Neither nginx nor Next compresses proxied API responses, and list
-    // endpoints run to ~1 MB of JSON. Gzip JSON only: router scripts are
-    // text/plain long-polls fetched by MikroTik and must pass through as-is.
+    // Never gzip here. Next's built-in compression (on by default, and since
+    // 16.4.6 applied to route handlers) already gzips responses for clients
+    // that ask. Doing it here too sent browsers gzip inside gzip under one
+    // Content-Encoding header: the sign-in reply could not be read, no token
+    // was stored, and every dashboard sign-in looped back to /login.
+    //
+    // Only JSON may be compressed. Router scripts are text/plain long-polls
+    // fetched by MikroTik and must pass through byte for byte, so anything
+    // else is marked no-transform, which Next's compression respects.
     const isJson = (res.headers.get("content-type") || "").includes("application/json");
-    const acceptsGzip = /\bgzip\b/.test(req.headers.get("accept-encoding") || "");
-    if (res.body && isJson && acceptsGzip && req.method !== "HEAD") {
-      resHeaders.delete("content-length");
-      resHeaders.set("content-encoding", "gzip");
-      resHeaders.append("vary", "Accept-Encoding");
-      return new NextResponse(res.body.pipeThrough(new CompressionStream("gzip")), {
-        status: res.status,
-        headers: resHeaders,
-      });
+    if (!isJson) {
+      const cacheControl = resHeaders.get("cache-control");
+      if (!/\bno-transform\b/i.test(cacheControl || "")) {
+        resHeaders.set("cache-control", cacheControl ? `${cacheControl}, no-transform` : "no-transform");
+      }
     }
 
     return new NextResponse(res.body, {

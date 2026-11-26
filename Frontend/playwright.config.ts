@@ -29,7 +29,8 @@ export default defineConfig({
   webServer: {
     command: "node .next/standalone/server.js",
     url: `http://127.0.0.1:${PORT}/login`,
-    env: { PORT: String(PORT), HOSTNAME: "127.0.0.1" },
+    // The API proxy test runs its own stub backend on this port; other tests mock /api in the browser.
+    env: { PORT: String(PORT), HOSTNAME: "127.0.0.1", BACKEND_INTERNAL_URL: `http://127.0.0.1:${Number(process.env.E2E_BACKEND_PORT || 3916)}` },
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
   },
