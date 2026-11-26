@@ -339,6 +339,7 @@
         <div class="divider" id="plans-label">or purchase a package</div>
 
         <button type="button" class="btn btn-outline" id="school-store-back" style="display:none;margin-bottom:10px" onclick="showSchoolStore(false)">← &nbsp;Back to school options</button>
+        <button type="button" class="btn btn-outline" id="school-voucher-back" style="display:none;margin-bottom:10px" onclick="leaveSchoolVoucherRetry()">← &nbsp;Back to sign in</button>
 
         <form id="school-voucher-box" style="display:none;margin-bottom:12px" onsubmit="useSchoolVoucher(event)">
             <span class="section-label">Have a voucher code?</span>
@@ -444,16 +445,29 @@ function showMsg(text, isError) {
     document.getElementById('msg-area').innerHTML =
         '<div class="status-msg ' + (isError ? 'error' : 'success') + '">' + text + '</div>';
 }
-if (MT_ERROR && MT_ERROR.charAt(0) !== '$') {
+/* The router re-opens this page with $(error) when a login fails. Runs at the end of the
+   script, once the storage keys below are set: a voucher typed on the school store comes
+   back to the voucher box (not the ID + PIN sign-in), a paid voucher offers a retry. */
+var SCHOOL_VOUCHER_RETRY = '';
+function handleRouterError() {
+    if (!MT_ERROR || MT_ERROR.charAt(0) === '$') return;
     var _prevPurchase = loadPurchase();
-    if (_prevPurchase) {
+    var _schoolVoucher = loadSchoolVoucherTry();
+    if (_schoolVoucher && (!_prevPurchase || _schoolVoucher.t >= _prevPurchase.t)) {
+        SCHOOL_VOUCHER_RETRY = _schoolVoucher.code;
+        document.getElementById('school-voucher-input').value = _schoolVoucher.code;
+        showMsg('We couldn\'t connect with voucher <b>' + escapeText(_schoolVoucher.code) + '</b>. A voucher works on one device at a time: '
+            + 'if it was just in use on this or another phone, wait a minute and tap "Connect with voucher" again. '
+            + 'Also check 0 and O, 1 and I.', true);
+        applySchoolMode(window.PORTAL_CFG || {});
+    } else if (_prevPurchase) {
         purchasedCode = _prevPurchase.code;
         document.getElementById('username-input').value = _prevPurchase.code;
         document.getElementById('voucher-code-display').textContent = _prevPurchase.code;
         document.getElementById('voucher-result').classList.add('show');
         showMsg('Your payment was successful, but we could not complete the connection. Tap "Connect with this code" to retry.', true);
     } else {
-        showMsg(MT_ERROR, true);
+        showMsg(escapeText(MT_ERROR), true);
     }
 }
 
@@ -551,8 +565,16 @@ function renderSettings(settings) {
 var SCHOOL = { ticket: null, pinChangeToken: null, busy: false, resumed: false, store: false, paidDevices: 0, brand: null, bringVoucherId: null };
 function applySchoolMode(settings) {
     if (!settings.school) return;
+    // Back from a refused voucher: show only the store's voucher box, code filled in.
+    var voucherRetry = !!SCHOOL_VOUCHER_RETRY && !SCHOOL.ticket;
+    if (voucherRetry && SCHOOL.store !== true) {
+        var brandTitle = document.querySelector('.brand h1'), brandSub = document.querySelector('.brand p');
+        if (!SCHOOL.brand) SCHOOL.brand = { h1: brandTitle.textContent, sub: brandSub.textContent, title: document.title };
+        SCHOOL.store = true;
+    }
     syncStoreBrand();
-    document.getElementById('school-section').style.display = '';
+    document.getElementById('school-section').style.display = voucherRetry ? 'none' : '';
+    document.getElementById('school-voucher-back').style.display = voucherRetry ? '' : 'none';
     document.getElementById('voucher-entry').style.display = 'none';
     document.getElementById('school-visitor-btn').style.display =
         settings.schoolVisitors && !SCHOOL.ticket && document.getElementById('school-visitor-form').style.display === 'none' ? '' : 'none';
@@ -562,7 +584,7 @@ function applySchoolMode(settings) {
     document.getElementById('plans-label').style.display = showPackages ? '' : 'none';
     document.getElementById('school-store-back').style.display = showPackages ? '' : 'none';
     document.getElementById('find-voucher-btn').style.display = showPackages ? '' : 'none';
-    document.getElementById('school-voucher-box').style.display = showPackages ? '' : 'none';
+    document.getElementById('school-voucher-box').style.display = showPackages || voucherRetry ? '' : 'none';
     document.getElementById('support-block').style.display = showPackages && window.SUPPORT_VISIBLE ? '' : 'none';
     var showStoreBtn = !!SCHOOL.ticket && SCHOOL.store !== true && settings.allowPurchases !== false && !SCHOOL.paidDevices;
     document.getElementById('school-store-btn').style.display = showStoreBtn ? '' : 'none';
@@ -754,9 +776,30 @@ function useSchoolVoucher(e) {
     e.preventDefault();
     var code = document.getElementById('school-voucher-input').value.trim();
     if (!code) return;
+    saveSchoolVoucherTry(code);
     document.getElementById('username-input').value = code;
     document.getElementById('password-input').value = code;
     document.getElementById('login-form').submit();
+}
+/* Remembered for 10 minutes so a refused login lands back on the voucher box. */
+var SCHOOL_VOUCHER_KEY = 'wb_school_voucher_' + TOKEN;
+function saveSchoolVoucherTry(code) {
+    try { localStorage.setItem(SCHOOL_VOUCHER_KEY, JSON.stringify({ code: code, t: Date.now() })); } catch (e) {}
+}
+function loadSchoolVoucherTry() {
+    try {
+        var raw = localStorage.getItem(SCHOOL_VOUCHER_KEY);
+        if (!raw) return null;
+        var v = JSON.parse(raw);
+        if (v && typeof v.code === 'string' && v.code && (Date.now() - v.t) < 10 * 60000) return v;
+    } catch (e) {}
+    return null;
+}
+function leaveSchoolVoucherRetry() {
+    SCHOOL_VOUCHER_RETRY = '';
+    try { localStorage.removeItem(SCHOOL_VOUCHER_KEY); } catch (e) {}
+    document.getElementById('msg-area').innerHTML = '';
+    showSchoolStore(false);
 }
 function schoolResult(res) {
     if (res.action === 'CHANGE_PIN') {
@@ -1392,6 +1435,7 @@ function useVoucher() {
     document.getElementById('password-input').value = purchasedCode;
     document.getElementById('login-form').submit();
 }
+handleRouterError();
 </script>
 </body>
 </html>
