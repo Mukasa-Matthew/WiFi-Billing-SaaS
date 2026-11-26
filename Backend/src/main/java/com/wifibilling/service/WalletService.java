@@ -242,6 +242,33 @@ public class WalletService {
         return true;
     }
 
+    /**
+     * A bank-style statement for [from, to): opening and closing available balance, and
+     * money in/out taken from the recorded balance after each entry — so
+     * opening + in − out = closing always holds, whatever the entry types. Informational
+     * entries (gateway/platform fee, payout debit of already-held money) move nothing.
+     */
+    public record Statement(long opening, long moneyIn, long moneyOut, long closing,
+                            org.springframework.data.domain.Page<WalletLedgerEntry> entries) {}
+
+    @Transactional(readOnly = true)
+    public Statement statement(Long tenantId, java.time.OffsetDateTime from, java.time.OffsetDateTime to,
+                               org.springframework.data.domain.Pageable page) {
+        var wallet = walletRepository.findByTenantId(tenantId);
+        if (wallet.isEmpty()) return new Statement(0, 0, 0, 0, org.springframework.data.domain.Page.empty(page));
+        Long id = wallet.get().getId();
+        long opening = ledgerRepository.findFirstByWalletIdAndCreatedAtLessThanOrderByCreatedAtDescIdDesc(id, from)
+                .map(WalletLedgerEntry::getAvailableAfter).orElse(0L);
+        long previous = opening, in = 0, out = 0;
+        for (Long after : ledgerRepository.availableAfterInRange(id, from, to)) {
+            long now = after == null ? previous : after;
+            if (now > previous) in += now - previous; else out += previous - now;
+            previous = now;
+        }
+        return new Statement(opening, in, out, previous,
+                ledgerRepository.findByWalletIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(id, from, to, page));
+    }
+
     @Transactional(readOnly = true)
     public List<WalletLedgerEntry> recentActivity(Long tenantId) {
         return walletRepository.findByTenantId(tenantId)

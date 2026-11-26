@@ -1,24 +1,11 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import api from "@/lib/api";
-import { Table, Badge, Notice, panel, button, buttonGhost, field, label, hint, message } from "@/components/BillingUI";
+import { Table, Badge, Notice, panel, button, buttonGhost, field, label, message, PageHeader, ugx, shortDate, date } from "@/components/BillingUI";
 import { Dialog } from "@/components/ui/Dialog";
 import { BusyLabel, DashboardLoading } from "@/components/LoadingUI";
-import {
-  CalendarCheck,
-  CreditCard,
-  WarningCircle,
-  CheckCircle,
-  ClockCountdown,
-  ShieldCheck,
-  X,
-  Bell,
-  ArrowRight,
-  FileText,
-  Clock,
-  Star
-} from "@/components/icons";
+import { CreditCard, WarningCircle, CheckCircle, X } from "@/components/icons";
 
 interface PlanOption {
   id: number;
@@ -27,924 +14,352 @@ interface PlanOption {
   durationUnit: string;
   durationValue: number;
   description: string;
-  active: boolean;
-  displayOrder: number;
-}
-
-interface PeriodHistoryItem {
-  id: number;
-  planName: string;
-  periodType: string; // FREE_TRIAL, PAID_SUBSCRIPTION, COMPLIMENTARY_EXTENSION, ADMIN_OVERRIDE
-  periodStart: string;
-  periodEnd: string;
-  durationDays: number;
-  amountCharged: number;
-  status: string;
-  paymentDate?: string | null;
-  paymentReference?: string | null;
-  note?: string | null;
 }
 
 interface PaymentHistoryItem {
   id: number;
   paidAt: string;
   reference: string;
-  externalRef?: string | null;
   planName: string;
   amount: number;
   phone: string;
-  method: string;
+  method: string; // MOBILE_MONEY | WALLET
   status: string; // SUCCESSFUL, PENDING, FAILED, CANCELLED
-  note?: string | null;
-}
-
-interface InvoiceView {
-  id: number;
-  periodStart: string;
-  periodEnd: string;
-  amountDue: number;
-  status: string;
-  paidAt?: string | null;
-}
-
-interface NotificationView {
-  id: number;
-  notificationType: string;
-  title: string;
-  message: string;
-  severity: string;
-  emailSent: boolean;
-  dismissed: boolean;
-  createdAt: string;
 }
 
 interface TenantSubView {
-  subscribed: boolean;
   status: string;
   displayStatus: string;
   planId?: number | null;
   planName?: string;
   price?: number;
-  currency?: string;
   startDate?: string;
   nextRenewalDate?: string;
   expiresAt?: string;
-  trialEndsAt?: string;
   graceUntil?: string;
   daysRemaining: number;
   hoursRemaining: number;
-  minutesRemaining: number;
   inTrial: boolean;
   inGrace: boolean;
   isExpired: boolean;
   isSuspended: boolean;
   canAcceptCustomerPayments: boolean;
-  reminderMessage?: string;
   availablePlans: PlanOption[];
-  periodHistory: PeriodHistoryItem[];
   paymentHistory: PaymentHistoryItem[];
-  invoices: InvoiceView[];
-  notifications: NotificationView[];
 }
 
-const TONE: Record<string, string> = {
-  ACTIVE: "green",
-  TRIALING: "blue",
-  GRACE_PERIOD: "amber",
-  SUSPENDED: "red",
-  CANCELLED: "slate",
-  SUCCESSFUL: "green",
-  PENDING: "amber",
-  FAILED: "red",
-  PAID: "green",
-  UNPAID: "amber",
+const STATUS_TONE: Record<string, string> = {
+  ACTIVE: "green", TRIALING: "blue", GRACE_PERIOD: "amber", SUSPENDED: "red", CANCELLED: "slate",
+};
+const PAYMENT_STATUS: Record<string, { label: string; tone: string }> = {
+  SUCCESSFUL: { label: "Paid", tone: "green" },
+  PENDING: { label: "Pending", tone: "amber" },
+  FAILED: { label: "Failed", tone: "red" },
+  CANCELLED: { label: "Cancelled", tone: "slate" },
 };
 
-const PERIOD_TYPE_NAME: Record<string, string> = {
-  FREE_TRIAL: "7-Day Free Trial",
-  PAID_SUBSCRIPTION: "Paid Subscription",
-  COMPLIMENTARY_EXTENSION: "Complimentary Extension",
-  ADMIN_OVERRIDE: "Admin Extension",
-};
+const period = (p: PlanOption) => `${p.durationValue} ${p.durationUnit.toLowerCase().replace(/s$/, "")}${p.durationValue === 1 ? "" : "s"}`;
+const paidWith = (p: PaymentHistoryItem) => (p.method === "WALLET" ? "Wallet" : `Mobile money${p.phone && p.phone !== "WALLET" ? ` · ${p.phone}` : ""}`);
+const timeLeft = (s: TenantSubView) =>
+  s.daysRemaining >= 1 ? `${s.daysRemaining} day${s.daysRemaining === 1 ? "" : "s"} left`
+    : s.hoursRemaining >= 1 ? `${s.hoursRemaining} hour${s.hoursRemaining === 1 ? "" : "s"} left`
+    : "Less than an hour left";
+const newKey = () =>
+  globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
 
-const money = (v?: number | null) => `UGX ${(v ?? 0).toLocaleString()}`;
-const d = (s?: string | null) => (s ? new Date(s).toLocaleDateString("en-UG", { timeZone: "Africa/Kampala" }) : "—");
-const dt = (s?: string | null) =>
-  s
-    ? new Date(s).toLocaleString("en-UG", {
-        timeZone: "Africa/Kampala",
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "—";
+type Msg = { text: string; tone: "info" | "success" | "danger" };
 
-export default function SubscriptionHubPage() {
+export default function SubscriptionPage() {
   const [sub, setSub] = useState<TenantSubView | null>(null);
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
   const [loading, setLoading] = useState(true);
 
-  // Live countdown state
-  const [nowTimestamp, setNowTimestamp] = useState<number>(Date.now());
-
-  // Checkout modal
   const [checkoutOpen, setCheckoutOpen] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<PlanOption | null>(null);
   const [phone, setPhone] = useState("");
-  const [checkoutBusy, setCheckoutBusy] = useState(false);
-  const [checkoutMsg, setCheckoutMsg] = useState<{ text: string; tone: "info" | "success" | "danger" } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [checkoutMsg, setCheckoutMsg] = useState<Msg | null>(null);
   const [activeReference, setActiveReference] = useState<string | null>(null);
-  // How the owner pays: a Mobile Money prompt, or straight from the wallet balance their hotspot earned.
   const [payMethod, setPayMethod] = useState<"MOMO" | "WALLET">("MOMO");
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
-  // One key per payment attempt: a double tap or a retry can never charge the wallet twice.
+  // One key per wallet payment attempt: a double tap or a retry can never charge twice.
   const [walletKey, setWalletKey] = useState("");
+  const [receipt, setReceipt] = useState<PaymentHistoryItem | null>(null);
 
-  // Receipt modal
-  const [selectedReceipt, setSelectedReceipt] = useState<PaymentHistoryItem | null>(null);
-
-  // Ticking countdown timer
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setNowTimestamp(Date.now());
-    }, 1000);
-    return () => clearInterval(timer);
+  const load = useCallback(async () => {
+    try { setSub((await api.get<TenantSubView>("/api/subscription")).data); }
+    catch (e) { setErr(message(e)); }
+    finally { setLoading(false); }
   }, []);
+  useEffect(() => { const t = window.setTimeout(load, 0); return () => window.clearTimeout(t); }, [load]);
 
-  const load = async () => {
-    try {
-      const res = await api.get<TenantSubView>("/api/subscription");
-      setSub(res.data);
-      if (res.data.availablePlans && res.data.availablePlans.length > 0) {
-        const current = res.data.availablePlans.find((p) => p.id === res.data.planId) || res.data.availablePlans[0];
-        setSelectedPlan(current);
-      }
-    } catch (e) {
-      setErr(message(e));
-    } finally {
-      setLoading(false);
-    }
-  };
+  const plan = sub?.availablePlans.find((p) => p.id === sub.planId) ?? null;
 
-  useEffect(() => {
-    load();
-  }, []);
-
-  // Poll this checkout's own outcome. The server asks Mobile Money directly while it is pending,
-  // so an already-active subscription never shows a false "payment received".
+  // Poll this checkout's own outcome; the server asks Mobile Money directly while pending.
   useEffect(() => {
     if (!activeReference || !checkoutOpen) return;
     const startedAt = Date.now();
     const interval = setInterval(async () => {
       try {
-        const res = await api.get<{ reference: string; status: string; message: string }>(
-          `/api/subscription/checkout/${encodeURIComponent(activeReference)}`
-        );
+        const res = await api.get<{ status: string; message: string }>(`/api/subscription/checkout/${encodeURIComponent(activeReference)}`);
         if (res.data.status === "SUCCESSFUL") {
           setActiveReference(null);
-          setCheckoutMsg({ text: res.data.message, tone: "success" });
-          setOk("Subscription renewed! All customer payments and router tools are fully unlocked.");
-          load();
+          setCheckoutMsg({ text: "Payment received. Your plan is renewed.", tone: "success" });
+          setOk("Subscription renewed.");
+          void load();
         } else if (res.data.status === "FAILED") {
           setActiveReference(null);
-          setCheckoutMsg({ text: res.data.message, tone: "danger" });
+          setCheckoutMsg({ text: res.data.message || "The payment didn’t go through. Try again.", tone: "danger" });
         } else if (Date.now() - startedAt > 5 * 60 * 1000) {
           setActiveReference(null);
-          setCheckoutMsg({
-            text: "Still waiting for Mobile Money. If you approved the payment, your subscription will update automatically within a few minutes.",
-            tone: "info",
-          });
+          setCheckoutMsg({ text: "Still waiting for Mobile Money. If you approved it, your plan will update in a few minutes.", tone: "info" });
         }
-      } catch (e) {
-        // ignore poll errors
-      }
+      } catch { /* keep polling */ }
     }, 3500);
-
     return () => clearInterval(interval);
-  }, [activeReference, checkoutOpen]);
-
-  // Live countdown calculation
-  const liveCountdown = useMemo(() => {
-    if (!sub || !sub.expiresAt) return { days: 0, hours: 0, minutes: 0, seconds: 0, isPast: true };
-    const expiryTime = new Date(sub.expiresAt).getTime();
-    const diff = expiryTime - nowTimestamp;
-    if (diff <= 0) {
-      return { days: 0, hours: 0, minutes: 0, seconds: 0, isPast: true };
-    }
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-    return { days, hours, minutes, seconds, isPast: false };
-  }, [sub, nowTimestamp]);
-
-  const newKey = () =>
-    typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID()
-      : "10000000-1000-4000-8000-100000000000".replace(/[018]/g, (c) =>
-          (Number(c) ^ (Math.random() * 16) >> (Number(c) / 4)).toString(16)
-        );
+  }, [activeReference, checkoutOpen, load]);
 
   const loadWallet = async (price?: number) => {
     try {
-      const res = await api.get<{ available: number }>("/api/wallet");
-      const available = Number(res.data.available || 0);
+      const available = Number((await api.get<{ available: number }>("/api/wallet")).data.available || 0);
       setWalletBalance(available);
       if (price !== undefined) setPayMethod(available >= price ? "WALLET" : "MOMO");
-    } catch {
-      setWalletBalance(null);
-      setPayMethod("MOMO");
-    }
+    } catch { setWalletBalance(null); setPayMethod("MOMO"); }
   };
 
-  const handleStartCheckout = (plan?: PlanOption) => {
-    const chosen = plan || selectedPlan;
-    if (plan) setSelectedPlan(plan);
-    setCheckoutMsg(null);
-    setActiveReference(null);
-    setWalletKey(newKey());
-    setCheckoutOpen(true);
-    loadWallet(chosen?.price);
+  const openCheckout = () => {
+    setCheckoutMsg(null); setActiveReference(null); setWalletKey(newKey()); setCheckoutOpen(true);
+    void loadWallet(plan?.price);
   };
 
-  const walletCovers = walletBalance !== null && !!selectedPlan && walletBalance >= selectedPlan.price;
+  const walletCovers = walletBalance !== null && !!plan && walletBalance >= plan.price;
 
-  const handlePayFromWallet = async () => {
-    if (!selectedPlan) return;
-    setCheckoutBusy(true);
-    setCheckoutMsg({ text: "Paying from your wallet…", tone: "info" });
-    try {
-      const res = await api.post<{ reference: string; status: string; message: string }>(
-        "/api/subscription/pay-from-wallet",
-        { planId: selectedPlan.id },
-        { headers: { "Idempotency-Key": walletKey } }
-      );
-      setCheckoutMsg({ text: res.data.message, tone: "success" });
-      setOk("Subscription renewed from your wallet balance.");
-      setWalletKey(newKey());
-      load();
-      loadWallet();
-    } catch (e) {
-      // With no answer the payment may have gone through: keep the key so a retry can't pay twice.
-      const answered = !!(e as { response?: unknown })?.response;
-      if (answered) setWalletKey(newKey());
-      setCheckoutMsg({ text: message(e), tone: "danger" });
-      if (answered) loadWallet();
-    } finally {
-      setCheckoutBusy(false);
-    }
-  };
-
-  const handleInitiatePayment = async (e: React.FormEvent) => {
+  const pay = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPlan) return;
+    if (!plan || busy) return;
+    setBusy(true);
     if (payMethod === "WALLET") {
-      await handlePayFromWallet();
+      setCheckoutMsg(null);
+      try {
+        await api.post("/api/subscription/pay-from-wallet", { planId: plan.id }, { headers: { "Idempotency-Key": walletKey } });
+        setCheckoutMsg({ text: "Paid from your wallet. Your plan is renewed.", tone: "success" });
+        setOk("Subscription renewed.");
+        setWalletKey(newKey());
+        void load(); void loadWallet();
+      } catch (err) {
+        // With no answer the payment may have gone through: keep the key so a retry can't pay twice.
+        const answered = !!(err as { response?: unknown })?.response;
+        if (answered) { setWalletKey(newKey()); void loadWallet(); }
+        setCheckoutMsg({ text: message(err), tone: "danger" });
+      } finally { setBusy(false); }
       return;
     }
-    if (!phone || phone.trim().length < 9) {
-      setCheckoutMsg({ text: "Please enter a valid Mobile Money phone number.", tone: "danger" });
+    if (phone.trim().length < 9) {
+      setCheckoutMsg({ text: "Enter a valid mobile money number.", tone: "danger" });
+      setBusy(false);
       return;
     }
-
-    setCheckoutBusy(true);
-    setCheckoutMsg({ text: "Initiating Mobile Money prompt...", tone: "info" });
+    setCheckoutMsg(null);
     try {
-      const res = await api.post<{ reference: string; message: string; status: string }>("/api/subscription/checkout", {
-        planId: selectedPlan.id,
-        phone: phone.trim(),
-      });
+      const res = await api.post<{ reference: string }>("/api/subscription/checkout", { planId: plan.id, phone: phone.trim() });
       setActiveReference(res.data.reference);
-      setCheckoutMsg({
-        text: res.data.message || `USSD prompt sent to ${phone}. Enter your PIN to approve UGX ${selectedPlan.price.toLocaleString()}.`,
-        tone: "info",
-      });
-    } catch (e) {
-      setCheckoutMsg({ text: message(e), tone: "danger" });
-    } finally {
-      setCheckoutBusy(false);
-    }
+      setCheckoutMsg({ text: `Check your phone and enter your PIN to approve ${ugx(plan.price)}.`, tone: "info" });
+    } catch (err) { setCheckoutMsg({ text: message(err), tone: "danger" }); }
+    finally { setBusy(false); }
   };
 
-  const handleDismissNotification = async (id: number) => {
-    try {
-      await api.post(`/api/subscription/notifications/${id}/dismiss`);
-      if (sub) {
-        setSub({
-          ...sub,
-          notifications: sub.notifications.filter((n) => n.id !== id),
-        });
-      }
-    } catch (e) {
-      // ignore
-    }
-  };
-
-  if (loading) {
-    return (
-      <DashboardLoading label="Loading your subscription…" />
-    );
-  }
-
+  if (loading) return <DashboardLoading label="Loading your subscription…" />;
   if (err) return <Notice text={err} />;
   if (!sub) return null;
 
+  const endingSoon = !sub.isExpired && sub.daysRemaining < 3;
+  const endsOn = sub.expiresAt || sub.nextRenewalDate;
+  const done = checkoutMsg?.tone === "success";
+
   return (
-    <div className="space-y-8 pb-12">
-      {/* Page Title & Action Bar */}
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight text-[var(--fg)]">Your subscription</h1>
-          <p className="mt-1 text-xs text-[var(--fg-muted)]">
-            Review your SaaS subscription, track live renewal time, inspect billing history, and pay via Mobile Money.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => handleStartCheckout()}
-            className={`${button} bg-blue-600 hover:bg-blue-500 text-white font-bold px-5 py-2.5 text-xs shadow-md transition`}
-          >
-            <CreditCard size={15} />
-            {sub.isExpired ? "Renew Subscription Now" : "Renew / Upgrade Plan"}
+    <div className="space-y-6 pb-12">
+      <PageHeader title="Subscription" description="Your AirPairy plan and payments."
+        action={plan && (
+          <button onClick={openCheckout} className={`${button} w-full sm:w-auto`}>
+            <CreditCard size={15} /> {sub.isExpired ? "Renew now" : "Renew"}
           </button>
-        </div>
-      </div>
+        )} />
 
       {ok && (
-        <div className="flex items-center justify-between rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3.5 text-xs font-semibold text-emerald-800 shadow-sm">
-          <span className="flex items-center gap-2">
-            <CheckCircle size={16} /> {ok}
-          </span>
-          <button onClick={() => setOk("")} className="text-emerald-700 hover:text-emerald-900">
-            <X size={15} />
-          </button>
+        <div role="status" className="flex items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
+          <span className="flex items-center gap-2"><CheckCircle size={16} /> {ok}</span>
+          <button onClick={() => setOk("")} aria-label="Dismiss" className="rounded p-1 text-emerald-700 hover:bg-emerald-100"><X size={14} /></button>
         </div>
       )}
 
-      {/* Prominent Expiration Warning / Grace Banner */}
-      {sub.isExpired && (
-        <div className="rounded-xl border border-red-300 bg-red-50 p-5 text-red-900 shadow-sm">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <WarningCircle size={24} className="shrink-0 text-red-600 mt-0.5 animate-pulse" />
-              <div>
-                <h3 className="font-bold text-sm text-red-900">
-                  {sub.inGrace ? "Subscription Expired — 2-Day Grace Period Active" : "Account Suspended: Renewal Required"}
-                </h3>
-                <p className="mt-1 text-xs text-red-800 leading-relaxed">
-                  {sub.inGrace
-                    ? "Your subscription expired. New customer payments and package/voucher generation are temporarily paused. Active customer sessions and router tunnels remain connected."
-                    : "Your 2-day grace period has ended. Router management and customer payments are disabled. Renew now to automatically unlock all features."}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => handleStartCheckout()}
-              className="shrink-0 rounded-lg bg-red-600 hover:bg-red-700 text-white px-4 py-2 text-xs font-bold shadow transition"
-            >
-              Renew &amp; Unlock Now
-            </button>
+      {/* Expired/suspended states are covered by the workspace-wide red banner. */}
+      {endingSoon && plan && (
+        <div role="status" className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
+          <WarningCircle size={20} className="mt-0.5 shrink-0 text-amber-600" />
+          <div>
+            <p className="text-sm font-semibold">Your plan ends in {timeLeft(sub).replace(" left", "")}</p>
+            <p className="mt-0.5 text-sm opacity-90">Renew now to avoid interruption. You won’t lose any remaining days.</p>
           </div>
         </div>
       )}
 
-      {/* SECTION 1: PROMINENT SUBSCRIPTION OVERVIEW HERO CARD */}
-      <div className="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-gradient-to-br from-[var(--surface)] via-[var(--surface)] to-[var(--subtle)] p-6 shadow-md md:p-8">
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:items-center">
-          {/* Plan & Status Info */}
-          <div className="lg:col-span-7 space-y-4">
-            <div className="flex flex-wrap items-center gap-2.5">
-              <span className="text-xs font-bold uppercase tracking-wider text-[var(--fg-muted)]">Your Plan</span>
-              <Badge tone={TONE[sub.status] || "slate"}>
-                {sub.displayStatus}
-              </Badge>
-              {sub.canAcceptCustomerPayments ? (
-                <span className="flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-                  <CheckCircle size={11} /> Payments Active
-                </span>
-              ) : (
-                <span className="flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-[10px] font-bold text-red-800 dark:bg-red-950/60 dark:text-red-300">
-                  <WarningCircle size={11} /> Payments Paused
-                </span>
-              )}
-            </div>
-
+      {/* Current plan */}
+      <section className={`${panel} p-6`} aria-label="Current plan">
+        {plan ? (
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] lg:items-center">
             <div>
-              <h2 className="text-2xl font-black text-[var(--fg)] tracking-tight sm:text-3xl">
-                {sub.planName}
-              </h2>
-              <p className="mt-1 text-sm font-semibold text-[var(--fg-muted)]">
-                {money(sub.price)} <span className="font-normal text-xs text-[var(--fg-faint)]">/ billing cycle</span>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-xl font-semibold tracking-tight text-[var(--fg)]">{sub.planName || plan.name}</h2>
+                <Badge tone={STATUS_TONE[sub.status] || "slate"} dot>{sub.displayStatus}</Badge>
+              </div>
+              <p className="mt-1 text-sm text-[var(--fg-muted)]">
+                <span className="num font-semibold text-[var(--fg)]">{ugx(sub.price ?? plan.price)}</span> every {period(plan)}
               </p>
             </div>
-
-            <div className="grid grid-cols-2 gap-4 pt-2 sm:grid-cols-3">
+            <dl className="grid gap-4 sm:grid-cols-3">
               <div>
-                <span className="text-[11px] font-medium text-[var(--fg-faint)]">Activated On</span>
-                <p className="mt-0.5 text-xs font-bold text-[var(--fg)]">{d(sub.startDate)}</p>
+                <dt className="text-xs font-medium text-[var(--fg-muted)]">{sub.isExpired ? "Ended on" : sub.inTrial ? "Trial ends" : "Renews on"}</dt>
+                <dd className="mt-1 text-sm font-semibold text-[var(--fg)]">{shortDate(endsOn)}</dd>
+                {!sub.isExpired && <dd className={`text-xs ${endingSoon ? "font-medium text-amber-700" : "text-[var(--fg-faint)]"}`}>{timeLeft(sub)}</dd>}
+                {sub.inGrace && sub.graceUntil && <dd className="text-xs font-medium text-red-600">Renew by {shortDate(sub.graceUntil)}</dd>}
               </div>
               <div>
-                <span className="text-[11px] font-medium text-[var(--fg-faint)]">Renews / ends on</span>
-                <p className="mt-0.5 text-xs font-bold text-[var(--fg)]">{d(sub.expiresAt || sub.nextRenewalDate)}</p>
+                <dt className="text-xs font-medium text-[var(--fg-muted)]">Customer payments</dt>
+                <dd className={`mt-1 text-sm font-semibold ${sub.canAcceptCustomerPayments ? "text-emerald-700 dark:text-emerald-400" : "text-red-600"}`}>
+                  {sub.canAcceptCustomerPayments ? "On" : "Paused"}
+                </dd>
+                <dd className="text-xs text-[var(--fg-faint)]">{sub.canAcceptCustomerPayments ? "Customers can buy packages" : "Renew to turn on"}</dd>
               </div>
               <div>
-                <span className="text-[11px] font-medium text-[var(--fg-faint)]">Grace period ends</span>
-                <p className="mt-0.5 text-xs font-bold text-[var(--fg)]">{d(sub.graceUntil)}</p>
+                <dt className="text-xs font-medium text-[var(--fg-muted)]">Member since</dt>
+                <dd className="mt-1 text-sm font-semibold text-[var(--fg)]">{shortDate(sub.startDate)}</dd>
               </div>
-            </div>
+            </dl>
           </div>
+        ) : (
+          <div className="py-4 text-center">
+            <p className="text-sm font-semibold text-[var(--fg)]">No plan assigned yet</p>
+            <p className="mt-1 text-sm text-[var(--fg-muted)]">Contact AirPairy support to get a plan for your workspace.</p>
+          </div>
+        )}
+      </section>
 
-          {/* Prominent Live Countdown Box */}
-          <div className="lg:col-span-5">
-            <div className={`rounded-xl border p-5 text-center shadow-inner ${
-              sub.isExpired
-                ? "border-red-300 bg-red-50/50 dark:bg-red-950/20"
-                : liveCountdown.days <= 2
-                ? "border-amber-300 bg-amber-50/50 dark:bg-amber-950/20"
-                : "border-blue-200 bg-blue-50/40 dark:bg-blue-950/20"
-            }`}>
-              <div className="flex items-center justify-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[var(--fg-muted)]">
-                <ClockCountdown size={15} /> Time Remaining
+      {/* Payments */}
+      <section className={`${panel} overflow-hidden`}>
+        <div className="border-b border-[var(--border)] px-5 py-4">
+          <h2 className="text-[14.5px] font-semibold text-[var(--fg)]">Payments</h2>
+        </div>
+        <Table
+          bare
+          searchable={false}
+          rows={sub.paymentHistory || []}
+          rowKey={(p: PaymentHistoryItem) => p.id}
+          emptyTitle="No payments yet"
+          emptyDescription="Your subscription payments will show here."
+          columns={[
+            { label: "Date", render: (p: PaymentHistoryItem) => (
+              <span className="whitespace-nowrap text-[var(--fg)]">
+                {date(p.paidAt)}
+                {p.status === "SUCCESSFUL" && <button onClick={() => setReceipt(p)} className="mt-0.5 block text-xs font-semibold text-[var(--accent-text)] sm:hidden">View receipt</button>}
+              </span>
+            )},
+            { label: "Plan", hideBelow: "md", render: (p: PaymentHistoryItem) => <span className="text-[var(--fg-muted)]">{p.planName}</span> },
+            { label: "Paid with", hideBelow: "lg", render: (p: PaymentHistoryItem) => <span className="text-[var(--fg-muted)]">{paidWith(p)}</span> },
+            { label: "Status", hideBelow: "sm", render: (p: PaymentHistoryItem) => {
+              const st = PAYMENT_STATUS[p.status] ?? { label: p.status, tone: "slate" };
+              return <Badge tone={st.tone} dot>{st.label}</Badge>;
+            }},
+            { label: "Amount", align: "right", render: (p: PaymentHistoryItem) => <span className="num font-semibold text-[var(--fg)]">{ugx(p.amount)}</span> },
+            { label: "", align: "right", hideBelow: "sm", render: (p: PaymentHistoryItem) => p.status === "SUCCESSFUL" && (
+              <button onClick={() => setReceipt(p)} className="min-h-9 rounded-lg px-2 text-xs font-semibold text-[var(--accent-text)] hover:underline">Receipt</button>
+            )},
+          ]}
+        />
+      </section>
+
+      {checkoutOpen && plan && (
+        <Dialog onClose={() => { if (!busy) setCheckoutOpen(false); }} title="Renew subscription">
+          <form onSubmit={pay} className="space-y-5">
+            <div className="flex items-center justify-between rounded-lg bg-[var(--subtle)] px-4 py-3">
+              <div>
+                <p className="text-sm font-semibold text-[var(--fg)]">{plan.name}</p>
+                <p className="text-xs text-[var(--fg-muted)]">{period(plan)}</p>
               </div>
+              <p className="num text-base font-semibold text-[var(--fg)]">{ugx(plan.price)}</p>
+            </div>
 
-              {sub.isExpired ? (
-                <div className="my-3">
-                  <span className="text-3xl font-black text-red-600">00:00:00</span>
-                  <p className="mt-1 text-xs font-semibold text-red-700">
-                    {sub.inGrace ? "Expired — Grace period running" : "Suspended"}
-                  </p>
+            {!done && <>
+              <fieldset>
+                <legend className={label}>Pay with</legend>
+                <div className="mt-1 grid grid-cols-2 gap-2">
+                  {([
+                    { key: "WALLET", title: "Wallet", sub: walletBalance === null ? "Checking…" : walletCovers ? ugx(walletBalance) : "Not enough balance", disabled: !walletCovers },
+                    { key: "MOMO", title: "Mobile money", sub: "MTN or Airtel", disabled: false },
+                  ] as const).map((o) => (
+                    <button key={o.key} type="button" disabled={o.disabled || busy || !!activeReference} aria-pressed={payMethod === o.key}
+                      onClick={() => setPayMethod(o.key)}
+                      className={`rounded-lg border px-3 py-2.5 text-left transition disabled:cursor-not-allowed disabled:opacity-55 ${payMethod === o.key ? "border-blue-500 bg-blue-50 ring-2 ring-blue-500/25 dark:bg-blue-500/10" : "border-[var(--border)] hover:border-[var(--border-strong)]"}`}>
+                      <span className="block text-sm font-semibold text-[var(--fg)]">{o.title}</span>
+                      <span className="block text-xs text-[var(--fg-muted)]">{o.sub}</span>
+                    </button>
+                  ))}
                 </div>
-              ) : (
-                <div className="my-3 grid grid-cols-4 gap-2">
-                  <div className="rounded-lg bg-[var(--surface)] p-2 shadow-sm border border-[var(--border-soft)]">
-                    <span className="text-2xl font-black text-[var(--fg)]">{liveCountdown.days}</span>
-                    <span className="block text-[10px] font-medium text-[var(--fg-faint)] uppercase">Days</span>
-                  </div>
-                  <div className="rounded-lg bg-[var(--surface)] p-2 shadow-sm border border-[var(--border-soft)]">
-                    <span className="text-2xl font-black text-[var(--fg)]">{liveCountdown.hours}</span>
-                    <span className="block text-[10px] font-medium text-[var(--fg-faint)] uppercase">Hours</span>
-                  </div>
-                  <div className="rounded-lg bg-[var(--surface)] p-2 shadow-sm border border-[var(--border-soft)]">
-                    <span className="text-2xl font-black text-[var(--fg)]">{liveCountdown.minutes}</span>
-                    <span className="block text-[10px] font-medium text-[var(--fg-faint)] uppercase">Mins</span>
-                  </div>
-                  <div className="rounded-lg bg-[var(--surface)] p-2 shadow-sm border border-[var(--border-soft)]">
-                    <span className="text-2xl font-black text-[var(--fg)]">{liveCountdown.seconds}</span>
-                    <span className="block text-[10px] font-medium text-[var(--fg-faint)] uppercase">Secs</span>
-                  </div>
+              </fieldset>
+
+              {payMethod === "MOMO" && (
+                <div>
+                  <label className={label} htmlFor="sub-phone">Phone number</label>
+                  <input id="sub-phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="07XX XXX XXX"
+                    className={field} required disabled={busy || !!activeReference} autoComplete="tel" />
                 </div>
               )}
-
-              <p className="text-[11px] text-[var(--fg-muted)]">
-                Early renewal stacks onto remaining days. Never lose active paid time.
-              </p>
-              <button
-                onClick={() => handleStartCheckout()}
-                className="mt-3 w-full rounded-lg bg-blue-600 hover:bg-blue-500 text-white py-2 text-xs font-bold transition shadow"
-              >
-                Renew / Extend Access
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* SECTION 2: AVAILABLE SUBSCRIPTION PLANS */}
-      <div className={panel}>
-        <div className="border-b border-[var(--border-soft)] px-5 py-4">
-          <h2 className="text-sm font-bold text-[var(--fg)]">Your Subscription Plan</h2>
-          <p className="text-xs text-[var(--fg-muted)]">
-            The plan allocated to your workspace. Self-service renewal with wallet balance or MTN/Airtel Mobile Money.
-          </p>
-        </div>
-        <div className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2 lg:grid-cols-3">
-          {sub.availablePlans.every((p) => p.id !== sub.planId) && (
-            <p className="col-span-full text-xs text-[var(--fg-muted)]">
-              No paid plan is allocated to your workspace yet. Contact your administrator to be assigned one.
-            </p>
-          )}
-          {sub.availablePlans.filter((p) => p.id === sub.planId).map((p) => {
-            const isCurrent = p.id === sub.planId;
-            return (
-              <div
-                key={p.id}
-                className={`relative flex flex-col justify-between rounded-xl border p-5 transition ${
-                  isCurrent
-                    ? "border-blue-500 bg-blue-50/20 dark:bg-blue-950/20 shadow-sm"
-                    : "border-[var(--border-soft)] hover:border-[var(--border-strong)]"
-                }`}
-              >
-                {isCurrent && (
-                  <span className="absolute -top-2.5 right-4 rounded-full bg-blue-600 px-2.5 py-0.5 text-[10px] font-bold text-white uppercase tracking-wider shadow-sm">
-                    Current Plan
-                  </span>
-                )}
-                <div>
-                  <h3 className="font-bold text-[var(--fg)] text-base">{p.name}</h3>
-                  <div className="mt-2 flex items-baseline gap-1">
-                    <span className="text-2xl font-black text-[var(--fg)]">{money(p.price)}</span>
-                    <span className="text-xs text-[var(--fg-muted)]">
-                      / {p.durationValue} {p.durationUnit.toLowerCase()}
-                    </span>
-                  </div>
-                  {p.description && (
-                    <p className="mt-3 text-xs text-[var(--fg-muted)] leading-relaxed">{p.description}</p>
-                  )}
-                </div>
-                <button
-                  onClick={() => handleStartCheckout(p)}
-                  className={`mt-5 w-full ${button} ${
-                    isCurrent ? "bg-blue-600 hover:bg-blue-500" : "bg-slate-800 hover:bg-slate-700"
-                  } text-white text-xs font-semibold`}
-                >
-                  Pay {money(p.price)}
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* SECTION 3: SUBSCRIPTION PERIOD HISTORY */}
-      <div className={panel}>
-        <div className="border-b border-[var(--border-soft)] px-5 py-4">
-          <h2 className="text-sm font-bold text-[var(--fg)]">Subscription Period History</h2>
-          <p className="text-xs text-[var(--fg-muted)]">
-            Every subscription period granted or purchased (Free Trial, Renewals, and Extensions).
-          </p>
-        </div>
-        {/* Desktop View Table */}
-        <div className="hidden md:block">
-          <Table
-            rows={sub.periodHistory || []}
-            emptyTitle="No subscription history recorded yet."
-            columns={[
-              {
-                label: "Plan / Grant",
-                render: (h) => (
-                  <div>
-                    <span className="font-bold text-[var(--fg)]">{h.planName}</span>
-                    <span className="block text-[11px] text-[var(--fg-muted)]">
-                      {PERIOD_TYPE_NAME[h.periodType] || h.periodType}
-                    </span>
-                  </div>
-                ),
-              },
-              {
-                label: "Period Range",
-                render: (h) => (
-                  <span className="text-xs text-[var(--fg-body)]">
-                    {d(h.periodStart)} → {d(h.periodEnd)} ({h.durationDays} days)
-                  </span>
-                ),
-              },
-              {
-                label: "Fee Paid",
-                render: (h) => (
-                  <span className="font-semibold text-xs text-[var(--fg)]">{money(h.amountCharged)}</span>
-                ),
-              },
-              {
-                label: "Payment Reference",
-                render: (h) => (
-                  <span className="font-mono text-xs text-[var(--fg-muted)]">
-                    {h.paymentReference || "—"}
-                  </span>
-                ),
-              },
-              {
-                label: "Status",
-                render: (h) => <Badge tone={TONE[h.status] || "slate"}>{h.status}</Badge>,
-              },
-            ]}
-          />
-        </div>
-
-        {/* Mobile View Cards */}
-        <div className="divide-y divide-[var(--border-soft)] md:hidden">
-          {sub.periodHistory && sub.periodHistory.length > 0 ? (
-            sub.periodHistory.map((h) => (
-              <div key={h.id} className="p-4 space-y-2 text-xs">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <span className="font-bold text-[var(--fg)]">{h.planName}</span>
-                    <span className="block text-[11px] text-[var(--fg-muted)]">
-                      {PERIOD_TYPE_NAME[h.periodType] || h.periodType}
-                    </span>
-                  </div>
-                  <Badge tone={TONE[h.status] || "slate"}>{h.status}</Badge>
-                </div>
-                <div className="flex justify-between text-[var(--fg-muted)]">
-                  <span>Range: {d(h.periodStart)} → {d(h.periodEnd)}</span>
-                  <span className="font-bold text-[var(--fg)]">{money(h.amountCharged)}</span>
-                </div>
-                {h.paymentReference && (
-                  <div className="font-mono text-[10px] text-[var(--fg-faint)]">
-                    Ref: {h.paymentReference}
-                  </div>
-                )}
-              </div>
-            ))
-          ) : (
-            <p className="p-6 text-center text-xs text-[var(--fg-muted)]">No subscription history recorded yet.</p>
-          )}
-        </div>
-      </div>
-
-      {/* SECTION 4: PAYMENT RECEIPTS & HISTORY */}
-      <div className={panel}>
-        <div className="border-b border-[var(--border-soft)] px-5 py-4">
-          <h2 className="text-sm font-bold text-[var(--fg)]">Subscription Payment Receipts</h2>
-          <p className="text-xs text-[var(--fg-muted)]">
-            Verified Mobile Money transactions for your SaaS platform access.
-          </p>
-        </div>
-        {/* Desktop View Table */}
-        <div className="hidden md:block">
-          <Table
-            rows={sub.paymentHistory || []}
-            emptyTitle="No subscription payments recorded yet."
-            columns={[
-              {
-                label: "Date",
-                render: (p) => <span className="text-xs text-[var(--fg-muted)]">{dt(p.paidAt)}</span>,
-              },
-              {
-                label: "Transaction Reference",
-                render: (p) => <span className="font-mono text-xs font-semibold">{p.reference}</span>,
-              },
-              {
-                label: "Plan",
-                render: (p) => <span className="text-xs text-[var(--fg-body)]">{p.planName}</span>,
-              },
-              {
-                label: "Amount",
-                render: (p) => <span className="font-bold text-xs text-[var(--fg)]">{money(p.amount)}</span>,
-              },
-              {
-                label: "Phone",
-                render: (p) => <span className="font-mono text-xs text-[var(--fg-muted)]">{p.phone}</span>,
-              },
-              {
-                label: "Status",
-                render: (p) => <Badge tone={TONE[p.status] || "slate"}>{p.status}</Badge>,
-              },
-              {
-                label: "Receipt",
-                render: (p) => (
-                  <button
-                    onClick={() => setSelectedReceipt(p)}
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-500"
-                  >
-                    <FileText size={13} /> View Receipt
-                  </button>
-                ),
-              },
-            ]}
-          />
-        </div>
-
-        {/* Mobile View Cards */}
-        <div className="divide-y divide-[var(--border-soft)] md:hidden">
-          {sub.paymentHistory && sub.paymentHistory.length > 0 ? (
-            sub.paymentHistory.map((p) => (
-              <div key={p.id} className="p-4 space-y-2 text-xs">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <span className="font-mono font-bold text-[var(--fg)]">{p.reference}</span>
-                    <span className="block text-[11px] text-[var(--fg-muted)]">{p.planName}</span>
-                  </div>
-                  <Badge tone={TONE[p.status] || "slate"}>{p.status}</Badge>
-                </div>
-                <div className="flex justify-between text-[var(--fg-muted)]">
-                  <span>{dt(p.paidAt)}</span>
-                  <span className="font-bold text-[var(--fg)]">{money(p.amount)}</span>
-                </div>
-                <div className="flex justify-between items-center pt-1">
-                  <span className="font-mono text-[11px] text-[var(--fg-faint)]">{p.phone}</span>
-                  <button
-                    onClick={() => setSelectedReceipt(p)}
-                    className="text-xs font-semibold text-blue-600 hover:underline"
-                  >
-                    View Receipt
-                  </button>
-                </div>
-              </div>
-            ))
-          ) : (
-            <p className="p-6 text-center text-xs text-[var(--fg-muted)]">No payments recorded yet.</p>
-          )}
-        </div>
-      </div>
-
-      {/* SECTION 5: SUBSCRIPTION NOTIFICATIONS & REMINDER AUDIT */}
-      <div className={panel}>
-        <div className="border-b border-[var(--border-soft)] px-5 py-4">
-          <h2 className="text-sm font-bold text-[var(--fg)]">Subscription Notifications &amp; Alerts</h2>
-          <p className="text-xs text-[var(--fg-muted)]">
-            Official expiration warnings, renewal receipts, and grace period alerts.
-          </p>
-        </div>
-        <div className="p-5 space-y-3">
-          {sub.notifications && sub.notifications.length > 0 ? (
-            sub.notifications.map((n) => (
-              <div
-                key={n.id}
-                className={`flex items-start justify-between gap-3 rounded-xl border p-4 text-xs transition ${
-                  n.severity === "DANGER"
-                    ? "border-red-300 bg-red-50 text-red-900"
-                    : n.severity === "WARNING"
-                    ? "border-amber-300 bg-amber-50 text-amber-900"
-                    : n.severity === "SUCCESS"
-                    ? "border-emerald-300 bg-emerald-50 text-emerald-900"
-                    : "border-blue-200 bg-blue-50 text-blue-900"
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <Bell size={18} className="shrink-0 mt-0.5 text-current" />
-                  <div>
-                    <h4 className="font-bold text-xs">{n.title}</h4>
-                    <p className="mt-0.5 text-[11px] leading-relaxed opacity-90">{n.message}</p>
-                    <span className="mt-1 block text-[10px] opacity-75">{dt(n.createdAt)}</span>
-                  </div>
-                </div>
-                <button
-                  onClick={() => handleDismissNotification(n.id)}
-                  title="Dismiss notification"
-                  className="rounded p-1 opacity-70 hover:opacity-100 hover:bg-black/5"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            ))
-          ) : (
-            <p className="py-6 text-center text-xs text-[var(--fg-muted)]">
-              No active subscription notifications. Everything is in order.
-            </p>
-          )}
-        </div>
-      </div>
-
-      {/* MODAL 1: MOBILE MONEY CHECKOUT MODAL */}
-      {checkoutOpen && (
-        <Dialog onClose={() => setCheckoutOpen(false)} title="Renew SaaS Subscription">
-          <form onSubmit={handleInitiatePayment} className="space-y-4">
-            <div>
-              <label className={label}>Selected Subscription Plan</label>
-              <div className="mt-1 flex items-center justify-between rounded-lg border border-[var(--border-strong)] bg-[var(--subtle)] p-3.5">
-                <div>
-                  <div className="font-bold text-[var(--fg)] text-sm">{selectedPlan?.name}</div>
-                  <div className="text-xs text-[var(--fg-muted)]">
-                    {selectedPlan?.durationValue} {selectedPlan?.durationUnit.toLowerCase()} access
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="font-extrabold text-[var(--fg)] text-base">{money(selectedPlan?.price)}</div>
-                  <div className="text-[10px] text-[var(--fg-muted)]">Official SaaS Platform Fee</div>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <label className={label}>How do you want to pay?</label>
-              <div className="mt-1 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={() => walletCovers && setPayMethod("WALLET")}
-                  disabled={!walletCovers || checkoutBusy}
-                  aria-pressed={payMethod === "WALLET"}
-                  className={`rounded-lg border p-3 text-left transition ${
-                    payMethod === "WALLET"
-                      ? "border-blue-500 bg-blue-50 ring-2 ring-blue-500/30"
-                      : "border-[var(--border-strong)] bg-[var(--subtle)]"
-                  } ${!walletCovers ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
-                >
-                  <div className="text-sm font-bold text-[var(--fg)]">Wallet balance</div>
-                  <div className="text-xs text-[var(--fg-muted)]">
-                    {walletBalance === null
-                      ? "Checking balance…"
-                      : `Available: ${money(walletBalance)}`}
-                  </div>
-                  {walletBalance !== null && !walletCovers && (
-                    <div className="mt-1 text-[11px] font-semibold text-amber-700">Not enough for this plan</div>
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPayMethod("MOMO")}
-                  disabled={checkoutBusy}
-                  aria-pressed={payMethod === "MOMO"}
-                  className={`cursor-pointer rounded-lg border p-3 text-left transition ${
-                    payMethod === "MOMO"
-                      ? "border-blue-500 bg-blue-50 ring-2 ring-blue-500/30"
-                      : "border-[var(--border-strong)] bg-[var(--subtle)]"
-                  }`}
-                >
-                  <div className="text-sm font-bold text-[var(--fg)]">Mobile Money</div>
-                  <div className="text-xs text-[var(--fg-muted)]">MTN MoMo or Airtel Money prompt</div>
-                </button>
-              </div>
-            </div>
-
-            {payMethod === "WALLET" ? (
-              <p className={hint}>
-                {money(selectedPlan?.price)} will be taken from your wallet balance straight away
-                {walletBalance !== null && selectedPlan ? `, leaving ${money(walletBalance - selectedPlan.price)}` : ""}.
-                No phone prompt is needed.
-              </p>
-            ) : (
-              <div>
-                <label className={label}>Mobile Money Phone Number</label>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="e.g. 0770000000 or 0750000000"
-                  className={field}
-                  required
-                />
-                <p className={hint}>MTN MoMo or Airtel Money. A PIN approval prompt will be sent directly to your phone.</p>
-              </div>
-            )}
+            </>}
 
             {checkoutMsg && (
-              <div
-                className={`rounded-lg border p-3.5 text-xs font-semibold leading-relaxed ${
-                  checkoutMsg.tone === "danger"
-                    ? "border-red-300 bg-red-50 text-red-800"
-                    : checkoutMsg.tone === "success"
-                    ? "border-emerald-300 bg-emerald-50 text-emerald-800"
-                    : "border-blue-300 bg-blue-50 text-blue-800"
-                }`}
-              >
+              <p role={checkoutMsg.tone === "danger" ? "alert" : "status"} className={`rounded-lg border px-3.5 py-3 text-sm ${
+                checkoutMsg.tone === "danger" ? "border-red-200 bg-red-50 text-red-800"
+                  : checkoutMsg.tone === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                  : "border-blue-200 bg-blue-50 text-blue-800"}`}>
+                {activeReference && <span className="mr-2 inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent align-[-1px] motion-reduce:animate-none" aria-hidden />}
                 {checkoutMsg.text}
-              </div>
+              </p>
             )}
 
-            <div className="mt-6 flex justify-end gap-2 border-t border-[var(--border-soft)] pt-4">
-              <button
-                type="button"
-                onClick={() => setCheckoutOpen(false)}
-                className={buttonGhost}
-                disabled={checkoutBusy}
-              >
-                Close
-              </button>
-              <button
-                type="submit"
-                className={`${button} bg-blue-600 hover:bg-blue-500 text-white font-bold`}
-                disabled={checkoutBusy}
-              >
-                <BusyLabel busy={checkoutBusy} label={payMethod === "WALLET" ? "Paying…" : "Sending prompt…"}>
-                  {payMethod === "WALLET" ? `Pay ${money(selectedPlan?.price)} from wallet` : `Pay ${money(selectedPlan?.price)} via MoMo`}
-                </BusyLabel>
-              </button>
+            {!done && !sub.isExpired && <p className="text-xs text-[var(--fg-faint)]">The new period starts when your current one ends.</p>}
+
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button type="button" onClick={() => setCheckoutOpen(false)} className={buttonGhost} disabled={busy}>{done ? "Done" : "Cancel"}</button>
+              {!done && (
+                <button type="submit" className={button} disabled={busy || !!activeReference || (payMethod === "WALLET" && !walletCovers)}>
+                  <BusyLabel busy={busy} label={payMethod === "WALLET" ? "Paying…" : "Sending…"}>Pay {ugx(plan.price)}</BusyLabel>
+                </button>
+              )}
             </div>
           </form>
         </Dialog>
       )}
 
-      {/* MODAL 2: RECEIPT VIEW MODAL */}
-      {selectedReceipt && (
-        <Dialog onClose={() => setSelectedReceipt(null)} title="Subscription Payment Receipt">
-          <div className="space-y-4 text-xs">
-            <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-center">
-              <CheckCircle size={32} className="mx-auto text-emerald-600" />
-              <h3 className="mt-2 text-base font-extrabold text-emerald-950">Payment Confirmed</h3>
-              <p className="text-xs text-emerald-800">{money(selectedReceipt.amount)} UGX</p>
-            </div>
-
-            <div className="divide-y divide-[var(--border-soft)] rounded-lg border border-[var(--border-soft)] bg-[var(--subtle)] p-3">
-              <div className="flex justify-between py-2">
-                <span className="text-[var(--fg-muted)]">Receipt Ref:</span>
-                <span className="font-mono font-bold text-[var(--fg)]">{selectedReceipt.reference}</span>
+      {receipt && (
+        <Dialog onClose={() => setReceipt(null)} title="Receipt">
+          <div className="text-center">
+            <CheckCircle size={28} className="mx-auto text-emerald-600" />
+            <p className="num mt-2 text-2xl font-semibold text-[var(--fg)]">{ugx(receipt.amount)}</p>
+            <p className="text-sm text-[var(--fg-muted)]">Paid {date(receipt.paidAt)}</p>
+          </div>
+          <dl className="mt-5 divide-y divide-[var(--border-soft)] rounded-lg border border-[var(--border-soft)] px-4 text-sm">
+            {[
+              ["Plan", receipt.planName],
+              ["Paid with", paidWith(receipt)],
+              ["Reference", <span key="r" className="font-mono text-xs">{receipt.reference}</span>],
+            ].map(([k, v]) => (
+              <div key={String(k)} className="flex justify-between gap-4 py-2.5">
+                <dt className="text-[var(--fg-muted)]">{k}</dt>
+                <dd className="text-right font-medium text-[var(--fg)]">{v}</dd>
               </div>
-              <div className="flex justify-between py-2">
-                <span className="text-[var(--fg-muted)]">Payment Method:</span>
-                <span className="font-bold text-[var(--fg)]">{selectedReceipt.method} ({selectedReceipt.phone})</span>
-              </div>
-              <div className="flex justify-between py-2">
-                <span className="text-[var(--fg-muted)]">Plan:</span>
-                <span className="font-bold text-[var(--fg)]">{selectedReceipt.planName}</span>
-              </div>
-              <div className="flex justify-between py-2">
-                <span className="text-[var(--fg-muted)]">Date &amp; Time:</span>
-                <span className="font-medium text-[var(--fg)]">{dt(selectedReceipt.paidAt)}</span>
-              </div>
-              <div className="flex justify-between py-2">
-                <span className="text-[var(--fg-muted)]">Status:</span>
-                <Badge tone="green">{selectedReceipt.status}</Badge>
-              </div>
-            </div>
-
-            <div className="flex justify-end pt-3">
-              <button onClick={() => setSelectedReceipt(null)} className={buttonGhost}>
-                Close
-              </button>
-            </div>
+            ))}
+          </dl>
+          <div className="mt-5 flex justify-end gap-2">
+            <button onClick={() => setReceipt(null)} className={button}>Close</button>
           </div>
         </Dialog>
       )}

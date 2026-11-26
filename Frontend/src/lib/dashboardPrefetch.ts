@@ -2,6 +2,7 @@
 
 import { getQueryClient } from "@/lib/queryClient";
 import api from "@/lib/api";
+import { DEFAULT_RANGE, presetRange, reportUrl } from "@/lib/paymentRange";
 
 /**
  * Intelligent Initial & Intent-based Data Prefetching:
@@ -93,16 +94,10 @@ export function prefetchRouteData(href: string, role?: string, tenantId?: number
       qc.prefetchQuery({ queryKey: [scope, "/api/routers"], queryFn: fetcher("/api/routers") });
       break;
     case "/dashboard/payments":
-      qc.prefetchQuery({ queryKey: [scope, "/api/finance/payments"], queryFn: fetcher("/api/finance/payments") });
-      break;
-    case "/dashboard/sessions":
-      qc.prefetchQuery({ queryKey: [scope, "/api/sessions/active"], queryFn: fetcher("/api/sessions/active") });
+      { const url = reportUrl(presetRange(DEFAULT_RANGE)); qc.prefetchQuery({ queryKey: [scope, url], queryFn: fetcher(url) }); }
       break;
     case "/dashboard/bindings":
       qc.prefetchQuery({ queryKey: [scope, "/api/bindings"], queryFn: fetcher("/api/bindings") });
-      break;
-    case "/dashboard/logs":
-      qc.prefetchQuery({ queryKey: [scope, "/api/sessions/history"], queryFn: fetcher("/api/sessions/history") });
       break;
     case "/dashboard/subscription":
       qc.prefetchQuery({ queryKey: [scope, "/api/subscription"], queryFn: fetcher("/api/subscription") });

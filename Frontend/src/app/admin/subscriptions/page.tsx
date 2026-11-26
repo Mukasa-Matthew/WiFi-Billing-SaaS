@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import api from "@/lib/api";
-import { Table, Badge, Notice, panel, button, buttonGhost, field, label, hint, message, PageHeader, date, useResource } from "@/components/BillingUI";
+import { Table, Badge, Notice, panel, button, buttonGhost, field, label, hint, message, PageHeader, date, useResource, ugx, shortDate } from "@/components/BillingUI";
 import { Dialog } from "@/components/ui/Dialog";
 import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { DashboardLoading, BusyLabel } from "@/components/LoadingUI";
@@ -108,9 +108,6 @@ const STATUS_NAME: Record<string, string> = {
   CANCELLED: "Cancelled",
 };
 
-const money = (v?: number | null) => `UGX ${(v ?? 0).toLocaleString()}`;
-const d = (s?: string | null) => (s ? new Date(s).toLocaleDateString() : "—");
-const dt = (s?: string | null) => (s ? new Date(s).toLocaleString() : "—");
 
 export default function AdminSubscriptionsPage() {
   const [ov, setOv] = useState<Overview | null>(null);
@@ -349,9 +346,9 @@ export default function AdminSubscriptionsPage() {
           </div>
           <div className={`${panel} p-4`}>
             <div className="text-xs font-semibold text-[var(--fg-muted)]">Month Revenue</div>
-            <div className="mt-2 text-2xl font-bold text-[var(--fg)]">{money(ov.monthRevenue + ov.platformFeeMonth)}</div>
+            <div className="mt-2 text-2xl font-bold text-[var(--fg)]">{ugx(ov.monthRevenue + ov.platformFeeMonth)}</div>
             <p className="mt-1 text-[11px] text-[var(--fg-faint)]">
-              {money(ov.monthRevenue)} plans · <span className="font-semibold text-emerald-700">{money(ov.platformFeeMonth)} platform fees</span>
+              {ugx(ov.monthRevenue)} plans · <span className="font-semibold text-emerald-700">{ugx(ov.platformFeeMonth)} platform fees</span>
             </p>
           </div>
         </div>
@@ -379,7 +376,7 @@ export default function AdminSubscriptionsPage() {
                   <Badge tone={p.active ? "green" : "slate"}>{p.active ? "Active" : "Inactive"}</Badge>
                 </div>
                 <div className="mt-2 text-xl font-extrabold text-[var(--fg)]">
-                  {money(p.price)}{" "}
+                  {ugx(p.price)}{" "}
                   <span className="text-xs font-normal text-[var(--fg-muted)]">
                     / {p.durationValue} {p.durationUnit.toLowerCase()}
                   </span>
@@ -443,7 +440,7 @@ export default function AdminSubscriptionsPage() {
               render: (r) => (
                 <div>
                   <div className="font-semibold text-xs">{r.planName}</div>
-                  <div className="text-[11px] text-[var(--fg-muted)]">{money(r.monthlyFee)}</div>
+                  <div className="text-[11px] text-[var(--fg-muted)]">{ugx(r.monthlyFee)}</div>
                 </div>
               ),
             },
@@ -455,9 +452,9 @@ export default function AdminSubscriptionsPage() {
               label: "Expires / Renews",
               render: (r) => (
                 <div>
-                  <div className="text-xs font-medium text-[var(--fg-body)]">{d(r.expiresAt || r.nextRenewalDate)}</div>
+                  <div className="text-xs font-medium text-[var(--fg-body)]">{shortDate(r.expiresAt || r.nextRenewalDate)}</div>
                   {r.status === "GRACE_PERIOD" && r.graceUntil && (
-                    <div className="text-[10px] text-amber-600 font-bold">Grace ends {d(r.graceUntil)}</div>
+                    <div className="text-[10px] text-amber-600 font-bold">Grace ends {shortDate(r.graceUntil)}</div>
                   )}
                 </div>
               ),
@@ -659,7 +656,7 @@ export default function AdminSubscriptionsPage() {
               >
                 {plans.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.name} — {money(p.price)} / {p.durationValue} {p.durationUnit.toLowerCase()}
+                    {p.name} — {ugx(p.price)} / {p.durationValue} {p.durationUnit.toLowerCase()}
                   </option>
                 ))}
               </select>
@@ -685,7 +682,7 @@ export default function AdminSubscriptionsPage() {
             <div className="rounded-lg border border-[var(--border-soft)] bg-[var(--subtle)] p-3.5 text-xs space-y-1">
               <div className="flex justify-between">
                 <span className="font-semibold text-[var(--fg-muted)]">Plan:</span>
-                <span className="font-bold text-[var(--fg)]">{billingDetail.subscription.planName} ({money(billingDetail.subscription.monthlyFee)})</span>
+                <span className="font-bold text-[var(--fg)]">{billingDetail.subscription.planName} ({ugx(billingDetail.subscription.monthlyFee)})</span>
               </div>
               <div className="flex justify-between">
                 <span className="font-semibold text-[var(--fg-muted)]">Status:</span>
@@ -695,7 +692,7 @@ export default function AdminSubscriptionsPage() {
               </div>
               <div className="flex justify-between">
                 <span className="font-semibold text-[var(--fg-muted)]">Expires / Renews:</span>
-                <span className="font-medium text-[var(--fg)]">{d(billingDetail.subscription.expiresAt || billingDetail.subscription.nextRenewalDate)}</span>
+                <span className="font-medium text-[var(--fg)]">{shortDate(billingDetail.subscription.expiresAt || billingDetail.subscription.nextRenewalDate)}</span>
               </div>
               {billingDetail.subscription.adminNote && (
                 <div className="pt-2 text-[11px] text-[var(--fg-faint)] italic">
@@ -711,10 +708,10 @@ export default function AdminSubscriptionsPage() {
                 rows={billingDetail.invoices}
                 emptyTitle="No invoices recorded."
                 columns={[
-                  { label: "Period", render: (i) => `${d(i.periodStart)} → ${d(i.periodEnd)}` },
-                  { label: "Due", render: (i) => money(i.amountDue) },
+                  { label: "Period", render: (i) => `${shortDate(i.periodStart)} → ${shortDate(i.periodEnd)}` },
+                  { label: "Due", render: (i) => ugx(i.amountDue) },
                   { label: "Status", render: (i) => <Badge tone={TONE[i.status] || "slate"}>{i.status}</Badge> },
-                  { label: "Paid At", render: (i) => d(i.paidAt) },
+                  { label: "Paid At", render: (i) => shortDate(i.paidAt) },
                 ]}
               />
             </div>
@@ -726,9 +723,9 @@ export default function AdminSubscriptionsPage() {
                 rows={billingDetail.payments}
                 emptyTitle="No payments recorded."
                 columns={[
-                  { label: "Date", render: (p) => dt(p.paidAt) },
+                  { label: "Date", render: (p) => date(p.paidAt) },
                   { label: "Ref", render: (p) => <span className="font-mono text-xs">{p.externalRef || "—"}</span> },
-                  { label: "Amount", render: (p) => money(p.amount) },
+                  { label: "Amount", render: (p) => ugx(p.amount) },
                   { label: "Method", render: (p) => p.method },
                 ]}
               />
@@ -741,7 +738,7 @@ export default function AdminSubscriptionsPage() {
                 rows={billingDetail.notifications}
                 emptyTitle="No notifications dispatched."
                 columns={[
-                  { label: "Date", render: (n) => dt(n.createdAt) },
+                  { label: "Date", render: (n) => date(n.createdAt) },
                   { label: "Type", render: (n) => <span className="font-mono text-xs">{n.notificationType}</span> },
                   { label: "Title", render: (n) => <span className="font-medium">{n.title}</span> },
                   { label: "Email Sent", render: (n) => <Badge tone={n.emailSent ? "green" : "slate"}>{n.emailSent ? "Yes" : "No"}</Badge> },
@@ -774,8 +771,8 @@ function PlatformFeesPanel({ overview }: { overview: Overview }) {
           </p>
         </div>
         <div className="flex gap-6 text-right">
-          <div><p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--fg-faint)]">Today</p><p className="text-lg font-bold text-emerald-700">{money(overview.platformFeeToday)}</p></div>
-          <div><p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--fg-faint)]">This month</p><p className="text-lg font-bold text-emerald-700">{money(overview.platformFeeMonth)}</p></div>
+          <div><p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--fg-faint)]">Today</p><p className="text-lg font-bold text-emerald-700">{ugx(overview.platformFeeToday)}</p></div>
+          <div><p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--fg-faint)]">This month</p><p className="text-lg font-bold text-emerald-700">{ugx(overview.platformFeeMonth)}</p></div>
         </div>
       </div>
       <Table
@@ -787,9 +784,9 @@ function PlatformFeesPanel({ overview }: { overview: Overview }) {
           { label: "When", render: (r: PlatformFeeRow) => <span className="whitespace-nowrap text-[var(--fg-muted)]">{date(r.at)}</span> },
           { label: "Business", render: (r: PlatformFeeRow) => <a href={`/admin/tenants/${r.tenantId}`} className="font-medium hover:underline">{r.businessName}</a> },
           { label: "Payment", hideBelow: "md", render: (r: PlatformFeeRow) => <span className="font-mono text-xs text-[var(--fg-muted)]">{r.reference}</span> },
-          { label: "Customer paid", align: "right", render: (r: PlatformFeeRow) => <span className="num">{money(r.amountPaid)}</span> },
+          { label: "Customer paid", align: "right", render: (r: PlatformFeeRow) => <span className="num">{ugx(r.amountPaid)}</span> },
           { label: "Rate", align: "right", hideBelow: "sm", render: (r: PlatformFeeRow) => <span className="num text-[var(--fg-muted)]">{r.percent}%</span> },
-          { label: "Platform fee", align: "right", render: (r: PlatformFeeRow) => <span className="num font-semibold text-emerald-700">+{money(r.fee)}</span> },
+          { label: "Platform fee", align: "right", render: (r: PlatformFeeRow) => <span className="num font-semibold text-emerald-700">+{ugx(r.fee)}</span> },
         ]}
       />
     </div>

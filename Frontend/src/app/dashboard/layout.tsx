@@ -26,8 +26,6 @@ import {
   ChartLine,
   CalendarCheck,
   LinkSimple,
-  FileText,
-  Activity,
   GraduationCap,
   Tray,
 } from "@/components/icons";
@@ -105,8 +103,6 @@ function TenantDashboardLayoutInner({ children }: { children: React.ReactNode })
     { name: "Wallet", href: "/dashboard/wallet", icon: Wallet, group: "Sales" },
     { name: "Financial analysis", href: "/dashboard/finance", icon: ChartLine, group: "Sales" },
     { name: "Routers", href: "/dashboard/routers", icon: RouterIcon, group: "Equipment", badge: { value: offlineRouters, tone: "danger", label: "offline" } },
-    { name: "Connected now", href: "/dashboard/sessions", icon: Activity, group: "Equipment" },
-    { name: "Connection logs", href: "/dashboard/logs", icon: FileText, group: "Equipment" },
     ...(schoolStatus?.school ? [
       { name: "School", href: "/dashboard/school", icon: GraduationCap, group: "Account" },
       { name: "Registrations", href: "/dashboard/school/registrations", icon: Tray, group: "Account" },

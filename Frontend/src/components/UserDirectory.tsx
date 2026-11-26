@@ -1,6 +1,7 @@
 "use client";
 import { BusyLabel } from "@/components/LoadingUI";
 import React, { useState } from "react";
+import { createPortal } from "react-dom";
 import { Users, WifiHigh, WifiSlash, Archive, Plugs, Eye, X, ClockCountdown, Prohibit, CalendarX, Package, DeviceMobile, Globe, User as UserIcon } from "@/components/icons";
 import api from "@/lib/api";
 import { useResource, Table, Badge, Notice, ErrorNotice, date, bytes, remaining, message, StatCard, FilterTabs, PageContainer, PageHeader } from "./BillingUI";
@@ -109,7 +110,7 @@ export default function UserDirectory({expired=false}:{expired?:boolean}) {
    {label:"Router",render:u=>u.router||"—"},{label:"First activation",render:u=>u.firstLogin?<span className="tabular-nums whitespace-nowrap text-[13px] text-[var(--fg-body)]">{date(u.firstLogin)}</span>:<span className="text-[13px] text-[var(--fg-faint)]">—</span>},{label:"Access expires",render:u=>u.expiresAt?<span className="tabular-nums whitespace-nowrap text-[13px] text-emerald-700">{date(u.expiresAt)}</span>:<span className="text-[13px] text-[var(--fg-faint)]">—</span>},
    {label:"Data usage",render:u=>bytes(u.dataBytes)},{label:"Time left",render:u=><Badge tone={(u.timeLeftSeconds??0)<3600?"amber":"green"}>{remaining(u.timeLeftSeconds)}</Badge>},actionColumn
   ]}/>
- {view&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" onClick={()=>setView(null)}>
+ {view&&createPortal(<div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" onClick={()=>setView(null)}>
   <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-[var(--surface)] shadow-xl" onClick={e=>e.stopPropagation()}>
    <div className="flex items-start justify-between border-b border-[var(--border-soft)] bg-[var(--subtle)] px-6 py-4">
     <div className="flex items-center gap-3">
@@ -154,6 +155,6 @@ export default function UserDirectory({expired=false}:{expired?:boolean}) {
     </section>
    </div>
   </div>
- </div>}
+ </div>, document.body)}
  </PageContainer>;
 }

@@ -1,24 +1,23 @@
-/* From Uiverse.io by satyamchaudharydev - https://uiverse.io/satyamchaudharydev/splendid-husky-54
-   MIT License, Copyright (c) satyamchaudharydev (satyam) */
-.withdrawal-steps { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; color: var(--fg-faint); font-size: 12px; font-weight: 600; }
+.withdrawal-steps { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; color: var(--fg-faint); font-size: 12px; font-weight: 600; list-style: none; padding: 0; }
 .withdrawal-step { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
-.withdrawal-step span { display: grid; width: 25px; height: 25px; place-items: center; border: 1px solid var(--border); border-radius: 50%; }
+.withdrawal-step span { display: grid; width: 25px; height: 25px; place-items: center; border: 1px solid var(--border); border-radius: 50%; transition: background-color .2s, border-color .2s, color .2s; }
 .withdrawal-step-active { color: #2563eb; }
 .withdrawal-step-active span { color: white; background: #2563eb; border-color: #2563eb; }
+.withdrawal-step-done { color: #047857; }
+.withdrawal-step-done span { color: white; background: #059669; border-color: #059669; }
 .withdrawal-step-line { height: 1px; flex: 1; background: var(--border); }
 .withdrawal-step-content { animation: withdrawal-reveal .25s ease both; }
-.withdrawal-code { font-size: 1.15rem; letter-spacing: .25em; font-weight: 600; }
-.withdrawal-loading { display: flex; align-items: center; justify-content: center; gap: 30px; padding: 4px 16px; border-radius: 12px; background: #172554; color: white; font-size: 12px; font-weight: 600; }
-.withdrawal-spinner { position: relative; width: 60px; height: 60px; display: flex; justify-content: center; align-items: center; border-radius: 50%; margin-left: -75px; }
-.withdrawal-spinner span { position: absolute; top: 50%; left: var(--left); width: 35px; height: 7px; background: #fff; animation: withdrawal-dominos 1s ease infinite; box-shadow: 2px 2px 3px 0 black; }
-.withdrawal-spinner span:nth-child(1) { --left: 80px; animation-delay: .125s; }
-.withdrawal-spinner span:nth-child(2) { --left: 70px; animation-delay: .3s; }
-.withdrawal-spinner span:nth-child(3) { --left: 60px; animation-delay: .425s; }
-.withdrawal-spinner span:nth-child(4) { --left: 50px; animation-delay: .54s; }
-.withdrawal-spinner span:nth-child(5) { --left: 40px; animation-delay: .665s; }
-.withdrawal-spinner span:nth-child(6) { --left: 30px; animation-delay: .79s; }
-.withdrawal-spinner span:nth-child(7) { --left: 20px; animation-delay: .915s; }
-.withdrawal-spinner span:nth-child(8) { --left: 10px; }
-@keyframes withdrawal-dominos { 50% { opacity: .7; } 75% { transform: rotate(90deg); } 80% { opacity: 1; } }
+
+/* Six code boxes; one transparent input sits on top and receives all typing/paste. */
+.withdrawal-code { position: relative; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; max-width: 336px; margin: 0 auto; }
+.withdrawal-code input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; border: 0; color: transparent; caret-color: transparent; font-size: 16px; }
+.withdrawal-code input:disabled { cursor: progress; }
+.withdrawal-code-box { display: grid; place-items: center; height: 52px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface, transparent); color: var(--fg); font-size: 1.375rem; font-weight: 700; font-variant-numeric: tabular-nums; transition: border-color .15s, box-shadow .15s; }
+.withdrawal-code-box.is-filled { border-color: var(--fg-faint); }
+.withdrawal-code-box.is-active { border-color: #2563eb; box-shadow: 0 0 0 3px rgb(37 99 235 / .18); }
+.withdrawal-code-box.is-active:empty::after { content: ""; width: 2px; height: 22px; background: #2563eb; animation: withdrawal-caret 1s steps(1) infinite; }
+.withdrawal-code-box.is-invalid { border-color: #dc2626; box-shadow: none; }
+
+@keyframes withdrawal-caret { 50% { opacity: 0; } }
 @keyframes withdrawal-reveal { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-@media (prefers-reduced-motion: reduce) { .withdrawal-spinner span, .withdrawal-step-content { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .withdrawal-step-content, .withdrawal-code-box.is-active:empty::after { animation: none; } }

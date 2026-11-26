@@ -5,9 +5,7 @@ import { DashboardLoading } from "@/components/LoadingUI";
 import {
   ArrowClockwise, Download, Eye, EyeSlash, Lightbulb, Printer, Target, TrendingDown, TrendingUp,
 } from "@/components/icons";
-import {
-  Card, ErrorNotice, PageHeader, StatCard, button, buttonGhost, compactNumber, field, message, useApi,
-} from "@/components/BillingUI";
+import { Card, ErrorNotice, PageHeader, StatCard, button, buttonGhost, compactNumber, field, message, useApi, ugx } from "@/components/BillingUI";
 import { DonutChart, Gauge, Heatmap, RankedBars, StatusBar, TrendChart, Waterfall } from "@/components/charts";
 import { hideStore } from "@/lib/hideRevenue";
 import { CHANNEL_COLOR, GROUP_COLOR } from "@/lib/revenueColors";
@@ -199,7 +197,7 @@ export default function FinancialAnalysisPage() {
   const res = useApi<Analysis>(url, 120000, { keepPrevious: true });
   const d = res.data;
 
-  const money = (v: number | null | undefined) => (hidden ? "UGX ••••••" : `UGX ${Number(v || 0).toLocaleString()}`);
+  const money = (v: number | null | undefined) => ugx(v, { hidden });
   const moneyShort = (v: number) => (hidden ? "•••" : compactNumber(v));
   const filtered = !!(routerId || packageId || channel || group);
 
@@ -287,7 +285,7 @@ export default function FinancialAnalysisPage() {
       {d && (
         <>
           {/* Headline numbers */}
-          <section aria-label="Headline numbers" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <section aria-label="Headline numbers" className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
             <StatCard label="Sales" value={money(d.totals.gross)}
               hint={compare ? <Delta cur={d.totals.gross} prev={d.previous.gross} /> : `${d.totals.sales.toLocaleString()} sales`} />
             <StatCard label="Net income (what you keep)" tone="green" value={money(d.totals.net)}

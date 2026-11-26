@@ -1,6 +1,7 @@
 "use client";
 import { BusyLabel } from "@/components/LoadingUI";
 import React, { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Warning } from "@/components/icons";
 import { buttonGhost } from "@/components/BillingUI";
 
@@ -66,7 +67,9 @@ function ConfirmDialog({ req, onClose }: { req: ConfirmRequest; onClose: () => v
     finally { busyRef.current = false; setBusy(false); }
   };
 
-  return (
+  // Portal to <body>: an animated page wrapper (transform) would otherwise become the
+  // containing block for `fixed` and shrink the backdrop to the content area.
+  return createPortal(
     <div className="fixed inset-0 z-[85] flex items-center justify-center p-4" role="presentation">
       <div className="absolute inset-0 bg-slate-950/55 backdrop-blur-[2px]" onClick={() => !busy && onClose()} />
       <div
@@ -94,6 +97,7 @@ function ConfirmDialog({ req, onClose }: { req: ConfirmRequest; onClose: () => v
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

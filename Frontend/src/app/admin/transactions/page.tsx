@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/api";
-import { Badge, ErrorNotice, PageHeader, Table, buttonGhost, date, field, hint, label, message, panel } from "@/components/BillingUI";
+import { Badge, ErrorNotice, PageHeader, Table, buttonGhost, date, field, hint, label, message, panel, ugx } from "@/components/BillingUI";
 import { Dialog } from "@/components/ui/Dialog";
 import { useToast } from "@/components/ui/Toast";
 import { MagnifyingGlass, Phone, ArrowsClockwise } from "@/components/icons";
@@ -22,7 +22,7 @@ interface TxPage {
 }
 
 const TONE: Record<string, string> = { SUCCESSFUL: "green", PENDING: "amber", FAILED: "red" };
-const money = (v?: number | null) => v == null ? "—" : `UGX ${v.toLocaleString()}`;
+const money = (v?: number | null) => ugx(v, { missing: "—" });
 
 export default function AdminTransactionsPage() {
   const toast = useToast();

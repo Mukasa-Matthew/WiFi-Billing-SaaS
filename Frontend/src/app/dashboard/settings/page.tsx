@@ -8,7 +8,7 @@ import {
   Bell, Ticket, CloudArrowDown, Trash, CreditCard, ArrowSquareOut,
 } from "@/components/icons";
 import PaymentGatewaySettings from "@/components/PaymentGatewaySettings";
-import { panel, message } from "@/components/BillingUI";
+import { panel, message, PageHeader } from "@/components/BillingUI";
 import { FormSkeleton, BusyLabel, useSingleFlight } from "@/components/LoadingUI";
 
 interface TenantSettings {
@@ -424,12 +424,7 @@ export default function TenantSettingsPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <div>
-        <h1 className="text-xl font-bold tracking-tight text-[var(--fg)]">Settings</h1>
-        <p className="mt-1 text-sm text-[var(--fg-muted)]">
-          Branding, portal behavior, voucher defaults, and notifications for your hotspot business.
-        </p>
-      </div>
+      <PageHeader title="Settings" description="Your business details, portal and notifications." />
 
       {/* Tab bar */}
       <nav className="flex border-b border-[var(--border)]" aria-label="Settings sections">

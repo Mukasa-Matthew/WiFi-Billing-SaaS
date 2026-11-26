@@ -65,6 +65,25 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
 
     List<Transaction> findTop1000ByTenantIdOrderByCreatedAtDesc(Long tenantId);
 
+    /**
+     * A tenant's transactions created in [from, to), filtered by status group: ALL, SUCCESSFUL,
+     * FAILED, or PENDING (anything not yet successful or failed).
+     */
+    @org.springframework.data.jpa.repository.Query("""
+            select t from Transaction t
+            where t.tenant.id = :tenantId and t.createdAt >= :from and t.createdAt < :to
+              and (:status = 'ALL'
+                   or (:status = 'PENDING' and t.status not in ('SUCCESSFUL', 'FAILED'))
+                   or t.status = :status)""")
+    org.springframework.data.domain.Page<Transaction> findInRange(Long tenantId, OffsetDateTime from, OffsetDateTime to,
+                                                                  String status, org.springframework.data.domain.Pageable pageable);
+
+    /** [status, amount, network, phone, gatewayMode] of every transaction in [from, to), for range totals. */
+    @org.springframework.data.jpa.repository.Query("""
+            select t.status, t.amount, t.network, t.phone, t.gatewayMode from Transaction t
+            where t.tenant.id = :tenantId and t.createdAt >= :from and t.createdAt < :to""")
+    List<Object[]> rangeFacts(Long tenantId, OffsetDateTime from, OffsetDateTime to);
+
     /** Newest-first page of a tenant's transactions, for callers that only need the latest few. */
     List<Transaction> findByTenantIdOrderByCreatedAtDesc(Long tenantId, org.springframework.data.domain.Pageable pageable);
 
