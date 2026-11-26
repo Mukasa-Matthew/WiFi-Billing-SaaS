@@ -82,7 +82,7 @@ public class Router {
 
     @Column(length=64) private String bindingsHash;
     private OffsetDateTime bindingsSyncedAt;
-    @Column(length=12000) private String hostsJson;
+    @Column(columnDefinition="text") private String hostsJson;
     private OffsetDateTime hostsSeenAt;
 
     @Column(name = "created_at")
