@@ -284,7 +284,8 @@ public class PortalController {
         if ("portal-sync.rsc".equals(filename)) {
             return ResponseEntity.ok()
                     .cacheControl(CacheControl.noStore())
-                    .body(com.wifibilling.service.RouterScriptGenerator.portalSyncScript(props.getPublicBaseUrl(), router.getToken()));
+                    .body(com.wifibilling.service.RouterScriptGenerator.portalSyncScript(props.getPublicBaseUrl(), router.getToken(),
+                            props.safePortalSync(router.getId())));
         }
 
         // Retained for backward compatibility and emergency diagnostics. Current

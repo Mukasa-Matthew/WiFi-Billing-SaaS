@@ -753,11 +753,83 @@ public class RouterScriptGenerator {
 
     /** RouterOS commands that fetch every portal template file to flash/hotspot. */
     public static String portalSyncScript(String publicBaseUrl, String token) {
+        return portalSyncScript(publicBaseUrl, token, false);
+    }
+
+    /** Smallest login page accepted as complete; the real one is ~85 KB. */
+    static final int MIN_LOGIN_PAGE_BYTES = 1000;
+    static final String RENAME_PROBE_A = "flash/hotspot/wbprobe-a.txt";
+    static final String RENAME_PROBE_B = "flash/hotspot/wbprobe-b.txt";
+
+    /**
+     * {@code keepOldUntilComplete=false}: each file is fetched straight over the one the
+     * hotspot serves. On a weak uplink a fetch that fails part-way leaves no file at all,
+     * so customers get no login page until a later sync succeeds (CALTON, 27 Nov 2026:
+     * twice, 18 and 34 minutes).
+     *
+     * {@code keepOldUntilComplete=true}: each file is fetched to {@code wbnew-<name>} and
+     * only replaces the served file once that download has completed, so a failed download
+     * leaves the working page in place. The swap uses {@code /file set name=}; whether this
+     * RouterOS build can rename files is probed on the router each run. Where it can't,
+     * a completed temp download is followed by the old direct fetch — the uplink has just
+     * proved it works, and a failed temp download never touches the served file. So it is
+     * never worse than the direct fetch.
+     *
+     * The whole script is one block: RouterOS drops :local variables between the
+     * top-level lines of an imported file.
+     */
+    public static String portalSyncScript(String publicBaseUrl, String token, boolean keepOldUntilComplete) {
         StringBuilder sb = new StringBuilder();
-        for (String tmpl : PORTAL_TEMPLATES) {
-            sb.append(tlsFetch(publicBaseUrl + "/api/portal/templates/" + tmpl + "?token=" + token,
-                    " dst-path=" + q("flash/hotspot/" + tmpl), "")).append('\n');
+        if (!keepOldUntilComplete) {
+            for (String tmpl : PORTAL_TEMPLATES) {
+                sb.append(tlsFetch(publicBaseUrl + "/api/portal/templates/" + tmpl + "?token=" + token,
+                        " dst-path=" + q("flash/hotspot/" + tmpl), "")).append('\n');
+            }
+            return sb.toString();
         }
+        String a = q(RENAME_PROBE_A), b = q(RENAME_PROBE_B);
+        sb.append(":do {\n");
+        sb.append(":local wbRename false\n");
+        sb.append(":do { /file remove [find name=").append(a).append("] } on-error={}\n");
+        sb.append(":do { /file remove [find name=").append(b).append("] } on-error={}\n");
+        sb.append(":do { /file add name=").append(a).append(" contents=\"x\"; :delay 1s; /file set [find name=")
+                .append(a).append("] name=").append(b).append("; :delay 1s; :if ([:len [/file find name=")
+                .append(b).append("]] > 0) do={ :set wbRename true } } on-error={}\n");
+        sb.append(":do { /file remove [find name=").append(a).append("] } on-error={}\n");
+        sb.append(":do { /file remove [find name=").append(b).append("] } on-error={}\n");
+        for (String tmpl : PORTAL_TEMPLATES) {
+            String url = publicBaseUrl + "/api/portal/templates/" + tmpl + "?token=" + token;
+            String dst = q("flash/hotspot/" + tmpl), tmp = q("flash/hotspot/wbnew-" + tmpl);
+            int min = "login.html".equals(tmpl) ? MIN_LOGIN_PAGE_BYTES : 1;
+            sb.append(":do {\n");
+            sb.append(":local got false\n");
+            sb.append(":do { /file remove [find name=").append(tmp).append("] } on-error={}\n");
+            sb.append(tlsFetch(url, " dst-path=" + tmp, "", " :set got true;")).append('\n');
+            sb.append(":delay 1s\n");
+            sb.append(":if ($got and ([:len [/file find name=").append(tmp).append("]] > 0)) do={\n");
+            // A size this build can't compare counts as complete: fetch already reported success.
+            sb.append(":local complete true\n");
+            sb.append(":do { :if ([/file get [find name=").append(tmp).append("] size] < ").append(min)
+                    .append(") do={ :set complete false } } on-error={}\n");
+            sb.append(":if ($complete) do={\n");
+            sb.append(":if ($wbRename) do={\n");
+            sb.append(":do { /file remove [find name=").append(dst).append("] } on-error={}\n");
+            sb.append(":do { /file set [find name=").append(tmp).append("] name=").append(dst).append(" } on-error={}\n");
+            sb.append(":delay 1s\n");
+            sb.append("}\n");
+            sb.append(":if ((!$wbRename) or ([:len [/file find name=").append(dst).append("]] = 0)) do={\n");
+            sb.append(tlsFetch(url, " dst-path=" + dst, "")).append('\n');
+            sb.append("}\n");
+            sb.append("}\n");
+            sb.append("}\n");
+            sb.append(":do { /file remove [find name=").append(tmp).append("] } on-error={}\n");
+            sb.append("} on-error={ :log warning ").append(q("wifi-billing: portal file " + tmpl + " not updated")).append(" }\n");
+        }
+        // Beacon: proves server-side (nginx access log, 404 is expected) that this script ran to
+        // the end on the router, and whether this RouterOS build could rename files.
+        sb.append(":do { /tool fetch url=(").append(q(publicBaseUrl + "/z/wb-portal-sync-done-rename-"))
+                .append(" . $wbRename) output=none check-certificate=no duration=8s } on-error={}\n");
+        sb.append("} on-error={ :log warning \"wifi-billing: portal sync failed\" }\n");
         return sb.toString();
     }
 
@@ -779,6 +851,13 @@ public class RouterScriptGenerator {
         return ":do { /tool fetch url=" + q(url) + args + " duration=25s } on-error={"
                 + " :do { /tool fetch url=" + q(url) + args + " check-certificate=no duration=25s } on-error={"
                 + onErrorBody + " } }";
+    }
+
+    /** As {@link #tlsFetch(String, String, String)}, running {@code onSuccess} after whichever attempt succeeds. */
+    private static String tlsFetch(String url, String args, String onErrorBody, String onSuccess) {
+        return ":do { /tool fetch url=" + q(url) + args + " duration=25s;" + onSuccess + " } on-error={"
+                + " :do { /tool fetch url=" + q(url) + args + " check-certificate=no duration=25s;" + onSuccess
+                + " } on-error={" + onErrorBody + " } }";
     }
 
     /** Quotes a value as a RouterOS string literal. */
