@@ -159,7 +159,13 @@ public class RouterManagementService {
    // Pull the current template set now, then migrate the on-router wb-portal-sync
    // script to the self-updating bootstrap (idempotent — older routers get
    // upgraded, new routers already have it).
-   script = RouterScriptGenerator.portalSyncScript(props.getPublicBaseUrl(), r.getToken())
+   // Routers on the safe sync get the bootstrap instead of the inline file list: it fetches
+   // and /imports portal-sync.rsc, so if that script ever fails to parse, the failure stays
+   // inside that /import (caught) instead of failing this task's management.rsc — which
+   // would leave the task PENDING and block every task queued behind it.
+   script = (props.safePortalSync(r.getId())
+           ? RouterScriptGenerator.portalSyncBootstrap(props.getPublicBaseUrl(), r.getToken())
+           : RouterScriptGenerator.portalSyncScript(props.getPublicBaseUrl(), r.getToken()))
         + "/system/script/set [find name=wb-portal-sync] source={\n"
         + RouterScriptGenerator.portalSyncBootstrap(props.getPublicBaseUrl(), r.getToken())
         + "}\n";

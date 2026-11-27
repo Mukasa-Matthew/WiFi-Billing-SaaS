@@ -54,6 +54,21 @@ public class PlatformProperties {
     @Value("${provisioning.server-public-ip:}")
     private String serverPublicIp;
 
+    /**
+     * Routers whose login-page sync keeps the old files until a new download completes
+     * (RouterScriptGenerator.portalSyncScript). Comma-separated router ids, or "*" for all.
+     * Rolled out router by router; CALTON (27) first.
+     */
+    @Value("${provisioning.safe-portal-sync.router-ids:27}")
+    private String safePortalSyncRouterIds;
+
+    public boolean safePortalSync(Long routerId) {
+        if (routerId == null || safePortalSyncRouterIds == null) return false;
+        String ids = safePortalSyncRouterIds.trim();
+        if (ids.equals("*")) return true;
+        return Arrays.stream(ids.split(",")).map(String::trim).anyMatch(String.valueOf(routerId)::equals);
+    }
+
     @Value("${telemetry.offline-after-minutes:6}")
     private long offlineAfterMinutes;
 
